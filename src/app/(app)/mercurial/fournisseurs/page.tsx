@@ -43,7 +43,7 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((r) => (
             <li key={r.id}>
-              <Link href={`/suppliers/${r.id}`} className={`card flex items-center justify-between gap-2 p-4 hover:border-brand-500 ${r.active ? "" : "opacity-50"}`}>
+              <Link href={`/mercurial/fournisseurs/${r.id}`} className={`card flex items-center justify-between gap-2 p-4 hover:border-brand-500 ${r.active ? "" : "opacity-50"}`}>
                 <div className="min-w-0">
                   <div className="truncate font-semibold">{r.name}</div>
                   <div className="text-xs text-stone-500">{r.products} {t.suppliers.productsCount}{!r.active && ` · ${t.suppliers.inactive}`}</div>

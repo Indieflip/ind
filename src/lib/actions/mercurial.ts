@@ -6,12 +6,19 @@ import { assertUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { num } from "@/lib/format";
 import { priceDiffPct } from "@/lib/rules";
+import { categoryCodeFromNature } from "@/lib/nature";
+
+async function categoryIdFor(nature: string | null) {
+  const code = categoryCodeFromNature(nature);
+  if (!code) return null;
+  return (await getDb().query.categories.findFirst({ where: eq(schema.categories.code, code) }))?.id ?? null;
+}
 
 type R = { ok?: boolean; error?: string } | undefined;
 
 function refresh() {
   revalidatePath("/mercurial");
-  revalidatePath("/suppliers", "layout");
+  revalidatePath("/mercurial/fournisseurs", "layout");
 }
 
 async function ensureUnit(name: string) {
@@ -29,7 +36,10 @@ export async function addMercurialRowAction(_p: R, form: FormData): Promise<R> {
   const name = String(form.get("name") ?? "").trim();
   const unit = await ensureUnit(String(form.get("unit") ?? ""));
   const price = num(form.get("price"));
-  const categoryId = Number(form.get("categoryId")) || null;
+  const priceMin = num(form.get("priceMin"));
+  const service = String(form.get("service") ?? "").trim() || null;
+  const nature = String(form.get("nature") ?? "").trim() || null;
+  const categoryId = await categoryIdFor(nature);
   if (!supplierId && newSupplier) {
     const found = await db.query.suppliers.findFirst({ where: eq(sql`lower(${schema.suppliers.name})`, newSupplier.toLowerCase()) });
     supplierId = found?.id ?? (await db.insert(schema.suppliers).values({ name: newSupplier }).returning())[0].id;
@@ -39,7 +49,11 @@ export async function addMercurialRowAction(_p: R, form: FormData): Promise<R> {
     where: and(eq(schema.products.supplierId, supplierId), eq(sql`lower(${schema.products.name})`, name.toLowerCase())),
   });
   if (dup) return { error: "exists" };
-  await db.insert(schema.products).values({ supplierId, name, unit, categoryId, price: price != null ? String(price) : null });
+  await db.insert(schema.products).values({
+    supplierId, name, unit, categoryId, service, nature,
+    price: price != null ? String(price) : null,
+    priceMin: priceMin != null ? String(priceMin) : null,
+  });
   refresh();
   return { ok: true };
 }
@@ -47,7 +61,7 @@ export async function addMercurialRowAction(_p: R, form: FormData): Promise<R> {
 /** Modification d'une cellule du mercurial. Un changement de prix est tracé dans le suivi des prix. */
 export async function updateMercurialRowAction(
   id: number,
-  data: { supplierId?: number; name?: string; unit?: string; price?: string; categoryId?: number | null },
+  data: { supplierId?: number; name?: string; unit?: string; price?: string; priceMin?: string; service?: string; nature?: string },
 ) {
   const user = await assertUser(can.editMercurial);
   const db = getDb();
@@ -57,7 +71,15 @@ export async function updateMercurialRowAction(
   if (data.supplierId) set.supplierId = data.supplierId;
   if (data.name?.trim()) set.name = data.name.trim();
   if (data.unit?.trim()) set.unit = await ensureUnit(data.unit);
-  if (data.categoryId !== undefined) set.categoryId = data.categoryId;
+  if (data.service !== undefined) set.service = data.service.trim() || null;
+  if (data.nature !== undefined) {
+    set.nature = data.nature.trim() || null;
+    set.categoryId = await categoryIdFor(set.nature);
+  }
+  if (data.priceMin !== undefined) {
+    const n = num(data.priceMin);
+    set.priceMin = n != null ? String(n) : null;
+  }
   if (data.price !== undefined) {
     const newPrice = num(data.price);
     const old = num(product.price);

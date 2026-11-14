@@ -1,0 +1,36 @@
+"use server";
+import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import { getDb, schema } from "@/db";
+import { assertUser } from "@/lib/auth";
+import { can } from "@/lib/permissions";
+import { num } from "@/lib/format";
+
+export async function updateFvAction(id: number, data: { supplier?: string; product?: string; unit?: string; blocked?: string; prices?: (string | null)[] }) {
+  await assertUser(can.editFv);
+  const set: Partial<typeof schema.fvItems.$inferInsert> = {};
+  if (data.supplier !== undefined) set.supplier = data.supplier.trim();
+  if (data.product?.trim()) set.product = data.product.trim();
+  if (data.unit !== undefined) set.unit = data.unit.trim() || null;
+  if (data.blocked !== undefined) set.blocked = data.blocked.trim() || null;
+  if (data.prices) set.prices = Array.from({ length: 24 }, (_, i) => num(data.prices![i] ?? null));
+  await getDb().update(schema.fvItems).set(set).where(eq(schema.fvItems.id, id));
+  revalidatePath("/fruits-legumes");
+}
+
+export async function addFvAction(_p: { ok?: boolean; error?: string } | undefined, form: FormData) {
+  await assertUser(can.editFv);
+  const supplier = String(form.get("supplier") ?? "").trim();
+  const product = String(form.get("product") ?? "").trim();
+  const year = Number(form.get("year"));
+  if (!supplier || !product || !year) return { error: "invalid" };
+  await getDb().insert(schema.fvItems).values({ supplier, product, unit: String(form.get("unit") ?? "").trim() || null, year, prices: Array(24).fill(null), position: 100000 });
+  revalidatePath("/fruits-legumes");
+  return { ok: true };
+}
+
+export async function deleteFvAction(id: number) {
+  await assertUser(can.editFv);
+  await getDb().delete(schema.fvItems).where(eq(schema.fvItems.id, id));
+  revalidatePath("/fruits-legumes");
+}

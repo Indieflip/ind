@@ -42,7 +42,8 @@ export async function enqueue(p: ReceptionPayload) {
 async function uploadIfNeeded(src: string, folder: string): Promise<string> {
   if (!src.startsWith("data:")) return src;
   const fd = new FormData();
-  fd.append("file", dataUrlToBlob(src), `${folder}.jpg`);
+  const blob = dataUrlToBlob(src);
+  fd.append("file", blob, `${folder}.${blob.type === "application/pdf" ? "pdf" : blob.type === "image/png" ? "png" : "jpg"}`);
   fd.append("folder", folder);
   const res = await fetch("/api/upload", { method: "POST", body: fd });
   if (!res.ok) throw new Error(`upload ${res.status}`);
@@ -65,7 +66,7 @@ export async function sendReception(p: ReceptionPayload, editId?: number): Promi
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ ...p, blPhotos, lines, signature }),
   });
-  if (res.status === 400 || res.status === 403 || res.status === 404) {
+  if (res.status === 400 || res.status === 403 || res.status === 404 || res.status === 409) {
     const body = await res.json().catch(() => ({}));
     throw Object.assign(new Error(body.error ?? `HTTP ${res.status}`), { fatal: true });
   }

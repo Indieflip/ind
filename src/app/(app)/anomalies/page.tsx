@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
 import { fmtDate } from "@/lib/format";
-import { dateRange, one, supplierOptions, type SP } from "@/lib/server/queries";
+import { dateRange, one, receptionNumbers, supplierOptions, type SP } from "@/lib/server/queries";
 import { Empty, Field, FilterBar, PageHeader } from "@/components/ui";
 import { StatusBadge } from "@/components/DecisionBadge";
 import { AnomalyForm, AnomalyManage } from "./AnomalyClient";
@@ -31,12 +31,23 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     .limit(500);
 
   const suppliers = await supplierOptions();
+  const numbers = await receptionNumbers();
+  const recent = await getDb()
+    .select({ id: schema.receptions.id, blNumber: schema.receptions.blNumber, supplierName: schema.receptions.supplierName, deliveredAt: schema.receptions.deliveredAt })
+    .from(schema.receptions)
+    .orderBy(desc(schema.receptions.deliveredAt))
+    .limit(300);
+  const preselect = Number(one(sp.reception)) || null;
+  const receptionOptions = recent.map((r) => ({
+    id: r.id,
+    label: `${numbers.get(r.id) ?? ""}. ${r.blNumber ? `BL ${r.blNumber}` : "—"} · ${r.supplierName} · ${fmtDate(r.deliveredAt, locale)}`,
+  }));
   const manage = can.manageAnomalies(user.role);
 
   return (
     <>
       <PageHeader title={t.anomalies.title} />
-      {can.createAnomaly(user.role) && <AnomalyForm suppliers={suppliers} />}
+      {can.createAnomaly(user.role) && <AnomalyForm receptions={receptionOptions} preselect={preselect} />}
       <FilterBar applyLabel={t.common.filter} resetHref="/anomalies" resetLabel={t.common.reset}>
         <Field label={t.common.from}><input type="date" name="from" defaultValue={f.from} className="input py-2" /></Field>
         <Field label={t.common.to}><input type="date" name="to" defaultValue={f.to} className="input py-2" /></Field>
@@ -82,7 +93,11 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
                     )}
                   </p>
                 </div>
-                {x.photoUrl && <a href={x.photoUrl} target="_blank"><img src={x.photoUrl} alt="" className="h-16 w-16 rounded-lg object-cover" /></a>}
+                {x.photoUrl && (
+                  <a href={x.photoUrl} target="_blank">
+                    {/\.pdf($|\?)/i.test(x.photoUrl) ? <span className="badge bg-stone-100 text-stone-700">PDF</span> : <img src={x.photoUrl} alt="" className="h-16 w-16 rounded-lg object-cover" />}
+                  </a>
+                )}
               </div>
               {manage ? (
                 <AnomalyManage id={x.id} status={x.status} creditAmount={x.creditAmount ?? ""} followUp={x.followUp ?? ""} />

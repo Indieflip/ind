@@ -36,6 +36,10 @@ export const payloadSchema = z.object({
   signerName: z.string().max(100).nullable(),
   signature: z.string().max(2000).nullable(),
   blPhotos: z.array(z.string().max(2000)).max(20),
+  bakery: z
+    .object({ baguette: z.number().nullable(), hamburger: z.number().nullable(), rolls: z.number().nullable(), painDeMie: z.number().nullable() })
+    .nullable()
+    .optional(),
   lines: z.array(lineSchema).max(300),
 });
 export type Payload = z.infer<typeof payloadSchema>;
@@ -98,7 +102,7 @@ async function writeContent(
   p: Payload,
   user: SessionUser,
   t: Dict,
-  keep: { products: Set<string>; hygiene: boolean } = { products: new Set(), hygiene: false },
+  keep: { products: Set<string>; hygiene: boolean; missingBl?: boolean } = { products: new Set(), hygiene: false },
   claims: Map<number, string> = new Map(),
   /** Modification : produits dont le prix du bon n'a pas changé → ni écart ni mercurial touchés (prix de référence d'origine conservé) */
   unchanged: Map<number, number | null> = new Map(),
@@ -108,6 +112,15 @@ async function writeContent(
 
   for (const url of p.blPhotos) {
     await tx.insert(schema.receptionPhotos).values({ receptionId: recId, kind: "bl", url });
+  }
+
+  // Suivi boulangerie : une ligne par bon (date de livraison)
+  await tx.delete(schema.bakeryEntries).where(eq(schema.bakeryEntries.receptionId, recId));
+  const b = p.bakery;
+  if (b && Object.values(b).some((v) => v != null)) {
+    const s = (v: number | null) => (v != null ? String(v) : null);
+    const day = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(date);
+    await tx.insert(schema.bakeryEntries).values({ receptionId: recId, date: day, baguette: s(b.baguette), hamburger: s(b.hamburger), rolls: s(b.rolls), painDeMie: s(b.painDeMie) });
   }
 
   // Unités saisies pendant le bon : ajoutées à la liste des unités
@@ -205,6 +218,14 @@ async function writeContent(
     }
   }
 
+  // Un bon sans BL (ni numéro ni photo) est une anomalie
+  if (!p.blNumber?.trim() && p.blPhotos.length === 0 && !keep.missingBl) {
+    await tx.insert(schema.anomalies).values({
+      receptionId: recId, supplierId, supplierName, type: "missing_bl",
+      description: t.anomalies.autoMissingBl, createdBy: user.id, createdAt: date,
+    });
+  }
+
   if (p.vehicleClean === false && !keep.hygiene) {
     await tx.insert(schema.anomalies).values({
       receptionId: recId, supplierId, supplierName, type: "hygiene",
@@ -238,12 +259,15 @@ export async function saveReception(p: Payload, user: SessionUser): Promise<numb
  *   écarts de prix supprimés puis recalculés (les réclamations déjà saisies sont conservées) ;
  * - anomalies encore « ouvertes » supprimées puis recalculées ; celles déjà traitées sont gardées.
  */
+export class LockedError extends Error {}
+
 export async function updateReception(id: number, p: Payload, user: SessionUser): Promise<number | null> {
   const db = getDb();
   const t = dictFor(user.locale);
   return db.transaction(async (tx) => {
     const rec = await tx.query.receptions.findFirst({ where: eq(schema.receptions.id, id) });
     if (!rec) return null;
+    if (rec.consolidatedAt) throw new LockedError("consolidated");
 
     // 1. Prix : on ne revient que sur les produits dont le prix du bon a changé.
     //    Les autres gardent leur écart d'origine et le mercurial n'est pas touché
@@ -273,10 +297,11 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
 
     // 2. Anomalies : on garde celles déjà traitées
     const anomalies = await tx.select().from(schema.anomalies).where(eq(schema.anomalies.receptionId, id));
-    const keep = { products: new Set<string>(), hygiene: false };
+    const keep = { products: new Set<string>(), hygiene: false, missingBl: false };
     for (const a of anomalies) {
       if (a.status === "open") continue;
-      if (a.type === "hygiene" && !a.productName) keep.hygiene = true;
+      if (a.type === "missing_bl") keep.missingBl = true;
+      else if (a.type === "hygiene" && !a.productName) keep.hygiene = true;
       else if (a.productName) keep.products.add(a.productName.toLowerCase());
     }
     await tx.delete(schema.anomalies).where(and(eq(schema.anomalies.receptionId, id), eq(schema.anomalies.status, "open")));

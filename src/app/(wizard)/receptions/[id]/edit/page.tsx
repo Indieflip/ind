@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -29,10 +29,12 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
   const db = getDb();
   const rec = await db.query.receptions.findFirst({ where: eq(schema.receptions.id, id) });
   if (!rec) notFound();
-  const [lines, photos, categories] = await Promise.all([
+  if (rec.consolidatedAt) redirect(`/receptions/${id}`);
+  const [lines, photos, categories, bakery] = await Promise.all([
     db.select().from(schema.receptionLines).where(eq(schema.receptionLines.receptionId, id)).orderBy(asc(schema.receptionLines.position)),
     db.select().from(schema.receptionPhotos).where(eq(schema.receptionPhotos.receptionId, id)),
     db.select().from(schema.categories),
+    db.query.bakeryEntries.findFirst({ where: eq(schema.bakeryEntries.receptionId, id) }),
   ]);
 
   const draftLines: DraftLine[] = lines.map((l) => ({
@@ -79,6 +81,9 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     reservesEdited: false, // recalculé juste en dessous
     signerName: rec.signerName ?? "",
     signature: rec.signatureUrl ?? "",
+    bakery: bakery
+      ? { baguette: str(bakery.baguette), hamburger: str(bakery.hamburger), rolls: str(bakery.rolls), painDeMie: str(bakery.painDeMie) }
+      : undefined,
     updatedAt: new Date().toISOString(),
   };
 

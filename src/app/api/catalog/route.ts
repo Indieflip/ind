@@ -3,6 +3,7 @@ import { getDb, schema } from "@/db";
 import { getUser } from "@/lib/auth";
 import { num } from "@/lib/format";
 import type { Catalog } from "@/lib/reception-types";
+import { getBakerySupplier } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -29,9 +30,10 @@ export async function GET() {
   }
   const catalog: Catalog = {
     suppliers: suppliers.map((s) => ({ ...s, drivers: bySupplier.get(s.id) ?? [] })),
-    products: products.map((p) => ({ id: p.id, supplierId: p.supplierId, name: p.name, unit: p.unit, categoryId: p.categoryId, price: num(p.price) })),
+    products: products.map((p) => ({ id: p.id, supplierId: p.supplierId, name: p.name, unit: p.unit, categoryId: p.categoryId, price: num(p.price) ?? num(p.priceMin) })),
     categories: categories.map((c) => ({ id: c.id, code: c.code, nameFr: c.nameFr, nameEn: c.nameEn, tempRequired: c.tempRequired, conformMax: c.conformMax, reserveMax: c.reserveMax })),
     units: units.map((u) => u.name),
+    bakerySupplier: await getBakerySupplier(),
     fetchedAt: new Date().toISOString(),
   };
   return Response.json(catalog);

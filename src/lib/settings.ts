@@ -17,3 +17,21 @@ export async function setSetting(key: string, value: string) {
 export async function getRestaurantName() {
   return (await getSetting("restaurant_name")) ?? "";
 }
+
+export const DEFAULT_BAKERY_SUPPLIER = "BOULANGERIE THIERRY";
+
+export async function getBakerySupplier() {
+  return (await getSetting("bakery_supplier")) ?? DEFAULT_BAKERY_SUPPLIER;
+}
+
+export const BAKERY_ITEMS = ["baguette", "hamburger", "rolls", "painDeMie"] as const;
+export type BakeryItem = (typeof BAKERY_ITEMS)[number];
+
+export async function getBakeryPrices(): Promise<Record<BakeryItem, number | null>> {
+  const out = {} as Record<BakeryItem, number | null>;
+  for (const k of BAKERY_ITEMS) {
+    const v = await getSetting(`bakery_price_${k}`);
+    out[k] = v != null && v !== "" ? Number(v) : null;
+  }
+  return out;
+}

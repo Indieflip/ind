@@ -18,7 +18,7 @@ export async function storeFile(data: Buffer, contentType: string, folder: strin
   }
   const id = randomUUID();
   await getDb().insert(schema.files).values({ id, contentType, dataBase64: data.toString("base64") });
-  return `/api/files/${id}`;
+  return `/api/files/${id}${ext === "pdf" ? ".pdf" : ""}`;
 }
 
 export function parseDataUrl(dataUrl: string): { buffer: Buffer; contentType: string } | null {

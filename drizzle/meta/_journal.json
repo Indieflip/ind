@@ -15,6 +15,20 @@
       "when": 1794685775260,
       "tag": "0001_units_and_edits",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794691244593,
+      "tag": "0002_consolidation_bakery_protocols",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794691415271,
+      "tag": "0003_excel_import",
+      "breakpoints": true
     }
   ]
 }

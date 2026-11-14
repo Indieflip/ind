@@ -5,9 +5,9 @@ import { useI18n } from "@/lib/i18n/client";
 import { Icon } from "@/components/Icon";
 import { PhotoButton, Thumbs } from "@/components/reception/PhotoButton";
 
-export function AnomalyForm({ suppliers }: { suppliers: { id: number; name: string }[] }) {
+export function AnomalyForm({ receptions, preselect }: { receptions: { id: number; label: string }[]; preselect: number | null }) {
   const { t } = useI18n();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!preselect);
   const [photo, setPhoto] = useState("");
   const [state, action, pending] = useActionState(createAnomalyAction, undefined);
   const ref = useRef<HTMLFormElement>(null);
@@ -19,18 +19,19 @@ export function AnomalyForm({ suppliers }: { suppliers: { id: number; name: stri
     return <button className="btn-primary no-print mb-4" onClick={() => setOpen(true)}><Icon name="plus" className="h-4 w-4" /> {t.anomalies.new}</button>;
   }
   return (
-    <form ref={ref} action={action} className="no-print card mb-4 space-y-3 p-4">
+    <form ref={ref} action={action} id="new" className="no-print card mb-4 space-y-3 p-4">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold">{t.anomalies.new}</h2>
         <button type="button" className="btn-ghost p-1.5" onClick={() => setOpen(false)}><Icon name="x" className="h-4 w-4" /></button>
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
-        <label>
-          <span className="label">{t.common.supplier} *</span>
-          <select name="supplierId" className="input" required defaultValue="">
+        <label className="sm:col-span-3">
+          <span className="label">{t.anomalies.chooseReception} *</span>
+          <select name="receptionId" className="input" required defaultValue={preselect ?? ""}>
             <option value="" />
-            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {receptions.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
           </select>
+          <span className="mt-1 block text-xs text-stone-500">{t.anomalies.receptionHint}</span>
         </label>
         <label>
           <span className="label">{t.anomalies.type}</span>

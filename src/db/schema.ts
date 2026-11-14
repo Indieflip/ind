@@ -11,6 +11,7 @@ import {
   uniqueIndex,
   index,
   real,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("role", ["admin", "contributor", "viewer"]);
@@ -27,6 +28,7 @@ export const anomalyTypeEnum = pgEnum("anomaly_type", [
   "quantity",
   "price",
   "hygiene",
+  "missing_bl",
   "other",
 ]);
 export const anomalyStatusEnum = pgEnum("anomaly_status", ["open", "claimed", "credit_received", "closed"]);
@@ -98,7 +100,12 @@ export const products = pgTable(
     name: text("name").notNull(),
     unit: text("unit").notNull().default("kg"),
     categoryId: integer("category_id").references(() => categories.id),
-    /** Prix HT du mercurial */
+    /** Colonnes du fichier Mercurial : Service (Cuisine, Bar…) et Nature (Viande, Epicerie…) */
+    service: text("service"),
+    nature: text("nature"),
+    /** Colonne « - » du fichier */
+    priceMin: numeric("price_min", { precision: 12, scale: 4 }),
+    /** Prix HT de référence (colonne « + » du fichier) */
     price: numeric("price", { precision: 12, scale: 4 }),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -128,6 +135,9 @@ export const receptions = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedBy: integer("updated_by").references(() => users.id),
     updatedAt: timestamp("updated_at", { withTimezone: true }),
+    /** Consolidation = validation : le bon ne peut plus être modifié ni supprimé */
+    consolidatedAt: timestamp("consolidated_at", { withTimezone: true }),
+    consolidatedBy: integer("consolidated_by").references(() => users.id),
   },
   (t) => [uniqueIndex("receptions_client_uuid_idx").on(t.clientUuid), index("receptions_delivered_idx").on(t.deliveredAt)],
 );
@@ -217,6 +227,77 @@ export const anomalies = pgTable(
   (t) => [index("anomalies_status_idx").on(t.status)],
 );
 
+/** Historique « Suivi MAJ » (repris du fichier Excel), affiché dans Reporting */
+export const majLog = pgTable(
+  "maj_log",
+  {
+    id: serial("id").primaryKey(),
+    date: date("date"),
+    nature: text("nature"),
+    item: text("item"),
+    detail: text("detail"),
+    reference: text("reference"),
+    claim: text("claim"),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("maj_log_date_idx").on(t.date)],
+);
+
+/** Onglet Fruits et légumes : prix « Moins » / « Plus » par mois et prix bloqués */
+export const fvItems = pgTable("fv_items", {
+  id: serial("id").primaryKey(),
+  supplier: text("supplier").notNull(),
+  product: text("product").notNull(),
+  unit: text("unit"),
+  year: integer("year").notNull(),
+  /** 24 valeurs : [janv. moins, janv. plus, févr. moins, …, déc. plus] */
+  prices: jsonb("prices").$type<(number | null)[]>().notNull().default([]),
+  blocked: text("blocked"),
+  position: integer("position").notNull().default(0),
+});
+
+/** Notes ajoutées à un bon consolidé (informations complémentaires, horodatées) */
+export const receptionNotes = pgTable(
+  "reception_notes",
+  {
+    id: serial("id").primaryKey(),
+    receptionId: integer("reception_id")
+      .notNull()
+      .references(() => receptions.id, { onDelete: "cascade" }),
+    text: text("text").notNull(),
+    createdBy: integer("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("notes_reception_idx").on(t.receptionId)],
+);
+
+/** Suivi boulangerie : quantités saisies sur les bons du fournisseur boulangerie */
+export const bakeryEntries = pgTable(
+  "bakery_entries",
+  {
+    id: serial("id").primaryKey(),
+    receptionId: integer("reception_id").references(() => receptions.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    baguette: numeric("baguette", { precision: 10, scale: 2 }),
+    hamburger: numeric("hamburger", { precision: 10, scale: 2 }),
+    rolls: numeric("rolls", { precision: 10, scale: 2 }),
+    painDeMie: numeric("pain_de_mie", { precision: 10, scale: 2 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("bakery_reception_idx").on(t.receptionId), index("bakery_date_idx").on(t.date)],
+);
+
+/** Protocoles (ex. Process pèse), modifiables par l'administrateur */
+export const protocols = pgTable("protocols", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content").notNull().default(""),
+  position: integer("position").notNull().default(100),
+  updatedBy: integer("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** Stockage de secours des fichiers quand Vercel Blob n'est pas configuré */
 export const files = pgTable("files", {
   id: text("id").primaryKey(),
@@ -235,3 +316,4 @@ export type ReceptionLine = typeof receptionLines.$inferSelect;
 export type Decision = ReceptionLine["decision"];
 export type Anomaly = typeof anomalies.$inferSelect;
 export type Unit = typeof units.$inferSelect;
+export type FvItem = typeof fvItems.$inferSelect;

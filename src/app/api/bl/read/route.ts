@@ -46,11 +46,16 @@ export async function POST(req: Request) {
   const images = (body?.images ?? []).filter((i) => typeof i === "string").slice(0, 8);
   if (!images.length) return Response.json({ error: "no_images" }, { status: 400 });
 
-  const imageBlocks: Anthropic.ImageBlockParam[] = [];
+  const imageBlocks: (Anthropic.ImageBlockParam | Anthropic.DocumentBlockParam)[] = [];
   for (const img of images) {
     const m = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/s.exec(img);
+    const pdf = /^data:application\/pdf;base64,(.+)$/s.exec(img);
     if (m) {
       imageBlocks.push({ type: "image", source: { type: "base64", media_type: m[1] as "image/jpeg", data: m[2] } });
+    } else if (pdf) {
+      imageBlocks.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: pdf[1] } });
+    } else if (/^https:\/\/.+\.pdf($|\?)/i.test(img)) {
+      imageBlocks.push({ type: "document", source: { type: "url", url: img } });
     } else if (/^https:\/\//.test(img)) {
       imageBlocks.push({ type: "image", source: { type: "url", url: img } });
     }

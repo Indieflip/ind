@@ -1,5 +1,5 @@
-import { sql } from "drizzle-orm";
-import { getDb } from "@/db";
+import { asc, sql } from "drizzle-orm";
+import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
@@ -8,6 +8,7 @@ import { one, type SP } from "@/lib/server/queries";
 import { Field, FilterBar, PageHeader, Stat, qs } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { MonthlyBars } from "./MonthlyBars";
+import { MajLog } from "./MajLog";
 
 function defaultFrom() {
   const d = new Date();
@@ -16,7 +17,7 @@ function defaultFrom() {
 }
 
 export default async function ReportingPage({ searchParams }: { searchParams: Promise<SP> }) {
-  await requireUser(can.viewReporting);
+  const user = await requireUser(can.viewReporting);
   const { t, locale } = await getDict();
   const sp = await searchParams;
   const from = one(sp.from) && /^\d{4}-\d{2}-\d{2}$/.test(one(sp.from)!) ? one(sp.from)! : defaultFrom();
@@ -25,6 +26,7 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
   const end = sql`((${to}::date + 1)::timestamp at time zone 'Europe/Paris')`;
   const db = getDb();
 
+  const majRows = await getDb().select().from(schema.majLog).orderBy(asc(schema.majLog.position));
   const [kpi, anomalyKpi, priceKpi, bySupplier, monthly] = await Promise.all([
     db.execute<{ receptions: number; conform: number }>(sql`
       select count(*)::int as receptions, count(*) filter (where status = 'conform')::int as conform
@@ -154,6 +156,7 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
         <p className="mt-1 text-sm text-stone-600">{t.reporting.haccpHint}</p>
         <a className="btn-primary mt-3" href={`/api/export/receptions${qs({ from, to })}`}><Icon name="download" className="h-4 w-4" /> {t.reporting.exportHaccp}</a>
       </section>
+      <MajLog rows={majRows.map((r) => ({ id: r.id, date: r.date, nature: r.nature, item: r.item, detail: r.detail, reference: r.reference, claim: r.claim }))} editable={can.editPrices(user.role)} />
     </>
   );
 }

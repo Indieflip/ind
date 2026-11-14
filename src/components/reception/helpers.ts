@@ -133,6 +133,9 @@ export function toPayload(d: Draft): ReceptionPayload {
     signerName: (d.signerName || d.driverName).trim() || null,
     signature: d.signature || null,
     blPhotos: d.blPhotos,
+    bakery: d.bakery
+      ? { baguette: num(d.bakery.baguette), hamburger: num(d.bakery.hamburger), rolls: num(d.bakery.rolls), painDeMie: num(d.bakery.painDeMie) }
+      : null,
     lines: d.lines
       .filter((l) => l.productName.trim())
       .map((l) => ({
@@ -153,12 +156,11 @@ export function toPayload(d: Draft): ReceptionPayload {
   };
 }
 
-export function normalize(s: string) {
-  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-}
+export { normalize, matches } from "@/lib/search";
+import { normalize as norm } from "@/lib/search";
 
-/** Recherche tolérante : tous les mots tapés doivent apparaître */
-export function matches(name: string, query: string) {
-  const n = normalize(name);
-  return normalize(query).split(/\s+/).filter(Boolean).every((w) => n.includes(w));
+/** Le bon est-il celui du fournisseur boulangerie (suivi Baguette / Hamburger / Roll's / Pain de mie) ? */
+export function isBakerySupplier(name: string, bakerySupplier = "BOULANGERIE THIERRY") {
+  const n = norm(name);
+  return !!n && n === norm(bakerySupplier);
 }

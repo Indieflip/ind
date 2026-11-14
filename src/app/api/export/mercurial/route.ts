@@ -1,4 +1,5 @@
-import { and, asc, eq, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, type SQL } from "drizzle-orm";
+import { matches } from "@/lib/search";
 import { getDb, schema } from "@/db";
 import { getUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -17,16 +18,22 @@ export async function GET(req: Request) {
   const supplier = sp.get("supplier");
   const q = sp.get("q")?.trim();
   if (supplier && /^\d+$/.test(supplier)) conds.push(eq(p.supplierId, Number(supplier)));
-  if (q) conds.push(sql`(${p.name} ilike ${"%" + q + "%"} or ${s.name} ilike ${"%" + q + "%"})`);
+  const service = sp.get("service");
+  const nature = sp.get("nature");
   const rows = await getDb()
-    .select({ supplier: s.name, name: p.name, unit: p.unit, price: p.price, catFr: schema.categories.nameFr, catEn: schema.categories.nameEn })
+    .select({ supplier: s.name, service: p.service, nature: p.nature, name: p.name, unit: p.unit, priceMin: p.priceMin, price: p.price })
     .from(p)
     .innerJoin(s, eq(s.id, p.supplierId))
-    .leftJoin(schema.categories, eq(schema.categories.id, p.categoryId))
     .where(and(...conds))
     .orderBy(asc(s.name), asc(p.name));
+  const m = t.mercurial;
+  // Mêmes colonnes que le fichier Excel : Fournisseur | Service | Nature | Produits | Unite | - | +
   return csvResponse(`mercurial-${new Date().toISOString().slice(0, 10)}.csv`, [
-    [t.common.supplier, t.common.product, t.common.unit, t.common.category, t.mercurial.priceHt],
-    ...rows.map((r) => [r.supplier, r.name, r.unit, user.locale === "en" ? r.catEn : r.catFr, num(r.price)]),
+    [t.common.supplier, m.service, m.nature, m.products, t.common.unit, "-", "+"],
+    ...rows
+      .filter((r) => !q || matches(`${r.name} ${r.supplier}`, q))
+      .filter((r) => !service || (r.service ?? "").split(/,\s*/).includes(service))
+      .filter((r) => !nature || (r.nature ?? "").split(/,\s*/).includes(nature))
+      .map((r) => [r.supplier, r.service, r.nature, r.name, r.unit, num(r.priceMin), num(r.price)]),
   ]);
 }

@@ -8,7 +8,7 @@ import { decisionStyles } from "../DecisionBadge";
 import { Icon } from "../Icon";
 import { UnitSelect } from "../UnitSelect";
 import { PhotoButton, Thumbs } from "./PhotoButton";
-import { evaluate, lineFromProduct, matches, priceGap, withAutoDecision } from "./helpers";
+import { evaluate, isBakerySupplier, lineFromProduct, matches, priceGap, withAutoDecision } from "./helpers";
 
 const DEFAULT_UNITS = ["pièce", "kg", "litre", "sachet"];
 
@@ -24,8 +24,13 @@ export function StepCheck({
   catalog?: Catalog;
 }) {
   const { t } = useI18n();
+  const bakery = isBakerySupplier(draft.supplierName, catalog?.bakerySupplier);
   return (
     <>
+      <a href="/protocoles" target="_blank" className="flex items-center gap-2 text-sm font-medium text-brand-700 underline">
+        <Icon name="book" className="h-4 w-4" /> {t.wizard.weighProtocol}
+      </a>
+      {bakery && <BakeryBlock draft={draft} setDraft={setDraft} />}
       {draft.lines.length === 0 && <p className="card p-4 text-center text-sm text-stone-500">{t.wizard.noProducts}</p>}
       {draft.lines.map((l) => (
         <LineCard
@@ -251,6 +256,31 @@ function AddProduct({ draft, setDraft, catalog }: { draft: Draft; setDraft: (fn:
           </div>
         </div>
       )}
+    </section>
+  );
+}
+
+/** Suivi boulangerie : quantités livrées, reportées dans Mercurial > Boulangerie */
+function BakeryBlock({ draft, setDraft }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void }) {
+  const { t } = useI18n();
+  const b = draft.bakery ?? { baguette: "", hamburger: "", rolls: "", painDeMie: "" };
+  return (
+    <section className="card border-l-4 border-l-amber-400 p-4">
+      <h3 className="font-semibold">{t.wizard.bakery}</h3>
+      <p className="mb-3 text-xs text-stone-500">{t.wizard.bakeryHint}</p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {(["baguette", "hamburger", "rolls", "painDeMie"] as const).map((k) => (
+          <label key={k}>
+            <span className="mb-0.5 block text-xs font-medium text-stone-600">{t.bakery[k]}</span>
+            <input
+              className="input py-2"
+              inputMode="decimal"
+              value={b[k]}
+              onChange={(e) => setDraft((d) => ({ ...d, bakery: { ...b, ...(d.bakery ?? {}), [k]: e.target.value } }))}
+            />
+          </label>
+        ))}
+      </div>
     </section>
   );
 }

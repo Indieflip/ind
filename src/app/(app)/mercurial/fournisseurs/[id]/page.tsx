@@ -29,7 +29,7 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="space-y-4">
-      <Link href="/suppliers" className="btn-ghost -ml-2 px-2"><Icon name="chevronLeft" className="h-4 w-4" /> {t.suppliers.title}</Link>
+      <Link href="/mercurial/fournisseurs" className="btn-ghost -ml-2 px-2"><Icon name="chevronLeft" className="h-4 w-4" /> {t.suppliers.title}</Link>
       <h1 className="text-2xl font-bold">{supplier.name}</h1>
       {editable && (
         <SupplierInfo id={supplier.id} name={supplier.name} email={supplier.email ?? ""} phone={supplier.phone ?? ""} notes={supplier.notes ?? ""} active={supplier.active} />

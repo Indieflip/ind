@@ -23,6 +23,8 @@ export interface Catalog {
   products: CatalogProduct[];
   categories: CatalogCategory[];
   units?: string[];
+  /** Nom du fournisseur dont les bons comportent le suivi boulangerie */
+  bakerySupplier?: string;
   fetchedAt: string;
 }
 
@@ -78,6 +80,8 @@ export interface Draft {
   reservesEdited: boolean;
   signerName: string;
   signature: string; // data URL
+  /** Suivi boulangerie (fournisseur boulangerie uniquement) */
+  bakery?: { baguette: string; hamburger: string; rolls: string; painDeMie: string };
   updatedAt: string;
 }
 
@@ -95,6 +99,7 @@ export interface ReceptionPayload {
   signerName: string | null;
   signature: string | null;
   blPhotos: string[];
+  bakery?: { baguette: number | null; hamburger: number | null; rolls: number | null; painDeMie: number | null } | null;
   lines: {
     productId: number | null;
     productName: string;

@@ -60,5 +60,30 @@ for (const [i, name] of baseUnits.entries()) {
 }
 await db.execute(sql`insert into units (name) select distinct unit from products where unit is not null and unit <> '' on conflict (name) do nothing`);
 
+// Premier protocole (modifiable ensuite dans l'onglet Protocoles)
+const processPese = `## 1. Préparation et vérification de l'instrument
+
+Contrôle de l'instrument (balance ou pont-bascule) :
+• Vérifier que la balance est bien mise de niveau et stable.
+• Vérifier que l'affichage est à zéro avant toute opération.
+
+Contrôle de la tare :
+• Peser ou vérifier avec un poids de 5 kg.
+
+## 2. Déroulement du pesage
+
+Réalisation de la pesée :
+• Placer la marchandise au centre du plateau (ou sur le pont-bascule) pour éviter les erreurs d'excentration.
+• Attendre la stabilisation complète de l'affichage avant de lire ou d'imprimer la valeur.
+
+Échantillonnage (en cas de lots ou préemballés) :
+• Si le contrôle porte sur des produits préemballés, appliquer un plan d'échantillonnage conforme aux normes (par exemple la norme AFNOR NFX 06-031-1 ou les règles de la DGCCRF) : la moyenne du lot doit être supérieure ou égale au poids nominal, avec un taux de défauts limité.
+
+## 3. Saisie des informations
+
+• Indiquer le poids dans le BL.`;
+await db.execute(sql`insert into protocols (title, content, position)
+  select 'Process pèse', ${processPese}, 1 where not exists (select 1 from protocols)`);
+
 console.log("[migrate] base à jour.");
 await close();

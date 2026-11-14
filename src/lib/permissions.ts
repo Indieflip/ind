@@ -8,9 +8,19 @@ export const can = {
   viewReceptions: (_r: Role) => true,
   /** Modifier un bon déjà enregistré */
   editReception: (r: Role) => r === "admin" || r === "contributor",
-  deleteReception: (r: Role) => r === "admin",
-  /** Consolidation des bons (montants) */
-  consolidate: (r: Role) => r === "admin" || r === "viewer",
+  /** Supprimer un bon non consolidé (erreur de saisie, doublon) */
+  deleteDraftReception: (r: Role) => r === "admin" || r === "contributor",
+  /** Consolider = valider un bon (il devient non modifiable) */
+  consolidate: (r: Role) => r === "admin",
+  viewConsolidation: (_r: Role) => true,
+  /** Ajouter une note sur un bon consolidé */
+  addNote: (r: Role) => r === "admin" || r === "contributor",
+  /** Protocoles */
+  viewProtocols: (_r: Role) => true,
+  editProtocols: (r: Role) => r === "admin",
+  /** Fruits et légumes */
+  viewFv: (_r: Role) => true,
+  editFv: (r: Role) => r === "admin",
   /** Mercurial (fournisseur, produit, unité, prix) */
   viewMercurial: (_r: Role) => true,
   editMercurial: (r: Role) => r === "admin",
