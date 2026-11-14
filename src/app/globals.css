@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #eef7f4;
+  --color-brand-100: #d5ece4;
+  --color-brand-500: #1f8a6b;
+  --color-brand-600: #187257;
+  --color-brand-700: #145c47;
+  --color-ink: #1c2321;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body { background: #f5f6f5; color: var(--color-ink); }
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility btn-primary { @apply btn bg-brand-600 text-white hover:bg-brand-700; }
+@utility btn-secondary { @apply btn border border-stone-300 bg-white text-stone-800 hover:bg-stone-50; }
+@utility btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700; }
+@utility btn-ghost { @apply btn text-stone-700 hover:bg-stone-100; }
+@utility btn-lg { @apply px-5 py-3.5 text-base; }
+@utility card { @apply rounded-xl border border-stone-200 bg-white shadow-sm; }
+@utility input { @apply w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-base outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 sm:text-sm; }
+@utility label { @apply mb-1 block text-sm font-medium text-stone-700; }
+@utility badge { @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold; }
+
+@layer components {
+  .table { @apply w-full text-left text-sm; }
+  .table th { @apply whitespace-nowrap border-b border-stone-200 bg-stone-50 px-3 py-2 font-semibold text-stone-600; }
+  .table td { @apply border-b border-stone-100 px-3 py-2 align-top; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+  .card { box-shadow: none; border-color: #ccc; }
+}

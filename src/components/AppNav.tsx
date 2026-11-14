@@ -1,0 +1,80 @@
+"use client";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Icon } from "./Icon";
+import { LocaleSwitch } from "./LocaleSwitch";
+import { logoutAction } from "@/lib/actions/auth";
+
+export interface NavItem { href: string; label: string; icon: string }
+
+export function AppNav(props: {
+  items: NavItem[];
+  userName: string;
+  roleLabel: string;
+  logoutLabel: string;
+  restaurant: string;
+  appName: string;
+}) {
+  const path = usePathname();
+  const active = (href: string) => path === href || path.startsWith(href + "/");
+  return (
+    <>
+      {/* Ordinateur : barre latérale */}
+      <aside className="no-print sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-stone-200 bg-white lg:flex">
+        <div className="flex items-center gap-3 px-5 py-5">
+          <img src="/icon.svg" alt="" className="h-9 w-9" />
+          <div className="min-w-0">
+            <div className="truncate text-sm font-bold">{props.appName}</div>
+            <div className="truncate text-xs text-stone-500">{props.restaurant}</div>
+          </div>
+        </div>
+        <nav className="flex-1 space-y-1 px-3">
+          {props.items.map((i) => (
+            <Link
+              key={i.href}
+              href={i.href}
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${active(i.href) ? "bg-brand-50 text-brand-700" : "text-stone-700 hover:bg-stone-100"}`}
+            >
+              <Icon name={i.icon} />
+              {i.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="border-t border-stone-200 p-4">
+          <div className="text-sm font-semibold">{props.userName}</div>
+          <div className="mb-3 text-xs text-stone-500">{props.roleLabel}</div>
+          <div className="flex items-center justify-between">
+            <LocaleSwitch />
+            <form action={logoutAction}>
+              <button className="btn-ghost px-2 py-1.5 text-xs" title={props.logoutLabel}>
+                <Icon name="logout" className="h-4 w-4" /> {props.logoutLabel}
+              </button>
+            </form>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile : en-tête + barre d'onglets en bas */}
+      <header className="no-print sticky top-0 z-20 flex items-center justify-between border-b border-stone-200 bg-white/95 px-4 py-2.5 backdrop-blur lg:hidden" style={{ paddingTop: "max(0.625rem, env(safe-area-inset-top))" }}>
+        <div className="flex items-center gap-2">
+          <img src="/icon.svg" alt="" className="h-7 w-7" />
+          <span className="text-sm font-bold">{props.appName}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <LocaleSwitch />
+          <form action={logoutAction}>
+            <button className="btn-ghost p-2" aria-label={props.logoutLabel}><Icon name="logout" className="h-4 w-4" /></button>
+          </form>
+        </div>
+      </header>
+      <nav className="no-print fixed inset-x-0 bottom-0 z-20 flex border-t border-stone-200 bg-white lg:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        {props.items.map((i) => (
+          <Link key={i.href} href={i.href} className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium ${active(i.href) ? "text-brand-600" : "text-stone-500"}`}>
+            <Icon name={i.icon} className="h-5 w-5" />
+            <span className="max-w-full truncate px-1">{i.label}</span>
+          </Link>
+        ))}
+      </nav>
+    </>
+  );
+}
