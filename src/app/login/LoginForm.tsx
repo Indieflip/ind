@@ -2,6 +2,7 @@
 import { useActionState } from "react";
 import { loginAction } from "@/lib/actions/auth";
 import { useI18n } from "@/lib/i18n/client";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export function LoginForm() {
   const { t } = useI18n();
@@ -14,7 +15,7 @@ export function LoginForm() {
       </div>
       <div>
         <label className="label" htmlFor="password">{t.auth.password}</label>
-        <input className="input" id="password" name="password" type="password" autoComplete="current-password" required />
+        <PasswordInput id="password" name="password" autoComplete="current-password" required />
       </div>
       {state?.error && <p className="text-sm text-red-600">{t.auth.invalid}</p>}
       <button className="btn-primary btn-lg w-full" disabled={pending}>{pending ? t.common.loading : t.auth.signIn}</button>

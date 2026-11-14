@@ -2,6 +2,7 @@
 import { useActionState } from "react";
 import { setupAction } from "@/lib/actions/auth";
 import { useI18n } from "@/lib/i18n/client";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export function SetupForm() {
   const { t } = useI18n();
@@ -22,7 +23,7 @@ export function SetupForm() {
       </div>
       <div>
         <label className="label">{t.auth.password}</label>
-        <input className="input" name="password" type="password" minLength={8} required autoComplete="new-password" />
+        <PasswordInput name="password" minLength={8} required autoComplete="new-password" />
         <p className="mt-1 text-xs text-stone-500">{t.auth.passwordHint}</p>
       </div>
       {state?.error && <p className="text-sm text-red-600">{t.common.error}</p>}

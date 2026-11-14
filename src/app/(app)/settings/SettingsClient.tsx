@@ -2,6 +2,7 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { addUserAction, setRestaurantAction, updateCategoryAction, updateUserAction } from "@/lib/actions/settings";
 import { useI18n } from "@/lib/i18n/client";
+import { PasswordInput } from "@/components/PasswordInput";
 import { Icon } from "@/components/Icon";
 
 export function RestaurantName({ initial }: { initial: string }) {
@@ -36,7 +37,7 @@ export function UserRow({ user, isMe }: { user: { id: number; name: string; emai
       </td>
       <td>
         <div className="flex gap-1">
-          <input className="input w-36 py-1.5" type="password" minLength={8} placeholder="••••••••" value={pw} onChange={(e) => { setPw(e.target.value); setDone(false); }} />
+          <div className="w-44"><PasswordInput className="input py-1.5" minLength={8} placeholder="••••••••" autoComplete="new-password" value={pw} onChange={(e) => { setPw(e.target.value); setDone(false); }} /></div>
           <button className="btn-secondary px-2 py-1.5" disabled={pw.length < 8 || pending} onClick={() => start(async () => { await updateUserAction(user.id, { password: pw }); setPw(""); setDone(true); })}>
             <Icon name="check" className="h-4 w-4" />
           </button>
@@ -56,7 +57,7 @@ export function AddUser() {
     <form ref={ref} action={action} className="grid gap-2 sm:grid-cols-[1fr_1.3fr_1fr_1fr_auto] sm:items-end">
       <label><span className="label">{t.auth.name}</span><input name="name" className="input" required /></label>
       <label><span className="label">{t.auth.email}</span><input name="email" type="email" className="input" required /></label>
-      <label><span className="label">{t.auth.password}</span><input name="password" type="password" minLength={8} className="input" required placeholder={t.auth.passwordHint} /></label>
+      <label><span className="label">{t.auth.password}</span><PasswordInput name="password" minLength={8} required autoComplete="new-password" placeholder={t.auth.passwordHint} /></label>
       <label>
         <span className="label">{t.settings.role}</span>
         <select name="role" className="input" defaultValue="contributor">
