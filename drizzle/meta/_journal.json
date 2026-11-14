@@ -29,6 +29,20 @@
       "when": 1794691415271,
       "tag": "0003_excel_import",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794699411358,
+      "tag": "0004_profiles_drafts_backups",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794699541183,
+      "tag": "0005_line_price_range",
+      "breakpoints": true
     }
   ]
 }

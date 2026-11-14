@@ -17,11 +17,12 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
   const db = getDb();
   const supplier = Number.isInteger(id) ? await db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, id) }) : undefined;
   if (!supplier) notFound();
-  const [products, cats, recents, unitRows] = await Promise.all([
+  const [products, cats, recents, unitRows, supplierAnomalies] = await Promise.all([
     db.select().from(schema.products).where(eq(schema.products.supplierId, id)).orderBy(desc(schema.products.active), asc(schema.products.name)),
     db.select().from(schema.categories).orderBy(asc(schema.categories.position)),
     db.select().from(schema.receptions).where(eq(schema.receptions.supplierId, id)).orderBy(desc(schema.receptions.deliveredAt)).limit(10),
     db.select({ name: schema.units.name }).from(schema.units).orderBy(asc(schema.units.position), asc(schema.units.name)),
+    db.select().from(schema.anomalies).where(eq(schema.anomalies.supplierId, id)).orderBy(desc(schema.anomalies.createdAt)).limit(100),
   ]);
   const units = unitRows.map((u) => u.name);
   const categories = cats.map((c) => ({ id: c.id, name: locale === "en" ? c.nameEn : c.nameFr }));
@@ -42,16 +43,40 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
             <tr>
               <th>{t.common.product}</th>
               <th>{t.common.unit}</th>
-              <th>{t.common.category}</th>
-              <th className="text-right">{t.wizard.mercurial}</th>
+              <th>{t.mercurial.nature}</th>
+              <th className="text-right">{t.mercurial.priceMin}</th>
+              <th className="text-right">{t.mercurial.priceMax}</th>
+              <th className="text-right">{t.mercurial.priceRange}</th>
               <th />
             </tr>
           </thead>
           <tbody>
-            {products.map((p) => <ProductRow key={p.id} p={p} categories={categories} editable={editable} />)}
+            {products.map((p) => <ProductRow key={p.id} p={p} editable={editable} />)}
           </tbody>
         </table>
       </div>
+      <section className="card p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="font-semibold">{t.mercurial.supplierAnomalies} <span className="text-sm font-normal text-stone-500">({supplierAnomalies.filter((a) => a.status !== "closed").length} {t.anomalies.openCount})</span></h2>
+          <Link href={`/anomalies?supplier=${supplier.id}&status=`} className="text-sm text-brand-700 underline">{t.nav.anomalies} →</Link>
+        </div>
+        {supplierAnomalies.length === 0 ? (
+          <p className="text-sm text-stone-500">{t.mercurial.noAnomalies}</p>
+        ) : (
+          <ul className="divide-y divide-stone-100">
+            {supplierAnomalies.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
+                <span className="w-20 shrink-0 text-xs text-stone-500">{fmtDateTime(a.createdAt, locale).split(" ")[0]}</span>
+                <span className="badge bg-stone-100 text-stone-700">{t.anomalies.types[a.type]}</span>
+                <span className="min-w-0 flex-1">{a.description}</span>
+                <StatusBadge status={a.status} label={t.anomalies.statuses[a.status]} />
+                {a.receptionId && <Link href={`/receptions/${a.receptionId}`} className="text-brand-700">→</Link>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       {recents.length > 0 && (
         <section className="card p-4">
           <h2 className="mb-2 font-semibold">{t.suppliers.lastReceptions}</h2>

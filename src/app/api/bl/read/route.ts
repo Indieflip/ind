@@ -5,10 +5,12 @@ import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { assertUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
+import { bestMatch } from "@/lib/fuzzy";
 
 export const maxDuration = 120;
 
 const BlSchema = z.object({
+  supplierName: z.string().nullable().describe("Nom du fournisseur (émetteur du BL), choisi dans la liste fournie si possible"),
   blNumber: z.string().nullable().describe("Numéro du bon de livraison, si visible"),
   lines: z.array(
     z.object({
@@ -62,15 +64,19 @@ export async function POST(req: Request) {
   }
   if (!imageBlocks.length) return Response.json({ error: "bad_images" }, { status: 400 });
 
-  // Mercurial du fournisseur, pour rattacher chaque ligne au bon produit
-  let catalogText = "(aucun mercurial pour ce fournisseur)";
+  // Fournisseur connu : son mercurial sert à rattacher chaque ligne au bon produit.
+  // Fournisseur inconnu (photo prise avant le choix) : on donne la liste des fournisseurs.
+  const db = getDb();
+  const suppliers = await db.select({ id: schema.suppliers.id, name: schema.suppliers.name }).from(schema.suppliers).where(eq(schema.suppliers.active, true));
+  let catalogText = "(fournisseur non choisi : rattache les produits avec productId = null)";
   if (body?.supplierId) {
-    const products = await getDb()
+    const products = await db
       .select({ id: schema.products.id, name: schema.products.name, unit: schema.products.unit })
       .from(schema.products)
       .where(and(eq(schema.products.supplierId, body.supplierId), eq(schema.products.active, true)));
-    if (products.length) catalogText = products.map((p) => `${p.id} | ${p.name} | ${p.unit}`).join("\n");
+    catalogText = products.length ? products.map((p) => `${p.id} | ${p.name} | ${p.unit}`).join("\n") : "(aucun mercurial pour ce fournisseur)";
   }
+  const suppliersText = suppliers.map((s) => s.name).join("\n");
 
   const client = new Anthropic();
   try {
@@ -86,7 +92,7 @@ export async function POST(req: Request) {
             ...imageBlocks,
             {
               type: "text",
-              text: `Mercurial du fournisseur (id | produit | unité) :\n${catalogText}\n\nDate du jour : ${new Date().toISOString().slice(0, 10)}.\nExtrais les lignes de ce bon de livraison (${imageBlocks.length} page(s)).`,
+              text: `Fournisseurs connus :\n${suppliersText}\n\nMercurial du fournisseur (id | produit | unité) :\n${catalogText}\n\nDate du jour : ${new Date().toISOString().slice(0, 10)}.\nExtrais les lignes de ce bon de livraison (${imageBlocks.length} page(s)).`,
             },
           ],
         },
@@ -94,14 +100,29 @@ export async function POST(req: Request) {
     });
 
     if (response.stop_reason === "refusal" || !response.parsed_output) {
-      return Response.json({ lines: [], blNumber: null });
+      return Response.json({ lines: [], blNumber: null, supplierId: null, supplierName: null });
     }
     const out = response.parsed_output;
+    // Fournisseur : celui choisi, sinon le plus proche du nom lu sur le BL
+    const supplier = body?.supplierId
+      ? suppliers.find((s) => s.id === body.supplierId)
+      : out.supplierName
+        ? bestMatch(out.supplierName, suppliers, (s) => s.name, 0.4)
+        : undefined;
+    const products = supplier
+      ? await db
+          .select({ id: schema.products.id, name: schema.products.name })
+          .from(schema.products)
+          .where(and(eq(schema.products.supplierId, supplier.id), eq(schema.products.active, true)))
+      : [];
+    const ids = new Set(products.map((p) => p.id));
     const lines = out.lines.map((l) => ({
       ...l,
+      // productId proposé par la lecture s'il existe chez ce fournisseur, sinon rapprochement par le libellé
+      productId: l.productId && ids.has(l.productId) ? l.productId : bestMatch(l.name, products, (p) => p.name)?.id ?? null,
       dlc: l.dlc && /^\d{4}-\d{2}-\d{2}$/.test(l.dlc) ? l.dlc : null,
     }));
-    return Response.json({ lines, blNumber: out.blNumber });
+    return Response.json({ lines, blNumber: out.blNumber, supplierId: supplier?.id ?? null, supplierName: supplier?.name ?? out.supplierName });
   } catch (e) {
     if (e instanceof Anthropic.AuthenticationError) return Response.json({ error: "not_configured" }, { status: 503 });
     if (e instanceof Anthropic.RateLimitError) return Response.json({ error: "rate_limited" }, { status: 429 });

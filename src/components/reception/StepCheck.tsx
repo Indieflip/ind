@@ -8,9 +8,9 @@ import { decisionStyles } from "../DecisionBadge";
 import { Icon } from "../Icon";
 import { UnitSelect } from "../UnitSelect";
 import { PhotoButton, Thumbs } from "./PhotoButton";
-import { evaluate, isBakerySupplier, lineFromProduct, matches, priceGap, withAutoDecision } from "./helpers";
+import { evaluate, isBakerySupplier, lineFromProduct, matches, priceCheck, withAutoDecision } from "./helpers";
 
-const DEFAULT_UNITS = ["pièce", "kg", "litre", "sachet"];
+const DEFAULT_UNITS = ["Pièce", "Kg", "Litre", "Sachet"];
 
 export function StepCheck({
   draft,
@@ -38,7 +38,7 @@ export function StepCheck({
           line={l}
           catalog={catalog}
           onChange={(patch) => updateLine(l.key, patch)}
-          onRemove={() => setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
+          onRemove={() => confirm(t.wizard.removeLineConfirm) && setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
         />
       ))}
       <AddProduct draft={draft} setDraft={setDraft} catalog={catalog} />
@@ -60,7 +60,10 @@ function LineCard({
   const { t, locale } = useI18n();
   const cat = catalog?.categories.find((c) => c.id === line.categoryId);
   const ev = evaluate(line, catalog);
-  const gap = priceGap(line);
+  const pc = priceCheck(line);
+  const lo = line.mercurialMin ?? line.mercurialPrice;
+  const hi = line.mercurialPrice ?? line.mercurialMin;
+  const rangeLabel = lo == null ? "" : `${t.wizard.mercurial} ${fmtMoney(lo, locale)}${hi != null && hi !== lo ? ` – ${fmtMoney(hi, locale)}` : ""}`;
   const style = decisionStyles[line.decision];
 
   const field = (key: keyof DraftLine, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
@@ -124,15 +127,16 @@ function LineCard({
         <div>
           <label className="mb-0.5 block text-xs font-medium text-stone-600">
             {t.wizard.unitPrice}
-            <span className="ml-1 font-normal text-stone-400">
-              {line.mercurialPrice != null ? `${t.wizard.mercurial} ${fmtMoney(line.mercurialPrice, locale)}` : ""}
-            </span>
+            <span className="ml-1 font-normal text-stone-400">{rangeLabel}</span>
+            {line.priceLocked && <span className="ml-1 badge bg-sky-100 text-sky-800">🔒 {t.wizard.lockedBadge}</span>}
           </label>
           <input className="input py-2" inputMode="decimal" value={line.unitPrice} onChange={(e) => onChange({ unitPrice: e.target.value })} />
-          {gap != null && gap !== 0 && (
-            <p className={`mt-0.5 text-xs font-semibold ${gap > 0 ? "text-red-600" : "text-emerald-600"}`}>{fmtPct(gap)}</p>
+          {pc.kind === "locked" && <p className="mt-0.5 text-xs font-semibold text-red-700">{fmtPct(pc.pct)} · {t.wizard.lockedWarn}</p>}
+          {(pc.kind === "increase" || pc.kind === "decrease") && (
+            <p className={`mt-0.5 text-xs font-semibold ${pc.kind === "increase" ? "text-red-600" : "text-emerald-600"}`}>{fmtPct(pc.pct)}</p>
           )}
-          {line.mercurialPrice == null && line.unitPrice && <p className="mt-0.5 text-xs font-semibold text-sky-700">{t.wizard.newProduct}</p>}
+          {pc.kind === "ok" && <p className="mt-0.5 text-xs text-stone-500">{t.wizard.inRange}</p>}
+          {pc.kind === "new" && <p className="mt-0.5 text-xs font-semibold text-sky-700">{t.wizard.newProduct}</p>}
         </div>
       </div>
 
@@ -173,7 +177,7 @@ function LineCard({
               <option key={r} value={r}>{t.reasons[r]}</option>
             ))}
           </select>
-          <Thumbs photos={line.photos} onRemove={(i) => onChange({ photos: line.photos.filter((_, j) => j !== i) })} />
+          <Thumbs photos={line.photos} onRemove={(i) => confirm(t.wizard.removePhotoConfirm) && onChange({ photos: line.photos.filter((_, j) => j !== i) })} />
           <PhotoButton label={t.common.photo} className="btn-secondary w-full" onPhotos={(urls) => onChange({ photos: [...line.photos, ...urls] })} />
         </div>
       )}
@@ -220,7 +224,7 @@ function AddProduct({ draft, setDraft, catalog }: { draft: Draft; setDraft: (fn:
               ))}
             </ul>
           )}
-          <button type="button" className="btn-secondary w-full" onClick={() => setCustom({ name: q, unit: "kg", categoryId: "" })}>
+          <button type="button" className="btn-secondary w-full" onClick={() => setCustom({ name: q, unit: "Kg", categoryId: "" })}>
             <Icon name="plus" /> {t.wizard.outOfList}
           </button>
         </>

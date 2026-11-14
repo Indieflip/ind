@@ -1,16 +1,20 @@
 import "server-only";
+import { unitName } from "@/lib/units";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { num } from "@/lib/format";
-import { priceDiffPct, receptionStatus } from "@/lib/rules";
+import { receptionStatus } from "@/lib/rules";
+import { checkPrice, fvRange, parisMonth, type PriceCheck, type PriceRef } from "@/lib/pricing";
+
+const fmtEuro = (n: number | null | undefined) => (n == null ? "—" : `${n.toFixed(2).replace(".", ",")} €`);
 import { dictFor } from "@/lib/i18n";
 import type { SessionUser } from "@/lib/auth";
 
 const lineSchema = z.object({
   productId: z.number().int().nullable(),
   productName: z.string().trim().min(1).max(300),
-  unit: z.string().trim().max(40).default("kg"),
+  unit: z.string().trim().max(40).default("Kg"),
   categoryId: z.number().int().nullable(),
   qtyOrdered: z.number().nullable(),
   qtyReceived: z.number().nullable(),
@@ -102,10 +106,10 @@ async function writeContent(
   p: Payload,
   user: SessionUser,
   t: Dict,
-  keep: { products: Set<string>; hygiene: boolean; missingBl?: boolean } = { products: new Set(), hygiene: false },
+  keep: { products: Set<string>; hygiene: boolean; missingBl?: boolean; locked?: Set<number> } = { products: new Set(), hygiene: false },
   claims: Map<number, string> = new Map(),
   /** Modification : produits dont le prix du bon n'a pas changé → ni écart ni mercurial touchés (prix de référence d'origine conservé) */
-  unchanged: Map<number, number | null> = new Map(),
+  unchanged: Map<number, PriceRef> = new Map(),
 ) {
   const { supplierId, supplierName } = supplier;
   const date = new Date(p.deliveredAt);
@@ -124,7 +128,8 @@ async function writeContent(
   }
 
   // Unités saisies pendant le bon : ajoutées à la liste des unités
-  for (const unit of new Set(p.lines.map((l) => l.unit.trim()).filter(Boolean))) {
+  for (const l of p.lines) l.unit = unitName(l.unit) || "Kg";
+  for (const unit of new Set(p.lines.map((l) => l.unit).filter(Boolean))) {
     await tx.insert(schema.units).values({ name: unit }).onConflictDoNothing();
   }
 
@@ -140,7 +145,7 @@ async function writeContent(
       if (!product) {
         [product] = await tx
           .insert(schema.products)
-          .values({ supplierId, name: l.productName, unit: l.unit || "kg", categoryId: l.categoryId, price: l.unitPrice != null ? String(l.unitPrice) : null })
+          .values({ supplierId, name: l.productName, unit: l.unit || "Kg", categoryId: l.categoryId, price: l.unitPrice != null ? String(l.unitPrice) : null })
           .returning();
         if (l.unitPrice != null) {
           await tx.insert(schema.priceChanges).values({
@@ -152,21 +157,51 @@ async function writeContent(
       }
     }
     const productId = product.id;
+    const fv = product.fvItemId ? await tx.query.fvItems.findFirst({ where: eq(schema.fvItems.id, product.fvItemId) }) : undefined;
+    const month = parisMonth(date);
+    // Tranche de référence : mercurial (min « - » / max « + ») ou fruits et légumes du mois de livraison
+    const current: PriceRef = fv
+      ? { ...fvRange(fv.prices, month), locked: fv.locked }
+      : { min: num(product.priceMin), max: num(product.price), locked: product.priceLocked };
     const keepPrice = unchanged.has(productId);
-    const mercurial = keepPrice ? unchanged.get(productId)! : num(product.price);
+    const ref: PriceRef = keepPrice ? unchanged.get(productId)! : current;
+    const check = keepPrice ? ({ kind: "ok" } as PriceCheck) : checkPrice(l.unitPrice, ref);
 
-    // Suivi des prix : tout écart crée une ligne et met le mercurial à jour
+    /** Met à jour la borne min ou max de la référence (mercurial ou mois des fruits et légumes) */
+    const setBound = async (bound: "min" | "max", value: number) => {
+      if (fv) {
+        const prices = [...fv.prices];
+        while (prices.length < 24) prices.push(null);
+        prices[month * 2 + (bound === "min" ? 0 : 1)] = value;
+        if (bound === "min" && prices[month * 2 + 1] == null) prices[month * 2 + 1] = value;
+        if (bound === "max" && prices[month * 2] == null) prices[month * 2] = value;
+        await tx.update(schema.fvItems).set({ prices }).where(eq(schema.fvItems.id, fv.id));
+        fv.prices = prices;
+      } else {
+        await tx.update(schema.products).set(bound === "min" ? { priceMin: String(value) } : { price: String(value) }).where(eq(schema.products.id, productId));
+      }
+    };
+
     if (l.unitPrice != null && !keepPrice) {
-      if (mercurial == null) {
-        await tx.update(schema.products).set({ price: String(l.unitPrice) }).where(eq(schema.products.id, productId));
-      } else if (Math.abs(l.unitPrice - mercurial) > 0.00005) {
+      if (check.kind === "new") {
+        // Pas encore de prix de référence : le prix du BL devient la référence
+        await setBound("max", l.unitPrice);
+      } else if (check.kind === "increase" || check.kind === "decrease") {
+        // Hors tranche : variation de prix enregistrée, la borne dépassée est mise à jour
         await tx.insert(schema.priceChanges).values({
           supplierId, supplierName, productId, productName: product.name, unit: product.unit,
-          oldPrice: String(mercurial), newPrice: String(l.unitPrice), pct: priceDiffPct(l.unitPrice, mercurial),
-          type: l.unitPrice > mercurial ? "increase" : "decrease", source: "reception",
+          oldPrice: String(check.bound), newPrice: String(l.unitPrice), pct: check.pct,
+          type: check.kind, source: "reception",
           receptionId: recId, createdBy: user.id, date, claim: claims.get(productId) ?? null,
         });
-        await tx.update(schema.products).set({ price: String(l.unitPrice) }).where(eq(schema.products.id, productId));
+        await setBound(check.kind === "increase" ? "max" : "min", l.unitPrice);
+      } else if (check.kind === "locked" && !keep.locked?.has(productId)) {
+        // Prix bloqué : pas de variation, une anomalie à réclamer au fournisseur
+        await tx.insert(schema.anomalies).values({
+          receptionId: recId, supplierId, supplierName, productName: l.productName, type: "locked_price",
+          description: `${t.anomalies.types.locked_price} — ${l.productName} : ${fmtEuro(l.unitPrice)} (${t.wizard.lockedRange} ${fmtEuro(ref.min ?? ref.max)}${ref.min != null && ref.max != null && ref.min !== ref.max ? ` – ${fmtEuro(ref.max)}` : ""}, ${check.pct > 0 ? "+" : ""}${String(check.pct).replace(".", ",")} %)`,
+          createdBy: user.id, createdAt: date,
+        });
       }
     }
 
@@ -184,7 +219,9 @@ async function writeContent(
         dlc: l.dlc,
         lot: l.lot || null,
         unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
-        mercurialPrice: mercurial != null ? String(mercurial) : null,
+        mercurialMin: ref.min != null ? String(ref.min) : null,
+        mercurialPrice: ref.max != null ? String(ref.max) : null,
+        priceLocked: ref.locked,
         decision: l.decision,
         reason: l.reason,
         position: position++,
@@ -249,6 +286,7 @@ export async function saveReception(p: Payload, user: SessionUser): Promise<numb
       .values({ clientUuid: p.clientUuid, ...supplier, ...headerValues(p), createdBy: user.id })
       .returning();
     await writeContent(tx, rec.id, supplier, p, user, t);
+    await tx.delete(schema.receptionDrafts).where(eq(schema.receptionDrafts.clientUuid, p.clientUuid));
     return rec.id;
   });
 }
@@ -273,12 +311,13 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
     //    Les autres gardent leur écart d'origine et le mercurial n'est pas touché
     //    (il a pu évoluer depuis, par une autre livraison ou une correction).
     const oldLines = await tx.select().from(schema.receptionLines).where(eq(schema.receptionLines.receptionId, id));
-    const unchanged = new Map<number, number | null>();
+    const unchanged = new Map<number, PriceRef>();
     for (const nl of p.lines) {
       if (!nl.productId) continue;
       const ol = oldLines.find((o) => o.productId === nl.productId);
-      if (ol && num(ol.unitPrice) === nl.unitPrice) unchanged.set(nl.productId, num(ol.mercurialPrice));
+      if (ol && num(ol.unitPrice) === nl.unitPrice) unchanged.set(nl.productId, { min: num(ol.mercurialMin), max: num(ol.mercurialPrice), locked: ol.priceLocked });
     }
+    const month = parisMonth(rec.deliveredAt);
     const changes = await tx
       .select()
       .from(schema.priceChanges)
@@ -289,18 +328,34 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
       if (!c.productId || unchanged.has(c.productId)) continue;
       if (c.claim) claims.set(c.productId, c.claim);
       const product = await tx.query.products.findFirst({ where: eq(schema.products.id, c.productId) });
-      if (product && c.type !== "new_product" && num(product.price) === num(c.newPrice)) {
-        await tx.update(schema.products).set({ price: c.oldPrice }).where(eq(schema.products.id, c.productId));
+      if (product && c.type !== "new_product") {
+        // On remet la borne modifiée par ce bon, si personne ne l'a changée depuis
+        const isMax = c.type === "increase";
+        if (product.fvItemId) {
+          const fv = await tx.query.fvItems.findFirst({ where: eq(schema.fvItems.id, product.fvItemId) });
+          const i = month * 2 + (isMax ? 1 : 0);
+          if (fv && fv.prices[i] === num(c.newPrice)) {
+            const prices = [...fv.prices];
+            prices[i] = num(c.oldPrice);
+            await tx.update(schema.fvItems).set({ prices }).where(eq(schema.fvItems.id, fv.id));
+          }
+        } else if (num(isMax ? product.price : product.priceMin) === num(c.newPrice)) {
+          await tx.update(schema.products).set(isMax ? { price: c.oldPrice } : { priceMin: c.oldPrice }).where(eq(schema.products.id, c.productId));
+        }
       }
       await tx.delete(schema.priceChanges).where(eq(schema.priceChanges.id, c.id));
     }
 
     // 2. Anomalies : on garde celles déjà traitées
     const anomalies = await tx.select().from(schema.anomalies).where(eq(schema.anomalies.receptionId, id));
-    const keep = { products: new Set<string>(), hygiene: false, missingBl: false };
+    const keep = { products: new Set<string>(), hygiene: false, missingBl: false, locked: new Set<number>() };
     for (const a of anomalies) {
       if (a.status === "open") continue;
       if (a.type === "missing_bl") keep.missingBl = true;
+      else if (a.type === "locked_price") {
+        const pr = a.productName ? oldLines.find((o) => o.productName === a.productName) : undefined;
+        if (pr?.productId) keep.locked.add(pr.productId);
+      }
       else if (a.type === "hygiene" && !a.productName) keep.hygiene = true;
       else if (a.productName) keep.products.add(a.productName.toLowerCase());
     }

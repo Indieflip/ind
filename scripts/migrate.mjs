@@ -54,11 +54,19 @@ for (const [code, fr, en, req, cmax, rmax, pos] of categories) {
 }
 
 // Unités de base + toutes celles déjà utilisées dans le mercurial
-const baseUnits = ["pièce", "kg", "litre", "sachet"];
+const baseUnits = ["Pièce", "Kg", "Litre", "Sachet"];
 for (const [i, name] of baseUnits.entries()) {
   await db.execute(sql`insert into units (name, position) values (${name}, ${i + 1}) on conflict (name) do nothing`);
 }
 await db.execute(sql`insert into units (name) select distinct unit from products where unit is not null and unit <> '' on conflict (name) do nothing`);
+
+// Unités : première lettre en majuscule, doublons de casse fusionnés (« pot », « POT » → « Pot »)
+await db.execute(sql`update products set unit = upper(left(lower(unit), 1)) || substr(lower(unit), 2) where unit <> '' and unit <> upper(left(lower(unit), 1)) || substr(lower(unit), 2)`);
+await db.execute(sql`delete from units u where u.name <> upper(left(lower(u.name), 1)) || substr(lower(u.name), 2)
+  and exists (select 1 from units v where v.name = upper(left(lower(u.name), 1)) || substr(lower(u.name), 2))`);
+await db.execute(sql`delete from units u where exists (select 1 from units v where v.id < u.id
+  and upper(left(lower(v.name), 1)) || substr(lower(v.name), 2) = upper(left(lower(u.name), 1)) || substr(lower(u.name), 2))`);
+await db.execute(sql`update units set name = upper(left(lower(name), 1)) || substr(lower(name), 2) where name <> upper(left(lower(name), 1)) || substr(lower(name), 2)`);
 
 // Premier protocole (modifiable ensuite dans l'onglet Protocoles)
 const processPese = `## 1. Préparation et vérification de l'instrument
@@ -84,6 +92,43 @@ Réalisation de la pesée :
 • Indiquer le poids dans le BL.`;
 await db.execute(sql`insert into protocols (title, content, position)
   select 'Process pèse', ${processPese}, 1 where not exists (select 1 from protocols)`);
+
+// Protocole de réception (procédure rapide, d'après le manuel d'utilisation)
+const receptionProcess = `## Avant de commencer
+• Contrôler la livraison devant le livreur, avant de signer son bon.
+• Avoir le téléphone chargé et le thermomètre sonde propre à portée de main.
+• Traiter en premier les produits frais et surgelés, puis les ranger aussitôt.
+
+## Étape 1 — Photo du BL
+• Réceptions > Nouvelle réception.
+• « Prendre en photo » (ou « Importer un fichier » : PNG, JPG, PDF) : BL bien à plat, entier et lisible, une photo par page.
+• Confirmer la qualité de la photo : la lecture automatique démarre et prépare la liste des produits.
+• Pas de BL ? « Pas de BL / saisie manuelle » : une anomalie « Bon de livraison manquant » sera créée.
+
+## Étape 2 — Détail livraison
+• Vérifier le fournisseur (proposé par la lecture), la date et l'heure, le numéro de BL et le nom du livreur.
+• Relever la température de la caisse du camion (frais et surgelés) et indiquer si le véhicule est propre.
+• Rush de livraisons ? Bouton « Brouillon » : le bon est enregistré et se reprend plus tard depuis Réceptions > Brouillons en cours.
+
+## Étape 3 — Contrôle des produits
+• Vérifier chaque ligne lue sur le BL ; ajouter les produits manquants avec la recherche ou « Produit hors liste ».
+• Pour chaque produit : quantité commandée / reçue (peser selon le protocole « Process pèse »), température à cœur pour le frais et le surgelé, DLC, n° de lot, prix unitaire HT.
+• Couleur de la fiche : vert = conforme, orange = réserve, rouge = refus. La décision peut être changée à la main.
+• Réserve ou refus : choisir le motif et prendre une photo du problème.
+• Prix : hors de la tranche minimum – maximum du mercurial = variation de prix ; prix bloqué non respecté = anomalie.
+
+## Étape 4 — Validation
+• Relire le récapitulatif complet du bon (en-tête, produits, températures, prix).
+• Compléter les températures manquantes si un bandeau le signale.
+• Relire le texte « Réserves à reporter sur le BL » et le recopier sur le bon du livreur AVANT de signer.
+• Faire signer le livreur sur l'écran, puis « Enregistrer la réception ».
+
+## Après la réception
+• Le bon reste modifiable tant qu'il n'est pas consolidé.
+• L'administrateur le consolide (onglet Consolidation) : il devient une preuve et ne peut plus être modifié ni supprimé.
+• Une anomalie (produit manquant, avoir…) se signale depuis la fiche du bon : « Signaler une anomalie ».`;
+await db.execute(sql`insert into protocols (title, content, position)
+  select 'Réception d''une livraison', ${receptionProcess}, 0 where not exists (select 1 from protocols where title = 'Réception d''une livraison')`);
 
 console.log("[migrate] base à jour.");
 await close();

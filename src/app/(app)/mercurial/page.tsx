@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
@@ -12,7 +12,7 @@ import { SearchSuggest } from "@/components/SearchSuggest";
 import { sortRows } from "@/components/SortHeader";
 import { AddRow, MercurialTable, UnitsPanel } from "./MercurialClient";
 
-const COLS = ["supplier", "service", "nature", "name", "unit", "priceMin", "price"] as const;
+const COLS = ["supplier", "nature", "name", "unit", "priceMin", "price"] as const;
 
 export default async function MercurialPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser(can.viewMercurial);
@@ -21,7 +21,6 @@ export default async function MercurialPage({ searchParams }: { searchParams: Pr
   const f = {
     q: (one(sp.q) ?? "").trim(),
     supplier: one(sp.supplier),
-    service: one(sp.service),
     nature: one(sp.nature),
     inactive: one(sp.inactive),
     sort: (COLS as readonly string[]).includes(one(sp.sort) ?? "") ? one(sp.sort) : undefined,
@@ -30,13 +29,15 @@ export default async function MercurialPage({ searchParams }: { searchParams: Pr
   const db = getDb();
   const p = schema.products;
   const s = schema.suppliers;
-  const [all, units] = await Promise.all([
+  const [all, units, supplierRows] = await Promise.all([
     db
-      .select({ id: p.id, supplierId: p.supplierId, supplier: s.name, service: p.service, nature: p.nature, name: p.name, unit: p.unit, priceMin: p.priceMin, price: p.price, active: p.active })
+      .select({ id: p.id, supplierId: p.supplierId, supplier: s.name, nature: p.nature, name: p.name, unit: p.unit, priceMin: p.priceMin, price: p.price, priceLocked: p.priceLocked, active: p.active })
       .from(p)
       .innerJoin(s, eq(s.id, p.supplierId))
+      .where(isNull(p.fvItemId)) // les fruits et légumes ont leur propre onglet
       .orderBy(asc(s.name), asc(p.name)),
     db.select().from(schema.units).orderBy(asc(schema.units.position), asc(schema.units.name)),
+    db.select({ id: s.id, name: s.name }).from(s).where(eq(s.active, true)).orderBy(asc(s.name)),
   ]);
 
   // Filtres et recherche tolérante (accents, majuscules, ponctuation) faits ici
@@ -44,19 +45,18 @@ export default async function MercurialPage({ searchParams }: { searchParams: Pr
     .map((r) => ({ ...r, priceMin: num(r.priceMin), price: num(r.price) }))
     .filter((r) => (f.inactive ? true : r.active))
     .filter((r) => !f.supplier || String(r.supplierId) === f.supplier)
-    .filter((r) => !f.service || (r.service ?? "").split(/,\s*/).includes(f.service))
     .filter((r) => !f.nature || (r.nature ?? "").split(/,\s*/).includes(f.nature))
     .filter((r) => !f.q || matches(`${r.name} ${r.supplier}`, f.q));
   if (f.sort) rows = sortRows(rows, (r) => r[f.sort as (typeof COLS)[number]], f.dir);
 
   const active = all.filter((r) => r.active);
-  const suppliers = [...new Map(active.map((r) => [r.supplierId, r.supplier])).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  // Tous les fournisseurs actifs, même sans produit (ex. fournisseur tout juste créé)
+  const suppliers = supplierRows;
   const split = (v: string | null) => (v ?? "").split(/,\s*/).filter(Boolean);
-  const services = [...new Set(active.flatMap((r) => split(r.service)))].sort();
   const natures = [...new Set(active.flatMap((r) => split(r.nature)))].sort((a, b) => a.localeCompare(b, "fr"));
   const suggestions = [...new Set([...active.map((r) => r.name), ...suppliers.map((x) => x.name)])];
   const editable = can.editMercurial(user.role);
-  const exportQs = new URLSearchParams(Object.entries({ q: f.q, supplier: f.supplier, service: f.service, nature: f.nature }).filter(([, v]) => v) as [string, string][]).toString();
+  const exportQs = new URLSearchParams(Object.entries({ q: f.q, supplier: f.supplier, nature: f.nature }).filter(([, v]) => v) as [string, string][]).toString();
 
   return (
     <>
@@ -67,7 +67,7 @@ export default async function MercurialPage({ searchParams }: { searchParams: Pr
 
       {editable && (
         <div className="mb-4 grid items-start gap-4 xl:grid-cols-[2fr_1fr]">
-          <AddRow suppliers={suppliers} units={units.map((u) => u.name)} services={services} natures={natures} />
+          <AddRow suppliers={suppliers} units={units.map((u) => u.name)} natures={natures} />
           <UnitsPanel units={units.map((u) => ({ id: u.id, name: u.name }))} />
         </div>
       )}
@@ -82,13 +82,6 @@ export default async function MercurialPage({ searchParams }: { searchParams: Pr
           <select name="supplier" defaultValue={f.supplier ?? ""} className="input py-2">
             <option value="">{t.common.all}</option>
             {suppliers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-          </select>
-        </label>
-        <label>
-          <span className="mb-1 block text-xs font-medium text-stone-600">{t.mercurial.service}</span>
-          <select name="service" defaultValue={f.service ?? ""} className="input py-2">
-            <option value="">{t.common.all}</option>
-            {services.map((x) => <option key={x} value={x}>{x}</option>)}
           </select>
         </label>
         <label>
@@ -107,7 +100,8 @@ export default async function MercurialPage({ searchParams }: { searchParams: Pr
       </form>
 
       <p className="mb-2 text-sm text-stone-500">{rows.length} {t.mercurial.count}{editable && ` · ${t.mercurial.priceTraced}`}</p>
-      <MercurialTable rows={rows} suppliers={suppliers} units={units.map((u) => u.name)} editable={editable} sort={f.sort} dir={f.dir} params={{ ...f, sort: undefined, dir: undefined }} />
+      <MercurialTable rows={rows} suppliers={suppliers} units={units.map((u) => u.name)} natures={natures} editable={editable} sort={f.sort} dir={f.dir} params={{ ...f, sort: undefined, dir: undefined }} />
+      <p className="mt-2 text-xs text-stone-500">{t.mercurial.fvManaged}</p>
     </>
   );
 }

@@ -50,8 +50,11 @@ export default async function FruitsLegumesPage({ searchParams }: { searchParams
         </label>
         <button className="btn-primary py-2">{t.common.filter}</button>
       </form>
-      <p className="mb-2 text-sm text-stone-500">{rows.length} {t.mercurial.count}</p>
-      <FvTable rows={rows.map((r) => ({ id: r.id, supplier: r.supplier, product: r.product, unit: r.unit, prices: r.prices, blocked: r.blocked }))} months={months} currentMonth={currentMonth} editable={can.editFv(user.role)} />
+      <p className="mb-2 flex flex-wrap items-center gap-3 text-sm text-stone-500">
+        <span>{rows.length} {t.mercurial.count}</span>
+        <span className="rounded bg-sky-50 px-2 py-0.5 text-sky-900">🔒 {t.fv.locked} : {rows.filter((r) => r.locked).length} — {t.fv.lockedHint}</span>
+      </p>
+      <FvTable rows={rows.map((r) => ({ id: r.id, supplier: r.supplier, product: r.product, unit: r.unit, prices: r.prices, blocked: r.blocked, locked: r.locked }))} months={months} currentMonth={currentMonth} editable={can.editFv(user.role)} />
     </>
   );
 }

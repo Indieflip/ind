@@ -14,7 +14,8 @@ import {
   jsonb,
 } from "drizzle-orm/pg-core";
 
-export const roleEnum = pgEnum("role", ["admin", "contributor", "viewer"]);
+/** Profils (onglet « Droits utilisateurs » du fichier) */
+export const roleEnum = pgEnum("role", ["admin", "econome", "comptable", "invite"]);
 export const decisionEnum = pgEnum("decision", ["conform", "reserve", "refuse"]);
 export const receptionStatusEnum = pgEnum("reception_status", ["conform", "with_reserves", "partial_refusal", "refused"]);
 export const priceChangeTypeEnum = pgEnum("price_change_type", ["increase", "decrease", "new_product"]);
@@ -29,6 +30,7 @@ export const anomalyTypeEnum = pgEnum("anomaly_type", [
   "price",
   "hygiene",
   "missing_bl",
+  "locked_price",
   "other",
 ]);
 export const anomalyStatusEnum = pgEnum("anomaly_status", ["open", "claimed", "credit_received", "closed"]);
@@ -47,7 +49,7 @@ export const users = pgTable(
     name: text("name").notNull(),
     email: text("email").notNull(),
     passwordHash: text("password_hash").notNull(),
-    role: roleEnum("role").notNull().default("contributor"),
+    role: roleEnum("role").notNull().default("econome"),
     locale: text("locale").notNull().default("fr"),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -105,8 +107,12 @@ export const products = pgTable(
     nature: text("nature"),
     /** Colonne « - » du fichier */
     priceMin: numeric("price_min", { precision: 12, scale: 4 }),
-    /** Prix HT de référence (colonne « + » du fichier) */
+    /** Prix maximum (colonne « + » du fichier). Le prix d'un BL compris entre min et max n'est pas un écart. */
     price: numeric("price", { precision: 12, scale: 4 }),
+    /** Prix bloqué : un prix différent sur un BL crée une anomalie, pas une variation de prix */
+    priceLocked: boolean("price_locked").notNull().default(false),
+    /** Produit issu de l'onglet Fruits et légumes (prix du mois en cours) */
+    fvItemId: integer("fv_item_id"),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -159,7 +165,10 @@ export const receptionLines = pgTable(
     dlc: date("dlc"),
     lot: text("lot"),
     unitPrice: numeric("unit_price", { precision: 12, scale: 4 }),
+    /** Tranche de prix de référence au moment du bon (min – max) */
+    mercurialMin: numeric("mercurial_min", { precision: 12, scale: 4 }),
     mercurialPrice: numeric("mercurial_price", { precision: 12, scale: 4 }),
+    priceLocked: boolean("price_locked").notNull().default(false),
     decision: decisionEnum("decision").notNull().default("conform"),
     reason: text("reason"),
     position: integer("position").notNull().default(0),
@@ -254,6 +263,8 @@ export const fvItems = pgTable("fv_items", {
   /** 24 valeurs : [janv. moins, janv. plus, févr. moins, …, déc. plus] */
   prices: jsonb("prices").$type<(number | null)[]>().notNull().default([]),
   blocked: text("blocked"),
+  /** Prix bloqué (produits en bleu dans le fichier) */
+  locked: boolean("locked").notNull().default(false),
   position: integer("position").notNull().default(0),
 });
 
@@ -283,6 +294,7 @@ export const bakeryEntries = pgTable(
     hamburger: numeric("hamburger", { precision: 10, scale: 2 }),
     rolls: numeric("rolls", { precision: 10, scale: 2 }),
     painDeMie: numeric("pain_de_mie", { precision: 10, scale: 2 }),
+    remark: text("remark"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("bakery_reception_idx").on(t.receptionId), index("bakery_date_idx").on(t.date)],
@@ -296,6 +308,40 @@ export const protocols = pgTable("protocols", {
   position: integer("position").notNull().default(100),
   updatedBy: integer("updated_by").references(() => users.id),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Brouillons de bons (enregistrés dès l'étape 1, repris plus tard depuis n'importe quel appareil) */
+export const receptionDrafts = pgTable("reception_drafts", {
+  id: serial("id").primaryKey(),
+  clientUuid: text("client_uuid").notNull().unique(),
+  supplierName: text("supplier_name"),
+  blNumber: text("bl_number"),
+  data: jsonb("data").notNull(),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Historique des imports de fichier */
+export const imports = pgTable("imports", {
+  id: serial("id").primaryKey(),
+  fileName: text("file_name").notNull(),
+  products: integer("products"),
+  suppliers: integer("suppliers"),
+  details: jsonb("details"),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Historique des sauvegardes (extractions de données) */
+export const backups = pgTable("backups", {
+  id: serial("id").primaryKey(),
+  kind: text("kind").notNull(), // manual | auto
+  fileName: text("file_name").notNull(),
+  size: integer("size"),
+  emailedTo: text("emailed_to"),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /** Stockage de secours des fichiers quand Vercel Blob n'est pas configuré */

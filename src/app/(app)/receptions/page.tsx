@@ -8,7 +8,9 @@ import { SortHeader, sortRows } from "@/components/SortHeader";
 import { Empty, Field, FilterBar, PageHeader, qs } from "@/components/ui";
 import { StatusBadge } from "@/components/DecisionBadge";
 import { Icon } from "@/components/Icon";
-import { DraftBanner } from "@/components/reception/DraftBanner";
+import { DraftBanner, DeleteDraftButton } from "@/components/reception/DraftBanner";
+import { desc, eq } from "drizzle-orm";
+import { getDb, schema } from "@/db";
 
 export default async function ReceptionsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser();
@@ -18,7 +20,15 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
   const sort = ["number", "bl", "date", "supplier", "lines", "status", "state", "author"].includes(one(sp.sort) ?? "") ? one(sp.sort)! : "date";
   // Par défaut : les plus récents d'abord
   const dir = one(sp.dir) === "asc" || one(sp.dir) === "desc" ? one(sp.dir)! : one(sp.sort) ? "asc" : "desc";
-  const [raw, suppliers] = await Promise.all([listReceptions(f), supplierOptions()]);
+  const [raw, suppliers, drafts] = await Promise.all([
+    listReceptions(f),
+    supplierOptions(),
+    getDb()
+      .select({ id: schema.receptionDrafts.id, supplierName: schema.receptionDrafts.supplierName, blNumber: schema.receptionDrafts.blNumber, updatedAt: schema.receptionDrafts.updatedAt, by: schema.users.name })
+      .from(schema.receptionDrafts)
+      .leftJoin(schema.users, eq(schema.users.id, schema.receptionDrafts.createdBy))
+      .orderBy(desc(schema.receptionDrafts.updatedAt)),
+  ]);
   const key: Record<string, (r: (typeof raw)[number]) => unknown> = {
     number: (r) => r.number, bl: (r) => r.blNumber, date: (r) => r.deliveredAt, supplier: (r) => r.supplierName,
     lines: (r) => r.lineCount, status: (r) => t.receptionStatus[r.status], state: (r) => (r.consolidatedAt ? 1 : 0), author: (r) => r.createdByName,
@@ -38,6 +48,25 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
       </PageHeader>
 
       {can.receive(user.role) && <DraftBanner />}
+      {one(sp.draft) === "saved" && <p className="no-print mb-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{t.receptions.draftSaved}</p>}
+      {drafts.length > 0 && can.receive(user.role) && (
+        <section className="no-print card mb-4 border-l-4 border-l-amber-400">
+          <h2 className="px-4 pt-3 text-sm font-semibold">{t.receptions.drafts} ({drafts.length})</h2>
+          <ul className="divide-y divide-stone-100">
+            {drafts.map((d) => (
+              <li key={d.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                <span className="min-w-0 flex-1 truncate">
+                  <strong>{d.supplierName || "—"}</strong>
+                  {d.blNumber && <span className="text-stone-500"> · BL {d.blNumber}</span>}
+                  <span className="text-xs text-stone-500"> · {fmtDateTime(d.updatedAt, locale)}{d.by ? ` ${t.receptions.draftBy} ${d.by}` : ""}</span>
+                </span>
+                <Link href={`/receptions/new?draft=${d.id}`} className="btn-primary px-3 py-1.5">{t.receptions.resumeDraft}</Link>
+                {can.deleteDraftReception(user.role) && <DeleteDraftButton id={d.id} confirmText={t.receptions.deleteDraftConfirm} label={t.common.delete} />}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <FilterBar applyLabel={t.common.filter} resetHref="/receptions" resetLabel={t.common.reset}>
         <Field label={t.receptions.searchBl}><input name="bl" defaultValue={f.bl} className="input w-36 py-2" placeholder="BL…" /></Field>

@@ -10,7 +10,7 @@ export default async function MercurialLayout({ children }: { children: React.Re
     { href: "/mercurial", label: t.mercurial.tabProducts, exact: true },
     { href: "/mercurial/fournisseurs", label: t.mercurial.tabSuppliers },
     { href: "/mercurial/boulangerie", label: t.mercurial.tabBakery },
-    ...(can.editMercurial(user.role) ? [{ href: "/mercurial/import", label: t.mercurial.tabImport }] : []),
+    ...(can.importFile(user.role) ? [{ href: "/mercurial/import", label: t.mercurial.tabImport }] : []),
   ];
   return (
     <>

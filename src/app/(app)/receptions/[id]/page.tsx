@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
 import { fmtDate, fmtDateTime, fmtMoney, fmtNum, fmtPct, num } from "@/lib/format";
-import { priceDiffPct } from "@/lib/rules";
+import { checkPrice } from "@/lib/pricing";
 import { StatusBadge, decisionStyles } from "@/components/DecisionBadge";
 import { Icon } from "@/components/Icon";
 import { PrintButton, DeleteReceptionButton, ConsolidateOneButton, AddNote } from "./Actions";
@@ -100,7 +100,8 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
       {/* Mobile : une carte par produit */}
       <ul className="space-y-2 md:hidden print:hidden">
         {lines.map((l) => {
-          const gap = priceDiffPct(num(l.unitPrice), num(l.mercurialPrice));
+          const pc = checkPrice(num(l.unitPrice), { min: num(l.mercurialMin), max: num(l.mercurialPrice), locked: l.priceLocked });
+          const gap = pc.kind === "increase" || pc.kind === "decrease" || pc.kind === "locked" ? pc.pct : null;
           return (
             <li key={l.id} className={`card border-l-4 ${decisionStyles[l.decision].border} p-3 text-sm`}>
               <div className="flex items-start justify-between gap-2">
@@ -145,7 +146,8 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
           </thead>
           <tbody>
             {lines.map((l) => {
-              const gap = priceDiffPct(num(l.unitPrice), num(l.mercurialPrice));
+              const pc = checkPrice(num(l.unitPrice), { min: num(l.mercurialMin), max: num(l.mercurialPrice), locked: l.priceLocked });
+          const gap = pc.kind === "increase" || pc.kind === "decrease" || pc.kind === "locked" ? pc.pct : null;
               const linePhotos = photos.filter((p) => p.lineId === l.id);
               return (
                 <tr key={l.id} className={`border-l-4 ${decisionStyles[l.decision].border}`}>

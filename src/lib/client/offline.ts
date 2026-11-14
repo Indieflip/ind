@@ -95,3 +95,25 @@ export async function syncOutbox(): Promise<number> {
     syncing = false;
   }
 }
+
+/** Enregistre le brouillon sur le serveur (photos envoyées d'abord). Retourne l'id du brouillon. */
+export async function saveServerDraft(d: Draft): Promise<number> {
+  const blPhotos = [];
+  for (const ph of d.blPhotos) blPhotos.push(await uploadIfNeeded(ph, "bl"));
+  const lines = [];
+  for (const l of d.lines) {
+    const photos = [];
+    for (const ph of l.photos) photos.push(await uploadIfNeeded(ph, "issue"));
+    lines.push({ ...l, photos });
+  }
+  const signature = d.signature ? await uploadIfNeeded(d.signature, "signature") : "";
+  const data = { ...d, blPhotos, lines, signature };
+  const res = await fetch("/api/drafts", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ clientUuid: d.clientUuid, supplierName: d.supplierName || null, blNumber: d.blNumber || null, data }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  await saveDraft(data as Draft);
+  return (await res.json()).id as number;
+}

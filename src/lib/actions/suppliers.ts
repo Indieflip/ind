@@ -1,5 +1,6 @@
 "use server";
 import { and, eq, sql } from "drizzle-orm";
+import { unitName } from "@/lib/units";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/db";
 import { assertUser } from "@/lib/auth";
@@ -93,6 +94,7 @@ export async function importCatalogAction(_p: R, form: FormData): Promise<R> {
       supplierId = s?.id ?? (await db.insert(schema.suppliers).values({ name: supplierName }).returning())[0].id;
       supplierCache.set(norm(supplierName), supplierId);
     }
+    unit = unitName(unit);
     if (unit) await db.insert(schema.units).values({ name: unit }).onConflictDoNothing();
     const categoryId = findCat(catRaw);
     const price = num(priceRaw.replace("€", ""));

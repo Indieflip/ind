@@ -1,5 +1,6 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { importExcelAction } from "@/lib/actions/excel";
 import { useI18n } from "@/lib/i18n/client";
 import { Icon } from "@/components/Icon";
@@ -9,6 +10,8 @@ export function ImportForm() {
   const x = t.excelImport;
   const [state, action, pending] = useActionState(importExcelAction, undefined);
   const r = state?.report;
+  const router = useRouter();
+  useEffect(() => { if (r) router.refresh(); }, [r, router]);
   return (
     <div className="max-w-2xl space-y-4">
       <form action={action} className="card space-y-4 p-4">
@@ -39,7 +42,7 @@ export function ImportForm() {
           <h2 className="mb-2 font-semibold text-emerald-700">{x.done}</h2>
           {r.mercurial && <p>{x.mercurial} : {r.mercurial.created} {x.created}, {r.mercurial.updated} {x.updated}, {r.mercurial.deactivated} {x.deactivated}, {r.mercurial.suppliers} {x.newSuppliers}</p>}
           {r.maj != null && <p>{x.maj} : {r.maj} {x.lines}</p>}
-          {r.fv != null && <p>{x.fv} : {r.fv} {x.lines}</p>}
+          {r.fv != null && <p>{x.fv} : {r.fv} {x.lines}{r.fvLocked ? ` (${r.fvLocked} 🔒)` : ""}</p>}
           {r.bakery && <p>{x.bakery} : {r.bakery.days} {x.days}</p>}
           {r.missing.length > 0 && <p className="text-amber-700">{x.missing} : {r.missing.join(", ")}</p>}
         </div>

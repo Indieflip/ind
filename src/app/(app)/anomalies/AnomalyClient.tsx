@@ -49,7 +49,7 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
         <textarea name="description" className="input" rows={2} required placeholder={t.anomalies.descriptionPlaceholder} />
       </label>
       <input type="hidden" name="photo" value={photo} />
-      <Thumbs photos={photo ? [photo] : []} onRemove={() => setPhoto("")} />
+      <Thumbs photos={photo ? [photo] : []} onRemove={() => confirm(t.wizard.removePhotoConfirm) && setPhoto("")} />
       <div className="flex flex-wrap gap-2">
         {!photo && <PhotoButton label={t.common.photo} onPhotos={(p) => setPhoto(p[0])} />}
         <button className="btn-primary" disabled={pending}>{t.common.save}</button>

@@ -41,7 +41,7 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     key: `line-${l.id}`,
     productId: l.productId,
     productName: l.productName,
-    unit: l.unit ?? "kg",
+    unit: l.unit ?? "Kg",
     categoryId: l.categoryId,
     qtyOrdered: str(l.qtyOrdered),
     qtyReceived: str(l.qtyReceived),
@@ -50,6 +50,8 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     lot: l.lot ?? "",
     unitPrice: str(l.unitPrice),
     mercurialPrice: num(l.mercurialPrice),
+    mercurialMin: num(l.mercurialMin),
+    priceLocked: l.priceLocked,
     decision: l.decision,
     // Décision forcée à la main à l'origine si elle diffère de la règle automatique : on la garde.
     // Sinon elle se recalcule quand on corrige une quantité, une température ou une DLC.
@@ -76,6 +78,8 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     vehicleClean: rec.vehicleClean,
     blPhotos: photos.filter((p) => p.kind === "bl").map((p) => p.url),
     blRead: "idle",
+    photoOk: photos.some((p) => p.kind === "bl"),
+    noBl: !photos.some((p) => p.kind === "bl"),
     lines: draftLines,
     reservesText: rec.reservesText ?? "",
     reservesEdited: false, // recalculé juste en dessous

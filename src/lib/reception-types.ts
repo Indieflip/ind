@@ -16,7 +16,10 @@ export interface CatalogProduct {
   name: string;
   unit: string;
   categoryId: number | null;
+  /** Tranche de prix de référence : min / max (mercurial, ou prix du mois pour les fruits et légumes) */
+  priceMin: number | null;
   price: number | null;
+  locked: boolean;
 }
 export interface Catalog {
   suppliers: CatalogSupplier[];
@@ -55,6 +58,8 @@ export interface DraftLine {
   lot: string;
   unitPrice: string;
   mercurialPrice: number | null;
+  mercurialMin?: number | null;
+  priceLocked?: boolean;
   decision: Decision;
   decisionManual: boolean;
   reason: Reason | "";
@@ -74,7 +79,10 @@ export interface Draft {
   truckTemp: string;
   vehicleClean: boolean | null;
   blPhotos: string[];
-  blRead: "idle" | "done" | "none" | "unavailable" | "error";
+  /** Étape 1 : qualité de la photo confirmée, ou livraison sans BL */
+  photoOk?: boolean;
+  noBl?: boolean;
+  blRead: "idle" | "running" | "done" | "none" | "unavailable" | "error";
   lines: DraftLine[];
   reservesText: string;
   reservesEdited: boolean;

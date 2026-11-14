@@ -1,4 +1,5 @@
 import "server-only";
+import { unitName } from "@/lib/units";
 import ExcelJS from "exceljs";
 import { eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -6,6 +7,7 @@ import { num } from "@/lib/format";
 import { normalize } from "@/lib/search";
 import { categoryCodeFromNature } from "@/lib/nature";
 import { setSetting } from "@/lib/settings";
+import { syncFvProducts } from "./fv";
 
 type Cell = string | number | Date | null;
 
@@ -50,9 +52,10 @@ function findSheet(wb: ExcelJS.Workbook, name: string) {
 }
 
 export interface ImportReport {
-  mercurial?: { created: number; updated: number; deactivated: number; suppliers: number };
+  mercurial?: { created: number; updated: number; deactivated: number; suppliers: number; fileProducts: number; fileSuppliers: number };
   maj?: number;
   fv?: number;
+  fvLocked?: number;
   bakery?: { days: number; prices: Record<string, number | null> };
   missing: string[];
 }
@@ -77,6 +80,7 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
       // Clé : fournisseur + produit + rang (le fichier contient quelques doublons volontaires)
       const pool = new Map<string, (typeof existing)[number][]>();
       for (const p of existing) {
+        if (p.fvItemId) continue;
         const k = `${p.supplierId}|${normalize(p.name)}`;
         pool.set(k, [...(pool.get(k) ?? []), p]);
       }
@@ -96,7 +100,7 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
             supplierIds.set(normalize(supplierName), supplierId);
             newSuppliers++;
           }
-          const unit = text(r[4]) ?? "";
+          const unit = unitName(text(r[4]));
           if (unit) units.add(unit);
           const values = {
             supplierId,
@@ -123,13 +127,18 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
         // Produits absents du fichier : retirés du mercurial (les bons passés les gardent)
         let deactivated = 0;
         for (const p of existing) {
-          if (!seen.has(p.id) && p.active) {
+          if (!seen.has(p.id) && p.active && !p.fvItemId) {
             await tx.update(schema.products).set({ active: false }).where(eq(schema.products.id, p.id));
             deactivated++;
           }
         }
         for (const u of units) await tx.insert(schema.units).values({ name: u }).onConflictDoNothing();
-        report.mercurial = { created, updated, deactivated, suppliers: newSuppliers };
+        const valid = rows.filter((r) => text(r[0]) && text(r[3]));
+        report.mercurial = {
+          created, updated, deactivated, suppliers: newSuppliers,
+          fileProducts: valid.length,
+          fileSuppliers: new Set(valid.map((r) => normalize(text(r[0])!))).size,
+        };
       });
     }
   }
@@ -164,12 +173,20 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
     const ws = findSheet(wb, "Fruits et légumes");
     if (!ws) report.missing.push("Fruits et légumes");
     else {
-      const rows = rowsOf(ws, 28).slice(2).filter((r) => text(r[1]));
+      // Produits en couleur (bleu) dans le fichier = prix bloqués
+      const lockedRows = new Set<number>();
+      ws.eachRow((row, n) => {
+        const f = row.getCell(2).fill as ExcelJS.FillPattern | undefined;
+        const c = f?.type === "pattern" && f.pattern !== "none" ? (f.fgColor as { argb?: string; indexed?: number; theme?: number } | undefined) : undefined;
+        const white = !c || c.argb === "FFFFFFFF" || c.indexed === 9 || c.indexed === 64 || (c.theme === 0 && !c.argb);
+        if (c && !white) lockedRows.add(n);
+      });
+      const rows = rowsOf(ws, 28).map((r, i) => ({ r, n: i + 1 })).slice(2).filter(({ r }) => text(r[1]));
       const year = Number(new Intl.DateTimeFormat("fr-FR", { year: "numeric", timeZone: "Europe/Paris" }).format(new Date()));
       await db.transaction(async (tx) => {
         await tx.delete(schema.fvItems).where(eq(schema.fvItems.year, year));
         let position = 0;
-        for (const r of rows) {
+        for (const { r, n } of rows) {
           await tx.insert(schema.fvItems).values({
             supplier: text(r[0]) ?? "",
             product: text(r[1])!,
@@ -177,11 +194,14 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
             year,
             prices: r.slice(3, 27).map(price),
             blocked: text(r[27]),
+            locked: lockedRows.has(n) || !!text(r[27]),
             position: position++,
           });
         }
       });
+      await syncFvProducts();
       report.fv = rows.length;
+      report.fvLocked = rows.filter(({ r, n }) => lockedRows.has(n) || !!text(r[27])).length;
     }
   }
 

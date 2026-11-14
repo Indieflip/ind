@@ -4,11 +4,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/client";
 import type { Catalog, Draft, DraftLine } from "@/lib/reception-types";
-import { clearDraft, enqueue, fetchCatalog, loadCatalogCache, loadDraft, saveDraft, sendReception } from "@/lib/client/offline";
+import { clearDraft, enqueue, fetchCatalog, loadCatalogCache, loadDraft, saveDraft, saveServerDraft, sendReception } from "@/lib/client/offline";
 import { Icon } from "../Icon";
-import { buildReservesText, newDraft, toPayload, withAutoDecision } from "./helpers";
+import { buildReservesText, lineFromProduct, newDraft, toPayload, withAutoDecision } from "./helpers";
 import { StepDelivery } from "./StepDelivery";
-import { StepBl } from "./StepBl";
+import { StepPhoto } from "./StepPhoto";
+import { ReadingBanner } from "./ReadingBanner";
 import { StepCheck } from "./StepCheck";
 import { StepValidate } from "./StepValidate";
 
@@ -21,6 +22,8 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<null | { id?: number; offline?: boolean }>(null);
   const [error, setError] = useState("");
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [readCount, setReadCount] = useState(0);
   const topRef = useRef<HTMLDivElement>(null);
 
   // Chargement : catalogue (cache puis réseau) + réception en cours
@@ -36,6 +39,14 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
       if (initialDraft) {
         if (alive) setDraftState(initialDraft);
         return;
+      }
+      const serverDraft = params.get("draft");
+      if (serverDraft) {
+        const res = await fetch(`/api/drafts/${serverDraft}`).catch(() => null);
+        if (res?.ok && alive) {
+          setDraftState({ ...newDraft(), ...((await res.json()).data as Draft) });
+          return;
+        }
       }
       const existing = params.get("new") ? undefined : await loadDraft();
       if (alive) setDraftState(existing ?? newDraft());
@@ -71,8 +82,84 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
     }
   }, [autoReserves, draft, setDraft]);
 
+  /** Lecture automatique du BL (lancée dès que la qualité de la photo est confirmée) */
+  const readBl = useCallback(
+    async (d: Draft) => {
+      if (!d.blPhotos.length) return;
+      if (!blReadingEnabled) {
+        setDraft((x) => ({ ...x, blRead: "unavailable" }));
+        return;
+      }
+      setDraft((x) => ({ ...x, blRead: "running" }));
+      try {
+        const res = await fetch("/api/bl/read", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ images: d.blPhotos, supplierId: d.supplierId }),
+        });
+        if (res.status === 503) return setDraft((x) => ({ ...x, blRead: "unavailable" }));
+        if (!res.ok) throw new Error(String(res.status));
+        const data = (await res.json()) as {
+          supplierId: number | null;
+          supplierName: string | null;
+          blNumber: string | null;
+          lines: { productId: number | null; name: string; unit: string | null; quantity: number | null; unitPrice: number | null; lot: string | null; dlc: string | null }[];
+        };
+        setReadCount(data.lines.length);
+        setDraft((x) => {
+          const lines = data.lines.map((r) => {
+            const product = catalog?.products.find((p) => p.id === r.productId) ?? null;
+            return withAutoDecision(
+              {
+                ...lineFromProduct(product, { fromBl: true }),
+                productName: product?.name ?? r.name,
+                unit: product?.unit ?? r.unit ?? "Kg",
+                qtyOrdered: r.quantity != null ? String(r.quantity) : "",
+                qtyReceived: r.quantity != null ? String(r.quantity) : "",
+                unitPrice: r.unitPrice != null ? String(r.unitPrice) : "",
+                lot: r.lot ?? "",
+                dlc: r.dlc ?? "",
+              },
+              catalog,
+            );
+          });
+          const chosen = !!x.supplierId || x.otherSupplier;
+          const supplier = !chosen && data.supplierId ? catalog?.suppliers.find((s) => s.id === data.supplierId) : undefined;
+          return {
+            ...x,
+            supplierId: supplier ? supplier.id : x.supplierId,
+            supplierName: supplier ? supplier.name : x.supplierName,
+            driverName: supplier && !x.driverName ? supplier.drivers[0] ?? "" : x.driverName,
+            blNumber: x.blNumber || data.blNumber || "",
+            blRead: lines.length ? "done" : "none",
+            lines: [...x.lines.filter((l) => !l.fromBl), ...lines],
+          };
+        });
+      } catch {
+        setDraft((x) => ({ ...x, blRead: "error" }));
+      }
+    },
+    [blReadingEnabled, catalog, setDraft],
+  );
+
   if (!draft) {
     return <div className="p-8 text-center text-stone-500">{t.common.loading}</div>;
+  }
+
+  async function saveAsDraft() {
+    if (!draft) return;
+    setDraftSaving(true);
+    setError("");
+    try {
+      await saveServerDraft(draft);
+      await clearDraft();
+      router.push("/receptions?draft=saved");
+      router.refresh();
+    } catch {
+      setError(t.wizard.draftError);
+    } finally {
+      setDraftSaving(false);
+    }
   }
 
   const go = (step: number) => {
@@ -81,8 +168,8 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
     window.scrollTo({ top: 0 });
   };
 
-  const canContinue =
-    draft.step === 0 ? (draft.otherSupplier ? draft.supplierName.trim().length > 0 : !!draft.supplierId) && !!draft.deliveredAt : true;
+  const supplierOk = (draft.otherSupplier ? draft.supplierName.trim().length > 0 : !!draft.supplierId) && !!draft.deliveredAt;
+  const canContinue = draft.step === 0 ? !!(draft.photoOk || draft.noBl) : draft.step === 1 ? supplierOk : true;
 
   async function finish() {
     if (!draft) return;
@@ -167,10 +254,25 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
       </header>
 
       <div className="space-y-4 p-4 pb-32">
-        {draft.step === 0 && <StepDelivery draft={draft} setDraft={setDraft} catalog={catalog} />}
-        {draft.step === 1 && (
-          <StepBl draft={draft} setDraft={setDraft} catalog={catalog} enabled={blReadingEnabled} onNext={() => go(2)} />
+        {draft.step === 0 && (
+          <StepPhoto
+            draft={draft}
+            setDraft={setDraft}
+            readingEnabled={blReadingEnabled}
+            onConfirm={() => {
+              const d = { ...draft, photoOk: true, noBl: false };
+              setDraft(() => d);
+              go(1);
+              void readBl(d);
+            }}
+            onNoBl={() => {
+              setDraft((d) => ({ ...d, noBl: true, photoOk: false, blRead: "idle" }));
+              go(1);
+            }}
+          />
         )}
+        {draft.step > 0 && draft.step < 3 && <ReadingBanner draft={draft} count={readCount || draft.lines.filter((l) => l.fromBl).length} onRetry={() => readBl(draft)} />}
+        {draft.step === 1 && <StepDelivery draft={draft} setDraft={setDraft} catalog={catalog} />}
         {draft.step === 2 && <StepCheck draft={draft} setDraft={setDraft} updateLine={updateLine} catalog={catalog} />}
         {draft.step === 3 && <StepValidate draft={draft} setDraft={setDraft} catalog={catalog} autoReserves={autoReserves} />}
         {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
@@ -199,6 +301,11 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
           {editId && draft.step < 3 && (
             <button type="button" className="btn-secondary btn-lg flex-1" disabled={saving || !canContinue} onClick={finish}>
               <Icon name="check" /> {saving ? t.wizard.saving : t.common.save}
+            </button>
+          )}
+          {!editId && draft.step >= 1 && (
+            <button type="button" className="btn-secondary btn-lg flex-1 px-3" disabled={draftSaving || saving} onClick={saveAsDraft} title={t.wizard.saveDraftHint}>
+              <Icon name="file" /> <span className="hidden sm:inline">{draftSaving ? t.wizard.saving : t.wizard.saveDraft}</span>
             </button>
           )}
           {draft.step < 3 ? (

@@ -1,39 +1,93 @@
-// Matrice des droits — un seul endroit à modifier si besoin.
-export type Role = "admin" | "contributor" | "viewer";
+// Profils et droits (onglet « Droits utilisateurs » du fichier).
+// Les droits sont modifiables par l'administrateur dans Réglages > Droits utilisateurs ;
+// la matrice est chargée depuis la base à chaque requête (voir loadRights dans auth.ts).
+export type Role = "admin" | "econome" | "comptable" | "invite";
+export const PROFILES: Role[] = ["admin", "econome", "comptable", "invite"];
+type Others = Exclude<Role, "admin">;
 
+export const RIGHTS = [
+  // Réceptions
+  { key: "createReception", tab: "receptions", defaults: { econome: true, comptable: false, invite: true } },
+  { key: "editReception", tab: "receptions", defaults: { econome: true, comptable: false, invite: true } },
+  { key: "deleteReception", tab: "receptions", defaults: { econome: true, comptable: false, invite: true } },
+  { key: "addNote", tab: "receptions", defaults: { econome: true, comptable: false, invite: true } },
+  { key: "consolidate", tab: "consolidation", defaults: { econome: false, comptable: false, invite: false } },
+  // Anomalies
+  { key: "createAnomaly", tab: "anomalies", defaults: { econome: true, comptable: false, invite: true } },
+  { key: "manageAnomalies", tab: "anomalies", defaults: { econome: false, comptable: false, invite: false } },
+  // Mercurial
+  { key: "importFile", tab: "mercurial", defaults: { econome: false, comptable: false, invite: false } },
+  { key: "editMercurial", tab: "mercurial", defaults: { econome: false, comptable: false, invite: false } },
+  { key: "editFv", tab: "fruitsVeg", defaults: { econome: false, comptable: false, invite: false } },
+  { key: "editPrices", tab: "prices", defaults: { econome: false, comptable: false, invite: false } },
+  // Consultation
+  { key: "viewPrices", tab: "prices", defaults: { econome: true, comptable: true, invite: true } },
+  { key: "viewReporting", tab: "reporting", defaults: { econome: true, comptable: true, invite: false } },
+  // Protocoles
+  { key: "editProtocols", tab: "protocols", defaults: { econome: false, comptable: false, invite: false } },
+  // Réglages
+  { key: "manageUsers", tab: "settings", defaults: { econome: false, comptable: false, invite: false } },
+  { key: "manageRights", tab: "settings", defaults: { econome: false, comptable: false, invite: false } },
+  { key: "backup", tab: "settings", defaults: { econome: false, comptable: false, invite: false } },
+] as const;
+
+export type RightKey = (typeof RIGHTS)[number]["key"];
+export type RightsMatrix = Record<RightKey, Record<Others, boolean>>;
+
+export function defaultMatrix(): RightsMatrix {
+  return Object.fromEntries(RIGHTS.map((r) => [r.key, { ...r.defaults }])) as RightsMatrix;
+}
+
+export function mergeMatrix(stored: unknown): RightsMatrix {
+  const m = defaultMatrix();
+  if (stored && typeof stored === "object") {
+    for (const r of RIGHTS) {
+      const v = (stored as Record<string, Record<string, unknown>>)[r.key];
+      if (v) for (const p of ["econome", "comptable", "invite"] as Others[]) if (typeof v[p] === "boolean") m[r.key][p] = v[p] as boolean;
+    }
+  }
+  return m;
+}
+
+// Matrice courante (identique pour tous les utilisateurs, rechargée à chaque requête authentifiée)
+let matrix: RightsMatrix = defaultMatrix();
+export function setCurrentMatrix(m: RightsMatrix) {
+  matrix = m;
+}
+
+export function has(role: Role, key: RightKey) {
+  if (role === "admin") return true;
+  return !!matrix[key]?.[role];
+}
+
+const all = (_r: Role) => true;
+
+/** Vérifications utilisées dans les pages et actions */
 export const can = {
-  /** Faire / reprendre une réception */
-  receive: (r: Role) => r === "admin" || r === "contributor",
-  /** Voir l'historique des réceptions */
-  viewReceptions: (_r: Role) => true,
-  /** Modifier un bon déjà enregistré */
-  editReception: (r: Role) => r === "admin" || r === "contributor",
-  /** Supprimer un bon non consolidé (erreur de saisie, doublon) */
-  deleteDraftReception: (r: Role) => r === "admin" || r === "contributor",
-  /** Consolider = valider un bon (il devient non modifiable) */
-  consolidate: (r: Role) => r === "admin",
-  viewConsolidation: (_r: Role) => true,
-  /** Ajouter une note sur un bon consolidé */
-  addNote: (r: Role) => r === "admin" || r === "contributor",
-  /** Protocoles */
-  viewProtocols: (_r: Role) => true,
-  editProtocols: (r: Role) => r === "admin",
-  /** Fruits et légumes */
-  viewFv: (_r: Role) => true,
-  editFv: (r: Role) => r === "admin",
-  /** Mercurial (fournisseur, produit, unité, prix) */
-  viewMercurial: (_r: Role) => true,
-  editMercurial: (r: Role) => r === "admin",
-  /** Onglet Suivi des prix */
-  viewPrices: (r: Role) => r === "admin" || r === "viewer",
-  editPrices: (r: Role) => r === "admin",
-  /** Mercurial / fournisseurs */
-  viewSuppliers: (_r: Role) => true,
-  editSuppliers: (r: Role) => r === "admin",
-  /** Anomalies */
-  viewAnomalies: (_r: Role) => true,
-  createAnomaly: (r: Role) => r === "admin" || r === "contributor",
-  manageAnomalies: (r: Role) => r === "admin",
-  viewReporting: (r: Role) => r === "admin" || r === "viewer",
-  manageSettings: (r: Role) => r === "admin",
+  receive: (r: Role) => has(r, "createReception"),
+  viewReceptions: all,
+  editReception: (r: Role) => has(r, "editReception"),
+  deleteDraftReception: (r: Role) => has(r, "deleteReception"),
+  addNote: (r: Role) => has(r, "addNote"),
+  consolidate: (r: Role) => has(r, "consolidate"),
+  viewConsolidation: all,
+  createAnomaly: (r: Role) => has(r, "createAnomaly"),
+  viewAnomalies: all,
+  manageAnomalies: (r: Role) => has(r, "manageAnomalies"),
+  viewMercurial: all,
+  viewSuppliers: all,
+  editMercurial: (r: Role) => has(r, "editMercurial"),
+  editSuppliers: (r: Role) => has(r, "editMercurial"),
+  importFile: (r: Role) => has(r, "importFile"),
+  viewFv: all,
+  editFv: (r: Role) => has(r, "editFv"),
+  viewPrices: (r: Role) => has(r, "viewPrices"),
+  editPrices: (r: Role) => has(r, "editPrices"),
+  viewReporting: (r: Role) => has(r, "viewReporting"),
+  viewProtocols: all,
+  editProtocols: (r: Role) => has(r, "editProtocols"),
+  manageSettings: (r: Role) => has(r, "manageUsers") || has(r, "manageRights") || has(r, "backup"),
+  manageUsers: (r: Role) => has(r, "manageUsers"),
+  manageRights: (r: Role) => has(r, "manageRights"),
+  backup: (r: Role) => has(r, "backup"),
 };

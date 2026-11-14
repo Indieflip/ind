@@ -4,7 +4,7 @@ Application web (mobile + ordinateur) de contrôle des livraisons : vérificatio
 
 - **Téléphone** : réception en 4 étapes (livraison → photo du BL → contrôle produit par produit → réserves + signature). Installable sur l'écran d'accueil, fonctionne hors connexion (la réception est gardée sur le téléphone et envoyée au retour du réseau).
 - **Ordinateur** : historique, suivi des prix, fournisseurs / mercurial, anomalies, reporting, réglages.
-- **Rôles** : Administrateur (tout), Contributeur (réceptions, anomalies, consultation), Lecture seule. Matrice dans `src/lib/permissions.ts`.
+- **Profils** : Administrateur, Économe, Comptable, Invité économe. Droits par défaut dans `src/lib/permissions.ts`, modifiables dans Réglages > Droits utilisateurs.
 - **Langues** : français / anglais (bouton FR/EN).
 
 ## Stack
@@ -19,6 +19,9 @@ Next.js 16 (App Router) · PostgreSQL (Neon) via Drizzle ORM · Tailwind CSS 4 �
 | `BLOB_READ_WRITE_TOKEN` | conseillé | Ajoutée en créant un store Vercel Blob relié au projet. Sans elle, les photos sont stockées en base |
 | `ANTHROPIC_API_KEY` | non | Active la lecture automatique des BL. Sans elle, la saisie est manuelle |
 | `AUTH_SECRET` | non | Secret des sessions ; sinon généré et stocké en base au premier lancement |
+| `RESEND_API_KEY` | non | Envoi automatique des sauvegardes par e-mail (service Resend) |
+| `CRON_SECRET` | non | Protège la tâche planifiée de sauvegarde (`/api/cron/backup`, chaque jour à 4 h UTC) |
+| `BACKUP_FROM_EMAIL` | non | Expéditeur des e-mails de sauvegarde (domaine vérifié chez Resend) |
 
 ## Déploiement
 

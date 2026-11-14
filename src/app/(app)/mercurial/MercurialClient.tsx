@@ -1,58 +1,78 @@
 "use client";
 import Link from "next/link";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   addMercurialRowAction, addUnitAction, deleteUnitAction, renameUnitAction, setProductActiveAction, updateMercurialRowAction,
 } from "@/lib/actions/mercurial";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtMoney } from "@/lib/format";
+import { matches } from "@/lib/search";
 import { Icon } from "@/components/Icon";
 import { UnitSelect } from "@/components/UnitSelect";
+import { NatureSelect } from "@/components/NatureSelect";
 
 interface Opt { id: number; name: string }
 interface Row {
-  id: number; supplierId: number; supplier: string; service: string | null; nature: string | null;
-  name: string; unit: string; priceMin: number | null; price: number | null; active: boolean;
+  id: number; supplierId: number; supplier: string; nature: string | null;
+  name: string; unit: string; priceMin: number | null; price: number | null; priceLocked: boolean; active: boolean;
 }
 
-export function AddRow({ suppliers, units, services, natures }: { suppliers: Opt[]; units: string[]; services: string[]; natures: string[] }) {
+export function AddRow({ suppliers, units, natures }: { suppliers: Opt[]; units: string[]; natures: string[] }) {
   const { t } = useI18n();
   const m = t.mercurial;
+  const router = useRouter();
   const [state, action, pending] = useActionState(addMercurialRowAction, undefined);
   const [supplierId, setSupplierId] = useState("");
-  const [unit, setUnit] = useState(units[0] ?? "kg");
+  const [unit, setUnit] = useState(units[0] ?? "Kg");
+  const [natureKey, setNatureKey] = useState(0);
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (state?.ok) {
       const keep = supplierId; // on garde le fournisseur pour enchaîner les saisies
       ref.current?.reset();
-      setSupplierId(keep === "new" ? "" : keep);
+      setSupplierId(keep);
+      setNatureKey((k) => k + 1);
       (ref.current?.querySelector('input[name="name"]') as HTMLInputElement | null)?.focus();
     }
   }, [state, supplierId]);
   return (
     <form ref={ref} action={action} className="card space-y-3 p-4">
       <h2 className="font-semibold">{m.addRow}</h2>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.2fr_1.6fr_1fr_0.8fr_0.8fr]">
         <label>
           <span className="label">{t.common.supplier} *</span>
-          <select name="supplierId" className="input" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} required>
+          <select
+            name="supplierId"
+            className="input"
+            value={supplierId}
+            required
+            onChange={(e) => {
+              // « Rajout fournisseur » : création dans l'onglet Fournisseurs
+              if (e.target.value === "new") router.push("/mercurial/fournisseurs#new");
+              else setSupplierId(e.target.value);
+            }}
+          >
             <option value="" />
             {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            <option value="new">+ {m.newSupplier}</option>
+            <option value="new">{m.addSupplierLink}</option>
           </select>
         </label>
-        <label><span className="label">{m.service}</span><input name="service" className="input" list="services-list" /></label>
-        <label><span className="label">{m.nature}</span><input name="nature" className="input" list="natures-list" /></label>
         <label><span className="label">{m.products} *</span><input name="name" className="input" required /></label>
         <label><span className="label">{t.common.unit} *</span><UnitSelect name="unit" value={unit} units={units} onChange={setUnit} required /></label>
-        <label><span className="label" title={m.minusTitle}>{m.minus}</span><input name="priceMin" className="input" inputMode="decimal" /></label>
-        <label><span className="label" title={m.plusTitle}>{m.plus}</span><input name="price" className="input" inputMode="decimal" /></label>
-        <div className="flex items-end"><button className="btn-primary w-full" disabled={pending}><Icon name="plus" className="h-4 w-4" />{t.common.add}</button></div>
+        <label><span className="label">{m.priceMin}</span><input name="priceMin" className="input" inputMode="decimal" /></label>
+        <label><span className="label">{m.priceMax}</span><input name="price" className="input" inputMode="decimal" /></label>
       </div>
-      <datalist id="services-list">{services.map((x) => <option key={x} value={x} />)}</datalist>
-      <datalist id="natures-list">{natures.map((x) => <option key={x} value={x} />)}</datalist>
-      {supplierId === "new" && <input name="newSupplier" className="input max-w-sm" placeholder={m.newSupplierName} required />}
+      <div className="grid gap-2 sm:grid-cols-[2fr_1fr_auto] sm:items-end">
+        <div>
+          <span className="label">{m.nature}</span>
+          <NatureSelect key={natureKey} name="nature" value="" options={natures} />
+        </div>
+        <label className="flex items-center gap-2 pb-2 text-sm" title={m.lockedHint}>
+          <input type="checkbox" name="priceLocked" className="h-4 w-4 accent-brand-600" /> 🔒 {m.locked}
+        </label>
+        <button className="btn-primary" disabled={pending}><Icon name="plus" className="h-4 w-4" />{t.common.add}</button>
+      </div>
       {state?.error && <p className="text-sm text-red-600">{state.error === "exists" ? m.exists : t.common.error}</p>}
     </form>
   );
@@ -81,10 +101,13 @@ export function UnitsPanel({ units }: { units: Opt[] }) {
               type="button"
               className="rounded-full p-1 text-stone-400 hover:bg-stone-100 hover:text-red-600"
               aria-label={t.common.delete}
-              onClick={() => start(async () => {
-                const r = await deleteUnitAction(u.id);
-                setError(r.error ? t.mercurial.unitUsed : "");
-              })}
+              onClick={() => {
+                if (!confirm(`${t.mercurial.unitDeleteConfirm}\n${u.name}`)) return;
+                start(async () => {
+                  const r = await deleteUnitAction(u.id);
+                  setError(r.error ? t.mercurial.unitUsed : "");
+                });
+              }}
             >
               <Icon name="x" className="h-3.5 w-3.5" />
             </button>
@@ -102,7 +125,7 @@ export function UnitsPanel({ units }: { units: Opt[] }) {
   );
 }
 
-function Th({ label, col, sort, dir, params, align, title }: { label: string; col: string; sort?: string; dir: string; params: Record<string, string | undefined>; align?: "right"; title?: string }) {
+function Th({ label, col, sort, dir, params, align }: { label: string; col: string; sort?: string; dir: string; params: Record<string, string | undefined>; align?: "right" }) {
   const { t } = useI18n();
   const on = sort === col;
   const next = on && dir === "asc" ? "desc" : "asc";
@@ -111,7 +134,7 @@ function Th({ label, col, sort, dir, params, align, title }: { label: string; co
   q.set("sort", col);
   q.set("dir", next);
   return (
-    <th className={align === "right" ? "text-right" : ""} title={title}>
+    <th className={align === "right" ? "text-right" : ""}>
       <Link href={`/mercurial?${q}`} className="inline-flex items-center gap-1 hover:text-stone-900" title={next === "asc" ? t.receptions.sortAsc : t.receptions.sortDesc}>
         {label}
         <span className={`text-[10px] ${on ? "text-brand-600" : "text-stone-300"}`}>{on ? (dir === "asc" ? "▲" : "▼") : "▲▼"}</span>
@@ -120,37 +143,69 @@ function Th({ label, col, sort, dir, params, align, title }: { label: string; co
   );
 }
 
-export function MercurialTable({ rows, suppliers, units, editable, sort, dir, params }: {
-  rows: Row[]; suppliers: Opt[]; units: string[]; editable: boolean; sort?: string; dir: string; params: Record<string, string | undefined>;
+type FilterKey = "supplier" | "nature" | "name" | "unit" | "priceMin" | "price";
+
+export function MercurialTable({ rows, suppliers, units, natures, editable, sort, dir, params }: {
+  rows: Row[]; suppliers: Opt[]; units: string[]; natures: string[]; editable: boolean; sort?: string; dir: string; params: Record<string, string | undefined>;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const m = t.mercurial;
   const h = { sort, dir, params };
+  // Filtres par colonne (en direct, accents et majuscules ignorés)
+  const [filters, setFilters] = useState<Record<FilterKey, string>>({ supplier: "", nature: "", name: "", unit: "", priceMin: "", price: "" });
+  const shown = useMemo(() => {
+    const val = (r: Row, k: FilterKey) =>
+      k === "priceMin" ? (r.priceMin != null ? fmtMoney(r.priceMin, locale) : "") : k === "price" ? (r.price != null ? fmtMoney(r.price, locale) : "") : String(r[k] ?? "");
+    return rows.filter((r) => (Object.keys(filters) as FilterKey[]).every((k) => !filters[k] || matches(val(r, k), filters[k])));
+  }, [rows, filters, locale]);
+  const filterInput = (k: FilterKey) => (
+    <th className="bg-white py-1.5">
+      <input
+        className="input px-2 py-1 text-xs font-normal"
+        placeholder={m.columnFilter}
+        value={filters[k]}
+        onChange={(e) => setFilters((f) => ({ ...f, [k]: e.target.value }))}
+      />
+    </th>
+  );
   return (
-    <div className="card overflow-x-auto">
-      <table className="table">
-        <thead>
-          <tr>
-            <Th label={t.common.supplier} col="supplier" {...h} />
-            <Th label={m.service} col="service" {...h} />
-            <Th label={m.nature} col="nature" {...h} />
-            <Th label={m.products} col="name" {...h} />
-            <Th label={t.common.unit} col="unit" {...h} />
-            <Th label={m.minus} col="priceMin" align="right" title={m.minusTitle} {...h} />
-            <Th label={m.plus} col="price" align="right" title={m.plusTitle} {...h} />
-            {editable && <th />}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => <MercurialRow key={r.id} r={r} suppliers={suppliers} units={units} editable={editable} />)}
-        </tbody>
-      </table>
-    </div>
+    <>
+      {shown.length !== rows.length && <p className="mb-2 text-sm text-stone-500">{shown.length} / {rows.length} {m.count}</p>}
+      <div className="card max-h-[75vh] overflow-auto">
+        <table className="table">
+          <thead className="sticky top-0 z-10">
+            <tr>
+              <Th label={t.common.supplier} col="supplier" {...h} />
+              <Th label={m.nature} col="nature" {...h} />
+              <Th label={m.products} col="name" {...h} />
+              <Th label={t.common.unit} col="unit" {...h} />
+              <Th label={m.priceMin} col="priceMin" align="right" {...h} />
+              <Th label={m.priceMax} col="price" align="right" {...h} />
+              {editable && <th />}
+            </tr>
+            <tr>
+              {filterInput("supplier")}
+              {filterInput("nature")}
+              {filterInput("name")}
+              {filterInput("unit")}
+              {filterInput("priceMin")}
+              {filterInput("price")}
+              {editable && <th className="bg-white" />}
+            </tr>
+          </thead>
+          <tbody>
+            {shown.slice(0, 600).map((r) => <MercurialRow key={r.id} r={r} suppliers={suppliers} units={units} natures={natures} editable={editable} />)}
+          </tbody>
+        </table>
+        {shown.length > 600 && <p className="p-3 text-center text-xs text-stone-500">600 / {shown.length} — {m.columnFilter}</p>}
+      </div>
+    </>
   );
 }
 
-function MercurialRow({ r, suppliers, units, editable }: { r: Row; suppliers: Opt[]; units: string[]; editable: boolean }) {
+function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; suppliers: Opt[]; units: string[]; natures: string[]; editable: boolean }) {
   const { t, locale } = useI18n();
+  const m = t.mercurial;
   const [edit, setEdit] = useState(false);
   const [pending, start] = useTransition();
   const [unit, setUnit] = useState(r.unit);
@@ -161,12 +216,11 @@ function MercurialRow({ r, suppliers, units, editable }: { r: Row; suppliers: Op
     return (
       <tr className={r.active ? "" : "opacity-50"}>
         <td className="whitespace-nowrap text-stone-600">{r.supplier}</td>
-        <td className="text-stone-600">{r.service ?? ""}</td>
         <td className="text-stone-600">{r.nature ?? ""}</td>
-        <td className="font-medium">{r.name}</td>
+        <td className="font-medium">{r.name}{r.priceLocked && <span className="ml-1.5 badge bg-sky-100 text-sky-800" title={m.lockedHint}>🔒 {m.locked}</span>}</td>
         <td>{r.unit}</td>
-        <td className="whitespace-nowrap text-right tabular-nums text-stone-500">{r.priceMin != null ? fmtMoney(r.priceMin, locale) : ""}</td>
-        <td className="whitespace-nowrap text-right font-medium tabular-nums">{r.price != null ? fmtMoney(r.price, locale) : ""}</td>
+        <td className="whitespace-nowrap text-right tabular-nums">{r.priceMin != null ? fmtMoney(r.priceMin, locale) : ""}</td>
+        <td className="whitespace-nowrap text-right tabular-nums">{r.price != null ? fmtMoney(r.price, locale) : ""}</td>
         {editable && (
           <td className="text-right">
             <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setEdit(true)}><Icon name="edit" className="h-3.5 w-3.5" /> {t.common.edit}</button>
@@ -176,15 +230,19 @@ function MercurialRow({ r, suppliers, units, editable }: { r: Row; suppliers: Op
     );
   }
   return (
-    <tr className="bg-brand-50/40">
+    <tr className="bg-brand-50/40 align-top">
       <td className="min-w-40">
         <select className="input py-1.5" defaultValue={r.supplierId} onChange={(e) => save({ supplierId: Number(e.target.value) })}>
           {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </td>
-      <td className="min-w-28"><input className="input py-1.5" list="services-list" defaultValue={r.service ?? ""} onBlur={(e) => e.target.value !== (r.service ?? "") && save({ service: e.target.value })} /></td>
-      <td className="min-w-28"><input className="input py-1.5" list="natures-list" defaultValue={r.nature ?? ""} onBlur={(e) => e.target.value !== (r.nature ?? "") && save({ nature: e.target.value })} /></td>
-      <td className="min-w-56"><input className="input py-1.5 font-medium" defaultValue={r.name} onBlur={(e) => e.target.value.trim() && e.target.value !== r.name && save({ name: e.target.value })} /></td>
+      <td className="min-w-56"><NatureSelect value={r.nature ?? ""} options={natures} onChange={(v) => save({ nature: v })} /></td>
+      <td className="min-w-56">
+        <input className="input py-1.5 font-medium" defaultValue={r.name} onBlur={(e) => e.target.value.trim() && e.target.value !== r.name && save({ name: e.target.value })} />
+        <label className="mt-1.5 flex items-center gap-2 text-xs" title={m.lockedHint}>
+          <input type="checkbox" defaultChecked={r.priceLocked} className="h-4 w-4 accent-brand-600" onChange={(e) => save({ priceLocked: e.target.checked })} /> 🔒 {m.locked}
+        </label>
+      </td>
       <td className="min-w-24"><UnitSelect className="input py-1.5" value={unit} units={units} onChange={(u) => { setUnit(u); save({ unit: u }); }} /></td>
       <td className="min-w-24"><input className="input py-1.5 text-right" inputMode="decimal" defaultValue={str(r.priceMin)} onBlur={(e) => e.target.value !== str(r.priceMin) && save({ priceMin: e.target.value })} /></td>
       <td className="min-w-24"><input className="input py-1.5 text-right" inputMode="decimal" defaultValue={str(r.price)} onBlur={(e) => e.target.value !== str(r.price) && save({ price: e.target.value })} /></td>
@@ -193,7 +251,7 @@ function MercurialRow({ r, suppliers, units, editable }: { r: Row; suppliers: Op
           type="button"
           className="btn-ghost px-2 py-1 text-xs text-red-600"
           disabled={pending}
-          onClick={() => { if (!r.active || confirm(t.suppliers.deleteWarning)) start(() => setProductActiveAction(r.id, !r.active)); }}
+          onClick={() => { if (confirm(r.active ? t.suppliers.deleteWarning : `${t.suppliers.reactivate} ?`)) start(() => setProductActiveAction(r.id, !r.active)); }}
         >
           {r.active ? t.suppliers.deactivate : t.suppliers.reactivate}
         </button>

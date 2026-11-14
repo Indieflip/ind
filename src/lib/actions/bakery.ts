@@ -16,7 +16,7 @@ export async function addBakeryRowAction(_p: { ok?: boolean; error?: string } | 
     const n = num(form.get(k));
     return n != null ? String(n) : null;
   };
-  await getDb().insert(schema.bakeryEntries).values({ date, baguette: v("baguette"), hamburger: v("hamburger"), rolls: v("rolls"), painDeMie: v("painDeMie") });
+  await getDb().insert(schema.bakeryEntries).values({ date, baguette: v("baguette"), hamburger: v("hamburger"), rolls: v("rolls"), painDeMie: v("painDeMie"), remark: String(form.get("remark") ?? "").trim() || null });
   revalidatePath("/mercurial/boulangerie");
   return { ok: true };
 }
@@ -39,5 +39,11 @@ export async function setBakeryPriceAction(item: string, value: string) {
 export async function setBakerySupplierAction(name: string) {
   await assertUser(can.editMercurial);
   if (name.trim()) await setSetting("bakery_supplier", name.trim());
+  revalidatePath("/mercurial/boulangerie");
+}
+
+export async function setBakeryRemarkAction(id: number, remark: string) {
+  await assertUser(can.editMercurial);
+  await getDb().update(schema.bakeryEntries).set({ remark: remark.trim() || null }).where(eq(schema.bakeryEntries.id, id));
   revalidatePath("/mercurial/boulangerie");
 }

@@ -68,3 +68,23 @@ export function DraftBanner() {
     </div>
   );
 }
+
+export function DeleteDraftButton({ id, confirmText, label }: { id: number; confirmText: string; label: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      className="btn-ghost p-1.5 text-stone-400 hover:text-red-600"
+      aria-label={label}
+      disabled={busy}
+      onClick={async () => {
+        if (!confirm(confirmText)) return;
+        setBusy(true);
+        await fetch(`/api/drafts/${id}`, { method: "DELETE" });
+        router.refresh();
+      }}
+    >
+      <Icon name="trash" className="h-4 w-4" />
+    </button>
+  );
+}

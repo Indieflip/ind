@@ -1,4 +1,5 @@
-import { evaluateLine, priceDiffPct, type Evaluation } from "@/lib/rules";
+import { evaluateLine, type Evaluation } from "@/lib/rules";
+import { checkPrice } from "@/lib/pricing";
 import { num } from "@/lib/format";
 import type { Catalog, CatalogProduct, Draft, DraftLine, ReceptionPayload } from "@/lib/reception-types";
 import type { Dict } from "@/lib/i18n";
@@ -42,7 +43,7 @@ export function lineFromProduct(p: CatalogProduct | null, extra: Partial<DraftLi
     key: uuid(),
     productId: p?.id ?? null,
     productName: p?.name ?? "",
-    unit: p?.unit ?? "kg",
+    unit: p?.unit ?? "Kg",
     categoryId: p?.categoryId ?? null,
     qtyOrdered: "",
     qtyReceived: "",
@@ -51,6 +52,8 @@ export function lineFromProduct(p: CatalogProduct | null, extra: Partial<DraftLi
     lot: "",
     unitPrice: "",
     mercurialPrice: p?.price ?? null,
+    mercurialMin: p?.priceMin ?? null,
+    priceLocked: p?.locked ?? false,
     decision: "conform",
     decisionManual: false,
     reason: "",
@@ -88,8 +91,15 @@ export function withAutoDecision(line: DraftLine, catalog: Catalog | undefined):
   return { ...line, decision: ev.decision, reason };
 }
 
+/** Comparaison du prix saisi avec la tranche min – max (ou le prix bloqué) */
+export function priceCheck(line: DraftLine) {
+  return checkPrice(num(line.unitPrice), { min: line.mercurialMin ?? null, max: line.mercurialPrice, locked: !!line.priceLocked });
+}
+
+/** Écart en % seulement si le prix sort de la tranche */
 export function priceGap(line: DraftLine) {
-  return priceDiffPct(num(line.unitPrice), line.mercurialPrice);
+  const c = priceCheck(line);
+  return c.kind === "increase" || c.kind === "decrease" || c.kind === "locked" ? c.pct : null;
 }
 
 export function needsTemp(line: DraftLine, catalog: Catalog | undefined) {
@@ -141,7 +151,7 @@ export function toPayload(d: Draft): ReceptionPayload {
       .map((l) => ({
         productId: l.productId,
         productName: l.productName.trim(),
-        unit: l.unit || "kg",
+        unit: l.unit || "Kg",
         categoryId: l.categoryId,
         qtyOrdered: num(l.qtyOrdered),
         qtyReceived: num(l.qtyReceived),

@@ -6,7 +6,17 @@ import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 import { getDb, schema } from "@/db";
-import type { Role } from "./permissions";
+import { mergeMatrix, setCurrentMatrix, type Role } from "./permissions";
+
+/** Charge la matrice des droits (Réglages > Droits utilisateurs) */
+export async function loadRights() {
+  const row = await getDb().query.appSettings.findFirst({ where: eq(schema.appSettings.key, "rights") });
+  let stored: unknown = null;
+  try {
+    stored = row ? JSON.parse(row.value) : null;
+  } catch {}
+  setCurrentMatrix(mergeMatrix(stored));
+}
 
 const COOKIE = "rm_session";
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 jours : pas besoin de se reconnecter à chaque livraison
@@ -68,7 +78,7 @@ export async function getUser(): Promise<SessionUser | null> {
   try {
     const { payload } = await jwtVerify(token, await secret());
     const uid = Number(payload.uid);
-    const user = await getDb().query.users.findFirst({ where: eq(schema.users.id, uid) });
+    const [user] = await Promise.all([getDb().query.users.findFirst({ where: eq(schema.users.id, uid) }), loadRights()]);
     if (!user || !user.active) return null;
     return { id: user.id, name: user.name, email: user.email, role: user.role, locale: user.locale };
   } catch {

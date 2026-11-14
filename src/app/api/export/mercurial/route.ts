@@ -1,4 +1,4 @@
-import { and, asc, eq, type SQL } from "drizzle-orm";
+import { and, asc, eq, isNull, type SQL } from "drizzle-orm";
 import { matches } from "@/lib/search";
 import { getDb, schema } from "@/db";
 import { getUser } from "@/lib/auth";
@@ -14,14 +14,13 @@ export async function GET(req: Request) {
   const sp = new URL(req.url).searchParams;
   const p = schema.products;
   const s = schema.suppliers;
-  const conds: SQL[] = [eq(p.active, true)];
+  const conds: SQL[] = [eq(p.active, true), isNull(p.fvItemId)];
   const supplier = sp.get("supplier");
   const q = sp.get("q")?.trim();
   if (supplier && /^\d+$/.test(supplier)) conds.push(eq(p.supplierId, Number(supplier)));
-  const service = sp.get("service");
   const nature = sp.get("nature");
   const rows = await getDb()
-    .select({ supplier: s.name, service: p.service, nature: p.nature, name: p.name, unit: p.unit, priceMin: p.priceMin, price: p.price })
+    .select({ supplier: s.name, priceLocked: p.priceLocked, nature: p.nature, name: p.name, unit: p.unit, priceMin: p.priceMin, price: p.price })
     .from(p)
     .innerJoin(s, eq(s.id, p.supplierId))
     .where(and(...conds))
@@ -29,11 +28,10 @@ export async function GET(req: Request) {
   const m = t.mercurial;
   // Mêmes colonnes que le fichier Excel : Fournisseur | Service | Nature | Produits | Unite | - | +
   return csvResponse(`mercurial-${new Date().toISOString().slice(0, 10)}.csv`, [
-    [t.common.supplier, m.service, m.nature, m.products, t.common.unit, "-", "+"],
+    [t.common.supplier, m.nature, m.products, t.common.unit, m.priceMin, m.priceMax, m.locked],
     ...rows
       .filter((r) => !q || matches(`${r.name} ${r.supplier}`, q))
-      .filter((r) => !service || (r.service ?? "").split(/,\s*/).includes(service))
       .filter((r) => !nature || (r.nature ?? "").split(/,\s*/).includes(nature))
-      .map((r) => [r.supplier, r.service, r.nature, r.name, r.unit, num(r.priceMin), num(r.price)]),
+      .map((r) => [r.supplier, r.nature, r.name, r.unit, num(r.priceMin), num(r.price), r.priceLocked ? t.common.yes : ""]),
   ]);
 }

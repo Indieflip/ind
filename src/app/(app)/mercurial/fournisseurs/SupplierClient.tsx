@@ -12,7 +12,7 @@ export function AddSupplier() {
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => { if (state?.ok) ref.current?.reset(); }, [state]);
   return (
-    <form ref={ref} action={action} className="card space-y-2 p-4">
+    <form ref={ref} action={action} id="new" className="card space-y-2 p-4 target:ring-2 target:ring-brand-500">
       <h2 className="font-semibold">{t.suppliers.addSupplier}</h2>
       <div className="flex gap-2">
         <input name="name" className="input" placeholder={t.suppliers.supplierName} required />
@@ -53,7 +53,7 @@ export function SupplierInfo({ id, name, email, phone, notes, active }: { id: nu
         <button
           className={active ? "btn-ghost text-red-600" : "btn-secondary"}
           disabled={pending}
-          onClick={() => { if (!active || confirm(t.suppliers.deleteWarning)) save({ active: !active }); }}
+          onClick={() => { if (confirm(active ? t.suppliers.deleteWarning : `${t.suppliers.reactivate} ?`)) save({ active: !active }); }}
         >
           {active ? t.suppliers.deactivate : t.suppliers.reactivate}
         </button>
@@ -66,7 +66,7 @@ interface Cat { id: number; name: string }
 
 export function AddProduct({ supplierId, categories, units }: { supplierId: number; categories: Cat[]; units: string[] }) {
   const { t } = useI18n();
-  const [unit, setUnit] = useState(units[0] ?? "kg");
+  const [unit, setUnit] = useState(units[0] ?? "Kg");
   const [state, action, pending] = useActionState(addProductAction, undefined);
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => { if (state?.ok) ref.current?.reset(); }, [state]);
@@ -90,24 +90,26 @@ export function AddProduct({ supplierId, categories, units }: { supplierId: numb
 
 export function ProductRow({
   p,
-  categories,
   editable,
 }: {
-  p: { id: number; name: string; unit: string; categoryId: number | null; price: string | null; active: boolean };
-  categories: Cat[];
+  p: { id: number; name: string; unit: string; nature: string | null; priceMin: string | null; price: string | null; priceLocked: boolean; active: boolean };
   editable: boolean;
 }) {
   const { t, locale } = useI18n();
+  const m = t.mercurial;
   const [pending, start] = useTransition();
   const [edit, setEdit] = useState(false);
-  const cat = categories.find((c) => c.id === p.categoryId);
+  const lo = p.priceMin ?? p.price;
+  const hi = p.price ?? p.priceMin;
   if (!editable || !edit) {
     return (
       <tr className={p.active ? "" : "opacity-50"}>
-        <td className="font-medium">{p.name}</td>
+        <td className="font-medium">{p.name}{p.priceLocked && <span className="ml-1.5 badge bg-sky-100 text-sky-800">🔒 {m.locked}</span>}</td>
         <td>{p.unit}</td>
-        <td className="text-stone-600">{cat?.name ?? "—"}</td>
+        <td className="text-stone-600">{p.nature ?? "—"}</td>
+        <td className="text-right tabular-nums">{fmtMoney(p.priceMin, locale)}</td>
         <td className="text-right tabular-nums">{fmtMoney(p.price, locale)}</td>
+        <td className="whitespace-nowrap text-right tabular-nums text-stone-600">{lo == null ? "—" : lo === hi ? fmtMoney(lo, locale) : `${fmtMoney(lo, locale)} – ${fmtMoney(hi, locale)}`}</td>
         <td className="text-right">
           {editable && <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setEdit(true)}>{t.common.edit}</button>}
         </td>
@@ -118,18 +120,15 @@ export function ProductRow({
     <tr>
       <td><input className="input py-1.5" defaultValue={p.name} onBlur={(e) => start(() => updateProductAction(p.id, { name: e.target.value }))} /></td>
       <td><input className="input w-24 py-1.5" list="units-list" defaultValue={p.unit} onBlur={(e) => start(() => updateProductAction(p.id, { unit: e.target.value }))} /></td>
-      <td>
-        <select className="input py-1.5" defaultValue={p.categoryId ?? ""} onChange={(e) => start(() => updateProductAction(p.id, { categoryId: Number(e.target.value) || null }))}>
-          <option value="" />
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-      </td>
+      <td className="text-stone-600">{p.nature ?? "—"}</td>
+      <td className="text-right text-xs text-stone-500">{fmtMoney(p.priceMin, locale)}</td>
       <td className="text-right text-xs text-stone-500">{fmtMoney(p.price, locale)}</td>
+      <td />
       <td className="whitespace-nowrap text-right">
         <button
           className="btn-ghost px-2 py-1 text-xs text-red-600"
           disabled={pending}
-          onClick={() => { if (!p.active || confirm(t.suppliers.deleteWarning)) start(() => updateProductAction(p.id, { active: !p.active })); }}
+          onClick={() => { if (confirm(p.active ? t.suppliers.deleteWarning : `${t.suppliers.reactivate} ?`)) start(() => updateProductAction(p.id, { active: !p.active })); }}
         >
           {p.active ? t.suppliers.deactivate : t.suppliers.reactivate}
         </button>

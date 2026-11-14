@@ -24,8 +24,52 @@ export function StepValidate({
   }).length;
   const missingTemps = draft.lines.filter((l) => needsTemp(l, catalog));
 
+  const w = t.wizard;
+  const dash = (v: string | null | undefined) => (v && String(v).trim() ? v : "—");
   return (
     <>
+      <section className="card p-4">
+        <h2 className="font-semibold">{w.recap}</h2>
+        <p className="mb-3 text-xs text-stone-500">{w.recapHint}</p>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+          <div><dt className="text-stone-500">{t.common.supplier}</dt><dd className="font-semibold">{dash(draft.supplierName)}</dd></div>
+          <div><dt className="text-stone-500">{w.dateTime}</dt><dd className="font-medium">{draft.deliveredAt.replace("T", " ")}</dd></div>
+          <div><dt className="text-stone-500">{w.blNumber}</dt><dd className="font-medium">{dash(draft.blNumber)}</dd></div>
+          <div><dt className="text-stone-500">{w.driverName}</dt><dd className="font-medium">{dash(draft.driverName)}</dd></div>
+          <div><dt className="text-stone-500">{t.receptions.truckTemp}</dt><dd className="font-medium">{draft.truckTemp ? `${draft.truckTemp} °C` : "—"}</dd></div>
+          <div><dt className="text-stone-500">{t.receptions.vehicleClean}</dt><dd className="font-medium">{draft.vehicleClean == null ? "—" : draft.vehicleClean ? t.common.yes : t.common.no}</dd></div>
+          <div className="col-span-2"><dt className="text-stone-500">{t.receptions.blPhotos}</dt><dd className="font-medium">{draft.blPhotos.length || (draft.noBl ? t.receptions.noBl : "—")}</dd></div>
+        </dl>
+        {draft.bakery && (
+          <p className="mt-2 text-sm text-stone-700">
+            {t.wizard.bakery} : {(["baguette", "hamburger", "rolls", "painDeMie"] as const).filter((k) => draft.bakery?.[k]).map((k) => `${t.bakery[k]} ${draft.bakery![k]}`).join(" · ") || "—"}
+          </p>
+        )}
+        <div className="mt-3 overflow-x-auto">
+          {draft.lines.length === 0 ? (
+            <p className="text-sm text-stone-500">{w.noLines}</p>
+          ) : (
+            <table className="w-full text-left text-xs">
+              <thead className="text-stone-500">
+                <tr><th className="py-1 pr-2">{t.common.product}</th><th className="px-1 text-right">{w.received}</th><th className="px-1 text-right">°C</th><th className="px-1">DLC</th><th className="px-1 text-right">{t.common.price}</th><th className="pl-1">{t.common.status}</th></tr>
+              </thead>
+              <tbody>
+                {draft.lines.map((l) => (
+                  <tr key={l.key} className="border-t border-stone-100">
+                    <td className="py-1.5 pr-2 font-medium">{l.productName}</td>
+                    <td className="px-1 text-right tabular-nums">{dash(l.qtyReceived)}{l.qtyOrdered && l.qtyOrdered !== l.qtyReceived ? ` / ${l.qtyOrdered}` : ""} {l.unit}</td>
+                    <td className="px-1 text-right tabular-nums">{dash(l.temperature)}</td>
+                    <td className="px-1 whitespace-nowrap">{l.dlc ? l.dlc.split("-").reverse().join("/") : "—"}</td>
+                    <td className="px-1 text-right tabular-nums">{dash(l.unitPrice)}</td>
+                    <td className="pl-1"><span className={`badge ${decisionStyles[l.decision].badge}`}>{t.decision[l.decision]}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </section>
+
       <section className="card p-4">
         <h2 className="mb-3 font-semibold">{t.wizard.summary}</h2>
         <div className="grid grid-cols-3 gap-2 text-center">
@@ -76,7 +120,7 @@ export function StepValidate({
         </div>
         <div>
           <span className="label">{t.wizard.signHere}</span>
-          <SignaturePad value={draft.signature} onChange={(sig) => setDraft((d) => ({ ...d, signature: sig, signerName: d.signerName || d.driverName }))} clearLabel={t.wizard.clearSignature} />
+          <SignaturePad value={draft.signature} onChange={(sig) => setDraft((d) => ({ ...d, signature: sig, signerName: d.signerName || d.driverName }))} clearLabel={t.wizard.clearSignature} confirmText={t.wizard.clearSignatureConfirm} />
         </div>
       </section>
     </>

@@ -2,6 +2,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { getUser } from "@/lib/auth";
 import { num } from "@/lib/format";
+import { fvRange, parisMonth } from "@/lib/pricing";
 import type { Catalog } from "@/lib/reception-types";
 import { getBakerySupplier } from "@/lib/settings";
 
@@ -22,6 +23,9 @@ export async function GET() {
       ) d order by last desc`),
     db.select({ name: schema.units.name }).from(schema.units).orderBy(asc(schema.units.position), asc(schema.units.name)),
   ]);
+  // Fruits et légumes : prix du mois en cours
+  const month = parisMonth(new Date());
+  const fvById = new Map((await db.select().from(schema.fvItems)).map((f) => [f.id, f]));
   const bySupplier = new Map<number, string[]>();
   for (const r of drivers.rows) {
     const list = bySupplier.get(r.supplier_id) ?? [];
@@ -30,7 +34,11 @@ export async function GET() {
   }
   const catalog: Catalog = {
     suppliers: suppliers.map((s) => ({ ...s, drivers: bySupplier.get(s.id) ?? [] })),
-    products: products.map((p) => ({ id: p.id, supplierId: p.supplierId, name: p.name, unit: p.unit, categoryId: p.categoryId, price: num(p.price) ?? num(p.priceMin) })),
+    products: products.map((p) => {
+      const fv = p.fvItemId ? fvById.get(p.fvItemId) : undefined;
+      const range = fv ? fvRange(fv.prices, month) : { min: num(p.priceMin), max: num(p.price) };
+      return { id: p.id, supplierId: p.supplierId, name: p.name, unit: p.unit, categoryId: p.categoryId, priceMin: range.min, price: range.max, locked: fv ? fv.locked : p.priceLocked };
+    }),
     categories: categories.map((c) => ({ id: c.id, code: c.code, nameFr: c.nameFr, nameEn: c.nameEn, tempRequired: c.tempRequired, conformMax: c.conformMax, reserveMax: c.reserveMax })),
     units: units.map((u) => u.name),
     bakerySupplier: await getBakerySupplier(),

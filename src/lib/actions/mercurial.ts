@@ -1,5 +1,6 @@
 "use server";
 import { and, eq, sql } from "drizzle-orm";
+import { unitName } from "@/lib/units";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/db";
 import { assertUser } from "@/lib/auth";
@@ -22,7 +23,7 @@ function refresh() {
 }
 
 async function ensureUnit(name: string) {
-  const n = name.trim();
+  const n = unitName(name);
   if (n) await getDb().insert(schema.units).values({ name: n }).onConflictDoNothing();
   return n;
 }
@@ -39,6 +40,7 @@ export async function addMercurialRowAction(_p: R, form: FormData): Promise<R> {
   const priceMin = num(form.get("priceMin"));
   const service = String(form.get("service") ?? "").trim() || null;
   const nature = String(form.get("nature") ?? "").trim() || null;
+  const priceLocked = form.get("priceLocked") === "on";
   const categoryId = await categoryIdFor(nature);
   if (!supplierId && newSupplier) {
     const found = await db.query.suppliers.findFirst({ where: eq(sql`lower(${schema.suppliers.name})`, newSupplier.toLowerCase()) });
@@ -50,7 +52,7 @@ export async function addMercurialRowAction(_p: R, form: FormData): Promise<R> {
   });
   if (dup) return { error: "exists" };
   await db.insert(schema.products).values({
-    supplierId, name, unit, categoryId, service, nature,
+    supplierId, name, unit, categoryId, service, nature, priceLocked,
     price: price != null ? String(price) : null,
     priceMin: priceMin != null ? String(priceMin) : null,
   });
@@ -61,7 +63,7 @@ export async function addMercurialRowAction(_p: R, form: FormData): Promise<R> {
 /** Modification d'une cellule du mercurial. Un changement de prix est tracé dans le suivi des prix. */
 export async function updateMercurialRowAction(
   id: number,
-  data: { supplierId?: number; name?: string; unit?: string; price?: string; priceMin?: string; service?: string; nature?: string },
+  data: { supplierId?: number; name?: string; unit?: string; price?: string; priceMin?: string; service?: string; nature?: string; priceLocked?: boolean },
 ) {
   const user = await assertUser(can.editMercurial);
   const db = getDb();
@@ -72,6 +74,7 @@ export async function updateMercurialRowAction(
   if (data.name?.trim()) set.name = data.name.trim();
   if (data.unit?.trim()) set.unit = await ensureUnit(data.unit);
   if (data.service !== undefined) set.service = data.service.trim() || null;
+  if (data.priceLocked !== undefined) set.priceLocked = data.priceLocked;
   if (data.nature !== undefined) {
     set.nature = data.nature.trim() || null;
     set.categoryId = await categoryIdFor(set.nature);
@@ -122,7 +125,7 @@ export async function addUnitAction(name: string) {
 
 export async function renameUnitAction(id: number, name: string) {
   await assertUser(can.editMercurial);
-  const n = name.trim();
+  const n = unitName(name);
   if (!n) return;
   const db = getDb();
   const unit = await db.query.units.findFirst({ where: eq(schema.units.id, id) });

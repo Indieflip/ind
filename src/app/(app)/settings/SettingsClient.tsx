@@ -1,6 +1,7 @@
 "use client";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { addUserAction, setRestaurantAction, updateCategoryAction, updateUserAction } from "@/lib/actions/settings";
+import { addUserAction, deleteUserAction, saveBackupSettingsAction, saveRightsAction, setRestaurantAction, updateCategoryAction, updateUserAction } from "@/lib/actions/settings";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/client";
 import { PasswordInput } from "@/components/PasswordInput";
 import { Icon } from "@/components/Icon";
@@ -27,7 +28,7 @@ export function UserRow({ user, isMe }: { user: { id: number; name: string; emai
       <td className="text-stone-600">{user.email}</td>
       <td>
         <select className="input py-1.5" defaultValue={user.role} disabled={isMe || pending} onChange={(e) => start(() => updateUserAction(user.id, { role: e.target.value }))}>
-          {(["admin", "contributor", "viewer"] as const).map((r) => <option key={r} value={r}>{t.roles[r]}</option>)}
+          {(["admin", "econome", "comptable", "invite"] as const).map((r) => <option key={r} value={r}>{t.roles[r]}</option>)}
         </select>
       </td>
       <td>
@@ -43,6 +44,24 @@ export function UserRow({ user, isMe }: { user: { id: number; name: string; emai
           </button>
           {done && <span className="self-center text-xs text-emerald-700">{t.common.saved}</span>}
         </div>
+      </td>
+      <td className="text-right">
+        {!isMe && (
+          <button
+            className="btn-ghost p-1.5 text-stone-400 hover:text-red-600"
+            aria-label={t.common.delete}
+            disabled={pending}
+            onClick={() => {
+              if (!confirm(`${t.settings.deleteUserConfirm}\n${user.name}`)) return;
+              start(async () => {
+                const r = await deleteUserAction(user.id);
+                if (r.error === "used") alert(t.settings.deleteUserUsed);
+              });
+            }}
+          >
+            <Icon name="trash" className="h-4 w-4" />
+          </button>
+        )}
       </td>
     </tr>
   );
@@ -60,8 +79,8 @@ export function AddUser() {
       <label><span className="label">{t.auth.password}</span><PasswordInput name="password" minLength={8} required autoComplete="new-password" placeholder={t.auth.passwordHint} /></label>
       <label>
         <span className="label">{t.settings.role}</span>
-        <select name="role" className="input" defaultValue="contributor">
-          {(["contributor", "viewer", "admin"] as const).map((r) => <option key={r} value={r}>{t.roles[r]}</option>)}
+        <select name="role" className="input" defaultValue="econome">
+          {(["econome", "invite", "comptable", "admin"] as const).map((r) => <option key={r} value={r}>{t.roles[r]}</option>)}
         </select>
       </label>
       <button className="btn-primary" disabled={pending}><Icon name="plus" className="h-4 w-4" />{t.settings.addUser}</button>
@@ -79,5 +98,91 @@ export function CategoryRow({ c }: { c: { id: number; name: string; tempRequired
       <td><input className="input w-24 py-1.5" inputMode="decimal" defaultValue={c.conformMax ?? ""} onBlur={(e) => start(() => updateCategoryAction(c.id, { conformMax: e.target.value }))} /></td>
       <td><input className="input w-24 py-1.5" inputMode="decimal" defaultValue={c.reserveMax ?? ""} onBlur={(e) => start(() => updateCategoryAction(c.id, { reserveMax: e.target.value }))} /></td>
     </tr>
+  );
+}
+
+type Others = "econome" | "comptable" | "invite";
+
+export function RightsEditor({ rights, matrix }: { rights: { key: string; tab: string }[]; matrix: Record<string, Record<Others, boolean>> }) {
+  const { t } = useI18n();
+  const router = useRouter();
+  const [m, setM] = useState(matrix);
+  const [pending, start] = useTransition();
+  const [saved, setSaved] = useState(false);
+  const profiles: Others[] = ["econome", "comptable", "invite"];
+  const tabLabel = (tab: string) => (t.nav as Record<string, string>)[tab] ?? tab;
+  return (
+    <div className="p-4">
+      <table className="table">
+        <thead>
+          <tr>
+            <th>{t.rights.tab}</th>
+            <th>{t.rights.right}</th>
+            <th className="text-center">{t.roles.admin}</th>
+            {profiles.map((p) => <th key={p} className="text-center">{t.roles[p]}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {rights.map((r) => (
+            <tr key={r.key}>
+              <td className="text-stone-500">{tabLabel(r.tab)}</td>
+              <td>{(t.rights as Record<string, string>)[r.key] ?? r.key}</td>
+              <td className="text-center"><input type="checkbox" checked disabled className="h-4 w-4" /></td>
+              {profiles.map((p) => (
+                <td key={p} className="text-center">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-brand-600"
+                    checked={!!m[r.key]?.[p]}
+                    onChange={(e) => { setSaved(false); setM((x) => ({ ...x, [r.key]: { ...x[r.key], [p]: e.target.checked } })); }}
+                  />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="mt-3 flex items-center gap-3">
+        <button className="btn-primary" disabled={pending} onClick={() => start(async () => { await saveRightsAction(m); setSaved(true); router.refresh(); })}>
+          <Icon name="check" className="h-4 w-4" /> {t.common.save}
+        </button>
+        {saved && <span className="text-sm text-emerald-700">{t.rights.saved}</span>}
+      </div>
+    </div>
+  );
+}
+
+export function BackupSettings({ initial, emailReady }: { initial: { email: string; frequencyDays: number; retentionYears: number }; emailReady: boolean }) {
+  const { t } = useI18n();
+  const b = t.backup;
+  const [v, setV] = useState(initial);
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState("");
+  return (
+    <div className="space-y-3 rounded-lg bg-stone-50 p-4">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label>
+          <span className="label">{b.email}</span>
+          <input className="input" type="email" value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} placeholder="compta@…" />
+        </label>
+        <label>
+          <span className="label">{b.frequency}</span>
+          <input className="input" type="number" min={1} max={90} value={v.frequencyDays} onChange={(e) => setV({ ...v, frequencyDays: Number(e.target.value) })} />
+        </label>
+        <label>
+          <span className="label">{b.retention}</span>
+          <input className="input" type="number" min={1} max={30} value={v.retentionYears} onChange={(e) => setV({ ...v, retentionYears: Number(e.target.value) })} />
+        </label>
+      </div>
+      <p className="text-xs text-stone-600">{b.retentionHint}</p>
+      <p className={`text-xs ${emailReady ? "text-emerald-700" : "text-amber-800"}`}>{emailReady ? b.emailReady : b.emailNotReady}</p>
+      <div className="flex items-center gap-3">
+        <button className="btn-primary" disabled={pending} onClick={() => start(async () => {
+          const r = await saveBackupSettingsAction(v);
+          setMsg(r.error ? b.emailInvalid : t.common.saved);
+        })}>{t.common.save}</button>
+        {msg && <span className="text-sm text-stone-600">{msg}</span>}
+      </div>
+    </div>
   );
 }
