@@ -6,7 +6,14 @@ export const can = {
   receive: (r: Role) => r === "admin" || r === "contributor",
   /** Voir l'historique des réceptions */
   viewReceptions: (_r: Role) => true,
+  /** Modifier un bon déjà enregistré */
+  editReception: (r: Role) => r === "admin" || r === "contributor",
   deleteReception: (r: Role) => r === "admin",
+  /** Consolidation des bons (montants) */
+  consolidate: (r: Role) => r === "admin" || r === "viewer",
+  /** Mercurial (fournisseur, produit, unité, prix) */
+  viewMercurial: (_r: Role) => true,
+  editMercurial: (r: Role) => r === "admin",
   /** Onglet Suivi des prix */
   viewPrices: (r: Role) => r === "admin" || r === "viewer",
   editPrices: (r: Role) => r === "admin",

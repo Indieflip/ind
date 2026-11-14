@@ -25,6 +25,9 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
     db.select().from(schema.categories),
     rec.createdBy ? db.query.users.findFirst({ where: eq(schema.users.id, rec.createdBy), columns: { name: true } }) : undefined,
   ]);
+  const editor = rec.updatedBy ? await db.query.users.findFirst({ where: eq(schema.users.id, rec.updatedBy), columns: { name: true } }) : undefined;
+  // Montant HT accepté : quantité reçue × prix, hors produits refusés
+  const total = lines.reduce((sum, l) => (l.decision === "refuse" ? sum : sum + (num(l.qtyReceived) ?? 0) * (num(l.unitPrice) ?? 0)), 0);
   const catName = (cid: number | null) => {
     const c = categories.find((x) => x.id === cid);
     return c ? (locale === "en" ? c.nameEn : c.nameFr) : "—";
@@ -36,7 +39,13 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
     <div className="space-y-4">
       <div className="no-print flex items-center justify-between gap-2">
         <Link href="/receptions" className="btn-ghost -ml-2 px-2"><Icon name="chevronLeft" className="h-4 w-4" /> {t.nav.receptions}</Link>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          {can.editReception(user.role) && (
+            <Link href={`/receptions/${rec.id}/edit`} className="btn-primary"><Icon name="edit" className="h-4 w-4" /> {t.receptions.edit}</Link>
+          )}
+          {can.consolidate(user.role) && (
+            <Link href={`/consolidation?ids=${rec.id}`} className="btn-secondary"><Icon name="layers" className="h-4 w-4" /> {t.receptions.consolidate}</Link>
+          )}
           <PrintButton label={t.common.print} />
           {can.deleteReception(user.role) && <DeleteReceptionButton id={rec.id} label={t.common.delete} confirmText={`${t.receptions.deleteHint}\n\n${t.common.confirmDelete}`} />}
         </div>
@@ -57,6 +66,12 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
           <div><dt className="text-stone-500">{t.receptions.truckTemp}</dt><dd className="font-medium">{rec.truckTemp != null ? `${fmtNum(rec.truckTemp, locale, 1)} °C` : "—"}</dd></div>
           <div><dt className="text-stone-500">{t.receptions.vehicleClean}</dt><dd className="font-medium">{rec.vehicleClean == null ? "—" : rec.vehicleClean ? t.common.yes : t.common.no}</dd></div>
           <div><dt className="text-stone-500">{t.receptions.createdBy}</dt><dd className="font-medium">{author?.name ?? "—"}</dd></div>
+          {rec.updatedAt && (
+            <div><dt className="text-stone-500">{t.receptions.editedOn}</dt><dd className="font-medium">{fmtDateTime(rec.updatedAt, locale)}{editor ? ` ${t.receptions.editedBy} ${editor.name}` : ""}</dd></div>
+          )}
+          {showPrices && total > 0 && (
+            <div><dt className="text-stone-500">{t.receptions.total}</dt><dd className="font-semibold">{fmtMoney(total, locale)}</dd></div>
+          )}
         </dl>
       </section>
 

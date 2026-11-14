@@ -12,7 +12,7 @@ import { StepBl } from "./StepBl";
 import { StepCheck } from "./StepCheck";
 import { StepValidate } from "./StepValidate";
 
-export function Wizard({ blReadingEnabled }: { blReadingEnabled: boolean }) {
+export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEnabled: boolean; editId?: number; initialDraft?: Draft }) {
   const { t } = useI18n();
   const router = useRouter();
   const params = useSearchParams();
@@ -33,20 +33,24 @@ export function Wizard({ blReadingEnabled }: { blReadingEnabled: boolean }) {
       if (fresh && alive) setCatalog(fresh);
     })();
     (async () => {
+      if (initialDraft) {
+        if (alive) setDraftState(initialDraft);
+        return;
+      }
       const existing = params.get("new") ? undefined : await loadDraft();
       if (alive) setDraftState(existing ?? newDraft());
     })();
     return () => {
       alive = false;
     };
-  }, [params]);
+  }, [params, initialDraft]);
 
   // Sauvegarde automatique sur le téléphone à chaque saisie
   useEffect(() => {
-    if (!draft || done) return;
+    if (!draft || done || editId) return; // en modification, rien n'est gardé sur le téléphone
     const id = setTimeout(() => saveDraft(draft), 250);
     return () => clearTimeout(id);
-  }, [draft, done]);
+  }, [draft, done, editId]);
 
   const setDraft = useCallback((fn: (d: Draft) => Draft) => setDraftState((d) => (d ? fn(d) : d)), []);
 
@@ -86,11 +90,16 @@ export function Wizard({ blReadingEnabled }: { blReadingEnabled: boolean }) {
     setError("");
     const payload = toPayload(draft);
     try {
-      const id = await sendReception(payload);
+      const id = await sendReception(payload, editId);
+      if (editId) {
+        router.push(`/receptions/${editId}`);
+        router.refresh();
+        return;
+      }
       await clearDraft();
       setDone({ id });
     } catch (e) {
-      if ((e as { fatal?: boolean }).fatal) {
+      if (editId || (e as { fatal?: boolean }).fatal) {
         setError(`${t.common.error} : ${(e as Error).message}`);
       } else {
         await enqueue(payload);
@@ -131,13 +140,14 @@ export function Wizard({ blReadingEnabled }: { blReadingEnabled: boolean }) {
     <div className="mx-auto min-h-dvh max-w-2xl bg-stone-50" ref={topRef}>
       <header className="sticky top-0 z-20 border-b border-stone-200 bg-white/95 px-4 pb-3 backdrop-blur" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
         <div className="flex items-center justify-between gap-2">
-          <Link href="/receptions" className="btn-ghost -ml-2 px-2 py-1.5 text-sm">
-            <Icon name="chevronLeft" className="h-4 w-4" /> {t.nav.receptions}
+          <Link href={editId ? `/receptions/${editId}` : "/receptions"} className="btn-ghost -ml-2 px-2 py-1.5 text-sm">
+            <Icon name="chevronLeft" className="h-4 w-4" /> {editId ? t.common.cancel : t.nav.receptions}
           </Link>
           <span className="text-xs font-medium text-stone-500">
             {t.wizard.step} {draft.step + 1} {t.wizard.of} 4
           </span>
         </div>
+        {editId && <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-amber-700">{t.receptions.editing}</p>}
         <h1 className="mt-1 text-lg font-bold">
           {steps[draft.step]}
           {draft.step > 0 && draft.supplierName && <span className="font-normal text-stone-500"> · {draft.supplierName}</span>}
@@ -164,7 +174,7 @@ export function Wizard({ blReadingEnabled }: { blReadingEnabled: boolean }) {
         {draft.step === 2 && <StepCheck draft={draft} setDraft={setDraft} updateLine={updateLine} catalog={catalog} />}
         {draft.step === 3 && <StepValidate draft={draft} setDraft={setDraft} catalog={catalog} autoReserves={autoReserves} />}
         {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-        {draft.step === 0 && (
+        {draft.step === 0 && !editId && (
           <button
             type="button"
             className="btn-ghost w-full text-red-600"
@@ -186,13 +196,18 @@ export function Wizard({ blReadingEnabled }: { blReadingEnabled: boolean }) {
               <Icon name="chevronLeft" /> {t.common.back}
             </button>
           )}
+          {editId && draft.step < 3 && (
+            <button type="button" className="btn-secondary btn-lg flex-1" disabled={saving || !canContinue} onClick={finish}>
+              <Icon name="check" /> {saving ? t.wizard.saving : t.common.save}
+            </button>
+          )}
           {draft.step < 3 ? (
             <button type="button" className="btn-primary btn-lg flex-[2]" disabled={!canContinue} onClick={() => go(draft.step + 1)}>
               {t.common.continue} <Icon name="chevronRight" />
             </button>
           ) : (
             <button type="button" className="btn-primary btn-lg flex-[2]" disabled={saving} onClick={finish}>
-              <Icon name="check" /> {saving ? t.wizard.saving : t.wizard.finish}
+              <Icon name="check" /> {saving ? t.wizard.saving : editId ? t.receptions.saveChanges : t.wizard.finish}
             </button>
           )}
         </div>

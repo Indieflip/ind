@@ -17,11 +17,13 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
   const db = getDb();
   const supplier = Number.isInteger(id) ? await db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, id) }) : undefined;
   if (!supplier) notFound();
-  const [products, cats, recents] = await Promise.all([
+  const [products, cats, recents, unitRows] = await Promise.all([
     db.select().from(schema.products).where(eq(schema.products.supplierId, id)).orderBy(desc(schema.products.active), asc(schema.products.name)),
     db.select().from(schema.categories).orderBy(asc(schema.categories.position)),
     db.select().from(schema.receptions).where(eq(schema.receptions.supplierId, id)).orderBy(desc(schema.receptions.deliveredAt)).limit(10),
+    db.select({ name: schema.units.name }).from(schema.units).orderBy(asc(schema.units.position), asc(schema.units.name)),
   ]);
+  const units = unitRows.map((u) => u.name);
   const categories = cats.map((c) => ({ id: c.id, name: locale === "en" ? c.nameEn : c.nameFr }));
   const editable = can.editSuppliers(user.role);
 
@@ -32,7 +34,8 @@ export default async function SupplierPage({ params }: { params: Promise<{ id: s
       {editable && (
         <SupplierInfo id={supplier.id} name={supplier.name} email={supplier.email ?? ""} phone={supplier.phone ?? ""} notes={supplier.notes ?? ""} active={supplier.active} />
       )}
-      {editable && <AddProduct supplierId={supplier.id} categories={categories} />}
+      {editable && <AddProduct supplierId={supplier.id} categories={categories} units={units} />}
+      <datalist id="units-list">{units.map((u) => <option key={u} value={u} />)}</datalist>
       <div className="card overflow-x-auto">
         <table className="table">
           <thead>

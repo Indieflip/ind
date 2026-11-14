@@ -4,6 +4,7 @@ import { addProductAction, addSupplierAction, importCatalogAction, updateProduct
 import { useI18n } from "@/lib/i18n/client";
 import { fmtMoney } from "@/lib/format";
 import { Icon } from "@/components/Icon";
+import { UnitSelect } from "@/components/UnitSelect";
 
 export function AddSupplier() {
   const { t } = useI18n();
@@ -63,8 +64,9 @@ export function SupplierInfo({ id, name, email, phone, notes, active }: { id: nu
 
 interface Cat { id: number; name: string }
 
-export function AddProduct({ supplierId, categories }: { supplierId: number; categories: Cat[] }) {
+export function AddProduct({ supplierId, categories, units }: { supplierId: number; categories: Cat[]; units: string[] }) {
   const { t } = useI18n();
+  const [unit, setUnit] = useState(units[0] ?? "kg");
   const [state, action, pending] = useActionState(addProductAction, undefined);
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => { if (state?.ok) ref.current?.reset(); }, [state]);
@@ -72,7 +74,7 @@ export function AddProduct({ supplierId, categories }: { supplierId: number; cat
     <form ref={ref} action={action} className="card grid gap-2 p-4 sm:grid-cols-[2fr_1fr_1.5fr_1fr_auto] sm:items-end">
       <input type="hidden" name="supplierId" value={supplierId} />
       <label><span className="label">{t.common.product} *</span><input name="name" className="input" required /></label>
-      <label><span className="label">{t.common.unit} *</span><input name="unit" className="input" defaultValue="kg" required /></label>
+      <label><span className="label">{t.common.unit} *</span><UnitSelect name="unit" value={unit} units={units} onChange={setUnit} required /></label>
       <label>
         <span className="label">{t.common.category} *</span>
         <select name="categoryId" className="input" required defaultValue="">
@@ -115,7 +117,7 @@ export function ProductRow({
   return (
     <tr>
       <td><input className="input py-1.5" defaultValue={p.name} onBlur={(e) => start(() => updateProductAction(p.id, { name: e.target.value }))} /></td>
-      <td><input className="input w-24 py-1.5" defaultValue={p.unit} onBlur={(e) => start(() => updateProductAction(p.id, { unit: e.target.value }))} /></td>
+      <td><input className="input w-24 py-1.5" list="units-list" defaultValue={p.unit} onBlur={(e) => start(() => updateProductAction(p.id, { unit: e.target.value }))} /></td>
       <td>
         <select className="input py-1.5" defaultValue={p.categoryId ?? ""} onChange={(e) => start(() => updateProductAction(p.id, { categoryId: Number(e.target.value) || null }))}>
           <option value="" />

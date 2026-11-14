@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { Icon } from "./Icon";
 import { LocaleSwitch } from "./LocaleSwitch";
 import { logoutAction } from "@/lib/actions/auth";
@@ -14,6 +15,7 @@ export function AppNav(props: {
   logoutLabel: string;
   restaurant: string;
   appName: string;
+  moreLabel: string;
 }) {
   const path = usePathname();
   const active = (href: string) => path === href || path.startsWith(href + "/");
@@ -67,13 +69,44 @@ export function AppNav(props: {
           </form>
         </div>
       </header>
-      <nav className="no-print fixed inset-x-0 bottom-0 z-20 flex border-t border-stone-200 bg-white lg:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-        {props.items.map((i) => (
-          <Link key={i.href} href={i.href} className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium ${active(i.href) ? "text-brand-600" : "text-stone-500"}`}>
+      <MobileTabs items={props.items} active={active} moreLabel={props.moreLabel} />
+    </>
+  );
+}
+
+/** Barre d'onglets mobile : 4 onglets + « Plus » pour les autres */
+function MobileTabs({ items, active, moreLabel }: { items: NavItem[]; active: (href: string) => boolean; moreLabel: string }) {
+  const [open, setOpen] = useState(false);
+  const main = items.length > 5 ? items.slice(0, 4) : items;
+  const more = items.length > 5 ? items.slice(4) : [];
+  const moreActive = more.some((i) => active(i.href));
+  const tab = (on: boolean) => `flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-medium ${on ? "text-brand-600" : "text-stone-500"}`;
+  return (
+    <>
+      {open && (
+        <div className="no-print fixed inset-0 z-30 bg-black/30 lg:hidden" onClick={() => setOpen(false)}>
+          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-3" style={{ paddingBottom: "calc(4.5rem + env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
+            {more.map((i) => (
+              <Link key={i.href} href={i.href} onClick={() => setOpen(false)} className={`flex items-center gap-3 rounded-lg px-3 py-3 font-medium ${active(i.href) ? "bg-brand-50 text-brand-700" : "text-stone-700"}`}>
+                <Icon name={i.icon} /> {i.label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+      <nav className="no-print fixed inset-x-0 bottom-0 z-40 flex border-t border-stone-200 bg-white lg:hidden" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        {main.map((i) => (
+          <Link key={i.href} href={i.href} onClick={() => setOpen(false)} className={tab(active(i.href))}>
             <Icon name={i.icon} className="h-5 w-5" />
             <span className="max-w-full truncate px-1">{i.label}</span>
           </Link>
         ))}
+        {more.length > 0 && (
+          <button type="button" onClick={() => setOpen((o) => !o)} className={tab(moreActive || open)}>
+            <Icon name="menu" className="h-5 w-5" />
+            <span>{moreLabel}</span>
+          </button>
+        )}
       </nav>
     </>
   );

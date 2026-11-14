@@ -53,6 +53,13 @@ export const users = pgTable(
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
 );
 
+/** Unités utilisables dans le mercurial et les bons (pièce, kg, litre, sachet…) */
+export const units = pgTable("units", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  position: integer("position").notNull().default(100),
+});
+
 /** Catégories de produits + seuils de température (°C) */
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
@@ -119,6 +126,8 @@ export const receptions = pgTable(
     notes: text("notes"),
     createdBy: integer("created_by").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedBy: integer("updated_by").references(() => users.id),
+    updatedAt: timestamp("updated_at", { withTimezone: true }),
   },
   (t) => [uniqueIndex("receptions_client_uuid_idx").on(t.clientUuid), index("receptions_delivered_idx").on(t.deliveredAt)],
 );
@@ -225,3 +234,4 @@ export type Reception = typeof receptions.$inferSelect;
 export type ReceptionLine = typeof receptionLines.$inferSelect;
 export type Decision = ReceptionLine["decision"];
 export type Anomaly = typeof anomalies.$inferSelect;
+export type Unit = typeof units.$inferSelect;

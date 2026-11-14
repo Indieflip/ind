@@ -53,5 +53,12 @@ for (const [code, fr, en, req, cmax, rmax, pos] of categories) {
     on conflict (code) do nothing`);
 }
 
+// Unités de base + toutes celles déjà utilisées dans le mercurial
+const baseUnits = ["pièce", "kg", "litre", "sachet"];
+for (const [i, name] of baseUnits.entries()) {
+  await db.execute(sql`insert into units (name, position) values (${name}, ${i + 1}) on conflict (name) do nothing`);
+}
+await db.execute(sql`insert into units (name) select distinct unit from products where unit is not null and unit <> '' on conflict (name) do nothing`);
+
 console.log("[migrate] base à jour.");
 await close();

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   if (!(await getUser())) return Response.json({ error: "unauthorized" }, { status: 401 });
   const db = getDb();
-  const [suppliers, products, categories, drivers] = await Promise.all([
+  const [suppliers, products, categories, drivers, units] = await Promise.all([
     db.select({ id: schema.suppliers.id, name: schema.suppliers.name }).from(schema.suppliers).where(eq(schema.suppliers.active, true)).orderBy(asc(schema.suppliers.name)),
     db.select().from(schema.products).where(eq(schema.products.active, true)).orderBy(asc(schema.products.name)),
     db.select().from(schema.categories).orderBy(asc(schema.categories.position)),
@@ -19,6 +19,7 @@ export async function GET() {
         from receptions where supplier_id is not null and driver_name is not null and driver_name <> ''
         group by supplier_id, driver_name
       ) d order by last desc`),
+    db.select({ name: schema.units.name }).from(schema.units).orderBy(asc(schema.units.position), asc(schema.units.name)),
   ]);
   const bySupplier = new Map<number, string[]>();
   for (const r of drivers.rows) {
@@ -30,6 +31,7 @@ export async function GET() {
     suppliers: suppliers.map((s) => ({ ...s, drivers: bySupplier.get(s.id) ?? [] })),
     products: products.map((p) => ({ id: p.id, supplierId: p.supplierId, name: p.name, unit: p.unit, categoryId: p.categoryId, price: num(p.price) })),
     categories: categories.map((c) => ({ id: c.id, code: c.code, nameFr: c.nameFr, nameEn: c.nameEn, tempRequired: c.tempRequired, conformMax: c.conformMax, reserveMax: c.reserveMax })),
+    units: units.map((u) => u.name),
     fetchedAt: new Date().toISOString(),
   };
   return Response.json(catalog);

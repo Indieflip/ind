@@ -50,7 +50,7 @@ async function uploadIfNeeded(src: string, folder: string): Promise<string> {
 }
 
 /** Envoie une réception : photos d'abord, puis les données. Lève une erreur si hors ligne. */
-export async function sendReception(p: ReceptionPayload): Promise<number> {
+export async function sendReception(p: ReceptionPayload, editId?: number): Promise<number> {
   const blPhotos = [];
   for (const ph of p.blPhotos) blPhotos.push(await uploadIfNeeded(ph, "bl"));
   const lines = [];
@@ -60,12 +60,12 @@ export async function sendReception(p: ReceptionPayload): Promise<number> {
     lines.push({ ...l, photos });
   }
   const signature = p.signature ? await uploadIfNeeded(p.signature, "signature") : null;
-  const res = await fetch("/api/receptions", {
-    method: "POST",
+  const res = await fetch(editId ? `/api/receptions/${editId}` : "/api/receptions", {
+    method: editId ? "PUT" : "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ ...p, blPhotos, lines, signature }),
   });
-  if (res.status === 400) {
+  if (res.status === 400 || res.status === 403 || res.status === 404) {
     const body = await res.json().catch(() => ({}));
     throw Object.assign(new Error(body.error ?? `HTTP ${res.status}`), { fatal: true });
   }

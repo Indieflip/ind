@@ -6,10 +6,11 @@ import type { Decision } from "@/lib/rules";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { decisionStyles } from "../DecisionBadge";
 import { Icon } from "../Icon";
+import { UnitSelect } from "../UnitSelect";
 import { PhotoButton, Thumbs } from "./PhotoButton";
 import { evaluate, lineFromProduct, matches, priceGap, withAutoDecision } from "./helpers";
 
-const UNITS = ["kg", "pièce", "carton", "colis", "litre", "botte", "barquette", "sac", "plateau", "bouteille"];
+const DEFAULT_UNITS = ["pièce", "kg", "litre", "sachet"];
 
 export function StepCheck({
   draft,
@@ -99,10 +100,9 @@ function LineCard({
         {field("qtyReceived", t.wizard.received, { inputMode: "decimal" })}
         <div>
           <label className="mb-0.5 block text-xs font-medium text-stone-600">{t.common.unit}</label>
-          <input className="input py-2" list="units" value={line.unit} onChange={(e) => onChange({ unit: e.target.value })} />
+          <UnitSelect className="input py-2" value={line.unit} units={catalog?.units ?? DEFAULT_UNITS} onChange={(unit) => onChange({ unit })} />
         </div>
       </div>
-      <datalist id="units">{UNITS.map((u) => <option key={u} value={u} />)}</datalist>
 
       <div className="mt-2 grid grid-cols-2 gap-2">
         {cat?.tempRequired && (
@@ -224,7 +224,7 @@ function AddProduct({ draft, setDraft, catalog }: { draft: Draft; setDraft: (fn:
           <p className="text-xs text-stone-500">{t.wizard.outOfListHint}</p>
           <input className="input" placeholder={`${t.wizard.productName} *`} value={custom.name} onChange={(e) => setCustom({ ...custom, name: e.target.value })} />
           <div className="grid grid-cols-2 gap-2">
-            <input className="input" list="units" placeholder={`${t.common.unit} *`} value={custom.unit} onChange={(e) => setCustom({ ...custom, unit: e.target.value })} />
+            <UnitSelect value={custom.unit} units={catalog?.units ?? DEFAULT_UNITS} onChange={(unit) => setCustom({ ...custom, unit })} />
             <select className="input" value={custom.categoryId} onChange={(e) => setCustom({ ...custom, categoryId: e.target.value })}>
               <option value="">{t.common.category} *</option>
               {catalog?.categories.map((c) => (

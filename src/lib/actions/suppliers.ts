@@ -82,7 +82,9 @@ export async function importCatalogAction(_p: R, form: FormData): Promise<R> {
     if (!line) continue;
     const sep = line.includes(";") ? ";" : line.includes("\t") ? "\t" : ",";
     const cols = line.split(sep).map((c) => c.trim().replace(/^"|"$/g, ""));
-    const [supplierName, productName, unit = "kg", catRaw = "", priceRaw = ""] = cols;
+    let [supplierName, productName, unit = "kg", catRaw = "", priceRaw = ""] = cols;
+    // Ordre « Fournisseur ; Produit ; Unité ; Prix ; Catégorie » accepté aussi
+    if (num(catRaw.replace("€", "")) != null && num(priceRaw.replace("€", "")) == null) [catRaw, priceRaw] = [priceRaw, catRaw];
     if (!supplierName || !productName || norm(supplierName) === "fournisseur" || norm(supplierName) === "supplier") { skipped++; continue; }
 
     let supplierId = supplierCache.get(norm(supplierName));
@@ -91,6 +93,7 @@ export async function importCatalogAction(_p: R, form: FormData): Promise<R> {
       supplierId = s?.id ?? (await db.insert(schema.suppliers).values({ name: supplierName }).returning())[0].id;
       supplierCache.set(norm(supplierName), supplierId);
     }
+    if (unit) await db.insert(schema.units).values({ name: unit }).onConflictDoNothing();
     const categoryId = findCat(catRaw);
     const price = num(priceRaw.replace("€", ""));
     const existing = await db.query.products.findFirst({

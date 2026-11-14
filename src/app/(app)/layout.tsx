@@ -13,6 +13,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const items: NavItem[] = [
     { href: "/receptions", label: t.nav.receptions, icon: "truck", show: can.viewReceptions(r) },
     { href: "/anomalies", label: t.nav.anomalies, icon: "alert", show: can.viewAnomalies(r) },
+    { href: "/mercurial", label: t.nav.mercurial, icon: "list", show: can.viewMercurial(r) },
+    { href: "/consolidation", label: t.nav.consolidation, icon: "layers", show: can.consolidate(r) },
     { href: "/prices", label: t.nav.prices, icon: "euro", show: can.viewPrices(r) },
     { href: "/suppliers", label: t.nav.suppliers, icon: "box", show: can.viewSuppliers(r) },
     { href: "/reporting", label: t.nav.reporting, icon: "chart", show: can.viewReporting(r) },
@@ -28,6 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         logoutLabel={t.nav.logout}
         restaurant={await getRestaurantName()}
         appName={t.app.name}
+        moreLabel={t.nav.more}
       />
       <div className="min-w-0 flex-1 pb-24 lg:pb-0">
         {user.role === "viewer" && (

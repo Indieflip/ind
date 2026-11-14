@@ -22,6 +22,7 @@ export interface Catalog {
   suppliers: CatalogSupplier[];
   products: CatalogProduct[];
   categories: CatalogCategory[];
+  units?: string[];
   fetchedAt: string;
 }
 

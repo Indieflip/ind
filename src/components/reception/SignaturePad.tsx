@@ -1,7 +1,20 @@
 "use client";
 import { useEffect, useRef } from "react";
 
-export function SignaturePad({ value, onChange, clearLabel }: { value: string; onChange: (dataUrl: string) => void; clearLabel: string }) {
+export function SignaturePad(props: { value: string; onChange: (dataUrl: string) => void; clearLabel: string }) {
+  // Signature déjà enregistrée (bon modifié) : on l'affiche, « Effacer » permet de refaire signer
+  if (props.value && !props.value.startsWith("data:")) {
+    return (
+      <div>
+        <img src={props.value} alt="" className="h-44 w-full rounded-lg border-2 border-stone-200 bg-white object-contain" />
+        <button type="button" className="btn-ghost mt-1 px-2 py-1 text-xs" onClick={() => props.onChange("")}>{props.clearLabel}</button>
+      </div>
+    );
+  }
+  return <Pad {...props} />;
+}
+
+function Pad({ value, onChange, clearLabel }: { value: string; onChange: (dataUrl: string) => void; clearLabel: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const dirty = useRef(false);
