@@ -68,7 +68,7 @@ export function WeighTable({ rows, canEdit, suppliers }: { rows: WeighRow[]; can
         <span className="ml-3 text-xs text-stone-500">{w.signHint}</span>
       </div>
       <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} selectable selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} dense fixed
-        copy={{ source: w.title, fields: fieldsOf, actions: (r) => [{ label: `⚑ ${t.claims.create}`, onClick: () => { copyRow(w.title, fieldsOf(r)); router.push("/anomalies/reclamations?from=row"); } }] }}
+        copy={{ source: w.title, fields: fieldsOf }}
       />
       {edit && <WeighEditor row={edit.row} pre={edit.pre} suppliers={suppliers} onClose={() => setEdit(null)} />}
     </>

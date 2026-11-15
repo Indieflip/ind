@@ -42,7 +42,7 @@ export function AnomalySheetForm({ id, initial, editable }: { id: number; initia
         <textarea className="input" rows={4} value={v.followUp} onChange={set("followUp")} disabled={!editable} placeholder={s.actionPlaceholder} />
       </label>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <label>
           <span className="label">{a.lastAction}</span>
           <div className="flex gap-1.5">
@@ -50,7 +50,6 @@ export function AnomalySheetForm({ id, initial, editable }: { id: number; initia
             {editable && <button type="button" className="btn-secondary shrink-0 px-2 text-xs" onClick={() => setV({ ...v, lastActionAt: today })}>{s.today}</button>}
           </div>
         </label>
-        <label><span className="label">{a.nextAction}</span><input type="date" className="input" value={v.nextActionAt} onChange={set("nextActionAt")} disabled={!editable} /></label>
         <label><span className="label">{a.nature}</span><input className="input" list="sheet-natures" value={v.nature} onChange={set("nature")} disabled={!editable} /></label>
         <datalist id="sheet-natures">{NATURES.map((x) => <option key={x} value={x} />)}</datalist>
       </div>

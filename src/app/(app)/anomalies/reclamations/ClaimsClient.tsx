@@ -15,6 +15,7 @@ import { PasteRowButton } from "@/components/table/RowMenu";
 export interface ClaimRow {
   id: number; date: string; dateIso: string; supplier: string; supplierId: number | null; reference: string; product: string; subject: string;
   amount: number | null; credit: number | null; notes: string; status: ClaimStatus; anomalyId: number | null; weighGapId: number | null; receptionId: number | null;
+  source: "manual" | "anomaly" | "weigh"; anomalyNumber: number | null;
 }
 
 import { claimStyles } from "@/lib/anomaly";
@@ -29,7 +30,7 @@ export function ClaimsBoard({ rows, suppliers, canCreate, canManage, prefill }: 
   const router = useRouter();
   const sp = useSearchParams();
   const [filter, setFilter] = useState<ClaimStatus | "all">("en_cours");
-  const [form, setForm] = useState<{ id: number | null; v: ClaimInput } | null>(null);
+  const [form, setForm] = useState<{ id: number | null; v: ClaimInput; auto?: boolean } | null>(null);
   const [pending, start] = useTransition();
 
   /** Ligne copiée (anomalie, écart de pesée…) → formulaire pré-rempli, modifiable avant d'enregistrer */
@@ -66,6 +67,14 @@ export function ClaimsBoard({ rows, suppliers, canCreate, canManage, prefill }: 
 
   const cols: Col<ClaimRow>[] = [
     { key: "id", width: "3rem", label: c.number, text: (r) => String(r.id), sort: (r) => r.id },
+    {
+      key: "source", width: "6.5rem", label: c.origin, text: (r) => (r.source === "anomaly" ? `${c.fromAnomaly} ${r.anomalyNumber ?? ""}` : r.source === "weigh" ? c.fromWeigh : c.fromManual),
+      options: [c.fromAnomaly, c.fromWeigh, c.fromManual], keepCase: true,
+      render: (r) =>
+        r.source === "anomaly" && r.anomalyId ? <Link className="text-brand-700 hover:underline" href={`/anomalies/${r.anomalyId}`}>{c.fromAnomaly} {r.anomalyNumber}</Link>
+        : r.source === "weigh" ? <Link className="text-sky-700 hover:underline" href="/anomalies/ecarts-pesee">{c.fromWeigh}</Link>
+        : <span className="text-stone-500">{c.fromManual}</span>,
+    },
     { key: "date", width: "5rem", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateIso },
     { key: "supplier", width: "9%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => (r.supplierId ? <Link className="text-brand-700 hover:underline" href={`/mercurial/fournisseurs/${r.supplierId}`}>{sentence(r.supplier)}</Link> : sentence(r.supplier) || "—") },
     { key: "reference", width: "8%", label: t.anomalies.blInvoice, text: (r) => r.reference, render: (r) => (r.receptionId ? <Link className="text-brand-700 hover:underline" href={`/receptions/${r.receptionId}`}>{r.reference || "—"}</Link> : r.reference || "—") },
@@ -87,7 +96,7 @@ export function ClaimsBoard({ rows, suppliers, canCreate, canManage, prefill }: 
       ? [{
           key: "edit", width: "2rem", label: "", text: () => "", sortable: false, filterable: false,
           render: (r: ClaimRow) => (
-            <button type="button" className="btn-ghost p-1.5" title={t.common.edit} onClick={() => setForm({ id: r.id, v: { date: r.dateIso, supplierId: r.supplierId ? String(r.supplierId) : "", supplierName: r.supplierId ? "" : r.supplier, reference: r.reference, product: r.product, subject: r.subject, amount: money(r.amount), credit: money(r.credit), notes: r.notes, status: r.status, anomalyId: r.anomalyId ? String(r.anomalyId) : undefined, weighGapId: r.weighGapId ? String(r.weighGapId) : undefined, receptionId: r.receptionId ? String(r.receptionId) : undefined } })}>
+            <button type="button" className="btn-ghost p-1.5" title={t.common.edit} onClick={() => setForm({ id: r.id, auto: r.source !== "manual", v: { date: r.dateIso, supplierId: r.supplierId ? String(r.supplierId) : "", supplierName: r.supplierId ? "" : r.supplier, reference: r.reference, product: r.product, subject: r.subject, amount: money(r.amount), credit: money(r.credit), notes: r.notes, status: r.status, anomalyId: r.anomalyId ? String(r.anomalyId) : undefined, weighGapId: r.weighGapId ? String(r.weighGapId) : undefined, receptionId: r.receptionId ? String(r.receptionId) : undefined } })}>
               <Icon name="edit" className="h-4 w-4" />
             </button>
           ),
@@ -121,10 +130,11 @@ export function ClaimsBoard({ rows, suppliers, canCreate, canManage, prefill }: 
         <ClaimForm
           initial={form.v}
           editing={form.id != null}
+          auto={!!form.auto}
           suppliers={suppliers}
           pending={pending}
           onCancel={() => setForm(null)}
-          onDelete={form.id != null ? async () => { if (await appConfirm(t.common.confirmDelete)) start(async () => { await deleteClaimAction(form.id!); setForm(null); router.refresh(); }); } : undefined}
+          onDelete={form.id != null && !form.auto ? async () => { if (await appConfirm(t.common.confirmDelete)) start(async () => { await deleteClaimAction(form.id!); setForm(null); router.refresh(); }); } : undefined}
           onSave={(v) => start(async () => {
             const res = form.id != null ? await updateClaimAction(form.id, v) : await addClaimAction(v);
             if (res?.ok) { setForm(null); router.refresh(); }
@@ -146,8 +156,8 @@ export function ClaimsBoard({ rows, suppliers, canCreate, canManage, prefill }: 
   );
 }
 
-function ClaimForm({ initial, editing, suppliers, pending, onSave, onCancel, onDelete }: {
-  initial: ClaimInput; editing: boolean; suppliers: { id: number; name: string }[]; pending: boolean;
+function ClaimForm({ initial, editing, auto, suppliers, pending, onSave, onCancel, onDelete }: {
+  initial: ClaimInput; editing: boolean; auto: boolean; suppliers: { id: number; name: string }[]; pending: boolean;
   onSave: (v: ClaimInput) => void; onCancel: () => void; onDelete?: () => void;
 }) {
   const { t } = useI18n();
@@ -158,11 +168,12 @@ function ClaimForm({ initial, editing, suppliers, pending, onSave, onCancel, onD
   return (
     <div className="card mb-4 space-y-3 border-brand-200 p-4">
       <h2 className="font-semibold">{editing ? c.edit : c.new}</h2>
+      {auto && <p className="rounded-lg bg-sky-50 p-2 text-xs text-sky-900">{c.autoHint}</p>}
       <div className="grid gap-3 sm:grid-cols-4">
-        <label><span className="label">{t.common.date}</span><input type="date" className="input" value={v.date} onChange={set("date")} /></label>
+        <label><span className="label">{t.common.date}</span><input type="date" className="input" value={v.date} onChange={set("date")} disabled={auto} /></label>
         <label className="sm:col-span-2">
           <span className="label">{t.common.supplier}</span>
-          <select className="input" value={v.supplierId} onChange={set("supplierId")}>
+          <select className="input" value={v.supplierId} onChange={set("supplierId")} disabled={auto}>
             <option value="">{v.supplierName ? `${v.supplierName} (${c.notInList})` : "—"}</option>
             {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
@@ -172,16 +183,16 @@ function ClaimForm({ initial, editing, suppliers, pending, onSave, onCancel, onD
             {(Object.keys(c.statuses) as ClaimStatus[]).map((s) => <option key={s} value={s}>{c.statuses[s]}</option>)}
           </select>
         </label>
-        <label><span className="label">{t.anomalies.blInvoice}</span><input className="input" value={v.reference} onChange={set("reference")} placeholder="Facture 123 du 12/11/26" /></label>
-        <label className="sm:col-span-3"><span className="label">{t.common.product}</span><input className="input" value={v.product} onChange={set("product")} /></label>
-        <label className="sm:col-span-4"><span className="label">{c.subject} *</span><textarea className="input" rows={2} value={v.subject} onChange={set("subject")} placeholder={c.subjectPlaceholder} /></label>
+        <label><span className="label">{t.anomalies.blInvoice}</span><input className="input" value={v.reference} onChange={set("reference")} disabled={auto} placeholder="Facture 123 du 12/11/26" /></label>
+        <label className="sm:col-span-3"><span className="label">{t.common.product}</span><input className="input" value={v.product} onChange={set("product")} disabled={auto} /></label>
+        <label className="sm:col-span-4"><span className="label">{c.subject} *</span><textarea className="input" rows={2} value={v.subject} onChange={set("subject")} disabled={auto} placeholder={c.subjectPlaceholder} /></label>
         <label><span className="label">{c.amount}</span><MoneyInput value={v.amount} onChange={set("amount")} /></label>
         <label><span className="label">{c.credit}</span><MoneyInput value={v.credit} onChange={set("credit")} /></label>
         <label className="sm:col-span-2"><span className="label">{c.notes}</span><textarea className="input" rows={2} value={v.notes} onChange={set("notes")} placeholder={c.notesPlaceholder} /></label>
       </div>
       <div className="flex flex-wrap gap-2">
         <button type="button" className="btn-secondary" onClick={onCancel}>{t.common.cancel}</button>
-        <button type="button" className="btn-primary" disabled={pending || !v.subject.trim()} onClick={() => onSave(v)}><Icon name="check" className="h-4 w-4" /> {t.common.save}</button>
+        <button type="button" className="btn-primary" disabled={pending || (!auto && !v.subject.trim())} onClick={() => onSave(v)}><Icon name="check" className="h-4 w-4" /> {t.common.save}</button>
         {onDelete && <button type="button" className="btn-ghost ml-auto text-red-600" onClick={onDelete}><Icon name="trash" className="h-4 w-4" /> {t.common.delete}</button>}
       </div>
     </div>

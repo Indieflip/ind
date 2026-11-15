@@ -479,6 +479,8 @@ export const claims = pgTable(
     anomalyId: integer("anomaly_id").references(() => anomalies.id, { onDelete: "set null" }),
     weighGapId: integer("weigh_gap_id").references(() => weighGaps.id, { onDelete: "set null" }),
     receptionId: integer("reception_id").references(() => receptions.id, { onDelete: "set null" }),
+    /** manual | anomaly | weigh : ligne reprise automatiquement d'une anomalie ou d'un écart de pesée */
+    source: text("source").notNull().default("manual"),
     createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

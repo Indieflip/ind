@@ -106,7 +106,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
   const copySpec = {
     source: a.title,
     fields: fieldsOf,
-    actions: (r: AnomalyRow) => [{ label: `⚑ ${t.claims.create}`, onClick: () => { copyRow(a.title, fieldsOf(r)); router.push("/anomalies/reclamations?from=row"); } }],
+    actions: (r: AnomalyRow) => [{ label: `🗂 ${t.sheet.open}`, onClick: () => router.push(`/anomalies/${r.id}`) }],
   };
   const totalSaving = [...rows, ...consolidated].reduce((s, r) => s + (r.saving ?? 0), 0);
   const cols: Col<AnomalyRow>[] = [
@@ -138,6 +138,10 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
       : []),
   ];
 
+  // Problème, Action, Dernière action, Résultat, Économie HT et Statut sont dans la fiche d'anomalie (clic sur la ligne)
+  const shownCols = cols
+    .filter((c) => !["problem", "action", "lastActionAt", "result", "saving", "status"].includes(c.key))
+    .map((c) => (c.key === "product" ? { ...c, width: undefined, render: (r: AnomalyRow) => <Link href={`/anomalies/${r.id}`} className="font-medium text-brand-700 hover:underline" title={t.sheet.open}>{r.product || r.problem}</Link> } : c));
   return (
     <>
       {/* Rappel du jour */}
@@ -180,7 +184,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
         <span className="text-xs italic text-stone-400">{a.provisional}</span>
         <span className="text-stone-500">{rows.length} {a.openCount} · {a.saving} : {fmtMoney(totalSaving, locale)}</span>
       </div>
-      <DataTable copy={copySpec} rows={rows} cols={cols} rowKey={(r) => r.id} empty={a.empty} selectable={canConsolidate} selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} dense fixed rowClassName={(r) => (r.due ? "bg-red-50/60" : "")} />
+      <DataTable copy={copySpec} rows={rows} cols={shownCols} rowKey={(r) => r.id} empty={a.empty} selectable={canConsolidate} selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} dense fixed rowClassName={(r) => (r.due ? "bg-red-50/60" : "")} />
 
       <button className="btn-ghost mt-4 px-0 text-sm text-brand-700" onClick={() => setShowDone((v) => !v)}>
         {showDone ? "▾" : "▸"} {a.consolidatedList} ({consolidated.length})
@@ -189,7 +193,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
         <div className="mt-2">
           <DataTable
             rows={consolidated}
-            cols={[...cols.filter((c) => c.key !== "edit" && c.key !== "status"), { key: "consolidated", width: "9rem", label: t.receptions.consolidatedOn, text: (r) => r.consolidated ?? "", className: "text-stone-600" }]}
+            cols={[...shownCols.filter((c) => c.key !== "edit"), { key: "consolidated", width: "9rem", label: t.receptions.consolidatedOn, text: (r) => r.consolidated ?? "", className: "text-stone-600" }]}
             rowKey={(r) => r.id}
             dense
             fixed

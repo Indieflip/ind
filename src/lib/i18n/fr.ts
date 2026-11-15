@@ -580,8 +580,13 @@ export const fr = {
     forget: "Oublier la ligne copiée",
   },
   claims: {
+    origin: "Origine",
+    fromAnomaly: "Anomalie",
+    fromWeigh: "Écart de pesée",
+    fromManual: "Saisie",
+    autoHint: "Ligne reprise automatiquement : le fournisseur, le produit et l'objet suivent l'anomalie ou l'écart de pesée. Le statut et l'avoir sont renvoyés à la fiche d'anomalie.",
     title: "Réclamations",
-    intro: "Toutes les réclamations auprès des fournisseurs, centralisées ici. Créez-en une à la main, ou depuis une anomalie ou un écart de pesée (menu ⋮ → « Créer une réclamation »).",
+    intro: "Toutes les anomalies et tous les écarts de pesée (poids manquant) arrivent ici automatiquement, avec leur suivi. Vous pouvez aussi saisir une réclamation à la main.",
     number: "N°",
     subject: "Objet de la réclamation",
     subjectPlaceholder: "ex. Manquant 2 barquettes de framboises, avoir demandé",
@@ -598,6 +603,8 @@ export const fr = {
     create: "Créer une réclamation",
   },
   sheet: {
+    of: "du",
+    noDocument: "Sans numéro de document",
     title: "Fiche d'anomalie",
     provisional: "provisoire",
     consolidated: "Consolidée le",

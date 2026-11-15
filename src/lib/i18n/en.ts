@@ -578,8 +578,13 @@ export const en: Dict = {
     forget: "Forget copied row",
   },
   claims: {
+    origin: "Origin",
+    fromAnomaly: "Issue",
+    fromWeigh: "Weighing gap",
+    fromManual: "Manual",
+    autoHint: "Automatic row: supplier, product and subject follow the issue or weighing gap. Status and credit are sent back to the issue sheet.",
     title: "Claims",
-    intro: "All claims to suppliers, in one place. Create one by hand, or from an issue or a weighing gap (⋮ menu → “Create a claim”).",
+    intro: "All issues and weighing gaps (missing weight) arrive here automatically, with their follow-up. You can also enter a claim by hand.",
     number: "No.",
     subject: "Claim subject",
     subjectPlaceholder: "e.g. 2 punnets of raspberries missing, credit requested",
@@ -596,6 +601,8 @@ export const en: Dict = {
     create: "Create a claim",
   },
   sheet: {
+    of: "of",
+    noDocument: "No document number",
     title: "Issue sheet",
     provisional: "provisional",
     consolidated: "Consolidated on",

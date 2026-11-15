@@ -48,19 +48,19 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
     <div className="space-y-4">
       <div className="no-print flex flex-wrap items-center justify-between gap-2">
         <Link href="/anomalies" className="btn-ghost -ml-2 px-2"><Icon name="chevronLeft" className="h-4 w-4" /> {t.anomalies.title}</Link>
-        {can.createAnomaly(user.role) && (
-          <Link href={`/anomalies/reclamations?anomaly=${a.id}`} className="btn-secondary"><Icon name="alert" className="h-4 w-4" /> {t.claims.create}</Link>
-        )}
+        <Link href="/anomalies/reclamations" className="btn-secondary"><Icon name="alert" className="h-4 w-4" /> {t.claims.title}</Link>
       </div>
 
       <section className="card overflow-hidden">
         <div className="flex flex-wrap items-start justify-between gap-3 bg-gradient-to-r from-red-700 to-red-600 px-5 py-4 text-white">
           <div className="min-w-0">
+            {/* FICHE D'ANOMALIE · N° … (provisoire) du <date de réception> / Fournisseur - Produit / Numéro et date du document */}
             <p className="text-xs font-semibold uppercase tracking-wider text-white/75">
               {s.title} · {t.anomalies.number} {number}{!a.number && <span className="ml-1 normal-case italic">({s.provisional})</span>}
+              <span className="normal-case"> {s.of} {fmtDate(rec?.deliveredAt ?? a.createdAt, locale)}</span>
             </p>
-            <h1 className="mt-0.5 text-2xl font-bold leading-tight">{a.productName || t.anomalies.types[a.type]}</h1>
-            <p className="mt-1 text-sm text-white/85">{sentence(supplier?.name ?? a.supplierName)}{reference ? ` · ${reference}` : ""} · {fmtDate(a.createdAt, locale)}</p>
+            <h1 className="mt-0.5 text-2xl font-bold leading-tight">{sentence(supplier?.name ?? a.supplierName)} - {a.productName || t.anomalies.types[a.type]}</h1>
+            <p className="mt-1 text-sm text-white/85">{reference || s.noDocument}</p>
           </div>
           <div className="flex flex-col items-end gap-1.5">
             <span className="badge bg-white text-red-800">{t.anomalies.types[a.type]}</span>
