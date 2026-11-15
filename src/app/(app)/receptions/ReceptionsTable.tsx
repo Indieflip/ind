@@ -29,10 +29,10 @@ export function ReceptionsTable({ rows, canDelete }: { rows: ReceptionRow[]; can
   const [pending, start] = useTransition();
   const stateLabel = (r: ReceptionRow) => (r.consolidated ? t.receptions.consolidated : t.receptions.toConsolidate);
   const cols: Col<ReceptionRow>[] = [
-    { key: "number", label: t.receptions.number, align: "right", text: (r) => String(r.number), sort: (r) => r.number },
-    { key: "bl", label: t.receptions.bl, text: (r) => r.blNumber ?? "", href: (r) => `/receptions/${r.id}`, render: (r) => r.blNumber || t.receptions.noBl },
+    { key: "number", label: t.receptions.numberLong, align: "right", width: "4.5rem", text: (r) => String(r.number), sort: (r) => r.number },
     { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, href: (r) => `/receptions/${r.id}`, className: "whitespace-nowrap" },
     { key: "supplier", label: t.common.supplier, text: (r) => r.supplierName },
+    { key: "bl", label: t.receptions.blInvoice, text: (r) => r.blNumber ?? "", href: (r) => `/receptions/${r.id}`, render: (r) => r.blNumber || t.receptions.noBl },
     { key: "lines", label: t.mercurial.products, align: "right", text: (r) => String(r.lineCount), sort: (r) => r.lineCount },
     { key: "status", label: t.common.status, text: (r) => r.statusLabel, options: Object.values(t.receptionStatus), render: (r) => <StatusBadge status={r.status} label={r.statusLabel} /> },
     {

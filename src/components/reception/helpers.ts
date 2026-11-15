@@ -67,6 +67,17 @@ export function docsOf(d: Draft): DocRef[] {
   return d.documents?.length ? d.documents : [{ type: "bl", number: d.blNumber ?? "" }];
 }
 
+/** Numéros des documents saisis */
+export function docNumbers(d: Draft) {
+  return docsOf(d).map((x) => x.number.trim()).filter(Boolean);
+}
+
+/** Document d'une ligne : celui choisi s'il existe encore, sinon le premier */
+export function lineDoc(d: Draft, l: DraftLine) {
+  const nums = docNumbers(d);
+  return l.doc && nums.includes(l.doc.trim()) ? l.doc.trim() : nums[0] ?? "";
+}
+
 export function evaluate(line: DraftLine, catalog: Catalog | undefined): Evaluation {
   const cat = catalog?.categories.find((c) => c.id === line.categoryId);
   return evaluateLine(
@@ -174,6 +185,7 @@ export function toPayload(d: Draft): ReceptionPayload {
         decision: l.decision ?? "conform",
         reason: l.reason || null,
         photos: l.photos,
+        document: lineDoc(d, l) || null,
       })),
   };
 }

@@ -54,6 +54,7 @@ function listRaw(f: ReceptionFilters, limit: number) {
       deliveredAt: r.deliveredAt,
       supplierName: r.supplierName,
       blNumber: r.blNumber,
+      documents: r.documents,
       status: r.status,
       driverName: r.driverName,
       consolidatedAt: r.consolidatedAt,

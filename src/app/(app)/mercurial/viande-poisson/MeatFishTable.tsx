@@ -122,7 +122,7 @@ function DayDetail({ entries, date, onClose }: { entries: Entry[]; date: string;
         <button type="button" className="btn-ghost px-2 py-1 text-sm" onClick={onClose}>✕</button>
       </div>
       <table className="w-full text-left text-sm">
-        <thead className="text-xs text-stone-500"><tr><th className="py-1">{mf.product}</th><th className="px-2 text-right">{t.wizard.received}</th><th className="px-2">{t.common.supplier}</th><th className="pl-2">{t.receptions.bl}</th></tr></thead>
+        <thead className="text-xs text-stone-500"><tr><th className="py-1">{mf.product}</th><th className="px-2 text-right">{t.wizard.received}</th><th className="px-2">{t.common.supplier}</th><th className="pl-2">{t.receptions.blInvoice}</th></tr></thead>
         <tbody>
           {sorted.map((e) => (
             <tr key={e.id} className="border-t border-stone-100">

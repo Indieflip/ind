@@ -144,6 +144,27 @@ const reclamation = "Contacts et démarches à suivre en cas de manquant, refus,
 await db.execute(sql`insert into protocols (title, content, position)
   select 'Process de réclamation', ${reclamation}, 3 where not exists (select 1 from protocols where lower(title) = lower('Process de réclamation'))`);
 
+// Liste des contenants : tares en grammes → kg (unité unique), tri A-Z
+{
+  const { rows } = await db.execute(sql`select id, content from protocols where content like '%| Tare (g) |%'`);
+  for (const p of rows) {
+    const lines = p.content.split("\n");
+    const head = lines.findIndex((l) => l.includes("| Tare (g) |"));
+    const body = [];
+    let end = head + 1;
+    while (end < lines.length && lines[end].trim().startsWith("|")) {
+      const cells = lines[end].trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+      const g = Number(String(cells[2]).replace(/\s/g, "").replace(",", "."));
+      if (cells[2] && cells[2] !== "—" && Number.isFinite(g)) cells[2] = (g / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 3 });
+      body.push(cells);
+      end++;
+    }
+    body.sort((a, b) => a[0].localeCompare(b[0], "fr") || a[1].localeCompare(b[1], "fr"));
+    const out = [...lines.slice(0, head), lines[head].replace("Tare (g)", "Tare (kg)"), ...body.map((c) => `| ${c.join(" | ")} |`), ...lines.slice(end)];
+    await db.execute(sql`update protocols set content = ${out.join("\n")} where id = ${p.id}`);
+  }
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

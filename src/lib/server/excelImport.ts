@@ -8,6 +8,7 @@ import { nameKey, normalize } from "@/lib/search";
 import { categoryCodeFromNature } from "@/lib/nature";
 import { setSetting } from "@/lib/settings";
 import { syncFvProducts } from "./fv";
+import { normalizeMajLog } from "./maj";
 
 type Cell = string | number | Date | null;
 
@@ -216,7 +217,7 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
           bySupplier.set(key, [...(bySupplier.get(key) ?? []), { process: text(r[1]) ?? "", lines: detail.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) }]);
         }
         const out: string[] = ["Contacts et démarches à suivre en cas de manquant, refus, retour ou erreur de facturation, par fournisseur.", ""];
-        for (const [sup, items] of bySupplier) {
+        for (const [sup, items] of [...bySupplier].sort((a, b) => a[0].localeCompare(b[0], "fr", { sensitivity: "base" }))) {
           out.push(`## ${sup}`);
           for (const it of items) {
             if (it.process) out.push(`${it.process} :`);
@@ -231,11 +232,15 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
         const rows = rowsOf(wsInfo, 4);
         const hi = headerIndex(rows, "Prestataire");
         const cell = (c: Cell) => multiline(c).replace(/\|/g, "/").replace(/\r?\n+/g, " // ") || "—";
-        const table = ["| Prestataire | Produit | Tare (g) | Contenant |"];
+        // Le fichier donne les tares en grammes : tout est ramené en kg
+        const kg = (c: Cell) => { const g = price(c); return g == null ? cell(c) : (g / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 3 }); };
+        const rowsOut: string[][] = [];
         for (const r of rows.slice(hi + 1)) {
           if (!text(r[1]) && !text(r[3])) continue;
-          table.push(`| ${cell(r[0])} | ${cell(r[1])} | ${cell(r[2])} | ${cell(r[3])} |`);
+          rowsOut.push([cell(r[0]), cell(r[1]), kg(r[2]), cell(r[3])]);
         }
+        rowsOut.sort((a, b) => a[0].localeCompare(b[0], "fr") || a[1].localeCompare(b[1], "fr"));
+        const table = ["| Prestataire | Produit | Tare (kg) | Contenant |", ...rowsOut.map((r) => `| ${r.join(" | ")} |`)];
         const section = ["## Liste des contenants (tares)", "Poids des contenants à déduire du poids pesé (poids net = poids total − tares).", ...table].join("\n");
         const [p] = await db.select().from(schema.protocols).where(sql`lower(${schema.protocols.title}) = lower('Process pèse')`).limit(1);
         const base = (p?.content ?? "").split(/\n## Liste des contenants/)[0].trimEnd();
@@ -345,6 +350,8 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
           });
         }
       });
+      await normalizeMajLog();
+      await setSetting("maj_normalized_v1", "1");
       report.maj = rows.length;
     }
   }

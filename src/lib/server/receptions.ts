@@ -26,6 +26,7 @@ const lineSchema = z.object({
   decision: z.enum(["conform", "reserve", "refuse"]),
   reason: z.string().max(60).nullable(),
   photos: z.array(z.string().max(2000)).max(10),
+  document: z.string().trim().max(100).nullish(),
 });
 
 export const payloadSchema = z.object({
@@ -132,7 +133,13 @@ async function writeContent(
   const natureOf = (cid: number | null) => cats.find((c) => c.id === cid)?.nameFr ?? null;
   const firstDoc = p.documents?.[0] ?? (p.blNumber ? { type: "bl" as const, number: p.blNumber } : null);
   /** Référence du document (« BL 123 », « Facture 456 ») reprise sur les anomalies */
-  const docRef = firstDoc ? `${firstDoc.type === "facture" ? "Facture" : firstDoc.type === "autre" ? "Document" : "BL"} ${firstDoc.number}` : null;
+  const docLabel = (d: { type: string; number: string }) => `${d.type === "facture" ? "Facture" : d.type === "autre" ? "Document" : "BL"} ${d.number}`;
+  const docRef = firstDoc ? docLabel(firstDoc) : null;
+  /** Référence du document propre à une ligne (saisie par BL / par facture) */
+  const lineRef = (l: { document?: string | null }) => {
+    const d = l.document ? p.documents?.find((x) => x.number === l.document) : null;
+    return d ? docLabel(d) : docRef;
+  };
   for (const l of p.lines) {
     const kind = kindOf(l.categoryId);
     const qty = l.qtyOrdered ?? l.qtyReceived; // quantité facturée (BL / facture)
@@ -143,7 +150,6 @@ async function writeContent(
   // Écarts de pesée : produit au kg dont le poids pesé est inférieur au poids facturé,
   // au-delà de la marge acceptée (10 g ou 0,10 €)
   await tx.delete(schema.weighGaps).where(eq(schema.weighGaps.receptionId, recId));
-  const ref = docRef ? `${supplierName} : ${docRef}` : supplierName;
   for (const l of p.lines) {
     if (unitName(l.unit) !== "Kg" || l.qtyOrdered == null || l.qtyReceived == null) continue;
     const gapQty = Math.round((l.qtyOrdered - l.qtyReceived) * 1000) / 1000;
@@ -153,7 +159,7 @@ async function writeContent(
     await tx.insert(schema.weighGaps).values({
       date: deliveryDay,
       nature: cats.find((c) => c.id === l.categoryId)?.nameFr ?? null,
-      supplierRef: ref,
+      supplierRef: lineRef(l) ? `${supplierName} : ${lineRef(l)}` : supplierName,
       product: l.productName,
       qtyInvoiced: String(l.qtyOrdered),
       unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
@@ -244,7 +250,7 @@ async function writeContent(
       } else if (check.kind === "locked" && !keep.locked?.has(productId)) {
         // Prix bloqué : pas de variation, une anomalie à réclamer au fournisseur
         await tx.insert(schema.anomalies).values({
-          receptionId: recId, supplierId, supplierName, productName: l.productName, type: "locked_price", nature: natureOf(l.categoryId), reference: docRef,
+          receptionId: recId, supplierId, supplierName, productName: l.productName, type: "locked_price", nature: natureOf(l.categoryId), reference: lineRef(l),
           description: `${t.anomalies.types.locked_price} — ${l.productName} : ${fmtEuro(l.unitPrice)} (${t.wizard.lockedRange} ${fmtEuro(ref.min ?? ref.max)}${ref.min != null && ref.max != null && ref.min !== ref.max ? ` – ${fmtEuro(ref.max)}` : ""}, ${check.pct > 0 ? "+" : ""}${String(check.pct).replace(".", ",")} %)`,
           createdBy: user.id, createdAt: date,
         });
@@ -270,6 +276,7 @@ async function writeContent(
         priceLocked: ref.locked,
         decision: l.decision,
         reason: l.reason,
+        document: l.document || null,
         position: position++,
       })
       .returning();
@@ -293,7 +300,7 @@ async function writeContent(
         supplierName,
         productName: l.productName,
         nature: natureOf(l.categoryId),
-        reference: docRef,
+        reference: lineRef(l),
         type: (l.reason && reasonToAnomaly[l.reason]) || (l.qtyReceived != null && l.qtyOrdered != null && l.qtyReceived < l.qtyOrdered ? "missing" : "other"),
         description: `${t.decision[l.decision]} — ${l.productName} : ${reasonLabel}${detail}`,
         photoUrl: l.photos[0] ?? null,

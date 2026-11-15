@@ -302,10 +302,10 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
       </div>
 
       <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-stone-200 bg-white" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-        <div className="mx-auto flex max-w-2xl gap-3 p-3">
+        <div className="mx-auto flex max-w-2xl gap-2 p-3 [&>button]:min-w-0 [&>button]:px-2 sm:gap-3 sm:[&>button]:px-4">
           {draft.step > 0 && (
             <button type="button" className="btn-secondary btn-lg flex-1" onClick={() => go(draft.step - 1)}>
-              <Icon name="chevronLeft" /> {t.common.back}
+              <Icon name="chevronLeft" /> <span className="truncate">{t.common.back}</span>
             </button>
           )}
           {editId && draft.step < 3 && (
@@ -314,17 +314,17 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
             </button>
           )}
           {!editId && draft.step >= 1 && (
-            <button type="button" className="btn-secondary btn-lg flex-1 px-3" disabled={draftSaving || saving} onClick={saveAsDraft} title={t.wizard.saveDraftHint}>
-              <Icon name="file" /> <span className="text-xs sm:text-sm">{draftSaving ? t.wizard.saving : t.wizard.saveDraft}</span>
+            <button type="button" className="btn-secondary btn-lg flex-1" disabled={draftSaving || saving} onClick={saveAsDraft} title={t.wizard.saveDraftHint}>
+              <Icon name="file" className="hidden h-5 w-5 shrink-0 sm:block" /> <span className="text-xs leading-tight sm:text-sm">{draftSaving ? t.wizard.saving : t.wizard.saveDraft}</span>
             </button>
           )}
           {draft.step < 3 ? (
-            <button type="button" className="btn-primary btn-lg flex-[2]" disabled={!canContinue} onClick={() => go(draft.step + 1)}>
-              {t.common.continue} <Icon name="chevronRight" />
+            <button type="button" className="btn-primary btn-lg flex-[1.4]" disabled={!canContinue} onClick={() => go(draft.step + 1)}>
+              <span className="truncate">{t.common.continue}</span> <Icon name="chevronRight" />
             </button>
           ) : (
-            <button type="button" className="btn-primary btn-lg flex-[2]" disabled={saving} onClick={finish}>
-              <Icon name="check" /> {saving ? t.wizard.saving : editId ? t.receptions.saveChanges : t.wizard.finish}
+            <button type="button" className="btn-primary btn-lg flex-[1.4]" disabled={saving} onClick={finish}>
+              <Icon name="check" /> <span className="truncate text-sm sm:text-base">{saving ? t.wizard.saving : editId ? t.receptions.saveChanges : t.wizard.finish}</span>
             </button>
           )}
         </div>

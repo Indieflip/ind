@@ -177,6 +177,8 @@ export const receptionLines = pgTable(
     priceLocked: boolean("price_locked").notNull().default(false),
     decision: decisionEnum("decision").notNull().default("conform"),
     reason: text("reason"),
+    /** Numéro du BL / de la facture auquel la ligne appartient (bons à plusieurs documents) */
+    document: text("document"),
     position: integer("position").notNull().default(0),
   },
   (t) => [index("lines_reception_idx").on(t.receptionId), index("lines_product_idx").on(t.productId)],
@@ -264,6 +266,9 @@ export const majLog = pgTable(
     detail: text("detail"),
     reference: text("reference"),
     claim: text("claim"),
+    /** Rapprochement avec la liste des fournisseurs et des produits du mercurial */
+    supplierId: integer("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
+    productId: integer("product_id").references(() => products.id, { onDelete: "set null" }),
     position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

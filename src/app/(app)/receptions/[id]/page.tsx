@@ -34,6 +34,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
       .orderBy(asc(schema.receptionNotes.createdAt)),
     db.query.bakeryEntries.findFirst({ where: eq(schema.bakeryEntries.receptionId, id) }),
   ]);
+  const multiDoc = new Set(lines.map((l) => l.document).filter(Boolean)).size > 1;
   const consolidator = rec.consolidatedBy ? await db.query.users.findFirst({ where: eq(schema.users.id, rec.consolidatedBy), columns: { name: true } }) : undefined;
   const locked = !!rec.consolidatedAt;
   const editor = rec.updatedBy ? await db.query.users.findFirst({ where: eq(schema.users.id, rec.updatedBy), columns: { name: true } }) : undefined;
@@ -112,7 +113,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
           return (
             <li key={l.id} className={`card border-l-4 ${decisionStyles[l.decision].border} p-3 text-sm`}>
               <div className="flex items-start justify-between gap-2">
-                <span className="font-semibold">{l.productName}</span>
+                <span className="font-semibold">{l.productName}{l.document && multiDoc && <span className="ml-1 text-xs font-normal text-stone-500">· {l.document}</span>}</span>
                 <span className={`badge ${decisionStyles[l.decision].badge}`}>{t.decision[l.decision]}</span>
               </div>
               <dl className="mt-2 grid grid-cols-3 gap-x-3 gap-y-1 text-xs">
@@ -140,6 +141,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
         <table className="table">
           <thead>
             <tr>
+              {multiDoc && <th>{t.receptions.blInvoice}</th>}
               <th>{t.common.product}</th>
               <th>{t.common.category}</th>
               <th className="text-right">{t.wizard.ordered}</th>
@@ -158,6 +160,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
               const linePhotos = photos.filter((p) => p.lineId === l.id);
               return (
                 <tr key={l.id} className={`border-l-4 ${decisionStyles[l.decision].border}`}>
+                  {multiDoc && <td className="whitespace-nowrap text-stone-600">{l.document ?? "—"}</td>}
                   <td className="font-medium">{l.productName}</td>
                   <td className="text-stone-500">{catName(l.categoryId)}</td>
                   <td className="text-right tabular-nums">{fmtNum(l.qtyOrdered, locale)} {l.qtyOrdered ? l.unit : ""}</td>

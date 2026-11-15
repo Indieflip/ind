@@ -65,7 +65,9 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
         rows={raw.map((r) => ({
           id: r.id,
           number: r.number,
-          blNumber: r.blNumber,
+          blNumber: (r.documents as { type: string; number: string }[] | null)?.length
+            ? (r.documents as { type: string; number: string }[]).map((d) => `${d.type === "facture" ? "Facture" : d.type === "autre" ? "Doc." : "BL"} ${d.number}`).join(" · ")
+            : r.blNumber,
           date: fmtDateTime(r.deliveredAt, locale),
           dateSort: r.deliveredAt.toISOString(),
           supplierName: r.supplierName,

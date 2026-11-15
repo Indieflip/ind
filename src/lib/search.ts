@@ -38,7 +38,7 @@ export function suggest(list: string[], query: string, limit = 8) {
   if (!normalize(query)) return [];
   return [...new Set(list)]
     .filter((x) => matches(x, query))
-    .sort((a, b) => score(b, query) - score(a, query))
+    .sort((a, b) => score(b, query) - score(a, query) || az(a, b))
     .slice(0, limit);
 }
 
@@ -48,4 +48,9 @@ export function nameKey(s: string) {
     .split(" ")
     .map((w) => w.replace(/(es|s|e)$/, ""))
     .join(" ");
+}
+
+/** Tri alphabétique A → Z (accents et majuscules ignorés, nombres dans l'ordre naturel) */
+export function az(a: string, b: string) {
+  return a.localeCompare(b, "fr", { sensitivity: "base", numeric: true });
 }

@@ -72,7 +72,7 @@ export function DataTable<R>({
       <ActiveFilters filters={tb.filters} labels={Object.fromEntries(cols.map((c) => [c.key, c.label]))} onChange={tb.setFilter} onReset={tb.reset} count={tb.filtered.length} total={rows.length} />
       <div className={`${maxHeight} min-h-48 overflow-auto`}>
         <table className={`table ${dense ? "text-xs [&_th]:text-xs" : ""} ${fixed ? "table-fixed [&_td]:break-words [&_td]:px-1.5 [&_th]:px-1.5" : ""}`}>
-          {fixed && (
+          {(fixed || cols.some((c) => c.width)) && (
             <colgroup>
               {selectable && <col style={{ width: "2rem" }} />}
               {cols.map((c) => <col key={c.key} style={c.width ? { width: c.width } : undefined} />)}

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { suggest } from "@/lib/search";
+import { az, suggest } from "@/lib/search";
 import { useI18n } from "@/lib/i18n/client";
 
 /**
@@ -35,7 +35,7 @@ export function FilterInput({ value, onChange, options = [], placeholder }: { va
   const text = parts[parts.length - 1] ?? "";
   const set = (c: string[], txt: string) => onChange([...c, txt].join("|").replace(/^\|$/, ""));
   const list = useMemo(() => {
-    const pool = options.filter((o) => !chips.includes(o));
+    const pool = options.filter((o) => !chips.includes(o)).sort(az);
     // Sans saisie : toute la liste (défilante) ; en tapant : les correspondances
     return text ? suggest(pool, text, 50) : open ? pool.slice(0, 300) : [];
   }, [options, text, chips, open]);

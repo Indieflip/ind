@@ -2,7 +2,7 @@
 import { useI18n } from "@/lib/i18n/client";
 import type { Catalog, Draft } from "@/lib/reception-types";
 import { decisionStyles } from "../DecisionBadge";
-import { docsOf, needsTemp, priceGap } from "./helpers";
+import { docNumbers, docsOf, lineDoc, needsTemp, priceGap } from "./helpers";
 import { SignaturePad } from "./SignaturePad";
 
 export function StepValidate({
@@ -26,6 +26,7 @@ export function StepValidate({
   const undecided = draft.lines.filter((l) => !l.decision);
 
   const w = t.wizard;
+  const multiDoc = docNumbers(draft).length > 1;
   const dash = (v: string | null | undefined) => (v && String(v).trim() ? v : "—");
   return (
     <>
@@ -52,11 +53,12 @@ export function StepValidate({
           ) : (
             <table className="w-full text-left text-xs">
               <thead className="text-stone-500">
-                <tr><th className="py-1 pr-2">{t.common.product}</th><th className="px-1 text-right">{w.received}</th><th className="px-1 text-right">°C</th><th className="px-1">DLC</th><th className="px-1 text-right">{t.common.price}</th><th className="pl-1">{t.common.status}</th></tr>
+                <tr>{multiDoc && <th className="py-1 pr-2">{t.receptions.blInvoice}</th>}<th className="py-1 pr-2">{t.common.product}</th><th className="px-1 text-right">{w.received}</th><th className="px-1 text-right">°C</th><th className="px-1">DLC</th><th className="px-1 text-right">{t.common.price}</th><th className="pl-1">{t.common.status}</th></tr>
               </thead>
               <tbody>
-                {draft.lines.map((l) => (
+                {(multiDoc ? docNumbers(draft).flatMap((n) => draft.lines.filter((l) => lineDoc(draft, l) === n)) : draft.lines).map((l) => (
                   <tr key={l.key} className="border-t border-stone-100">
+                    {multiDoc && <td className="py-1.5 pr-2 whitespace-nowrap text-stone-600">{lineDoc(draft, l)}</td>}
                     <td className="py-1.5 pr-2 font-medium">{l.productName}</td>
                     <td className="px-1 text-right tabular-nums">{dash(l.qtyReceived)}{l.qtyOrdered && l.qtyOrdered !== l.qtyReceived ? ` / ${l.qtyOrdered}` : ""} {l.unit}</td>
                     <td className="px-1 text-right tabular-nums">{dash(l.temperature)}</td>

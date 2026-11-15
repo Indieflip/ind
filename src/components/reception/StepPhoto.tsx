@@ -25,6 +25,7 @@ export function StepPhoto({
   return (
     <>
       <section className="card space-y-4 p-4">
+        <p className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-900"><Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0" /> {w.anomalyFirst}</p>
         <p className="text-sm text-stone-600">{w.photoHint}</p>
         <Thumbs
           photos={draft.blPhotos}

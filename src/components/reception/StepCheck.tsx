@@ -11,7 +11,8 @@ import { Icon } from "../Icon";
 import { UnitSelect } from "../UnitSelect";
 import { similarity } from "@/lib/fuzzy";
 import { PhotoButton, Thumbs } from "./PhotoButton";
-import { evaluate, isBakerySupplier, lineFromProduct, matches, priceCheck, suggestedReason, withAutoDecision } from "./helpers";
+import { docNumbers, docsOf, evaluate, isBakerySupplier, lineDoc, lineFromProduct, matches, priceCheck, suggestedReason, withAutoDecision } from "./helpers";
+import { az } from "@/lib/search";
 
 const DEFAULT_UNITS = ["Pièce", "Kg", "Litre", "Sachet"];
 
@@ -28,14 +29,37 @@ export function StepCheck({
 }) {
   const { t } = useI18n();
   const bakery = isBakerySupplier(draft.supplierName, catalog?.bakerySupplier);
+  // Saisie par document : avec plusieurs BL / factures, les produits sont saisis document par document
+  const docs = docsOf(draft).filter((x) => x.number.trim());
+  const nums = docNumbers(draft);
+  const [active, setActive] = useState(nums[0] ?? "");
+  const current = nums.includes(active) ? active : nums[0] ?? "";
+  const multi = nums.length > 1;
+  const shown = multi ? draft.lines.filter((l) => lineDoc(draft, l) === current) : draft.lines;
   return (
     <>
       <a href="/protocoles" target="_blank" className="flex items-center gap-2 text-sm font-medium text-brand-700 underline">
         <Icon name="book" className="h-4 w-4" /> {t.wizard.weighProtocol}
       </a>
       {bakery && <BakeryBlock draft={draft} setDraft={setDraft} />}
-      {draft.lines.length === 0 && <p className="card p-4 text-center text-sm text-stone-500">{t.wizard.noProducts}</p>}
-      {draft.lines.map((l) => (
+      {multi && (
+        <section className="card p-3">
+          <p className="mb-2 text-xs text-stone-600">{t.wizard.byDocument}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {docs.map((d) => {
+              const n = draft.lines.filter((l) => lineDoc(draft, l) === d.number.trim()).length;
+              const on = d.number.trim() === current;
+              return (
+                <button key={d.number} type="button" onClick={() => setActive(d.number.trim())} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${on ? "border-brand-600 bg-brand-50 text-brand-800" : "border-stone-200 bg-white text-stone-600"}`}>
+                  {t.wizard.docTypes[d.type]} {d.number} <span className="ml-1 rounded-full bg-stone-100 px-1.5 text-xs text-stone-600">{n}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+      {shown.length === 0 && <p className="card p-4 text-center text-sm text-stone-500">{t.wizard.noProducts}</p>}
+      {shown.map((l) => (
         <LineCard
           key={l.key}
           line={l}
@@ -45,7 +69,7 @@ export function StepCheck({
           onRemove={async () => await appConfirm(t.wizard.removeLineConfirm) && setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
         />
       ))}
-      <AddProduct draft={draft} setDraft={setDraft} catalog={catalog} />
+      <AddProduct draft={draft} setDraft={setDraft} catalog={catalog} doc={multi ? current : undefined} />
     </>
   );
 }
@@ -220,9 +244,11 @@ function LineCard({
   );
 }
 
-function AddProduct({ draft, setDraft, catalog }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; catalog?: Catalog }) {
+function AddProduct({ draft, setDraft, catalog, doc }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; catalog?: Catalog; doc?: string }) {
   const { t, locale } = useI18n();
   const [q, setQ] = useState("");
+  const [browse, setBrowse] = useState(false);
+  const add = (line: DraftLine) => setDraft((d) => ({ ...d, lines: [...d.lines, { ...line, doc }] }));
   const [custom, setCustom] = useState<null | { name: string; unit: string; categoryId: string }>(null);
 
   // Produits proches déjà au mercurial du fournisseur : évite de créer un doublon
@@ -235,10 +261,10 @@ function AddProduct({ draft, setDraft, catalog }: { draft: Draft; setDraft: (fn:
   }, [custom, catalog, draft.supplierId]);
 
   const results = useMemo(() => {
-    if (!catalog || q.trim().length < 2) return [];
-    const own = catalog.products.filter((p) => p.supplierId === draft.supplierId && matches(p.name, q));
-    return own.slice(0, 12);
-  }, [catalog, q, draft.supplierId]);
+    if (!catalog || (!browse && q.trim().length < 2)) return [];
+    const own = catalog.products.filter((p) => p.supplierId === draft.supplierId && (!q.trim() || matches(p.name, q))).sort((a, b) => az(a.name, b.name));
+    return browse ? own : own.slice(0, 12);
+  }, [catalog, q, draft.supplierId, browse]);
 
   return (
     <section className="card space-y-3 border-dashed p-4">
@@ -247,18 +273,29 @@ function AddProduct({ draft, setDraft, catalog }: { draft: Draft; setDraft: (fn:
         <>
           <div className="relative">
             <Icon name="search" className="pointer-events-none absolute left-3 top-3 h-5 w-5 text-stone-400" />
-            <input className="input pl-10" placeholder={t.wizard.searchProduct} value={q} onChange={(e) => setQ(e.target.value)} />
+            <input className="input pl-10 pr-12" placeholder={t.wizard.searchProduct} value={q} onChange={(e) => setQ(e.target.value)} />
+            <button
+              type="button"
+              className={`absolute right-1 top-1 bottom-1 flex w-10 items-center justify-center rounded-md text-lg ${browse ? "bg-brand-50 text-brand-700" : "text-stone-500 hover:bg-stone-100"}`}
+              aria-label={t.wizard.supplierProducts}
+              title={t.wizard.supplierProducts}
+              onClick={() => setBrowse((v) => !v)}
+            >
+              {browse ? "▴" : "▾"}
+            </button>
           </div>
+          {browse && results.length === 0 && <p className="text-xs text-stone-500">{t.wizard.noSupplierProducts}</p>}
           {results.length > 0 && (
-            <ul className="max-h-56 divide-y divide-stone-100 overflow-y-auto rounded-lg border border-stone-200">
+            <ul className="max-h-72 divide-y divide-stone-100 overflow-y-auto rounded-lg border border-stone-200">
               {results.map((p) => (
                 <li key={p.id}>
                   <button
                     type="button"
                     className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-stone-50"
                     onClick={() => {
-                      setDraft((d) => ({ ...d, lines: [...d.lines, withAutoDecision(lineFromProduct(p), catalog)] }));
+                      add(withAutoDecision(lineFromProduct(p), catalog));
                       setQ("");
+                      setBrowse(false);
                     }}
                   >
                     <span>{p.name}</span>
@@ -297,7 +334,7 @@ function AddProduct({ draft, setDraft, catalog }: { draft: Draft; setDraft: (fn:
                       type="button"
                       className="btn-secondary px-2 py-1 text-xs"
                       onClick={() => {
-                        setDraft((d) => ({ ...d, lines: [...d.lines, lineFromProduct(p)] }));
+                        add(lineFromProduct(p));
                         setCustom(null);
                         setQ("");
                       }}
@@ -317,7 +354,7 @@ function AddProduct({ draft, setDraft, catalog }: { draft: Draft; setDraft: (fn:
               disabled={!custom.name.trim() || !custom.unit.trim() || !custom.categoryId}
               onClick={() => {
                 const line = lineFromProduct(null, { productName: custom.name.trim(), unit: custom.unit.trim(), categoryId: Number(custom.categoryId) });
-                setDraft((d) => ({ ...d, lines: [...d.lines, withAutoDecision(line, catalog)] }));
+                add(withAutoDecision(line, catalog));
                 setCustom(null);
                 setQ("");
               }}

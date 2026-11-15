@@ -67,6 +67,8 @@ export interface DraftLine {
   reason: Reason | "";
   photos: string[]; // data URL ou URL déjà envoyée
   fromBl?: boolean;
+  /** Numéro du document (BL / facture) auquel le produit est rattaché */
+  doc?: string;
 }
 
 export type DocType = "bl" | "facture" | "autre";
@@ -130,5 +132,6 @@ export interface ReceptionPayload {
     decision: Decision;
     reason: string | null;
     photos: string[];
+    document?: string | null;
   }[];
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "reception_lines" ADD COLUMN "document" text;

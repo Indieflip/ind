@@ -54,6 +54,7 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     decision: l.decision,
 
     reason: (l.reason ?? "") as DraftLine["reason"],
+    doc: l.document ?? undefined,
     photos: photos.filter((p) => p.lineId === l.id).map((p) => p.url),
   }));
 
