@@ -9,6 +9,9 @@ import { one, type SP } from "@/lib/server/queries";
 import { PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { ProtocolEditor, ProtocolView } from "./ProtocolClient";
+import { ContainersTable } from "./ContainersTable";
+import { normalize } from "@/lib/search";
+import { num } from "@/lib/format";
 
 export default async function ProtocolsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser(can.viewProtocols);
@@ -26,6 +29,9 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   const creating = one(sp.new) === "1" && editable;
   const editing = one(sp.edit) === "1" && editable;
   const current = creating || showThresholds || showConformity ? null : list.find((p) => String(p.id) === one(sp.id)) ?? list[0];
+  // Le protocole « Process pèse » affiche la liste des contenants (tares)
+  const isWeighing = !!current && normalize(current.title) === "process pese";
+  const containers = isWeighing ? await getDb().select().from(schema.containers).orderBy(asc(schema.containers.position), asc(schema.containers.id)) : [];
 
   return (
     <>
@@ -128,6 +134,12 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
                   {editable && <Link href={`/protocoles?id=${current.id}&edit=1`} className="btn-secondary no-print"><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</Link>}
                 </div>
                 <ProtocolView content={current.content} />
+                {isWeighing && (
+                  <ContainersTable
+                    editable={editable}
+                    rows={containers.map((x) => ({ id: x.id, supplier: x.supplier ?? "", product: x.product ?? "", tare: num(x.tare), container: x.container ?? "" }))}
+                  />
+                )}
               </article>
             )
           ) : null}

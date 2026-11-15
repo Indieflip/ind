@@ -61,21 +61,33 @@ for (const [i, name] of baseUnits.entries()) {
 await db.execute(sql`insert into units (name) select distinct unit from products where unit is not null and unit <> '' on conflict (name) do nothing`);
 
 // Unités : première lettre en majuscule, doublons de casse fusionnés (« pot », « POT » → « Pot »)
-await db.execute(sql`update products set unit = upper(left(lower(unit), 1)) || substr(lower(unit), 2) where unit <> '' and unit <> upper(left(lower(unit), 1)) || substr(lower(unit), 2)`);
-await db.execute(sql`delete from units u where u.name <> upper(left(lower(u.name), 1)) || substr(lower(u.name), 2)
+await db.execute(sql`update products set unit = upper(left(lower(unit), 1)) || substr(lower(unit), 2) where unit <> '' and unit not like '%/%' and unit <> upper(left(lower(unit), 1)) || substr(lower(unit), 2)`);
+await db.execute(sql`delete from units u where u.name not like '%/%' and u.name <> upper(left(lower(u.name), 1)) || substr(lower(u.name), 2)
   and exists (select 1 from units v where v.name = upper(left(lower(u.name), 1)) || substr(lower(u.name), 2))`);
 await db.execute(sql`delete from units u where exists (select 1 from units v where v.id < u.id
   and upper(left(lower(v.name), 1)) || substr(lower(v.name), 2) = upper(left(lower(u.name), 1)) || substr(lower(u.name), 2))`);
-await db.execute(sql`update units set name = upper(left(lower(name), 1)) || substr(lower(name), 2) where name <> upper(left(lower(name), 1)) || substr(lower(name), 2)`);
+await db.execute(sql`update units set name = upper(left(lower(name), 1)) || substr(lower(name), 2) where name not like '%/%' and name <> upper(left(lower(name), 1)) || substr(lower(name), 2)`);
 
 // Unités en double sous deux écritures : fusion (Pce → Pièce, Bte → Boite, Seaux / Sceaux → Seau, Btl → Bouteille)
-const aliases = { Pce: "Pièce", Piece: "Pièce", Bte: "Boite", "Boîte": "Boite", Seaux: "Seau", Sceaux: "Seau", Btl: "Bouteille" };
+const aliases = { Pce: "Pièce", Piece: "Pièce", Bte: "Boite", "Boîte": "Boite", Seaux: "Seau", Sceaux: "Seau", Btl: "Bouteille", Bocal: "Bocal / Pot", Pot: "Bocal / Pot" };
 for (const [from, to] of Object.entries(aliases)) {
   await db.execute(sql`insert into units (name) select ${to} where exists (select 1 from units where name = ${from}) on conflict (name) do nothing`);
   await db.execute(sql`update products set unit = ${to} where unit = ${from}`);
   await db.execute(sql`update reception_lines set unit = ${to} where unit = ${from}`);
+  await db.execute(sql`update fv_items set unit = ${to} where unit = ${from}`);
   await db.execute(sql`delete from units where name = ${from}`);
 }
+
+// Tri des unités (une seule fois) : suppression des unités qui ne servent à aucun produit, ni bon
+if (!(await db.execute(sql`select 1 from app_settings where key = 'units_cleanup_v1'`)).rows.length) {
+  const { rowCount } = await db.execute(sql`delete from units u where u.name not in ('Kg', 'Pièce', 'Litre', 'Sachet')
+    and not exists (select 1 from products p where p.unit = u.name)
+    and not exists (select 1 from fv_items f where f.unit = u.name)
+    and not exists (select 1 from reception_lines l where l.unit = u.name)`);
+  await db.execute(sql`insert into app_settings (key, value) values ('units_cleanup_v1', '1') on conflict (key) do nothing`);
+  console.log(`[migrate] unités inutilisées supprimées : ${rowCount}`);
+}
+await db.execute(sql`delete from units where trim(name) = ''`);
 
 // Premier protocole (modifiable ensuite dans l'onglet Protocoles)
 const processPese = `## 1. Préparation et vérification de l'instrument
@@ -144,29 +156,37 @@ const reclamation = "Contacts et démarches à suivre en cas de manquant, refus,
 await db.execute(sql`insert into protocols (title, content, position)
   select 'Process de réclamation', ${reclamation}, 3 where not exists (select 1 from protocols where lower(title) = lower('Process de réclamation'))`);
 
-// Process pèse : liste des contenants (tares en kg) ajoutée si elle n'y est pas encore
+// Liste des contenants : table dédiée (filtres, ajout, modification) affichée sous le protocole « Process pèse »
 const tares = "## Liste des contenants (tares)\nPoids des contenants à déduire du poids pesé (poids net = poids total − tares).\n| Prestataire | Produit | Tare (kg) | Contenant |\n| - | Tout produit | 1,6 | Caisse rouge profondeur moyenne |\n| - | Tout produit | — | Gastro Petit |\n| - | Tout produit | 1,12 | Gastro Moyen |\n| - | Tout produit | 1,91 | Gastro Grand |\n| Dab | Déconsigne | - | A = demi d'eau (4,80€) // D = L d'eau (4,20€) // E = soda (5,50€) // F = fût (30€) // G = Orangina (7€) |\n| Producteurs Réunis | Ail épeluché C 4E GAM | 0,025 | Boite en plastique |\n| Producteurs Réunis | Carotte plateau KG | 1 | Boite en bois |\n| Producteurs Réunis | Champignon Paris EQ.MOYEN KG | 0,185 | Cagette en plastique bleue ou noir |\n| Producteurs Réunis | Citron jaune 4/40 Gros | 0,53 | Carton Bleu  // \"Caki Fruit |\n| Producteurs Réunis | Citron jaune 4/40 Gros | 0,94 | Carton simple gros noir et jaune  // \"18KGNET |\n| Producteurs Réunis | Citron jaune 4/40 Gros | 0,45 | Carton noir // \"CITRAT CITRUS ARGENTINO |\n| Producteurs Réunis | Citron jaune 4/40 Gros | 0,41 | Carton Bleu  // \"Twente Partners |\n| Producteurs Réunis | Citron vert | 0,43 | Carton noir |\n| Producteurs Réunis | Courgette blanche/Grise KG | 0,96 | Cagette en bois beige (classique) |\n| Producteurs Réunis | Courgette blanche/Grise KG | 0,865 | Cagette bois simple // \"VIRGEN DEL ROLLION |\n| Producteurs Réunis | Figue extra | 0,27 | Carton blanc + feuille plastique // \"Dauna de Elche |\n| Producteurs Réunis | Figue extra | 0,38 | Cagette bois // \"SOLIES |\n| Producteurs Réunis | Fraise | 0,035 | Barquette |\n| Producteurs Réunis | Mangue | 0,37 | Carton  // \"Mangoes |\n| Producteurs Réunis | Mangue | 0,49 | Carton rose // \"LA ROSEE DU ROY |\n| Producteurs Réunis | Mangue | 0,59 | Carton noir grand // \"SUBLIME |\n| Producteurs Réunis | Mangue | 0,59 | Carton blanc // \"Glamour |\n| Producteurs Réunis | Oignon pelé (blanc et Rouge) | 0,89 | Cagette en bois  // \"RPH OIGNONS |\n| Producteurs Réunis | Oignon rouge pelé | 0,675 | Cagette en bois simple moyen |\n| Producteurs Réunis | Orange jus machine | 0,65 | Cagette bois // \"CHOUCHOU |\n| Producteurs Réunis | Orange jus machine | 0,475 | Carton noir // \"CHOUCHOU |\n| Producteurs Réunis | Orange jus machine | 0,905 | Carton blanc et orange // \"SUTHERN |\n| Producteurs Réunis | Orange jus machine | 0,6 | Carton noir grand // \"Coquette |\n| Producteurs Réunis | Orange jus machine | 1,45 | Cagette bois simple |\n| Producteurs Réunis | PDT Epeluché | 0,535 | Carton grand  // \"LA DIMANCHE VILLE |\n| Producteurs Réunis | PDT Grenaille 10k | 0,65 | Carton bleu claire moyen \"CA C BON GRENAILLE |\n| Producteurs Réunis | Poivron (Rouge, Jaune, Vert) | 0,51 | Carton \"Poivron PAPRIKA POIVRON |\n| Producteurs Réunis | Poivron Jaune | 0,43 | Carton jaune // \"Poivron PAPRIKA POIVRON |\n| Producteurs Réunis | Poivron vert KG | 0,665 | Cagette beige \"MI V IEJO |\n| Producteurs Réunis | Poivron vert KG | 0,55 | Carton rouge et blanc // \"Naturinda |\n| Producteurs Réunis | Pomme Golden Office 70/75 KG (136-180G) | 0,515 | Carton moyen  // \"MOUTINE |\n| Producteurs Réunis | Pomme Golden Office 70/75 KG (136-180G) | 0,43 | Carton  // \"L'ELEGANTE |\n| Producteurs Réunis | Pomme Golden Office 70/75 KG (136-180G) | 0,575 | Carton beige // \"Alp in 972, La pomme des Alpes |\n| Producteurs Réunis | Pousse Epinard Nice Herbe Kg (France) | 0,72 | Cagette en plastique noir (Taille grande) |\n| Producteurs Réunis | Riquette | 0,46 | Carton simple |\n| Producteurs Réunis | Tomate 57/67 (Pays-Bas) | 0,53 | Carton rouge et vert // \"Vittura |\n| Producteurs Réunis | Tomate 57/67 (Pays-Bas) | 0,565 | Cagette plastique bleue simple |\n| Producteurs Réunis | Tomate 57/67 (Pays-Bas) | 0,36 | Carton vert  // \"Baron / Frandria |\n| Producteurs Réunis | Tomate ancienne multivariete (France) | 0,48 | Cagette en bois  // \"Prince de Bretagne, les maraichers |\n| Producteurs Réunis | Tomate ancienne multivariete (France) | 0,48 | Cagette en bois  // \"BEL'ORTA |\n| Producteurs Réunis | Tomate cerise \"Meli-Melo | 0,28 | Carton blanc et bleu // \"Den Berk Délice |\n| Producteurs Réunis | Tomate cerise grappe France | 0,235 | Carton bleu et orange  // \"Belorta Cherrystar |\n| Producteurs Réunis | Tout produit | 0,35 | Carton blanc et rouge // \"Producteurs Réunis |\n| Producteurs Réunis | Tout produit | 0,965 | Carton noir et jaune grand  // \"CITRAR 18KG |\n| Top Mediterranee | Coeur de longe / longe de thon | 0,197 | Barquette |";
-await db.execute(sql`update protocols set content = content || ${'\n\n' + tares} where title = 'Process pèse' and content not like '%Liste des contenants%'`);
-await db.execute(sql`update protocols set content = ${'Tares des contenants : voir la « Liste des contenants (tares) » en bas de ce protocole (poids en kg à déduire du poids pesé).\n\n'} || content where title = 'Process pèse' and content like '%Liste des contenants%' and content not like 'Tares des contenants : voir%'`);
-
-// Liste des contenants : tares en grammes → kg (unité unique), tri A-Z
 {
-  const { rows } = await db.execute(sql`select id, content from protocols where content like '%| Tare (g) |%'`);
-  for (const p of rows) {
-    const lines = p.content.split("\n");
-    const head = lines.findIndex((l) => l.includes("| Tare (g) |"));
-    const body = [];
-    let end = head + 1;
-    while (end < lines.length && lines[end].trim().startsWith("|")) {
-      const cells = lines[end].trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
-      const g = Number(String(cells[2]).replace(/\s/g, "").replace(",", "."));
-      if (cells[2] && cells[2] !== "—" && Number.isFinite(g)) cells[2] = (g / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 3 });
-      body.push(cells);
-      end++;
+  const pointer = "Tares des contenants : voir la « Liste des contenants (tares) » en bas de ce protocole (poids en kg à déduire du poids pesé).";
+  const proto = (await db.execute(sql`select id, content from protocols where title = 'Process pèse' limit 1`)).rows[0];
+  const seeded = (await db.execute(sql`select 1 from app_settings where key = 'containers_seed_v1'`)).rows.length > 0;
+  const toCells = (l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+  if (!seeded) {
+    const hasRows = (await db.execute(sql`select 1 from containers limit 1`)).rows.length > 0;
+    if (!hasRows) {
+      const source = proto?.content?.includes("| Prestataire |") ? proto.content : tares;
+      const lines = source.split("\n");
+      const head = lines.findIndex((l) => l.includes("| Prestataire |"));
+      const grams = head >= 0 && lines[head].includes("Tare (g)");
+      let position = 0;
+      for (let k = head + 1; head >= 0 && k < lines.length && lines[k].trim().startsWith("|"); k++) {
+        const [supplier, product, tare, container] = toCells(lines[k]);
+        let n = Number(String(tare ?? "").replace(/\s/g, "").replace(",", "."));
+        if (!tare || !Number.isFinite(n) || tare === "-" || tare === "—") n = null;
+        else if (grams) n = n / 1000;
+        const clean = (x) => (x && x !== "—" ? x.replace(/ \/\/ /g, "\n") : null);
+        await db.execute(sql`insert into containers (supplier, product, tare, container, position) values (${clean(supplier)}, ${clean(product)}, ${n}, ${clean(container)}, ${position++})`);
+      }
     }
-    body.sort((a, b) => a[0].localeCompare(b[0], "fr") || a[1].localeCompare(b[1], "fr"));
-    const out = [...lines.slice(0, head), lines[head].replace("Tare (g)", "Tare (kg)"), ...body.map((c) => `| ${c.join(" | ")} |`), ...lines.slice(end)];
-    await db.execute(sql`update protocols set content = ${out.join("\n")} where id = ${p.id}`);
+    await db.execute(sql`insert into app_settings (key, value) values ('containers_seed_v1', '1') on conflict (key) do nothing`);
+  }
+  // Le tableau en texte est retiré du protocole (la liste est désormais la table ci-dessous)
+  if (proto) {
+    let content = proto.content.split(/\n*## Liste des contenants/)[0].trimEnd();
+    if (!content.startsWith("Tares des contenants : voir")) content = `${pointer}\n\n${content}`;
+    if (content !== proto.content) await db.execute(sql`update protocols set content = ${content} where id = ${proto.id}`);
   }
 }
 

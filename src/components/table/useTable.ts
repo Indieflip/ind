@@ -40,9 +40,17 @@ export function useTable<R>(rows: R[], cols: ColumnDef<R>[], opts: { pageSize?: 
   }, [rows, cols]);
 
   const filtered = useMemo(() => {
-    // Plusieurs choix séparés par « | » : la ligne correspond si elle correspond à l'un d'eux
-    const terms = Object.fromEntries(cols.map((c) => [c.key, (filters[c.key] ?? "").split("|").map((x) => x.trim()).filter(Boolean)]));
-    let out = rows.filter((r) => cols.every((c) => !terms[c.key].length || terms[c.key].some((q) => matches(c.text(r), q))));
+    // Plusieurs choix séparés par « | » : la ligne correspond si elle correspond à l'un d'eux.
+    // Une valeur choisie dans la liste (étiquette, ex. l'unité « Sac ») est cherchée telle quelle : « Sac » ne ramène pas « Sachet ».
+    // Le texte en cours de saisie (après le dernier « | ») reste une recherche approchée.
+    const terms = Object.fromEntries(
+      cols.map((c) => {
+        const parts = (filters[c.key] ?? "").split("|");
+        return [c.key, parts.map((q, i) => ({ q: q.trim(), exact: i < parts.length - 1 })).filter((x) => x.q)];
+      }),
+    );
+    const hit = (text: string, t: { q: string; exact: boolean }) => (t.exact ? text.trim().toLowerCase() === t.q.toLowerCase() : matches(text, t.q));
+    let out = rows.filter((r) => cols.every((c) => !terms[c.key].length || terms[c.key].some((t) => hit(c.text(r), t))));
     if (sort) {
       const c = cols.find((x) => x.key === sort.key);
       if (c) {

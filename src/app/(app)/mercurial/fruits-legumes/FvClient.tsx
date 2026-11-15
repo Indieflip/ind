@@ -7,13 +7,14 @@ import { useTable, type ColumnDef } from "@/components/table/useTable";
 import { addFvAction, deleteFvAction, updateFvAction } from "@/lib/actions/fv";
 import { useI18n } from "@/lib/i18n/client";
 import { Icon } from "@/components/Icon";
+import { UnitSelect } from "@/components/UnitSelect";
 
 interface Row { id: number; supplier: string; product: string; unit: string | null; prices: (number | null)[]; blocked: string | null; locked: boolean }
 
 const cell = (n: number | null | undefined) => (n == null ? "" : n.toFixed(2).replace(".", ","));
 const money = (n: number | null | undefined) => (n == null ? "" : `${cell(n)} €`);
 
-export function FvTable({ rows, months, currentMonth, editable }: { rows: Row[]; months: string[]; currentMonth: number; editable: boolean }) {
+export function FvTable({ rows, months, currentMonth, editable, units }: { rows: Row[]; months: string[]; currentMonth: number; editable: boolean; units: string[] }) {
   const { t } = useI18n();
   const [lockedOnly, setLockedOnly] = useState(false);
   const [view, setView] = useState<number>(currentMonth >= 0 ? currentMonth : new Date().getMonth());
@@ -87,7 +88,7 @@ export function FvTable({ rows, months, currentMonth, editable }: { rows: Row[];
               </tr>
             </thead>
             <tbody>
-              {tb.pageRows.map((r) => <FvRow key={r.id} r={r} currentMonth={currentMonth} editable={editable} shownMonths={shownMonths} />)}
+              {tb.pageRows.map((r) => <FvRow key={r.id} r={r} currentMonth={currentMonth} editable={editable} shownMonths={shownMonths} units={units} />)}
             </tbody>
           </table>
         </div>
@@ -107,7 +108,8 @@ function FragmentPair({ highlight, minus, plus }: { highlight: boolean; minus: s
   );
 }
 
-function FvRow({ r, currentMonth, editable, shownMonths }: { r: Row; currentMonth: number; editable: boolean; shownMonths: number[] }) {
+function FvRow({ r, currentMonth, editable, shownMonths, units }: { r: Row; currentMonth: number; editable: boolean; shownMonths: number[]; units: string[] }) {
+  const [unit, setUnit] = useState(r.unit ?? "");
   const cells = shownMonths.flatMap((m) => [m * 2, m * 2 + 1]);
   const { t } = useI18n();
   const [edit, setEdit] = useState(false);
@@ -140,7 +142,7 @@ function FvRow({ r, currentMonth, editable, shownMonths }: { r: Row; currentMont
           <input type="checkbox" defaultChecked={r.locked} className="h-3.5 w-3.5 accent-brand-600" onChange={(e) => start(() => updateFvAction(r.id, { locked: e.target.checked }))} /> 🔒 {t.fv.locked}
         </label>
       </td>
-      <td className={td}><input className="input w-14 px-1.5 py-1 text-xs" defaultValue={r.unit ?? ""} onBlur={(e) => start(() => updateFvAction(r.id, { unit: e.target.value }))} /></td>
+      <td className={td}><UnitSelect className="input w-24 px-1 py-1 text-xs" value={unit} units={units} onChange={(u) => { setUnit(u); start(() => updateFvAction(r.id, { unit: u })); }} /></td>
       {cells.map((i) => [prices[i], i] as const).map(([p, i]) => (
         <td key={i} className={`${td} whitespace-nowrap ${i % 2 === 0 ? "border-l border-stone-100" : ""}`}>
           <MoneyInput
@@ -159,9 +161,10 @@ function FvRow({ r, currentMonth, editable, shownMonths }: { r: Row; currentMont
   );
 }
 
-export function AddFv({ year, suppliers }: { year: number; suppliers: string[] }) {
+export function AddFv({ year, suppliers, units }: { year: number; suppliers: string[]; units: string[] }) {
   const { t } = useI18n();
   const [state, action, pending] = useActionState(addFvAction, undefined);
+  const [newUnit, setNewUnit] = useState("Kg");
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => { if (state?.ok) ref.current?.reset(); }, [state]);
   return (
@@ -169,7 +172,7 @@ export function AddFv({ year, suppliers }: { year: number; suppliers: string[] }
       <input type="hidden" name="year" value={year} />
       <label><span className="label">{t.fv.supplier} *</span><input name="supplier" list="fv-suppliers" className="input" required /></label>
       <label><span className="label">{t.common.product} *</span><input name="product" className="input" required /></label>
-      <label><span className="label">{t.common.unit}</span><input name="unit" className="input" defaultValue="Kg" /></label>
+      <label><span className="label">{t.common.unit}</span><UnitSelect name="unit" value={newUnit} units={units} onChange={setNewUnit} /></label>
       <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" name="locked" className="h-4 w-4 accent-brand-600" /> 🔒 {t.fv.locked}</label>
       <button className="btn-primary" disabled={pending}><Icon name="plus" className="h-4 w-4" />{t.common.add}</button>
       <datalist id="fv-suppliers">{suppliers.map((s) => <option key={s} value={s} />)}</datalist>

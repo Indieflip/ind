@@ -10,6 +10,7 @@ import { checkPrice, fvRange, parisMonth, type PriceCheck, type PriceRef } from 
 
 const fmtEuro = (n: number | null | undefined) => (n == null ? "—" : `${n.toFixed(2).replace(".", ",")} €`);
 import { dictFor } from "@/lib/i18n";
+import { docLabel } from "@/lib/documents";
 import type { SessionUser } from "@/lib/auth";
 
 const lineSchema = z.object({
@@ -133,7 +134,7 @@ async function writeContent(
   const natureOf = (cid: number | null) => cats.find((c) => c.id === cid)?.nameFr ?? null;
   const firstDoc = p.documents?.[0] ?? (p.blNumber ? { type: "bl" as const, number: p.blNumber } : null);
   /** Référence du document (« BL 123 », « Facture 456 ») reprise sur les anomalies */
-  const docLabel = (d: { type: string; number: string }) => `${d.type === "facture" ? "Facture" : d.type === "autre" ? "Document" : "BL"} ${d.number}`;
+  // « Facture 123 du 12/11/26 » : type, numéro et date du document
   const docRef = firstDoc ? docLabel(firstDoc) : null;
   /** Référence du document propre à une ligne (saisie par BL / par facture) */
   const lineRef = (l: { document?: string | null }) => {

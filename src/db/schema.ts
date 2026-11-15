@@ -427,3 +427,14 @@ export type Decision = ReceptionLine["decision"];
 export type Anomaly = typeof anomalies.$inferSelect;
 export type Unit = typeof units.$inferSelect;
 export type FvItem = typeof fvItems.$inferSelect;
+
+/** Liste des contenants (tares en kg), affichée dans le protocole « Process pèse » */
+export const containers = pgTable("containers", {
+  id: serial("id").primaryKey(),
+  supplier: text("supplier"),
+  product: text("product"),
+  tare: numeric("tare", { precision: 10, scale: 3 }),
+  container: text("container"),
+  position: integer("position").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

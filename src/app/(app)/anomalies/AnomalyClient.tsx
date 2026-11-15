@@ -71,7 +71,7 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
 }
 
 export interface AnomalyRow {
-  id: number; date: string; dateSort: string; nature: string; supplier: string; product: string; problem: string;
+  id: number; date: string; dateSort: string; nature: string; supplier: string; supplierId: number | null; reference: string; product: string; problem: string;
   action: string; lastActionAt: string; result: string; saving: number | null; status: string; statusLabel: string;
   type: string; nextActionAt: string; due: boolean; receptionId: number | null; photoUrl: string | null; consolidated?: string;
 }
@@ -88,17 +88,18 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
   const due = rows.filter((r) => r.due);
   const totalSaving = [...rows, ...consolidated].reduce((s, r) => s + (r.saving ?? 0), 0);
   const cols: Col<AnomalyRow>[] = [
-    { key: "date", width: "5rem", label: a.deliveryDate, text: (r) => r.date, sort: (r) => r.dateSort, className: "" },
-    { key: "nature", width: "5rem", label: a.nature, text: (r) => r.nature },
-    { key: "supplier", width: "11%", label: a.supplierRef, text: (r) => r.supplier, render: (r) => (r.receptionId ? <Link className="text-brand-700 hover:underline" href={`/receptions/${r.receptionId}`}>{r.supplier}</Link> : r.supplier) },
-    { key: "product", width: "11%", label: t.common.product, text: (r) => r.product },
+    { key: "date", width: "5.25rem", label: a.deliveryDate, text: (r) => r.date, sort: (r) => r.dateSort, className: "" },
+    { key: "nature", width: "4.5rem", label: a.nature, text: (r) => r.nature },
+    { key: "supplier", width: "7.5%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => (r.supplierId ? <Link className="text-brand-700 hover:underline" href={`/mercurial/fournisseurs/${r.supplierId}`}>{r.supplier}</Link> : r.supplier) },
+    { key: "reference", width: "7%", label: a.blInvoice, text: (r) => r.reference, render: (r) => (r.receptionId ? <Link className="text-brand-700 hover:underline" href={`/receptions/${r.receptionId}`}>{r.reference || "—"}</Link> : r.reference || "—") },
+    { key: "product", width: "8.5%", label: t.common.product, text: (r) => r.product },
     { key: "problem", label: a.problem, text: (r) => r.problem, className: "whitespace-pre-wrap" },
     { key: "action", label: a.action, text: (r) => r.action, className: "whitespace-pre-wrap" },
-    { key: "lastActionAt", width: "5rem", label: a.lastAction, text: (r) => (r.lastActionAt ? fmtDate(r.lastActionAt, locale) : ""), sort: (r) => r.lastActionAt, className: "whitespace-nowrap" },
-    { key: "result", width: "9%", label: a.result, text: (r) => r.result },
-    { key: "saving", width: "4.5rem", label: a.saving, align: "right", text: (r) => (r.saving != null ? fmtMoney(r.saving, locale) : ""), sort: (r) => r.saving, filterable: false },
+    { key: "lastActionAt", width: "4.75rem", label: a.lastAction, text: (r) => (r.lastActionAt ? fmtDate(r.lastActionAt, locale) : ""), sort: (r) => r.lastActionAt, className: "whitespace-nowrap" },
+    { key: "result", width: "7%", label: a.result, text: (r) => r.result },
+    { key: "saving", width: "4.75rem", label: a.saving, align: "right", text: (r) => (r.saving != null ? fmtMoney(r.saving, locale) : ""), sort: (r) => r.saving, filterable: false },
     {
-      key: "status", width: "5.5rem", label: t.common.status, text: (r) => r.statusLabel,
+      key: "status", width: "5.25rem", label: t.common.status, text: (r) => r.statusLabel,
       render: (r) => (
         <div className="space-y-1">
           <StatusBadge status={r.status} label={r.statusLabel} />
@@ -107,7 +108,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
       ),
     },
     ...(canManage
-      ? [{ key: "edit", width: "2.25rem", label: "", text: () => "", sortable: false, filterable: false, render: (r: AnomalyRow) => <button className="btn-ghost p-1.5" title={t.common.edit} onClick={() => setEdit(r)}><Icon name="edit" className="h-4 w-4" /></button> } as Col<AnomalyRow>]
+      ? [{ key: "edit", width: "2rem", label: "", text: () => "", sortable: false, filterable: false, render: (r: AnomalyRow) => <button className="btn-ghost p-1.5" title={t.common.edit} onClick={() => setEdit(r)}><Icon name="edit" className="h-4 w-4" /></button> } as Col<AnomalyRow>]
       : []),
   ];
 

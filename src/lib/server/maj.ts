@@ -1,5 +1,5 @@
 import "server-only";
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { bestMatch } from "@/lib/fuzzy";
 import { nameKey, normalize } from "@/lib/search";
@@ -169,4 +169,36 @@ export async function ensureMajNormalized() {
   if (await getSetting("maj_normalized_v3")) return;
   await normalizeMajLog();
   await setSetting("maj_normalized_v3", "1");
+}
+
+/** Rapprochement d'un texte (« Supviande », « Giney's », « Producteur Réunis »…) avec la liste des fournisseurs */
+export async function supplierMatcher() {
+  const suppliers = await getDb().select({ id: schema.suppliers.id, name: schema.suppliers.name }).from(schema.suppliers);
+  const list = suppliers.map((s) => ({ ...s, keys: aliases(s.name) }));
+  const keys = list.flatMap((s) => s.keys);
+  const find = (text: string | null | undefined) => {
+    if (!text) return null;
+    const t = keyText(text);
+    let best: { id: number; len: number } | null = null;
+    for (const s of list) for (const k of s.keys) if (t.includes(` ${k} `) && (!best || k.length > best.len)) best = { id: s.id, len: k.length };
+    return best?.id ?? null;
+  };
+  return { find, keys, name: (id: number | null) => suppliers.find((s) => s.id === id)?.name ?? null };
+}
+
+/** Anomalies reprises du fichier : fournisseur rattaché à la liste et nom retiré de la colonne BL / Facture (une seule fois) */
+export async function ensureAnomaliesLinked() {
+  if (await getSetting("anomalies_linked_v1")) return;
+  const m = await supplierMatcher();
+  const db = getDb();
+  const rows = await db.select().from(schema.anomalies);
+  for (const a of rows) {
+    if (a.receptionId) continue;
+    const supplierId = a.supplierId ?? m.find(a.supplierName) ?? m.find(a.reference);
+    const reference = cleanReference(a.reference, m.keys);
+    if (supplierId !== a.supplierId || reference !== a.reference) {
+      await db.update(schema.anomalies).set({ supplierId, reference }).where(eq(schema.anomalies.id, a.id));
+    }
+  }
+  await setSetting("anomalies_linked_v1", "1");
 }

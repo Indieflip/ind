@@ -47,22 +47,28 @@ export function ImportForm() {
             <span className="text-sm text-stone-500">{x.noFile}</span>
           )}
         </div>
-        <fieldset className="space-y-2">
+        <fieldset className="space-y-3">
           <legend className="label">{x.sheets}</legend>
           {(
             [
-              ["mercurial", x.mercurial],
-              ["maj", x.maj],
-              ["fv", x.fv],
-              ["bakery", x.bakery],
-              ["locked", x.locked],
+              [x.groupMercurial, [["mercurial", x.mercurial], ["maj", x.maj], ["fv", x.fv], ["bakery", x.bakery], ["locked", x.locked]]],
+              [x.groupControl, [["gaps", x.gaps], ["anomalies", x.anomalies], ["process", x.process], ["info", x.info]]],
             ] as const
-          ).map(([k, label]) => (
-            <label key={k} className="flex items-start gap-2 text-sm">
-              <input type="checkbox" name={k} defaultChecked className="mt-0.5 h-4 w-4 accent-brand-600" />
-              <span>{label}</span>
-            </label>
+          ).map(([group, items]) => (
+            <div key={group} className="rounded-lg border border-stone-200 p-3">
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-stone-500">{group}</p>
+              {items.map(([k, label]) => (
+                <label key={k} className="flex items-start gap-2 py-0.5 text-sm">
+                  <input type="checkbox" name={k} defaultChecked className="mt-0.5 h-4 w-4 accent-brand-600" />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
           ))}
+          <div className="rounded-lg border border-stone-200 p-3">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{x.groupMeat}</p>
+            <p className="text-sm text-stone-600">{x.meatSheets}</p>
+          </div>
         </fieldset>
         <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">{x.warning}</p>
         <button className="btn-primary" disabled={pending || !fileName}><Icon name="download" className="h-4 w-4 rotate-180" /> {pending ? x.running : x.run}</button>

@@ -15,6 +15,7 @@ export default async function FruitsLegumesPage({ searchParams }: { searchParams
   const years = (await db.selectDistinct({ year: schema.fvItems.year }).from(schema.fvItems).orderBy(desc(schema.fvItems.year))).map((y) => y.year);
   const thisYear = new Date().getFullYear();
   const year = Number(one(sp.year)) || years[0] || thisYear;
+  const units = (await db.select({ name: schema.units.name }).from(schema.units).orderBy(asc(schema.units.position), asc(schema.units.name))).map((u) => u.name);
   const all = await db.select().from(schema.fvItems).where(eq(schema.fvItems.year, year)).orderBy(asc(schema.fvItems.position), asc(schema.fvItems.id));
   const rows = all;
   const suppliers = [...new Set(all.map((r) => r.supplier))].sort((a, b) => a.localeCompare(b, "fr"));
@@ -25,7 +26,7 @@ export default async function FruitsLegumesPage({ searchParams }: { searchParams
     <>
       <PageHeader title={t.fv.title} />
       <p className="-mt-3 mb-4 max-w-3xl text-sm text-stone-600">{t.fv.intro}</p>
-      {can.editFv(user.role) && <AddFv year={year} suppliers={suppliers} />}
+      {can.editFv(user.role) && <AddFv year={year} suppliers={suppliers} units={units} />}
       <form method="get" className="no-print mb-3 flex items-end gap-2">
         <label>
           <span className="mb-1 block text-xs font-medium text-stone-600">{t.fv.year}</span>
@@ -36,7 +37,7 @@ export default async function FruitsLegumesPage({ searchParams }: { searchParams
         <button className="btn-secondary py-2">{t.common.apply}</button>
       </form>
       <p className="mb-2 text-xs text-stone-500">🔒 {t.fv.lockedHint} {t.fv.monthHint}</p>
-      <FvTable rows={rows.map((r) => ({ id: r.id, supplier: r.supplier, product: r.product, unit: r.unit, prices: r.prices, blocked: r.blocked, locked: r.locked }))} months={months} currentMonth={currentMonth} editable={can.editFv(user.role)} />
+      <FvTable rows={rows.map((r) => ({ id: r.id, supplier: r.supplier, product: r.product, unit: r.unit, prices: r.prices, blocked: r.blocked, locked: r.locked }))} months={months} currentMonth={currentMonth} editable={can.editFv(user.role)} units={units} />
     </>
   );
 }

@@ -17,6 +17,10 @@ export async function importExcelAction(_p: { report?: ImportReport; error?: str
       fv: form.get("fv") === "on",
       bakery: form.get("bakery") === "on",
       locked: form.get("locked") === "on",
+      gaps: form.get("gaps") === "on",
+      anomalies: form.get("anomalies") === "on",
+      process: form.get("process") === "on",
+      info: form.get("info") === "on",
     });
     await getDb().insert(schema.imports).values({
       fileName: file.name,
