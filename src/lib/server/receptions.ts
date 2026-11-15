@@ -34,6 +34,7 @@ export const payloadSchema = z.object({
   supplierName: z.string().trim().min(1).max(200),
   deliveredAt: z.string().datetime({ offset: true }),
   blNumber: z.string().max(100).nullable(),
+  documents: z.array(z.object({ type: z.enum(["bl", "facture", "autre"]), number: z.string().max(100) })).max(10).optional(),
   driverName: z.string().max(100).nullable(),
   truckTemp: z.number().nullable(),
   vehicleClean: z.boolean().nullable(),
@@ -85,6 +86,7 @@ function headerValues(p: Payload) {
   return {
     deliveredAt: new Date(p.deliveredAt),
     blNumber: p.blNumber || null,
+    documents: p.documents?.length ? p.documents : p.blNumber ? [{ type: "bl", number: p.blNumber }] : null,
     driverName: p.driverName || null,
     truckTemp: p.truckTemp,
     vehicleClean: p.vehicleClean,
@@ -121,17 +123,45 @@ async function writeContent(
 
   // Suivi Viande / Poisson : kg facturés des produits de ces catégories, à la date de livraison
   await tx.delete(schema.meatFishEntries).where(eq(schema.meatFishEntries.receptionId, recId));
-  const cats = await tx.select({ id: schema.categories.id, code: schema.categories.code }).from(schema.categories);
+  const cats = await tx.select({ id: schema.categories.id, code: schema.categories.code, nameFr: schema.categories.nameFr }).from(schema.categories);
   const kindOf = (cid: number | null) => {
     const code = cats.find((c) => c.id === cid)?.code;
     return code === "meat" ? "viande" : code === "fish" ? "poisson" : null;
   };
   const deliveryDay = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(date);
+  const natureOf = (cid: number | null) => cats.find((c) => c.id === cid)?.nameFr ?? null;
+  const firstDoc = p.documents?.[0] ?? (p.blNumber ? { type: "bl" as const, number: p.blNumber } : null);
+  /** Référence du document (« BL 123 », « Facture 456 ») reprise sur les anomalies */
+  const docRef = firstDoc ? `${firstDoc.type === "facture" ? "Facture" : firstDoc.type === "autre" ? "Document" : "BL"} ${firstDoc.number}` : null;
   for (const l of p.lines) {
     const kind = kindOf(l.categoryId);
     const qty = l.qtyOrdered ?? l.qtyReceived; // quantité facturée (BL / facture)
     if (!kind || qty == null || qty === 0 || l.decision === "refuse") continue;
     await tx.insert(schema.meatFishEntries).values({ kind, date: deliveryDay, product: l.productName, unit: l.unit, qty: String(qty), receptionId: recId, supplierName });
+  }
+
+  // Écarts de pesée : produit au kg dont le poids pesé est inférieur au poids facturé,
+  // au-delà de la marge acceptée (10 g ou 0,10 €)
+  await tx.delete(schema.weighGaps).where(eq(schema.weighGaps.receptionId, recId));
+  const ref = docRef ? `${supplierName} : ${docRef}` : supplierName;
+  for (const l of p.lines) {
+    if (unitName(l.unit) !== "Kg" || l.qtyOrdered == null || l.qtyReceived == null) continue;
+    const gapQty = Math.round((l.qtyOrdered - l.qtyReceived) * 1000) / 1000;
+    const gapAmount = l.unitPrice != null ? Math.round(gapQty * l.unitPrice * 10000) / 10000 : null;
+    if (gapQty <= 0.01 && (gapAmount == null || gapAmount <= 0.1)) continue;
+    if (gapQty <= 0) continue;
+    await tx.insert(schema.weighGaps).values({
+      date: deliveryDay,
+      nature: cats.find((c) => c.id === l.categoryId)?.nameFr ?? null,
+      supplierRef: ref,
+      product: l.productName,
+      qtyInvoiced: String(l.qtyOrdered),
+      unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
+      qtyWeighed: String(l.qtyReceived),
+      gapQty: String(gapQty),
+      gapAmount: gapAmount != null ? String(gapAmount) : null,
+      receptionId: recId,
+    });
   }
 
   // Suivi boulangerie : une ligne par bon (date de livraison)
@@ -214,7 +244,7 @@ async function writeContent(
       } else if (check.kind === "locked" && !keep.locked?.has(productId)) {
         // Prix bloqué : pas de variation, une anomalie à réclamer au fournisseur
         await tx.insert(schema.anomalies).values({
-          receptionId: recId, supplierId, supplierName, productName: l.productName, type: "locked_price",
+          receptionId: recId, supplierId, supplierName, productName: l.productName, type: "locked_price", nature: natureOf(l.categoryId), reference: docRef,
           description: `${t.anomalies.types.locked_price} — ${l.productName} : ${fmtEuro(l.unitPrice)} (${t.wizard.lockedRange} ${fmtEuro(ref.min ?? ref.max)}${ref.min != null && ref.max != null && ref.min !== ref.max ? ` – ${fmtEuro(ref.max)}` : ""}, ${check.pct > 0 ? "+" : ""}${String(check.pct).replace(".", ",")} %)`,
           createdBy: user.id, createdAt: date,
         });
@@ -262,6 +292,8 @@ async function writeContent(
         supplierId,
         supplierName,
         productName: l.productName,
+        nature: natureOf(l.categoryId),
+        reference: docRef,
         type: (l.reason && reasonToAnomaly[l.reason]) || (l.qtyReceived != null && l.qtyOrdered != null && l.qtyReceived < l.qtyOrdered ? "missing" : "other"),
         description: `${t.decision[l.decision]} — ${l.productName} : ${reasonLabel}${detail}`,
         photoUrl: l.photos[0] ?? null,
@@ -274,14 +306,14 @@ async function writeContent(
   // Un bon sans BL (ni numéro ni photo) est une anomalie
   if (!p.blNumber?.trim() && p.blPhotos.length === 0 && !keep.missingBl) {
     await tx.insert(schema.anomalies).values({
-      receptionId: recId, supplierId, supplierName, type: "missing_bl",
+      receptionId: recId, supplierId, supplierName, type: "missing_bl", reference: docRef,
       description: t.anomalies.autoMissingBl, createdBy: user.id, createdAt: date,
     });
   }
 
   if (p.vehicleClean === false && !keep.hygiene) {
     await tx.insert(schema.anomalies).values({
-      receptionId: recId, supplierId, supplierName, type: "hygiene",
+      receptionId: recId, supplierId, supplierName, type: "hygiene", reference: docRef,
       description: `${t.wizard.vehicleClean} ${t.common.no}`, createdBy: user.id, createdAt: date,
     });
   }

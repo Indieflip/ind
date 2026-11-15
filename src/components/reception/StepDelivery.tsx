@@ -1,7 +1,9 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useI18n } from "@/lib/i18n/client";
-import type { Catalog, Draft } from "@/lib/reception-types";
+import type { Catalog, DocRef, Draft } from "@/lib/reception-types";
+import { docsOf } from "./helpers";
+import { appConfirm } from "../Confirm";
 import { Icon } from "../Icon";
 import { matches } from "./helpers";
 
@@ -91,11 +93,8 @@ export function StepDelivery({ draft, setDraft, catalog }: { draft: Draft; setDr
             onChange={(e) => setDraft((d) => ({ ...d, deliveredAt: e.target.value }))}
           />
         </div>
+        <Documents draft={draft} setDraft={setDraft} />
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label">{t.wizard.blNumber}</label>
-            <input className="input" value={draft.blNumber} onChange={(e) => setDraft((d) => ({ ...d, blNumber: e.target.value }))} />
-          </div>
           <div>
             <label className="label">{t.wizard.driverName}</label>
             <input
@@ -137,5 +136,47 @@ export function StepDelivery({ draft, setDraft, catalog }: { draft: Draft; setDr
         </div>
       </section>
     </>
+  );
+}
+
+/** Documents de la livraison : type (bon de livraison, facture, autre) + numéro, plusieurs possibles */
+function Documents({ draft, setDraft }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void }) {
+  const { t } = useI18n();
+  const w = t.wizard;
+  const docs = docsOf(draft);
+  const update = (next: DocRef[]) =>
+    setDraft((d) => ({ ...d, documents: next, blNumber: next.find((x) => x.number.trim())?.number ?? "" }));
+  return (
+    <div className="space-y-2">
+      {docs.map((doc, i) => (
+        <div key={i} className="grid grid-cols-[1fr_1.2fr_auto] items-end gap-2">
+          <label>
+            <span className="label">{w.docType}</span>
+            <select className="input" value={doc.type} onChange={(e) => update(docs.map((x, j) => (j === i ? { ...x, type: e.target.value as DocRef["type"] } : x)))}>
+              <option value="bl">{w.docTypes.bl}</option>
+              <option value="facture">{w.docTypes.facture}</option>
+              <option value="autre">{w.docTypes.autre}</option>
+            </select>
+          </label>
+          <label>
+            <span className="label">{w.blNumber}</span>
+            <input className="input" value={doc.number} onChange={(e) => update(docs.map((x, j) => (j === i ? { ...x, number: e.target.value } : x)))} />
+          </label>
+          {docs.length > 1 ? (
+            <button
+              type="button"
+              className="btn-ghost mb-0.5 p-2 text-stone-400 hover:text-red-600"
+              aria-label={t.common.delete}
+              onClick={async () => { if (await appConfirm(w.removeDocConfirm)) update(docs.filter((_, j) => j !== i)); }}
+            >
+              <Icon name="trash" className="h-4 w-4" />
+            </button>
+          ) : <span className="w-9" />}
+        </div>
+      ))}
+      <button type="button" className="btn-ghost px-2 py-1 text-sm text-brand-700" onClick={() => update([...docs, { type: "facture", number: "" }])}>
+        <Icon name="plus" className="h-4 w-4" /> {w.addDocument}
+      </button>
+    </div>
   );
 }

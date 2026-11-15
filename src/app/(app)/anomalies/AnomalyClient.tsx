@@ -1,11 +1,18 @@
 "use client";
-import { MoneyInput } from "@/components/MoneyInput";
-import { appConfirm } from "@/components/Confirm";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { createAnomalyAction, updateAnomalyAction } from "@/lib/actions/anomalies";
+import { consolidateAnomaliesAction, createAnomalyAction, updateAnomalyAction } from "@/lib/actions/anomalies";
 import { useI18n } from "@/lib/i18n/client";
+import { fmtDate, fmtMoney } from "@/lib/format";
 import { Icon } from "@/components/Icon";
+import { MoneyInput } from "@/components/MoneyInput";
+import { StatusBadge } from "@/components/DecisionBadge";
+import { appConfirm } from "@/components/Confirm";
+import { DataTable, type Col } from "@/components/table/DataTable";
 import { PhotoButton, Thumbs } from "@/components/reception/PhotoButton";
+
+const NATURES = ["Viande", "Poisson", "Fruits & Légumes", "Crèmerie", "Épicerie", "Boisson", "Boulangerie", "Autre"];
 
 export function AnomalyForm({ receptions, preselect }: { receptions: { id: number; label: string }[]; preselect: number | null }) {
   const { t } = useI18n();
@@ -16,7 +23,6 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
   useEffect(() => {
     if (state?.ok) { ref.current?.reset(); setPhoto(""); setOpen(false); }
   }, [state]);
-
   if (!open) {
     return <button className="btn-primary no-print mb-4" onClick={() => setOpen(true)}><Icon name="plus" className="h-4 w-4" /> {t.anomalies.new}</button>;
   }
@@ -26,14 +32,19 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
         <h2 className="font-semibold">{t.anomalies.new}</h2>
         <button type="button" className="btn-ghost p-1.5" onClick={() => setOpen(false)}><Icon name="x" className="h-4 w-4" /></button>
       </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <label className="sm:col-span-3">
-          <span className="label">{t.anomalies.chooseReception} *</span>
-          <select name="receptionId" className="input" required defaultValue={preselect ?? ""}>
-            <option value="" />
-            {receptions.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
-          </select>
-          <span className="mt-1 block text-xs text-stone-500">{t.anomalies.receptionHint}</span>
+      <label className="block">
+        <span className="label">{t.anomalies.chooseReception} *</span>
+        <select name="receptionId" className="input" required defaultValue={preselect ?? ""}>
+          <option value="" />
+          {receptions.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+        </select>
+        <span className="mt-1 block text-xs text-stone-500">{t.anomalies.receptionHint}</span>
+      </label>
+      <div className="grid gap-3 sm:grid-cols-4">
+        <label>
+          <span className="label">{t.anomalies.nature}</span>
+          <input name="nature" className="input" list="anomaly-natures" />
+          <datalist id="anomaly-natures">{NATURES.map((n) => <option key={n} value={n} />)}</datalist>
         </label>
         <label>
           <span className="label">{t.anomalies.type}</span>
@@ -41,17 +52,15 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
             {Object.entries(t.anomalies.types).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </label>
-        <label>
-          <span className="label">{t.common.product}</span>
-          <input name="productName" className="input" />
-        </label>
+        <label><span className="label">{t.common.product}</span><input name="productName" className="input" /></label>
+        <label><span className="label">{t.anomalies.nextAction}</span><input type="date" name="nextActionAt" className="input" /></label>
       </div>
       <label className="block">
-        <span className="label">{t.anomalies.description} *</span>
+        <span className="label">{t.anomalies.problem} *</span>
         <textarea name="description" className="input" rows={2} required placeholder={t.anomalies.descriptionPlaceholder} />
       </label>
       <input type="hidden" name="photo" value={photo} />
-      <Thumbs photos={photo ? [photo] : []} onRemove={async () => await appConfirm(t.wizard.removePhotoConfirm) && setPhoto("")} />
+      <Thumbs photos={photo ? [photo] : []} onRemove={async () => { if (await appConfirm(t.wizard.removePhotoConfirm)) setPhoto(""); }} />
       <div className="flex flex-wrap gap-2">
         {!photo && <PhotoButton label={t.common.photo} onPhotos={(p) => setPhoto(p[0])} />}
         <button className="btn-primary" disabled={pending}>{t.common.save}</button>
@@ -61,26 +70,162 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
   );
 }
 
-export function AnomalyManage({ id, status, creditAmount, followUp }: { id: number; status: string; creditAmount: string; followUp: string }) {
-  const { t } = useI18n();
+export interface AnomalyRow {
+  id: number; date: string; dateSort: string; nature: string; supplier: string; product: string; problem: string;
+  action: string; lastActionAt: string; result: string; saving: number | null; status: string; statusLabel: string;
+  type: string; nextActionAt: string; due: boolean; receptionId: number | null; photoUrl: string | null; consolidated?: string;
+}
+
+/** Anomalies : à suivre aujourd'hui, suivi (colonnes du fichier), consolidation */
+export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, today }: { rows: AnomalyRow[]; consolidated: AnomalyRow[]; canManage: boolean; canConsolidate: boolean; today: string }) {
+  const { t, locale } = useI18n();
+  const a = t.anomalies;
+  const router = useRouter();
+  const [sel, setSel] = useState<Set<string | number>>(new Set());
+  const [edit, setEdit] = useState<AnomalyRow | null>(null);
+  const [showDone, setShowDone] = useState(false);
   const [pending, start] = useTransition();
+  const due = rows.filter((r) => r.due);
+  const totalSaving = [...rows, ...consolidated].reduce((s, r) => s + (r.saving ?? 0), 0);
+  const cols: Col<AnomalyRow>[] = [
+    { key: "date", width: "5rem", label: a.deliveryDate, text: (r) => r.date, sort: (r) => r.dateSort, className: "" },
+    { key: "nature", width: "5rem", label: a.nature, text: (r) => r.nature },
+    { key: "supplier", width: "11%", label: a.supplierRef, text: (r) => r.supplier, render: (r) => (r.receptionId ? <Link className="text-brand-700 hover:underline" href={`/receptions/${r.receptionId}`}>{r.supplier}</Link> : r.supplier) },
+    { key: "product", width: "11%", label: t.common.product, text: (r) => r.product },
+    { key: "problem", label: a.problem, text: (r) => r.problem, className: "whitespace-pre-wrap" },
+    { key: "action", label: a.action, text: (r) => r.action, className: "whitespace-pre-wrap" },
+    { key: "lastActionAt", width: "5rem", label: a.lastAction, text: (r) => (r.lastActionAt ? fmtDate(r.lastActionAt, locale) : ""), sort: (r) => r.lastActionAt, className: "whitespace-nowrap" },
+    { key: "result", width: "9%", label: a.result, text: (r) => r.result },
+    { key: "saving", width: "4.5rem", label: a.saving, align: "right", text: (r) => (r.saving != null ? fmtMoney(r.saving, locale) : ""), sort: (r) => r.saving, filterable: false },
+    {
+      key: "status", width: "5.5rem", label: t.common.status, text: (r) => r.statusLabel,
+      render: (r) => (
+        <div className="space-y-1">
+          <StatusBadge status={r.status} label={r.statusLabel} />
+          {r.nextActionAt && <div className={`text-[11px] ${r.due ? "font-semibold text-red-700" : "text-stone-500"}`}>{a.nextActionShort} {fmtDate(r.nextActionAt, locale)}</div>}
+        </div>
+      ),
+    },
+    ...(canManage
+      ? [{ key: "edit", width: "2.25rem", label: "", text: () => "", sortable: false, filterable: false, render: (r: AnomalyRow) => <button className="btn-ghost p-1.5" title={t.common.edit} onClick={() => setEdit(r)}><Icon name="edit" className="h-4 w-4" /></button> } as Col<AnomalyRow>]
+      : []),
+  ];
+
   return (
-    <div className="no-print mt-3 grid gap-2 border-t border-stone-100 pt-3 sm:grid-cols-[auto_10rem_1fr]">
-      <select className="input py-2" defaultValue={status} disabled={pending} onChange={(e) => start(() => updateAnomalyAction(id, { status: e.target.value }))}>
-        {Object.entries(t.anomalies.statuses).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-      </select>
-      <MoneyInput
-        className="input py-2"
-        placeholder={t.anomalies.credit}
-        defaultValue={creditAmount}
-        onBlur={(e) => e.target.value !== creditAmount && start(() => updateAnomalyAction(id, { creditAmount: e.target.value }))}
-      />
-      <input
-        className="input py-2"
-        placeholder={t.anomalies.followUp}
-        defaultValue={followUp}
-        onBlur={(e) => e.target.value !== followUp && start(() => updateAnomalyAction(id, { followUp: e.target.value }))}
-      />
+    <>
+      {/* Rappel du jour */}
+      <section className={`mb-4 rounded-xl border p-4 ${due.length ? "border-red-200 bg-red-50" : "border-emerald-200 bg-emerald-50"}`}>
+        <h2 className={`font-semibold ${due.length ? "text-red-800" : "text-emerald-800"}`}>
+          {a.dueToday} ({due.length})
+        </h2>
+        {due.length === 0 ? (
+          <p className="text-sm text-emerald-800">{a.nothingDue}</p>
+        ) : (
+          <ul className="mt-2 space-y-1 text-sm">
+            {due.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-red-700">{fmtDate(r.nextActionAt, locale)}</span>
+                <strong>{r.supplier}</strong> · {r.product || r.problem}
+                {canManage && <button className="ml-auto text-xs font-semibold text-red-800 underline" onClick={() => setEdit(r)}>{a.followUpNow}</button>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <div className="mb-2 flex flex-wrap items-center gap-3 text-sm">
+        {canConsolidate && (
+          <button
+            className="btn-primary"
+            disabled={!sel.size || pending}
+            onClick={async () => {
+              if (!(await appConfirm(a.consolidateConfirm, { danger: false }))) return;
+              start(async () => {
+                await consolidateAnomaliesAction([...sel].map(Number));
+                setSel(new Set());
+                router.refresh();
+              });
+            }}
+          >
+            <Icon name="layers" className="h-4 w-4" /> {a.consolidate} {sel.size > 0 && `(${sel.size})`}
+          </button>
+        )}
+        <span className="text-stone-500">{rows.length} {a.openCount} · {a.saving} : {fmtMoney(totalSaving, locale)}</span>
+      </div>
+      <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} empty={a.empty} selectable={canConsolidate} selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} dense fixed rowClassName={(r) => (r.due ? "bg-red-50/60" : "")} />
+
+      <button className="btn-ghost mt-4 px-0 text-sm text-brand-700" onClick={() => setShowDone((v) => !v)}>
+        {showDone ? "▾" : "▸"} {a.consolidatedList} ({consolidated.length})
+      </button>
+      {showDone && (
+        <div className="mt-2">
+          <DataTable
+            rows={consolidated}
+            cols={[...cols.filter((c) => c.key !== "edit" && c.key !== "status"), { key: "consolidated", width: "9rem", label: t.receptions.consolidatedOn, text: (r) => r.consolidated ?? "", className: "text-stone-600" }]}
+            rowKey={(r) => r.id}
+            dense
+            fixed
+            maxHeight="max-h-[60vh]"
+          />
+        </div>
+      )}
+
+      {edit && <AnomalyEditor row={edit} onClose={() => setEdit(null)} today={today} />}
+    </>
+  );
+}
+
+function AnomalyEditor({ row, onClose, today }: { row: AnomalyRow; onClose: () => void; today: string }) {
+  const { t } = useI18n();
+  const a = t.anomalies;
+  const router = useRouter();
+  const [v, setV] = useState({
+    nature: row.nature, description: row.problem, followUp: row.action, lastActionAt: row.lastActionAt || today,
+    result: row.result, creditAmount: row.saving != null ? String(row.saving).replace(".", ",") : "", status: row.status, nextActionAt: row.nextActionAt,
+  });
+  const [pending, start] = useTransition();
+  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setV({ ...v, [k]: e.target.value });
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 sm:items-center" onClick={onClose}>
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div>
+            <h2 className="font-semibold">{row.supplier}</h2>
+            <p className="text-sm text-stone-600">{row.date} · {row.product}</p>
+          </div>
+          <button className="btn-ghost p-1.5" onClick={onClose} aria-label={t.common.close}><Icon name="x" className="h-4 w-4" /></button>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label><span className="label">{a.nature}</span><input className="input" list="anomaly-natures" value={v.nature} onChange={set("nature")} /></label>
+          <label>
+            <span className="label">{t.common.status}</span>
+            <select className="input" value={v.status} onChange={set("status")}>
+              {Object.entries(a.statuses).map(([k, x]) => <option key={k} value={k}>{x}</option>)}
+            </select>
+          </label>
+          <label className="sm:col-span-2"><span className="label">{a.problem}</span><textarea className="input" rows={2} value={v.description} onChange={set("description")} /></label>
+          <label className="sm:col-span-2"><span className="label">{a.action}</span><textarea className="input" rows={3} value={v.followUp} onChange={set("followUp")} /></label>
+          <label><span className="label">{a.lastAction}</span><input type="date" className="input" value={v.lastActionAt} onChange={set("lastActionAt")} /></label>
+          <label><span className="label">{a.nextAction}</span><input type="date" className="input" value={v.nextActionAt} onChange={set("nextActionAt")} /></label>
+          <label><span className="label">{a.result}</span><input className="input" list="anomaly-results" value={v.result} onChange={set("result")} /></label>
+          <label><span className="label">{a.saving}</span><MoneyInput value={v.creditAmount} onChange={set("creditAmount")} /></label>
+          <datalist id="anomaly-results">{a.resultOptions.map((x) => <option key={x} value={x} />)}</datalist>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button className="btn-secondary" onClick={onClose}>{t.common.cancel}</button>
+          <button
+            className="btn-primary"
+            disabled={pending}
+            onClick={() => start(async () => {
+              await updateAnomalyAction(row.id, v);
+              onClose();
+              router.refresh();
+            })}
+          >
+            {t.common.save}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

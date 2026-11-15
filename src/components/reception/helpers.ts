@@ -1,7 +1,7 @@
 import { evaluateLine, type Evaluation } from "@/lib/rules";
 import { checkPrice } from "@/lib/pricing";
 import { num } from "@/lib/format";
-import type { Catalog, CatalogProduct, Draft, DraftLine, ReceptionPayload } from "@/lib/reception-types";
+import type { Catalog, CatalogProduct, DocRef, Draft, DraftLine, ReceptionPayload } from "@/lib/reception-types";
 import type { Dict } from "@/lib/i18n";
 
 export function uuid() {
@@ -24,6 +24,7 @@ export function newDraft(): Draft {
     otherSupplier: false,
     deliveredAt: nowLocalInput(),
     blNumber: "",
+    documents: [{ type: "bl", number: "" }],
     driverName: "",
     truckTemp: "",
     vehicleClean: null,
@@ -59,6 +60,11 @@ export function lineFromProduct(p: CatalogProduct | null, extra: Partial<DraftLi
     photos: [],
     ...extra,
   };
+}
+
+/** Documents du bon (anciens brouillons : le numéro de BL seul) */
+export function docsOf(d: Draft): DocRef[] {
+  return d.documents?.length ? d.documents : [{ type: "bl", number: d.blNumber ?? "" }];
 }
 
 export function evaluate(line: DraftLine, catalog: Catalog | undefined): Evaluation {
@@ -140,7 +146,8 @@ export function toPayload(d: Draft): ReceptionPayload {
     supplierId: d.otherSupplier ? null : d.supplierId,
     supplierName: d.supplierName.trim(),
     deliveredAt: new Date(d.deliveredAt).toISOString(),
-    blNumber: d.blNumber.trim() || null,
+    blNumber: docsOf(d).find((x) => x.number.trim())?.number.trim() || d.blNumber.trim() || null,
+    documents: docsOf(d).filter((x) => x.number.trim()).map((x) => ({ type: x.type, number: x.number.trim() })),
     driverName: d.driverName.trim() || null,
     truckTemp: num(d.truckTemp),
     vehicleClean: d.vehicleClean,

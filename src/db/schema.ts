@@ -145,6 +145,8 @@ export const receptions = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedBy: integer("updated_by").references(() => users.id),
     updatedAt: timestamp("updated_at", { withTimezone: true }),
+    /** Documents de la livraison : [{ type: "bl" | "facture" | "autre", number }] */
+    documents: jsonb("documents").$type<{ type: string; number: string }[]>(),
     /** Consolidation = validation : le bon ne peut plus être modifié ni supprimé */
     consolidatedAt: timestamp("consolidated_at", { withTimezone: true }),
     consolidatedBy: integer("consolidated_by").references(() => users.id),
@@ -232,7 +234,18 @@ export const anomalies = pgTable(
     status: anomalyStatusEnum("status").notNull().default("open"),
     creditAmount: numeric("credit_amount", { precision: 12, scale: 2 }),
     followUp: text("follow_up"),
+    /** Colonnes du fichier « Anomalies » : nature, référence BL / facture, dernière action, résultat */
+    nature: text("nature"),
+    reference: text("reference"),
+    lastActionAt: date("last_action_at"),
+    /** Date de relance : l'anomalie apparaît dans « À suivre aujourd'hui » */
+    nextActionAt: date("next_action_at"),
+    result: text("result"),
+    consolidatedAt: timestamp("consolidated_at", { withTimezone: true }),
+    consolidatedBy: integer("consolidated_by").references(() => users.id),
     photoUrl: text("photo_url"),
+    /** Ligne reprise du fichier « Suivi contrôle » (remplacée à chaque nouvel import) */
+    imported: boolean("imported").notNull().default(false),
     createdBy: integer("created_by").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     closedAt: timestamp("closed_at", { withTimezone: true }),
@@ -302,6 +315,30 @@ export const bakeryEntries = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("bakery_reception_idx").on(t.receptionId), index("bakery_date_idx").on(t.date)],
+);
+
+/** Écarts de pesée : quantité facturée vs pesée (onglet « Ecarts pesée » du fichier de contrôle) */
+export const weighGaps = pgTable(
+  "weigh_gaps",
+  {
+    id: serial("id").primaryKey(),
+    date: date("date").notNull(),
+    nature: text("nature"),
+    supplierRef: text("supplier_ref"),
+    product: text("product").notNull(),
+    qtyInvoiced: numeric("qty_invoiced", { precision: 12, scale: 3 }),
+    unitPrice: numeric("unit_price", { precision: 12, scale: 4 }),
+    qtyWeighed: numeric("qty_weighed", { precision: 12, scale: 3 }),
+    acceptableLoss: numeric("acceptable_loss", { precision: 12, scale: 3 }),
+    gapQty: numeric("gap_qty", { precision: 12, scale: 3 }),
+    gapAmount: numeric("gap_amount", { precision: 12, scale: 4 }),
+    detail: text("detail"),
+    claimDate: date("claim_date"),
+    receptionId: integer("reception_id").references(() => receptions.id, { onDelete: "cascade" }),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("weigh_gaps_date_idx").on(t.date)],
 );
 
 /** Suivi des kg facturés de viande et de poisson (Mercurial > Viande et Poisson) */

@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { importExcelAction } from "@/lib/actions/excel";
 import { useI18n } from "@/lib/i18n/client";
@@ -11,10 +11,12 @@ export function ImportForm() {
   const [state, action, pending] = useActionState(importExcelAction, undefined);
   const r = state?.report;
   const router = useRouter();
-  useEffect(() => { if (r) router.refresh(); }, [r, router]);
+  const form = useRef<HTMLFormElement>(null);
+  // Après chaque import : le champ fichier est vidé
+  useEffect(() => { if (state) form.current?.reset(); if (r) router.refresh(); }, [state, r, router]);
   return (
     <div className="max-w-2xl space-y-4">
-      <form action={action} className="card space-y-4 p-4">
+      <form ref={form} action={action} className="card space-y-4 p-4">
         <p className="text-sm text-stone-600">{x.intro}</p>
         <input type="file" name="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required className="block text-sm" />
         <fieldset className="space-y-2">
@@ -46,6 +48,7 @@ export function ImportForm() {
           {r.fv != null && <p>{x.fv} : {r.fv} {x.lines}{r.fvLocked ? ` (${r.fvLocked} 🔒)` : ""}</p>}
           {r.bakery && <p>{x.bakery} : {r.bakery.days} {x.days}</p>}
           {r.meatFish && <p>{r.meatFish.kind === "viande" ? t.meatFish.meat : t.meatFish.fish} {r.meatFish.year} : {r.meatFish.entries} {x.mfEntries}, {r.meatFish.products} {x.mfProducts}, {r.meatFish.months} {x.mfMonths}</p>}
+          {r.control && <p>{x.control} : {r.control.weighGaps} {x.weighGaps}, {r.control.anomalies} {x.anomaliesCount}{r.control.protocols.length ? ` · ${x.protocolsUpdated} : ${r.control.protocols.join(", ")}` : ""}</p>}
           {r.lockedList && <p>{x.locked} : {r.lockedList.matched} / {r.lockedList.listed} {x.lockedMatched}</p>}
           {r.missing.length > 0 && <p className="text-amber-700">{x.missing} : {r.missing.join(", ")}</p>}
         </div>

@@ -65,6 +65,7 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     otherSupplier: false,
     deliveredAt: toLocalInput(rec.deliveredAt),
     blNumber: rec.blNumber ?? "",
+    documents: (rec.documents as Draft["documents"]) ?? [{ type: "bl", number: rec.blNumber ?? "" }],
     driverName: rec.driverName ?? "",
     truckTemp: str(rec.truckTemp),
     vehicleClean: rec.vehicleClean,

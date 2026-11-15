@@ -2,7 +2,7 @@
 import { useI18n } from "@/lib/i18n/client";
 import type { Catalog, Draft } from "@/lib/reception-types";
 import { decisionStyles } from "../DecisionBadge";
-import { needsTemp, priceGap } from "./helpers";
+import { docsOf, needsTemp, priceGap } from "./helpers";
 import { SignaturePad } from "./SignaturePad";
 
 export function StepValidate({
@@ -35,7 +35,7 @@ export function StepValidate({
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <div><dt className="text-stone-500">{t.common.supplier}</dt><dd className="font-semibold">{dash(draft.supplierName)}</dd></div>
           <div><dt className="text-stone-500">{w.dateTime}</dt><dd className="font-medium">{draft.deliveredAt.replace("T", " ")}</dd></div>
-          <div><dt className="text-stone-500">{w.blNumber}</dt><dd className="font-medium">{dash(draft.blNumber)}</dd></div>
+          <div className="col-span-2"><dt className="text-stone-500">{w.docType}</dt><dd className="font-medium">{docsOf(draft).filter((x) => x.number.trim()).map((x) => `${w.docTypes[x.type]} ${x.number}`).join(" · ") || "—"}</dd></div>
           <div><dt className="text-stone-500">{w.driverName}</dt><dd className="font-medium">{dash(draft.driverName)}</dd></div>
           <div><dt className="text-stone-500">{t.receptions.truckTemp}</dt><dd className="font-medium">{draft.truckTemp ? `${draft.truckTemp} °C` : "—"}</dd></div>
           <div><dt className="text-stone-500">{t.receptions.vehicleClean}</dt><dd className="font-medium">{draft.vehicleClean == null ? "—" : draft.vehicleClean ? t.common.yes : t.common.no}</dd></div>

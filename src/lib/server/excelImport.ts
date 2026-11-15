@@ -59,6 +59,7 @@ export interface ImportReport {
   bakery?: { days: number; prices: Record<string, number | null> };
   lockedList?: { listed: number; matched: number };
   meatFish?: { kind: string; year: number; entries: number; products: number; months: number };
+  control?: { weighGaps: number; anomalies: number; protocols: string[] };
   missing: string[];
 }
 
@@ -120,6 +121,131 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
     }
   }
 
+
+  // ---------- Suivi contrôle Qualité & Quantité : « Ecarts pesée », « Anomalies », « Process », « Info complémentaire »
+  {
+    const wsGap = findSheet(wb, "Ecarts pesée") ?? findSheet(wb, "Ecarts pesee") ?? findSheet(wb, "Écarts pesées");
+    const wsAno = findSheet(wb, "Anomalies");
+    const wsProc = findSheet(wb, "Process");
+    const wsInfo = findSheet(wb, "Info complémentaire");
+    if (wsGap || (wsAno && !findSheet(wb, "Mercurial")) || wsProc || wsInfo) {
+      const control = { weighGaps: 0, anomalies: 0, protocols: [] as string[] };
+      const headerIndex = (rows: Cell[][], first: string) => rows.findIndex((r) => normalize(String(r[0] ?? "")) === normalize(first));
+      const multiline = (c: Cell) => (text(c) ?? "").replace(/^"+|"+$/g, "").trim();
+
+      if (wsGap) {
+        const rows = rowsOf(wsGap, 12);
+        const hi = headerIndex(rows, "Date réception");
+        const gaps: (typeof schema.weighGaps.$inferInsert)[] = [];
+        for (const [i, r] of rows.slice(hi + 1).entries()) {
+          const date = isoDate(r[0]);
+          const product = text(r[3]);
+          if (!date || !product || normalize(product).startsWith("total")) continue;
+          const n = (c: Cell) => { const v = price(c); return v == null ? null : String(v); };
+          gaps.push({
+            date, nature: text(r[1]), supplierRef: text(r[2])?.replace(/\s+/g, " ") ?? null, product,
+            qtyInvoiced: n(r[4]), unitPrice: n(r[5]), qtyWeighed: n(r[6]), acceptableLoss: n(r[7]), gapQty: n(r[8]), gapAmount: n(r[9]),
+            detail: multiline(r[10]) || null, claimDate: isoDate(r[11]), position: i,
+          });
+        }
+        await db.transaction(async (tx) => {
+          await tx.delete(schema.weighGaps).where(isNull(schema.weighGaps.receptionId));
+          for (let k = 0; k < gaps.length; k += 200) await tx.insert(schema.weighGaps).values(gaps.slice(k, k + 200));
+        });
+        control.weighGaps = gaps.length;
+      }
+
+      if (wsAno) {
+        const rows = rowsOf(wsAno, 9);
+        const hi = headerIndex(rows, "Date livraison");
+        const supplierIds = new Map<string, number>();
+        for (const x of await db.select().from(schema.suppliers)) if (!supplierIds.has(nameKey(x.name))) supplierIds.set(nameKey(x.name), x.id);
+        const typeOf = (pb: string): (typeof schema.anomalies.$inferInsert)["type"] => {
+          const v = normalize(pb);
+          if (/pas de bl/.test(v)) return "missing_bl";
+          if (/manquant|non receptionn|pas ete livre/.test(v)) return "missing";
+          if (/prix|facture a |augmentation/.test(v)) return "price";
+          if (/aspect|abime|trop mur|ouvert/.test(v)) return "damaged";
+          if (/pese|q=|quantit|en plus|au lieu/.test(v)) return "quantity";
+          if (/erreur/.test(v)) return "wrong_product";
+          return "other";
+        };
+        const list: (typeof schema.anomalies.$inferInsert)[] = [];
+        for (const r of rows.slice(hi + 1)) {
+          const ref = text(r[2])?.replace(/\s+/g, " ") ?? "";
+          const problem = multiline(r[4]);
+          const product = multiline(r[3]);
+          if (!ref && !problem && !product) continue;
+          const [sup, ...rest] = ref.split(/\s+:\s+/);
+          const supplierName = (sup || "—").trim();
+          const date = isoDate(r[0]);
+          const result = multiline(r[7]);
+          const saving = price(r[8]);
+          const done = /avoir recu|cloture|regle/.test(normalize(result));
+          list.push({
+            supplierName, supplierId: supplierIds.get(nameKey(supplierName)) ?? null, reference: rest.join(" : ") || null,
+            productName: product || null, nature: text(r[1]), description: problem || product || "—", type: typeOf(problem),
+            followUp: multiline(r[5]) || null, lastActionAt: isoDate(r[6]), result: result || null,
+            creditAmount: saving != null ? String(Math.abs(saving)) : null, status: done ? "closed" : saving != null ? "credit_received" : "open",
+            imported: true, createdAt: date ? new Date(`${date}T12:00:00Z`) : new Date(),
+          });
+        }
+        await db.transaction(async (tx) => {
+          await tx.delete(schema.anomalies).where(and(eq(schema.anomalies.imported, true), isNull(schema.anomalies.consolidatedAt)));
+          for (let k = 0; k < list.length; k += 200) await tx.insert(schema.anomalies).values(list.slice(k, k + 200));
+        });
+        control.anomalies = list.length;
+      }
+
+      const upsertProtocol = async (title: string, content: string, position: number) => {
+        const [p] = await db.select().from(schema.protocols).where(sql`lower(${schema.protocols.title}) = lower(${title})`).limit(1);
+        if (p) await db.update(schema.protocols).set({ content, updatedAt: new Date() }).where(eq(schema.protocols.id, p.id));
+        else await db.insert(schema.protocols).values({ title, content, position });
+        control.protocols.push(title);
+      };
+
+      if (wsProc) {
+        const rows = rowsOf(wsProc, 3);
+        const hi = headerIndex(rows, "Fournisseur");
+        const bySupplier = new Map<string, { process: string; lines: string[] }[]>();
+        for (const r of rows.slice(hi + 1)) {
+          const sup = text(r[0]);
+          const detail = multiline(r[2]);
+          if (!sup && !detail) continue;
+          const key = sup ?? [...bySupplier.keys()].pop() ?? "—";
+          bySupplier.set(key, [...(bySupplier.get(key) ?? []), { process: text(r[1]) ?? "", lines: detail.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) }]);
+        }
+        const out: string[] = ["Contacts et démarches à suivre en cas de manquant, refus, retour ou erreur de facturation, par fournisseur.", ""];
+        for (const [sup, items] of bySupplier) {
+          out.push(`## ${sup}`);
+          for (const it of items) {
+            if (it.process) out.push(`${it.process} :`);
+            for (const l of it.lines) out.push(`• ${l}`);
+          }
+          out.push("");
+        }
+        await upsertProtocol("Process de réclamation", out.join("\n").trim(), 3);
+      }
+
+      if (wsInfo) {
+        const rows = rowsOf(wsInfo, 4);
+        const hi = headerIndex(rows, "Prestataire");
+        const cell = (c: Cell) => multiline(c).replace(/\|/g, "/").replace(/\r?\n+/g, " // ") || "—";
+        const table = ["| Prestataire | Produit | Tare (g) | Contenant |"];
+        for (const r of rows.slice(hi + 1)) {
+          if (!text(r[1]) && !text(r[3])) continue;
+          table.push(`| ${cell(r[0])} | ${cell(r[1])} | ${cell(r[2])} | ${cell(r[3])} |`);
+        }
+        const section = ["## Liste des contenants (tares)", "Poids des contenants à déduire du poids pesé (poids net = poids total − tares).", ...table].join("\n");
+        const [p] = await db.select().from(schema.protocols).where(sql`lower(${schema.protocols.title}) = lower('Process pèse')`).limit(1);
+        const base = (p?.content ?? "").split(/\n## Liste des contenants/)[0].trimEnd();
+        await upsertProtocol("Process pèse", base ? `${base}\n\n${section}` : section, 1);
+      }
+
+      report.control = control;
+      return report;
+    }
+  }
 
   // ---------- Mercurial : Fournisseur | Service | Nature | Produits | Unite | - | +
   if (sheets.mercurial) {

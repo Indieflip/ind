@@ -4,6 +4,8 @@ import { can } from "@/lib/permissions";
 import { AppNav, type NavItem } from "@/components/AppNav";
 import { getRestaurantName } from "@/lib/settings";
 import { backupSettings, lastBackup } from "@/lib/server/backup";
+import { and, count, isNotNull, isNull, lte, ne } from "drizzle-orm";
+import { getDb, schema } from "@/db";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +33,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     else if (days >= bs.frequencyDays) backupReminder = `${t.backup.reminder} ${days} ${t.backup.daysAgo}.`;
   }
 
+  // Rappel quotidien des anomalies à relancer
+  let dueAnomalies = 0;
+  if (can.manageAnomalies(r)) {
+    const a = schema.anomalies;
+    const day = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date());
+    try {
+      const [row] = await getDb().select({ n: count() }).from(a).where(and(isNull(a.consolidatedAt), isNotNull(a.nextActionAt), lte(a.nextActionAt, day), ne(a.status, "closed")));
+      dueAnomalies = row?.n ?? 0;
+    } catch { /* base indisponible : pas de rappel */ }
+  }
+
   return (
     <div className="min-h-dvh lg:flex">
       <AppNav
@@ -50,6 +63,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="no-print flex flex-wrap items-center justify-center gap-2 border-b border-sky-200 bg-sky-50 px-4 py-2 text-center text-sm text-sky-900">
             {backupReminder}
             <a href="/settings/import-export#sauvegarde" className="font-semibold underline">{t.backup.reminderLink}</a>
+          </div>
+        )}
+        {dueAnomalies > 0 && (
+          <div className="no-print flex flex-wrap items-center justify-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2 text-center text-sm text-red-900">
+            <strong>{dueAnomalies}</strong> {t.anomalies.reminder}
+            <a href="/anomalies" className="font-semibold underline">{t.anomalies.reminderLink}</a>
           </div>
         )}
         <main className="mx-auto max-w-7xl p-4 sm:p-6">{children}</main>

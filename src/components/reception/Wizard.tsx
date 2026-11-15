@@ -7,7 +7,7 @@ import { useI18n } from "@/lib/i18n/client";
 import type { Catalog, Draft, DraftLine } from "@/lib/reception-types";
 import { clearDraft, enqueue, fetchCatalog, loadCatalogCache, loadDraft, saveDraft, saveServerDraft, sendReception } from "@/lib/client/offline";
 import { Icon } from "../Icon";
-import { buildReservesText, lineFromProduct, newDraft, toPayload, withAutoDecision } from "./helpers";
+import { buildReservesText, docsOf, lineFromProduct, newDraft, toPayload, withAutoDecision } from "./helpers";
 import { StepDelivery } from "./StepDelivery";
 import { StepPhoto } from "./StepPhoto";
 import { ReadingBanner } from "./ReadingBanner";
@@ -133,6 +133,10 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
             supplierName: supplier ? supplier.name : x.supplierName,
             driverName: supplier && !x.driverName ? supplier.drivers[0] ?? "" : x.driverName,
             blNumber: x.blNumber || data.blNumber || "",
+            documents: (() => {
+              const docs = docsOf(x);
+              return !docs[0]?.number && data.blNumber ? [{ ...docs[0], number: data.blNumber }, ...docs.slice(1)] : docs;
+            })(),
             blRead: lines.length ? "done" : "none",
             lines: [...x.lines.filter((l) => !l.fromBl), ...lines],
           };

@@ -69,6 +69,9 @@ export interface DraftLine {
   fromBl?: boolean;
 }
 
+export type DocType = "bl" | "facture" | "autre";
+export interface DocRef { type: DocType; number: string }
+
 export interface Draft {
   clientUuid: string;
   step: number;
@@ -77,6 +80,8 @@ export interface Draft {
   otherSupplier: boolean;
   deliveredAt: string; // valeur datetime-local
   blNumber: string;
+  /** Documents de la livraison (bon de livraison, facture, autre) ; le premier numéro = blNumber */
+  documents?: DocRef[];
   driverName: string;
   truckTemp: string;
   vehicleClean: boolean | null;
@@ -102,6 +107,7 @@ export interface ReceptionPayload {
   supplierName: string;
   deliveredAt: string; // ISO
   blNumber: string | null;
+  documents?: DocRef[];
   driverName: string | null;
   truckTemp: number | null;
   vehicleClean: boolean | null;

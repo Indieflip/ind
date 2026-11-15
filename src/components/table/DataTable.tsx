@@ -11,6 +11,8 @@ export interface Col<R> extends ColumnDef<R> {
   render?: (r: R) => React.ReactNode;
   href?: (r: R) => string | null;
   sortable?: boolean;
+  /** Largeur de la colonne (tableau à largeur fixe), ex. "8%" */
+  width?: string;
 }
 
 /** En-tête triable (▲ A→Z / ▼ Z→A) */
@@ -43,6 +45,7 @@ export function DataTable<R>({
   rowClassName,
   maxHeight = "max-h-[75vh]",
   dense,
+  fixed,
 }: {
   rows: R[];
   cols: Col<R>[];
@@ -57,6 +60,8 @@ export function DataTable<R>({
   maxHeight?: string;
   /** Texte plus petit pour les tableaux à nombreuses colonnes */
   dense?: boolean;
+  /** Colonnes de largeur fixe (Col.width) : le tableau tient dans la page, le texte passe à la ligne */
+  fixed?: boolean;
 }) {
   const { t } = useI18n();
   const tb = useTable(rows, cols, { pageSize, defaultSort });
@@ -66,7 +71,14 @@ export function DataTable<R>({
     <div className="card overflow-hidden">
       <ActiveFilters filters={tb.filters} labels={Object.fromEntries(cols.map((c) => [c.key, c.label]))} onChange={tb.setFilter} onReset={tb.reset} count={tb.filtered.length} total={rows.length} />
       <div className={`${maxHeight} min-h-48 overflow-auto`}>
-        <table className={`table ${dense ? "text-xs [&_th]:text-xs" : ""}`}>
+        <table className={`table ${dense ? "text-xs [&_th]:text-xs" : ""} ${fixed ? "table-fixed [&_td]:break-words [&_td]:px-1.5 [&_th]:px-1.5" : ""}`}>
+          {fixed && (
+            <colgroup>
+              {selectable && <col style={{ width: "2rem" }} />}
+              {cols.map((c) => <col key={c.key} style={c.width ? { width: c.width } : undefined} />)}
+              <col style={{ width: "2rem" }} />
+            </colgroup>
+          )}
           <thead className="sticky top-0 z-10">
             <tr>
               {selectable && (
@@ -97,7 +109,7 @@ export function DataTable<R>({
                 </th>
               ))}
               <th className="bg-white py-1.5 text-right">
-                <ResetFilters onClick={tb.reset} active={tb.active} />
+                <ResetFilters onClick={tb.reset} active={tb.active} compact={fixed} />
               </th>
             </tr>
           </thead>

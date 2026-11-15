@@ -57,6 +57,20 @@
       "when": 1794738739250,
       "tag": "0007_meat_fish",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794742293347,
+      "tag": "0008_documents_anomalies_weigh",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794742681139,
+      "tag": "0009_anomalies_imported",
+      "breakpoints": true
     }
   ]
 }

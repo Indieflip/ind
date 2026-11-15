@@ -10,6 +10,20 @@ import { Icon } from "@/components/Icon";
 export function ProtocolView({ content }: { content: string }) {
   const blocks: React.ReactNode[] = [];
   let bullets: string[] = [];
+  let table: string[][] = [];
+  const flushTable = () => {
+    if (!table.length) return;
+    const [head, ...body] = table;
+    blocks.push(
+      <div key={blocks.length} className="mb-3 overflow-x-auto rounded-lg border border-stone-200">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-stone-50 text-xs text-stone-600"><tr>{head.map((c, i) => <th key={i} className="px-2 py-1.5">{c}</th>)}</tr></thead>
+          <tbody>{body.map((r, i) => <tr key={i} className="border-t border-stone-100 align-top">{r.map((c, j) => <td key={j} className="whitespace-pre-line px-2 py-1.5">{c.replace(/ \/\/ /g, "\n")}</td>)}</tr>)}</tbody>
+        </table>
+      </div>,
+    );
+    table = [];
+  };
   const flush = () => {
     if (bullets.length) {
       blocks.push(
@@ -22,6 +36,8 @@ export function ProtocolView({ content }: { content: string }) {
   };
   for (const raw of content.split(/\r?\n/)) {
     const line = raw.trim();
+    if (line.startsWith("|")) { flush(); table.push(line.replace(/^\||\|$/g, "").split("|").map((c) => c.trim())); continue; }
+    flushTable();
     const bullet = /^[•\-*]\s+(.*)$/.exec(line);
     if (bullet) { bullets.push(bullet[1]); continue; }
     flush();
@@ -32,6 +48,7 @@ export function ProtocolView({ content }: { content: string }) {
     else blocks.push(<p key={blocks.length} className="mb-2 text-stone-800">{line}</p>);
   }
   flush();
+  flushTable();
   return <div className="max-w-3xl">{blocks}</div>;
 }
 

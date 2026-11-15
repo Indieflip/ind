@@ -83,7 +83,14 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
           <StatusBadge status={rec.status} label={t.receptionStatus[rec.status]} />
         </div>
         <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
-          <div><dt className="text-stone-500">{t.receptions.bl}</dt><dd className="font-semibold">{rec.blNumber ?? "—"}</dd></div>
+          <div className="col-span-2">
+            <dt className="text-stone-500">{t.wizard.docType}</dt>
+            <dd className="font-semibold">
+              {((rec.documents as { type: "bl" | "facture" | "autre"; number: string }[] | null) ?? (rec.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : []))
+                .map((d) => `${t.wizard.docTypes[d.type]} ${d.number}`)
+                .join(" · ") || "—"}
+            </dd>
+          </div>
           <div><dt className="text-stone-500">{t.receptions.driver}</dt><dd className="font-medium">{rec.driverName ?? "—"}</dd></div>
           <div><dt className="text-stone-500">{t.receptions.truckTemp}</dt><dd className="font-medium">{rec.truckTemp != null ? `${fmtNum(rec.truckTemp, locale, 1)} °C` : "—"}</dd></div>
           <div><dt className="text-stone-500">{t.receptions.vehicleClean}</dt><dd className="font-medium">{rec.vehicleClean == null ? "—" : rec.vehicleClean ? t.common.yes : t.common.no}</dd></div>

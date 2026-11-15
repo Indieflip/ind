@@ -95,11 +95,11 @@ export function FilterInput({ value, onChange, options = [], placeholder }: { va
 }
 
 /** Bouton « Réinitialiser » placé en bout de ligne de filtres */
-export function ResetFilters({ onClick, active }: { onClick: () => void; active: boolean }) {
+export function ResetFilters({ onClick, active, compact }: { onClick: () => void; active: boolean; compact?: boolean }) {
   const { t } = useI18n();
   return (
-    <button type="button" className={`btn px-1.5 py-1 text-[11px] ${active ? "bg-stone-800 text-white hover:bg-stone-900" : "border border-stone-200 bg-white text-stone-400"}`} disabled={!active} onClick={onClick}>
-      {t.table.reset}
+    <button type="button" title={t.table.reset} aria-label={t.table.reset} className={`btn px-1.5 py-1 text-[11px] ${active ? "bg-stone-800 text-white hover:bg-stone-900" : "border border-stone-200 bg-white text-stone-400"}`} disabled={!active} onClick={onClick}>
+      {compact ? "↺" : t.table.reset}
     </button>
   );
 }
