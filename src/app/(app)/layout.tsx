@@ -13,11 +13,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const r = user.role;
   const items: NavItem[] = [
     { href: "/receptions", label: t.nav.receptions, icon: "truck", show: can.viewReceptions(r) },
-    { href: "/consolidation", label: t.nav.consolidation, icon: "layers", show: can.viewConsolidation(r) },
-    { href: "/anomalies", label: t.nav.anomalies, icon: "alert", show: can.viewAnomalies(r) },
     { href: "/mercurial", label: t.nav.mercurial, icon: "list", show: can.viewMercurial(r) },
     { href: "/prices", label: t.nav.prices, icon: "euro", show: can.viewPrices(r) },
+    { href: "/anomalies", label: t.nav.anomalies, icon: "alert", show: can.viewAnomalies(r) },
     { href: "/reporting", label: t.nav.reporting, icon: "chart", show: true },
+    { href: "/consolidation", label: t.nav.consolidation, icon: "layers", show: can.viewConsolidation(r) },
     { href: "/protocoles", label: t.nav.protocols, icon: "book", show: can.viewProtocols(r) },
     { href: "/settings", label: t.nav.settings, icon: "gear", show: r === "admin" },
   ].filter((i) => i.show) as NavItem[];

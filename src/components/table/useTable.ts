@@ -40,7 +40,9 @@ export function useTable<R>(rows: R[], cols: ColumnDef<R>[], opts: { pageSize?: 
   }, [rows, cols]);
 
   const filtered = useMemo(() => {
-    let out = rows.filter((r) => cols.every((c) => !filters[c.key] || matches(c.text(r), filters[c.key])));
+    // Plusieurs choix séparés par « | » : la ligne correspond si elle correspond à l'un d'eux
+    const terms = Object.fromEntries(cols.map((c) => [c.key, (filters[c.key] ?? "").split("|").map((x) => x.trim()).filter(Boolean)]));
+    let out = rows.filter((r) => cols.every((c) => !terms[c.key].length || terms[c.key].some((q) => matches(c.text(r), q))));
     if (sort) {
       const c = cols.find((x) => x.key === sort.key);
       if (c) {
@@ -64,7 +66,7 @@ export function useTable<R>(rows: R[], cols: ColumnDef<R>[], opts: { pageSize?: 
     filters,
     setFilter: (key: string, v: string) => { setFilters((f) => ({ ...f, [key]: v })); setPage(0); },
     reset: () => { setFilters({}); setPage(0); },
-    active: Object.values(filters).some(Boolean),
+    active: Object.values(filters).some((v) => v.replace(/\|/g, "").trim() !== ""),
     sort,
     toggleSort: (key: string) => setSort((s) => (s?.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" })),
     options,

@@ -110,7 +110,7 @@ function FvRow({ r, currentMonth, editable }: { r: Row; currentMonth: number; ed
         <td className={`${td} sticky left-0 font-medium ${r.locked ? "bg-sky-50 text-sky-900" : "bg-white"}`}>{r.locked && "🔒 "}{r.product}</td>
         <td className={td}>{r.unit}</td>
         {Array.from({ length: 24 }, (_, i) => (
-          <td key={i} className={`${td} text-right tabular-nums ${i % 2 === 0 ? "border-l border-stone-100 text-stone-500" : ""} ${Math.floor(i / 2) === currentMonth ? "bg-brand-50/60" : ""}`}>{money(r.prices[i])}</td>
+          <td key={i} className={`${td} whitespace-nowrap text-right tabular-nums ${i % 2 === 0 ? "border-l border-stone-100 text-stone-500" : ""} ${Math.floor(i / 2) === currentMonth ? "bg-brand-50/60" : ""}`}>{money(r.prices[i])}</td>
         ))}
         {editable && (
           <td className={td}>
@@ -131,7 +131,7 @@ function FvRow({ r, currentMonth, editable }: { r: Row; currentMonth: number; ed
       </td>
       <td className={td}><input className="input w-14 px-1.5 py-1 text-xs" defaultValue={r.unit ?? ""} onBlur={(e) => start(() => updateFvAction(r.id, { unit: e.target.value }))} /></td>
       {prices.map((p, i) => (
-        <td key={i} className={`${td} ${i % 2 === 0 ? "border-l border-stone-100" : ""}`}>
+        <td key={i} className={`${td} whitespace-nowrap ${i % 2 === 0 ? "border-l border-stone-100" : ""}`}>
           <MoneyInput
             className="input w-20 px-1.5 py-1 text-right text-xs"
             value={p}

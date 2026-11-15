@@ -25,12 +25,12 @@ interface Row {
   fv: boolean;
 }
 
-export function AddRow({ suppliers, units, natures }: { suppliers: Opt[]; units: string[]; natures: string[] }) {
+export function AddRow({ suppliers, units, natures, fixedSupplier }: { suppliers: Opt[]; units: string[]; natures: string[]; fixedSupplier?: Opt }) {
   const { t } = useI18n();
   const m = t.mercurial;
   const router = useRouter();
   const [state, action, pending] = useActionState(addMercurialRowAction, undefined);
-  const [supplierId, setSupplierId] = useState("");
+  const [supplierId, setSupplierId] = useState(fixedSupplier ? String(fixedSupplier.id) : "");
   const [unit, setUnit] = useState(units[0] ?? "Kg");
   const [natureKey, setNatureKey] = useState(0);
   const [supplierKey] = useState(0);
@@ -50,6 +50,12 @@ export function AddRow({ suppliers, units, natures }: { suppliers: Opt[]; units:
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[1.2fr_1.6fr_1fr_0.8fr_0.8fr]">
         <div>
           <span className="label">{t.common.supplier} *</span>
+          {fixedSupplier ? (
+            <>
+              <input type="hidden" name="supplierId" value={fixedSupplier.id} />
+              <p className="input bg-stone-50 font-medium">{fixedSupplier.name}</p>
+            </>
+          ) : (
           <SupplierCombo
             key={supplierKey}
             suppliers={suppliers}
@@ -59,6 +65,7 @@ export function AddRow({ suppliers, units, natures }: { suppliers: Opt[]; units:
             required
             extraOption={{ label: m.addSupplierLink, onPick: () => router.push("/mercurial/fournisseurs#new") }}
           />
+          )}
         </div>
         <label><span className="label">{m.products} *</span><input name="name" className="input" required /></label>
         <label><span className="label">{t.common.unit} *</span><UnitSelect name="unit" value={unit} units={units} onChange={setUnit} required /></label>

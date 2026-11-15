@@ -144,5 +144,21 @@ for (const s of sups) {
   }
 }
 
+// Conditions de conformité par catégorie (préremplies une seule fois, modifiables ensuite)
+const common = {
+  conform: "DLC de plus de 2 jours\nQuantité reçue = quantité du BL\nEmballage intact, étiquette lisible (n° de lot, DLC)\nAspect et odeur normaux",
+  reserve: "DLC courte (aujourd'hui, demain ou après-demain)\nQuantité reçue différente du BL (écart noté sur le BL)\nPrix hors tranche ou prix bloqué non respecté",
+  refuse: "DLC dépassée\nEmballage abîmé ou ouvert\nÉtiquette absente ou illisible\nOdeur ou aspect anormal\nProduit non commandé ou mauvaise référence",
+};
+const temps = (await db.execute(sql`select id, code, temp_required, conform_max, reserve_max from categories where conform_rules is null and reserve_rules is null and refuse_rules is null`)).rows;
+for (const c of temps) {
+  const t = c.temp_required && c.conform_max != null && c.reserve_max != null;
+  const f = (n) => String(n).replace(".", ",");
+  const conform = (t ? `Température à cœur ≤ ${f(c.conform_max)} °C\n` : "") + common.conform;
+  const reserve = (t ? `Température entre ${f(c.conform_max)} °C et ${f(c.reserve_max)} °C\n` : "") + common.reserve;
+  const refuse = (t ? `Température > ${f(c.reserve_max)} °C\n` : "") + (c.code === "frozen" ? "Produit décongelé ou recongelé (givre, cristaux)\n" : "") + common.refuse;
+  await db.execute(sql`update categories set conform_rules = ${conform}, reserve_rules = ${reserve}, refuse_rules = ${refuse} where id = ${c.id}`);
+}
+
 console.log("[migrate] base à jour.");
 await close();

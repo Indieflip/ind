@@ -43,6 +43,13 @@
       "when": 1794699541183,
       "tag": "0005_line_price_range",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794711047760,
+      "tag": "0006_conformity_rules",
+      "breakpoints": true
     }
   ]
 }

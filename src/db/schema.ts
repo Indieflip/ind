@@ -75,6 +75,10 @@ export const categories = pgTable("categories", {
   conformMax: real("conform_max"),
   /** Température maxi « réserve » ; au-delà : refus proposé */
   reserveMax: real("reserve_max"),
+  /** Conditions de conformité (Réglages > Réglementation > Conformité), une par ligne */
+  conformRules: text("conform_rules"),
+  reserveRules: text("reserve_rules"),
+  refuseRules: text("refuse_rules"),
   position: integer("position").notNull().default(0),
 });
 

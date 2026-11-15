@@ -10,18 +10,37 @@ import { useI18n } from "@/lib/i18n/client";
 export function FilterInput({ value, onChange, options = [], placeholder }: { value: string; onChange: (v: string) => void; options?: string[]; placeholder?: string }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const list = useMemo(() => (value ? suggest(options, value, 8).filter((o) => o !== value) : []), [options, value]);
+  // Plusieurs choix possibles : « choix 1|choix 2|texte en cours »
+  const parts = value.split("|");
+  const chips = parts.slice(0, -1).filter(Boolean);
+  const text = parts[parts.length - 1] ?? "";
+  const set = (c: string[], txt: string) => onChange([...c, txt].join("|").replace(/^\|$/, ""));
+  const list = useMemo(() => {
+    const pool = options.filter((o) => !chips.includes(o));
+    return text ? suggest(pool, text, 8) : open ? pool.slice(0, 8) : [];
+  }, [options, text, chips, open]);
   return (
-    <div className="relative min-w-20">
-      <input
-        className="input py-1 pl-2 pr-6 text-xs font-normal"
-        value={value}
-        placeholder={placeholder ?? t.table.filter}
-        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        onKeyDown={(e) => e.key === "Escape" && onChange("")}
-      />
+    <div className="relative min-w-24">
+      <div className="flex min-h-[1.9rem] flex-wrap items-center gap-1 rounded-lg border border-stone-300 bg-white py-0.5 pl-1 pr-6 focus-within:border-brand-500">
+        {chips.map((c, i) => (
+          <span key={c} className="inline-flex max-w-full items-center gap-0.5 rounded bg-brand-50 px-1.5 py-0.5 text-[11px] font-medium text-brand-700">
+            <span className="truncate">{c}</span>
+            <button type="button" className="leading-none text-brand-700/70 hover:text-brand-900" aria-label={t.table.clear} onClick={() => set(chips.filter((_, j) => j !== i), text)}>×</button>
+          </span>
+        ))}
+        <input
+          className="min-w-10 flex-1 bg-transparent px-1 py-0.5 text-xs font-normal outline-none"
+          value={text}
+          placeholder={chips.length ? "" : placeholder ?? t.table.filter}
+          onChange={(e) => { set(chips, e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") onChange("");
+            if (e.key === "Backspace" && !text && chips.length) set(chips.slice(0, -1), "");
+          }}
+        />
+      </div>
       {value && (
         <button
           type="button"
@@ -38,7 +57,9 @@ export function FilterInput({ value, onChange, options = [], placeholder }: { va
         <ul className="absolute left-0 z-30 mt-1 max-h-56 w-max min-w-full max-w-72 overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 text-left text-xs font-normal normal-case shadow-lg">
           {list.map((o) => (
             <li key={o}>
-              <button type="button" className="block w-full px-2.5 py-1.5 text-left hover:bg-brand-50" onMouseDown={(e) => e.preventDefault()} onClick={() => { onChange(o); setOpen(false); }}>
+              {/* Choisir une valeur l'ajoute (sélection multiple) */}
+              <button type="button" className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-brand-50" onMouseDown={(e) => e.preventDefault()} onClick={() => set([...chips, o], "")}>
+                <span className="h-3 w-3 rounded border border-stone-300" />
                 {o}
               </button>
             </li>

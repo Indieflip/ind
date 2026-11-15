@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
@@ -10,21 +10,31 @@ import { fvRange, parisMonth } from "@/lib/pricing";
 import { one, type SP } from "@/lib/server/queries";
 import { Icon } from "@/components/Icon";
 import { StatusBadge } from "@/components/DecisionBadge";
-import { AddProduct, SupplierAnomalies, SupplierInfo, SupplierSearch } from "../SupplierClient";
-import { MercurialTable } from "../../MercurialClient";
+import { SupplierAnomalies, SupplierInfo, SupplierReceptions, SupplierSearch } from "../SupplierClient";
+import { AddRow, MercurialTable } from "../../MercurialClient";
 
 export default async function SupplierPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SP> }) {
   const user = await requireUser(can.viewSuppliers);
   const { t, locale } = await getDict();
   const id = Number((await params).id);
-  const tab = one((await searchParams).tab) === "anomalies" ? "anomalies" : "products";
+  const tabParam = one((await searchParams).tab);
+  const tab = tabParam === "anomalies" ? "anomalies" : tabParam === "receptions" ? "receptions" : "products";
   const db = getDb();
   const supplier = Number.isInteger(id) ? await db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, id) }) : undefined;
   if (!supplier) notFound();
   const [products, cats, recents, unitRows, supplierAnomalies, allSuppliers, fvItems] = await Promise.all([
     db.select().from(schema.products).where(eq(schema.products.supplierId, id)).orderBy(asc(schema.products.name)),
     db.select().from(schema.categories).orderBy(asc(schema.categories.position)),
-    db.select().from(schema.receptions).where(eq(schema.receptions.supplierId, id)).orderBy(desc(schema.receptions.deliveredAt)).limit(10),
+    db
+      .select({
+        id: schema.receptions.id, deliveredAt: schema.receptions.deliveredAt, blNumber: schema.receptions.blNumber, status: schema.receptions.status,
+        consolidatedAt: schema.receptions.consolidatedAt, author: schema.users.name,
+        lines: sql<number>`(select count(*)::int from reception_lines l where l.reception_id = "receptions"."id")`,
+      })
+      .from(schema.receptions)
+      .leftJoin(schema.users, eq(schema.users.id, schema.receptions.createdBy))
+      .where(eq(schema.receptions.supplierId, id))
+      .orderBy(desc(schema.receptions.deliveredAt)),
     db.select({ name: schema.units.name }).from(schema.units).orderBy(asc(schema.units.position), asc(schema.units.name)),
     db.select().from(schema.anomalies).where(eq(schema.anomalies.supplierId, id)).orderBy(desc(schema.anomalies.createdAt)),
     db.select({ id: schema.suppliers.id, name: schema.suppliers.name }).from(schema.suppliers).where(eq(schema.suppliers.active, true)).orderBy(asc(schema.suppliers.name)),
@@ -57,6 +67,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
       <h1 className="text-2xl font-bold">{supplier.name}</h1>
       <nav className="flex gap-1 border-b border-stone-200">
         <Link href={`/mercurial/fournisseurs/${id}`} className={tabCls(tab === "products")}>{t.mercurial.tabProducts} ({rows.filter((r) => r.active).length})</Link>
+        <Link href={`/mercurial/fournisseurs/${id}?tab=receptions`} className={tabCls(tab === "receptions")}>{t.nav.receptions} ({recents.length})</Link>
         <Link href={`/mercurial/fournisseurs/${id}?tab=anomalies`} className={tabCls(tab === "anomalies")}>{t.nav.anomalies} ({openAnomalies})</Link>
       </nav>
 
@@ -65,25 +76,17 @@ export default async function SupplierPage({ params, searchParams }: { params: P
           {editable && (
             <SupplierInfo id={supplier.id} name={supplier.name} email={supplier.email ?? ""} phone={supplier.phone ?? ""} notes={supplier.notes ?? ""} active={supplier.active} />
           )}
-          {editable && <AddProduct supplierId={supplier.id} categories={categories} units={units} />}
+          {editable && <AddRow suppliers={allSuppliers} units={units} natures={natures} fixedSupplier={{ id: supplier.id, name: supplier.name }} />}
           <h2 className="pt-2 text-lg font-semibold">{t.suppliers.productList}</h2>
           <MercurialTable rows={rows} suppliers={allSuppliers} units={units} natures={natures} editable={editable} />
-          {recents.length > 0 && (
-            <section className="card p-4">
-              <h2 className="mb-2 font-semibold">{t.suppliers.lastReceptions}</h2>
-              <ul className="divide-y divide-stone-100">
-                {recents.map((r) => (
-                  <li key={r.id}>
-                    <Link href={`/receptions/${r.id}`} className="flex items-center justify-between py-2 text-sm hover:text-brand-700">
-                      <span>{fmtDateTime(r.deliveredAt, locale)} · {r.blNumber ?? "—"}</span>
-                      <StatusBadge status={r.status} label={t.receptionStatus[r.status]} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
         </>
+      ) : tab === "receptions" ? (
+        <SupplierReceptions
+          rows={recents.map((r) => ({
+            id: r.id, blNumber: r.blNumber, date: fmtDateTime(r.deliveredAt, locale), dateSort: r.deliveredAt.toISOString(),
+            lines: r.lines, status: r.status, statusLabel: t.receptionStatus[r.status], consolidated: !!r.consolidatedAt, author: r.author,
+          }))}
+        />
       ) : (
         <SupplierAnomalies
           supplierId={supplier.id}

@@ -11,6 +11,11 @@ import { FilterInput, ResetFilters } from "@/components/table/FilterInput";
 import { matches } from "@/lib/search";
 
 const ITEMS = ["baguette", "hamburger", "rolls", "painDeMie"] as const;
+/** Filtre à choix multiples « a|b|texte » : vrai si l'un des termes correspond */
+const anyMatch = (text: string, f: string) => {
+  const terms = f.split("|").map((x) => x.trim()).filter(Boolean);
+  return !terms.length || terms.some((q) => matches(text, q));
+};
 type Item = (typeof ITEMS)[number];
 
 /** Produits boulangerie présentés comme le mercurial : Fournisseur | Produits | Unité | Prix */
@@ -20,19 +25,8 @@ export function BakeryProducts({ prices, supplier, suppliers, editable }: { pric
   const str = (n: number | null) => (n != null ? String(n).replace(".", ",") : "");
   return (
     <div className="card mb-4 overflow-x-auto">
-      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4">
+      <div className="px-4 pt-4">
         <h2 className="font-semibold">{t.bakery.productList}</h2>
-        <label className="flex items-center gap-2 text-sm text-stone-600">
-          {t.bakery.supplierSetting}
-          {editable ? (
-            <select className="input w-56 py-1.5" defaultValue={supplier} onChange={(e) => start(() => setBakerySupplierAction(e.target.value))}>
-              {!suppliers.includes(supplier) && <option value={supplier}>{supplier}</option>}
-              {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          ) : (
-            <strong>{supplier}</strong>
-          )}
-        </label>
       </div>
       <table className="table mt-2">
         <thead>
@@ -94,8 +88,8 @@ export function BakeryTable({ rows, prices, editable }: { rows: Row[]; prices: R
     () =>
       rows
         .filter((r) => !month || r.date.startsWith(month))
-        .filter((r) => !fDate || matches(fmtDate(r.date, locale), fDate))
-        .filter((r) => !fRemark || matches(r.remark ?? "", fRemark))
+        .filter((r) => anyMatch(fmtDate(r.date, locale), fDate))
+        .filter((r) => anyMatch(r.remark ?? "", fRemark))
         .sort((a, b2) => b2.date.localeCompare(a.date)),
     [rows, month, fDate, fRemark, locale],
   );

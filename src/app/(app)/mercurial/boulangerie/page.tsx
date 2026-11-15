@@ -21,7 +21,7 @@ export default async function BakeryPage() {
   const editable = can.editMercurial(user.role);
   return (
     <>
-      <PageHeader title={b.title} />
+      <PageHeader title={b.pageTitle} />
       <p className="-mt-3 mb-4 max-w-3xl text-sm text-stone-600">{b.intro}</p>
       <BakeryProducts prices={prices} supplier={supplier} suppliers={suppliers.map((s) => s.name)} editable={editable} />
       {entries.length === 0 ? (

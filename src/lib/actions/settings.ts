@@ -2,7 +2,7 @@
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/db";
-import { assertUser, hashPassword } from "@/lib/auth";
+import { assertUser, hashPassword, verifyPassword } from "@/lib/auth";
 import { can, mergeMatrix } from "@/lib/permissions";
 import { num } from "@/lib/format";
 import { setSetting } from "@/lib/settings";
@@ -32,10 +32,7 @@ export async function updateUserAction(id: number, data: { role?: string; active
   if (data.role && ROLES.includes(data.role as "admin") && id !== me.id) set.role = data.role as "admin";
   if (data.active !== undefined && id !== me.id) set.active = data.active;
   if (data.name?.trim()) set.name = data.name.trim();
-  if (data.password) {
-    if (data.password.length < 8) throw new Error("password too short");
-    set.passwordHash = await hashPassword(data.password);
-  }
+  // Le mot de passe ne se change plus ici : voir changePasswordAction (vérification obligatoire)
   if (Object.keys(set).length) await getDb().update(schema.users).set(set).where(eq(schema.users.id, id));
   revalidatePath("/settings");
 }
@@ -84,4 +81,46 @@ export async function saveBackupSettingsAction(data: { email: string; frequencyD
   await setSetting("retention_years", String(Math.min(30, Math.max(1, Math.round(data.retentionYears || 10)))));
   revalidatePath("/settings");
   return { ok: true };
+}
+
+/** Profil d'un utilisateur (nom, e-mail, profil, actif) */
+export async function updateUserProfileAction(id: number, data: { name: string; email: string; role: string; active: boolean }) {
+  const me = await assertUser(can.manageUsers);
+  const email = data.email.trim().toLowerCase();
+  if (!data.name.trim() || !email.includes("@")) return { error: "invalid" };
+  const db = getDb();
+  const other = await db.query.users.findFirst({ where: eq(sql`lower(${schema.users.email})`, email) });
+  if (other && other.id !== id) return { error: "exists" };
+  const set: Partial<typeof schema.users.$inferInsert> = { name: data.name.trim(), email };
+  if (id !== me.id && ROLES.includes(data.role as "admin")) set.role = data.role as "admin";
+  if (id !== me.id) set.active = data.active;
+  await db.update(schema.users).set(set).where(eq(schema.users.id, id));
+  revalidatePath("/settings/utilisateurs", "layout");
+  return { ok: true };
+}
+
+/**
+ * Changement de mot de passe sécurisé : l'administrateur confirme avec SON mot de passe actuel,
+ * puis saisit deux fois le nouveau.
+ */
+export async function changePasswordAction(id: number, current: string, next: string, confirmNext: string) {
+  const me = await assertUser(can.manageUsers);
+  if (next.length < 8) return { error: "short" };
+  if (next !== confirmNext) return { error: "mismatch" };
+  const db = getDb();
+  const self = await db.query.users.findFirst({ where: eq(schema.users.id, me.id) });
+  if (!self || !(await verifyPassword(current, self.passwordHash))) return { error: "current" };
+  await db.update(schema.users).set({ passwordHash: await hashPassword(next) }).where(eq(schema.users.id, id));
+  return { ok: true };
+}
+
+export async function updateConformityAction(id: number, data: { conformRules?: string; reserveRules?: string; refuseRules?: string }) {
+  await assertUser((r) => r === "admin");
+  const set: Partial<typeof schema.categories.$inferInsert> = {};
+  if (data.conformRules !== undefined) set.conformRules = data.conformRules.trim() || null;
+  if (data.reserveRules !== undefined) set.reserveRules = data.reserveRules.trim() || null;
+  if (data.refuseRules !== undefined) set.refuseRules = data.refuseRules.trim() || null;
+  await getDb().update(schema.categories).set(set).where(eq(schema.categories.id, id));
+  revalidatePath("/settings/reglementation", "layout");
+  revalidatePath("/protocoles");
 }

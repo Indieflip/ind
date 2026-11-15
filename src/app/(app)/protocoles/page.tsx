@@ -16,6 +16,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   const categories = await getDb().select().from(schema.categories).orderBy(asc(schema.categories.position));
   const showThresholds = one(sp.id) === "seuils";
+  const showConformity = one(sp.id) === "conformite";
   const list = await getDb()
     .select({ id: schema.protocols.id, title: schema.protocols.title, content: schema.protocols.content, updatedAt: schema.protocols.updatedAt, by: schema.users.name })
     .from(schema.protocols)
@@ -24,7 +25,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   const editable = can.editProtocols(user.role);
   const creating = one(sp.new) === "1" && editable;
   const editing = one(sp.edit) === "1" && editable;
-  const current = creating || showThresholds ? null : list.find((p) => String(p.id) === one(sp.id)) ?? list[0];
+  const current = creating || showThresholds || showConformity ? null : list.find((p) => String(p.id) === one(sp.id)) ?? list[0];
 
   return (
     <>
@@ -42,16 +43,46 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
           <Link href="/protocoles?id=seuils" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${showThresholds ? "bg-brand-50 text-brand-700" : "text-stone-700 hover:bg-stone-100"}`}>
             <Icon name="thermo" className="h-4 w-4" /> {t.protocols.thresholds}
           </Link>
+          <Link href="/protocoles?id=conformite" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${showConformity ? "bg-brand-50 text-brand-700" : "text-stone-700 hover:bg-stone-100"}`}>
+            <Icon name="check" className="h-4 w-4" /> {t.protocols.conformity}
+          </Link>
         </nav>
         <div className="min-w-0">
-          {showThresholds ? (
+          {showConformity ? (
+            <article className="card p-5 sm:p-6">
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h1 className="text-2xl font-bold">{t.protocols.conformity}</h1>
+                  <p className="text-sm text-stone-600">{t.protocols.conformityIntro}</p>
+                </div>
+                {can.manageSettings(user.role) && <Link href="/settings/reglementation/conformite" className="btn-secondary no-print"><Icon name="gear" className="h-4 w-4" /> {t.nav.settings}</Link>}
+              </div>
+              <div className="space-y-4">
+                {categories.map((c) => (
+                  <section key={c.id} className="rounded-xl border border-stone-200">
+                    <h2 className="border-b border-stone-200 bg-stone-50 px-4 py-2 font-semibold">{locale === "en" ? c.nameEn : c.nameFr}</h2>
+                    <div className="grid gap-px bg-stone-200 sm:grid-cols-3">
+                      {([["conform", c.conformRules, "bg-emerald-50 text-emerald-900"], ["reserve", c.reserveRules, "bg-amber-50 text-amber-900"], ["refuse", c.refuseRules, "bg-red-50 text-red-900"]] as const).map(([d, rules, cls]) => (
+                        <div key={d} className={`p-3 ${cls}`}>
+                          <p className="mb-1 text-xs font-bold uppercase tracking-wide">{t.decision[d]}</p>
+                          <ul className="list-disc space-y-0.5 pl-4 text-sm">
+                            {(rules ?? "").split(/\r?\n/).filter((x) => x.trim()).map((x, i) => <li key={i}>{x}</li>)}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </article>
+          ) : showThresholds ? (
             <article className="card p-5 sm:p-6">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h1 className="text-2xl font-bold">{t.protocols.thresholds}</h1>
                   <p className="text-sm text-stone-600">{t.protocols.thresholdsIntro}</p>
                 </div>
-                {can.manageSettings(user.role) && <Link href="/settings/reglementation#seuils" className="btn-secondary no-print"><Icon name="gear" className="h-4 w-4" /> {t.nav.settings}</Link>}
+                {can.manageSettings(user.role) && <Link href="/settings/reglementation" className="btn-secondary no-print"><Icon name="gear" className="h-4 w-4" /> {t.nav.settings}</Link>}
               </div>
               <div className="overflow-x-auto">
                 <table className="table">

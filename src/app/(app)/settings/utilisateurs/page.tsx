@@ -20,10 +20,10 @@ export default async function UsersPage() {
     <>
       <section className="card overflow-x-auto">
         <h2 className="px-4 pt-4 font-semibold">{s.users}</h2>
-        <p className="px-4 text-xs text-stone-500">{s.passwordInfo}</p>
+        <p className="px-4 text-xs text-stone-500">{s.usersHint}</p>
         <table className="table mt-2">
           <thead>
-            <tr><th>{t.auth.name}</th><th>{t.auth.email}</th><th>{s.role}</th><th>{t.common.status}</th><th>{s.resetPassword}</th><th /></tr>
+            <tr><th>{t.auth.name}</th><th>{t.auth.email}</th><th>{s.role}</th><th>{t.common.status}</th><th /></tr>
           </thead>
           <tbody>
             {users.map((u) => <UserRow key={u.id} user={u} isMe={u.id === me.id} />)}

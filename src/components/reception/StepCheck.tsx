@@ -10,7 +10,7 @@ import { decisionStyles } from "../DecisionBadge";
 import { Icon } from "../Icon";
 import { UnitSelect } from "../UnitSelect";
 import { PhotoButton, Thumbs } from "./PhotoButton";
-import { evaluate, isBakerySupplier, lineFromProduct, matches, priceCheck, suggestedDecision, suggestedReason, withAutoDecision } from "./helpers";
+import { evaluate, isBakerySupplier, lineFromProduct, matches, priceCheck, suggestedReason, withAutoDecision } from "./helpers";
 
 const DEFAULT_UNITS = ["Pièce", "Kg", "Litre", "Sachet"];
 
@@ -67,7 +67,6 @@ function LineCard({
   const hi = line.mercurialPrice ?? line.mercurialMin;
   const rangeLabel = lo == null ? "" : `${t.wizard.mercurial} ${fmtMoney(lo, locale)}${hi != null && hi !== lo ? ` – ${fmtMoney(hi, locale)}` : ""}`;
   const style = line.decision ? decisionStyles[line.decision] : { border: "border-l-stone-300", badge: "", dot: "" };
-  const proposed = suggestedDecision(line, catalog);
 
   const field = (key: keyof DraftLine, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
     <div>
@@ -166,10 +165,6 @@ function LineCard({
           </button>
         ))}
       </div>
-      <p className={`mt-1 text-xs ${line.decision ? "text-stone-500" : "font-semibold text-amber-700"}`}>
-        {!line.decision && `${t.wizard.chooseDecision} · `}
-        {t.wizard.autoDecision} : {t.decision[proposed]}
-      </p>
 
       {line.decision && line.decision !== "conform" && (
         <div className="mt-3 space-y-2">

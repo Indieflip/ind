@@ -121,3 +121,19 @@ export function SupplierAnomalies({ rows, supplierId }: { rows: AnomalyRow[]; su
     </>
   );
 }
+
+interface RecRow { id: number; blNumber: string | null; date: string; dateSort: string; lines: number; status: string; statusLabel: string; consolidated: boolean; author: string | null }
+
+/** Réceptions du fournisseur */
+export function SupplierReceptions({ rows }: { rows: RecRow[] }) {
+  const { t } = useI18n();
+  const cols: Col<RecRow>[] = [
+    { key: "bl", label: t.receptions.bl, text: (r) => r.blNumber ?? "", href: (r) => `/receptions/${r.id}`, render: (r) => r.blNumber || t.receptions.noBl },
+    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, href: (r) => `/receptions/${r.id}`, className: "whitespace-nowrap" },
+    { key: "lines", label: t.mercurial.products, align: "right", text: (r) => String(r.lines), sort: (r) => r.lines },
+    { key: "status", label: t.common.status, text: (r) => r.statusLabel, render: (r) => <StatusBadge status={r.status} label={r.statusLabel} /> },
+    { key: "state", label: t.nav.consolidation, text: (r) => (r.consolidated ? t.receptions.consolidated : t.receptions.toConsolidate) },
+    { key: "author", label: t.receptions.createdBy, text: (r) => r.author ?? "" },
+  ];
+  return <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} empty={t.receptions.empty} defaultSort={{ key: "date", dir: "desc" }} />;
+}
