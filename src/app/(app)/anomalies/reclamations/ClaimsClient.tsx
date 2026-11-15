@@ -17,17 +17,13 @@ export interface ClaimRow {
   amount: number | null; credit: number | null; notes: string; status: ClaimStatus; anomalyId: number | null; weighGapId: number | null; receptionId: number | null;
 }
 
-export const claimStyles: Record<ClaimStatus, string> = {
-  en_cours: "bg-amber-100 text-amber-900",
-  cloturee: "bg-emerald-100 text-emerald-800",
-  annulee: "bg-stone-200 text-stone-600",
-};
+import { claimStyles } from "@/lib/anomaly";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const empty = (): ClaimInput => ({ date: today(), supplierId: "", supplierName: "", reference: "", product: "", subject: "", amount: "", credit: "", notes: "", status: "en_cours" });
 const money = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
 
-export function ClaimsBoard({ rows, suppliers, canCreate, canManage }: { rows: ClaimRow[]; suppliers: { id: number; name: string }[]; canCreate: boolean; canManage: boolean }) {
+export function ClaimsBoard({ rows, suppliers, canCreate, canManage, prefill }: { rows: ClaimRow[]; suppliers: { id: number; name: string }[]; canCreate: boolean; canManage: boolean; prefill?: RowFields }) {
   const { t, locale } = useI18n();
   const c = t.claims;
   const router = useRouter();
@@ -54,6 +50,8 @@ export function ClaimsBoard({ rows, suppliers, canCreate, canManage }: { rows: C
   };
   // Arrivée depuis « Créer une réclamation » (menu ⋮ d'une anomalie ou d'un écart) : formulaire déjà rempli
   useEffect(() => {
+    // Depuis la fiche d'une anomalie : réclamation pré-remplie
+    if (prefill && canCreate) { setForm({ id: null, v: fromFields(prefill) }); router.replace("/anomalies/reclamations"); return; }
     if (sp.get("from") !== "row" || !canCreate) return;
     const row = readRow();
     if (row) setForm({ id: null, v: fromFields(row.fields) });

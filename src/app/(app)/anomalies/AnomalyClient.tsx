@@ -12,6 +12,7 @@ import { appConfirm } from "@/components/Confirm";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { PhotoButton, Thumbs } from "@/components/reception/PhotoButton";
 import { PasteRowButton } from "@/components/table/RowMenu";
+import { outcomeOf, outcomeStyles } from "@/lib/anomaly";
 import { copyRow, type RowFields } from "@/lib/client/rowClipboard";
 
 const NATURES = ["Viande", "Poisson", "Fruits & Légumes", "Crèmerie", "Épicerie", "Boisson", "Boulangerie", "Autre"];
@@ -93,14 +94,13 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
   const a = t.anomalies;
   const router = useRouter();
   const [sel, setSel] = useState<Set<string | number>>(new Set());
-  const [edit, setEdit] = useState<AnomalyRow | null>(null);
   const [showDone, setShowDone] = useState(false);
   const [pending, start] = useTransition();
   const due = rows.filter((r) => r.due);
   // Menu ⋮ : copier la ligne (à coller dans un autre tableau) ou en faire une réclamation
   const fieldsOf = (r: AnomalyRow): RowFields => ({
     date: r.dateSort.slice(0, 10), nature: r.nature, supplier: r.supplier, supplierId: r.supplierId ? String(r.supplierId) : "", reference: r.reference,
-    product: r.product, description: r.problem, action: r.action, result: r.result, amount: r.saving != null ? String(r.saving) : "",
+    product: r.product, description: r.problem, action: r.action, result: a.outcomes[outcomeOf(r.result)], amount: r.saving != null ? String(r.saving) : "",
     receptionId: r.receptionId ? String(r.receptionId) : "", anomalyId: String(r.id),
   });
   const copySpec = {
@@ -111,7 +111,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
   const totalSaving = [...rows, ...consolidated].reduce((s, r) => s + (r.saving ?? 0), 0);
   const cols: Col<AnomalyRow>[] = [
     {
-      key: "number", width: "3.25rem", label: a.number, text: (r) => (r.number != null ? String(r.number) : ""), sort: (r) => r.number,
+      key: "number", width: "3.25rem", label: a.number, text: (r) => (r.number != null ? String(r.number) : ""), sort: (r) => r.number, href: (r) => `/anomalies/${r.id}`,
       render: (r) => (r.number == null ? "—" : r.numberFinal ? <strong>{r.number}</strong> : <span className="italic text-stone-400" title={a.provisional}>{r.number}</span>),
     },
     { key: "date", width: "5.25rem", label: a.deliveryDate, text: (r) => r.date, sort: (r) => r.dateSort, className: "" },
@@ -119,10 +119,10 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
     { key: "supplier", width: "7.5%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => (r.supplierId ? <Link className="text-brand-700 hover:underline" href={`/mercurial/fournisseurs/${r.supplierId}`}>{sentence(r.supplier)}</Link> : sentence(r.supplier)) },
     { key: "reference", width: "7%", label: a.blInvoice, text: (r) => r.reference, render: (r) => (r.receptionId ? <Link className="text-brand-700 hover:underline" href={`/receptions/${r.receptionId}`}>{r.reference || "—"}</Link> : r.reference || "—") },
     { key: "product", width: "8.5%", label: t.common.product, text: (r) => r.product },
-    { key: "problem", label: a.problem, text: (r) => r.problem, className: "whitespace-pre-wrap" },
+    { key: "problem", label: a.problem, text: (r) => r.problem, className: "whitespace-pre-wrap", keepCase: true, render: (r) => <Link href={`/anomalies/${r.id}`} className="hover:text-brand-700 hover:underline" title={t.sheet.open}>{r.problem}</Link> },
     { key: "action", label: a.action, text: (r) => r.action, className: "whitespace-pre-wrap" },
     { key: "lastActionAt", width: "4.75rem", label: a.lastAction, text: (r) => (r.lastActionAt ? fmtDate(r.lastActionAt, locale) : ""), sort: (r) => r.lastActionAt, className: "whitespace-nowrap" },
-    { key: "result", width: "7%", label: a.result, text: (r) => r.result },
+    { key: "result", width: "6%", label: a.result, text: (r) => a.outcomes[outcomeOf(r.result)], options: Object.values(a.outcomes), render: (r) => <span className={`badge ${outcomeStyles[outcomeOf(r.result)]}`}>{a.outcomes[outcomeOf(r.result)]}</span> },
     { key: "saving", width: "4.75rem", label: a.saving, align: "right", text: (r) => (r.saving != null ? fmtMoney(r.saving, locale) : ""), sort: (r) => r.saving, filterable: false },
     {
       key: "status", width: "5.25rem", label: t.common.status, text: (r) => r.statusLabel,
@@ -134,7 +134,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
       ),
     },
     ...(canManage
-      ? [{ key: "edit", width: "2rem", label: "", text: () => "", sortable: false, filterable: false, render: (r: AnomalyRow) => <button className="btn-ghost p-1.5" title={t.common.edit} onClick={() => setEdit(r)}><Icon name="edit" className="h-4 w-4" /></button> } as Col<AnomalyRow>]
+      ? [{ key: "edit", width: "2rem", label: "", text: () => "", sortable: false, filterable: false, render: (r: AnomalyRow) => <Link className="btn-ghost p-1.5" title={t.sheet.open} href={`/anomalies/${r.id}`}><Icon name="edit" className="h-4 w-4" /></Link> } as Col<AnomalyRow>]
       : []),
   ];
 
@@ -153,7 +153,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
               <li key={r.id} className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-red-700">{fmtDate(r.nextActionAt, locale)}</span>
                 <strong>{sentence(r.supplier)}</strong> · {r.product || r.problem}
-                {canManage && <button className="ml-auto text-xs font-semibold text-red-800 underline" onClick={() => setEdit(r)}>{a.followUpNow}</button>}
+                <Link className="ml-auto text-xs font-semibold text-red-800 underline" href={`/anomalies/${r.id}`}>{a.followUpNow}</Link>
               </li>
             ))}
           </ul>
@@ -199,62 +199,6 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
         </div>
       )}
 
-      {edit && <AnomalyEditor row={edit} onClose={() => setEdit(null)} today={today} />}
     </>
-  );
-}
-
-function AnomalyEditor({ row, onClose, today }: { row: AnomalyRow; onClose: () => void; today: string }) {
-  const { t } = useI18n();
-  const a = t.anomalies;
-  const router = useRouter();
-  const [v, setV] = useState({
-    nature: row.nature, description: row.problem, followUp: row.action, lastActionAt: row.lastActionAt || today,
-    result: row.result, creditAmount: row.saving != null ? String(row.saving).replace(".", ",") : "", status: row.status, nextActionAt: row.nextActionAt,
-  });
-  const [pending, start] = useTransition();
-  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setV({ ...v, [k]: e.target.value });
-  return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 sm:items-center" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-3 flex items-start justify-between gap-2">
-          <div>
-            <h2 className="font-semibold">{sentence(row.supplier)}</h2>
-            <p className="text-sm text-stone-600">{row.date} · {row.product}</p>
-          </div>
-          <button className="btn-ghost p-1.5" onClick={onClose} aria-label={t.common.close}><Icon name="x" className="h-4 w-4" /></button>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label><span className="label">{a.nature}</span><input className="input" list="anomaly-natures" value={v.nature} onChange={set("nature")} /></label>
-          <label>
-            <span className="label">{t.common.status}</span>
-            <select className="input" value={v.status} onChange={set("status")}>
-              {Object.entries(a.statuses).map(([k, x]) => <option key={k} value={k}>{x}</option>)}
-            </select>
-          </label>
-          <label className="sm:col-span-2"><span className="label">{a.problem}</span><textarea className="input" rows={2} value={v.description} onChange={set("description")} /></label>
-          <label className="sm:col-span-2"><span className="label">{a.action}</span><textarea className="input" rows={3} value={v.followUp} onChange={set("followUp")} /></label>
-          <label><span className="label">{a.lastAction}</span><input type="date" className="input" value={v.lastActionAt} onChange={set("lastActionAt")} /></label>
-          <label><span className="label">{a.nextAction}</span><input type="date" className="input" value={v.nextActionAt} onChange={set("nextActionAt")} /></label>
-          <label><span className="label">{a.result}</span><input className="input" list="anomaly-results" value={v.result} onChange={set("result")} /></label>
-          <label><span className="label">{a.saving}</span><MoneyInput value={v.creditAmount} onChange={set("creditAmount")} /></label>
-          <datalist id="anomaly-results">{a.resultOptions.map((x) => <option key={x} value={x} />)}</datalist>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button className="btn-secondary" onClick={onClose}>{t.common.cancel}</button>
-          <button
-            className="btn-primary"
-            disabled={pending}
-            onClick={() => start(async () => {
-              await updateAnomalyAction(row.id, v);
-              onClose();
-              router.refresh();
-            })}
-          >
-            {t.common.save}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }

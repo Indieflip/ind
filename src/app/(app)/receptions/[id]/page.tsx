@@ -10,6 +10,7 @@ import { checkPrice } from "@/lib/pricing";
 import { StatusBadge, decisionStyles } from "@/components/DecisionBadge";
 import { Icon } from "@/components/Icon";
 import { receptionNumbers } from "@/lib/server/queries";
+import { outcomeOf, outcomeStyles } from "@/lib/anomaly";
 import { AnomalyActionField, PrintButton, DeleteReceptionButton, ConsolidateOneButton, AddNote } from "./Actions";
 
 const isPdf = (url: string) => /\.pdf($|\?)/i.test(url) || url.startsWith("data:application/pdf");
@@ -256,16 +257,17 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
               {recAnomalies.map((a) => (
                 <li key={a.id} className="flex flex-wrap items-start justify-between gap-2 px-5 py-2.5 text-sm">
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium">
+                    <Link href={`/anomalies/${a.id}`} className="font-medium text-brand-700 hover:underline">
                       {a.number ? <span className="mr-1.5 text-stone-500">N° {a.number}</span> : null}
-                      {t.anomalies.types[a.type]}{a.productName ? ` · ${a.productName}` : ""}
-                    </p>
+                      {t.anomalies.types[a.type]}{a.productName ? ` · ${a.productName}` : ""} →
+                    </Link>
                     <p className="text-stone-600">{a.description}</p>
                     <AnomalyActionField id={a.id} initial={a.followUp ?? ""} editable={can.manageAnomalies(user.role) && !a.consolidatedAt} label={t.receptions.actions} saveLabel={t.common.save} savedLabel={t.receptions.actionSaved} />
-                    {a.result && <p className="text-xs text-stone-500">{t.anomalies.result} : {a.result}</p>}
+
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <StatusBadge status={a.status} label={t.anomalies.statuses[a.status]} />
+                    <span className={`badge ${outcomeStyles[outcomeOf(a.result)]}`}>{t.anomalies.result} : {t.anomalies.outcomes[outcomeOf(a.result)]}</span>
                     {a.creditAmount && <span className="text-xs text-stone-600">{t.anomalies.saving} {fmtMoney(num(a.creditAmount), locale)}</span>}
                   </div>
                 </li>

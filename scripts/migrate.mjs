@@ -255,6 +255,24 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'anomaly_texts
   await db.execute(sql`insert into app_settings (key, value) values ('anomaly_texts_v3', '1') on conflict (key) do nothing`);
 }
 
+// Fiche d'anomalie : « Résultat » devient un choix Clôturé / En cours / Annulé (une fois).
+// Le texte d'origine (« Vérifier la réception de l'avoir : ok le 21/10/26 ») est gardé dans « Action ».
+if (!(await db.execute(sql`select 1 from app_settings where key = 'anomaly_outcome_v1'`)).rows.length) {
+  const { rows } = await db.execute(sql`select id, result, follow_up, status from anomalies`);
+  const plain = (x) => (x ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  for (const a of rows) {
+    const r = (a.result ?? "").trim();
+    if (["cloture", "en_cours", "annule"].includes(r)) continue;
+    const t = plain(r);
+    let code = "en_cours";
+    if (/annul/.test(t)) code = "annule";
+    else if (a.status === "closed" || a.status === "credit_received" || /\bok\b|\bras\b|a ete livre|receptionne|reception avoir le|avoir recu|clotur/.test(t)) code = "cloture";
+    const follow = r ? [a.follow_up, `Résultat : ${r}`].filter(Boolean).join("\n") : a.follow_up;
+    await db.execute(sql`update anomalies set result = ${code}, follow_up = ${follow} where id = ${a.id}`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('anomaly_outcome_v1', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

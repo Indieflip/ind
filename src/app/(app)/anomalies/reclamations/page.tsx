@@ -5,14 +5,17 @@ import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
 import { fmtDate, num } from "@/lib/format";
 import { PageHeader } from "@/components/ui";
+import { one, type SP } from "@/lib/server/queries";
 import { ClaimsBoard } from "./ClaimsClient";
 
 /** Anomalies > Réclamations : réclamations auprès des fournisseurs (En cours, Clôturée, Annulée) */
-export default async function ClaimsPage() {
+export default async function ClaimsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser(can.viewAnomalies);
   const { t, locale } = await getDict();
   const c = schema.claims;
   const db = getDb();
+  const fromAnomaly = Number(one((await searchParams).anomaly)) || null;
+  const an = fromAnomaly ? await db.query.anomalies.findFirst({ where: eq(schema.anomalies.id, fromAnomaly) }) : undefined;
   const [rows, suppliers] = await Promise.all([
     db.select({ c, supplier: schema.suppliers.name }).from(c).leftJoin(schema.suppliers, eq(schema.suppliers.id, c.supplierId)).orderBy(desc(c.date), desc(c.id)),
     db.select({ id: schema.suppliers.id, name: schema.suppliers.name }).from(schema.suppliers).where(eq(schema.suppliers.active, true)).orderBy(asc(schema.suppliers.name)),
@@ -24,6 +27,11 @@ export default async function ClaimsPage() {
       <ClaimsBoard
         suppliers={suppliers}
         canCreate={can.createAnomaly(user.role)}
+        prefill={an ? {
+          date: an.createdAt.toISOString().slice(0, 10), supplier: an.supplierName, supplierId: an.supplierId ? String(an.supplierId) : "", reference: an.reference ?? "",
+          product: an.productName ?? "", description: an.description, action: an.followUp ?? "", amount: an.creditAmount ?? "",
+          receptionId: an.receptionId ? String(an.receptionId) : "", anomalyId: String(an.id),
+        } : undefined}
         canManage={can.manageAnomalies(user.role)}
         rows={rows.map(({ c: x, supplier }) => ({
           id: x.id, date: fmtDate(x.date, locale), dateIso: x.date, supplier: supplier ?? x.supplierName ?? "", supplierId: x.supplierId,

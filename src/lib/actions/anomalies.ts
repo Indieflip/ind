@@ -7,6 +7,7 @@ import { can } from "@/lib/permissions";
 import { num } from "@/lib/format";
 import { storeFile, parseDataUrl } from "@/lib/storage";
 import { matchProduct } from "@/lib/server/maj";
+import { outcomeOf } from "@/lib/anomaly";
 
 const TYPES = schema.anomalyTypeEnum.enumValues;
 const STATUSES = schema.anomalyStatusEnum.enumValues;
@@ -57,7 +58,7 @@ export async function updateAnomalyAction(
   if (data.followUp !== undefined) set.followUp = data.followUp.trim() || null;
   if (data.description !== undefined && data.description.trim()) set.description = data.description.trim();
   if (data.nature !== undefined) set.nature = data.nature.trim() || null;
-  if (data.result !== undefined) set.result = data.result.trim() || null;
+  if (data.result !== undefined) set.result = outcomeOf(data.result);
   const day = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
   if (data.lastActionAt !== undefined) set.lastActionAt = day(data.lastActionAt);
   if (data.nextActionAt !== undefined) set.nextActionAt = day(data.nextActionAt);

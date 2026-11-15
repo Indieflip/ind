@@ -9,6 +9,7 @@ import { categoryCodeFromNature } from "@/lib/nature";
 import { setSetting } from "@/lib/settings";
 import { syncFvProducts } from "./fv";
 import { cleanReference, linkWeighGaps, normalizeMajLog, supplierMatcher } from "./maj";
+import { outcomeFromText } from "@/lib/anomaly";
 
 type Cell = string | number | Date | null;
 
@@ -191,7 +192,10 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
           list.push({
             supplierName, supplierId: matcher.find(supplierName) ?? matcher.find(ref), reference: cleanReference(rest.join(" : "), matcher.keys) || null,
             productName: product || null, nature: text(r[1]), description: problem || product || "—", type: typeOf(problem),
-            followUp: multiline(r[5]) || null, lastActionAt: isoDate(r[6]), result: result || null,
+            // Résultat : choix Clôturé / En cours / Annulé ; le texte du fichier reste lisible dans « Action »
+            followUp: [multiline(r[5]), result ? `Résultat : ${result}` : ""].filter(Boolean).join("\n") || null,
+            lastActionAt: isoDate(r[6]),
+            result: outcomeFromText(result, done ? "closed" : undefined),
             creditAmount: saving != null ? String(Math.abs(saving)) : null, status: done ? "closed" : saving != null ? "credit_received" : "open",
             imported: true, createdAt: date ? new Date(`${date}T12:00:00Z`) : new Date(),
           });
