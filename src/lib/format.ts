@@ -71,3 +71,19 @@ export function csvResponse(filename: string, rows: (string | number | null | un
     },
   });
 }
+
+/**
+ * Texte des tableaux : première lettre en majuscule, le reste en minuscules (« PRODUCTEURS REUNIS » → « Producteurs reunis »).
+ * Un texte déjà en minuscules / majuscules mêlées garde sa casse (noms propres). Restent intacts : les mots avec
+ * des chiffres (n° de BL, calibres) et les sigles sans voyelle (JFC, SNDA, FBS, BL).
+ */
+export function sentence(s: string | null | undefined): string {
+  if (!s) return s ?? "";
+  const letters = s.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ]/g, "");
+  let out = s;
+  if (letters.length > 1 && letters === letters.toUpperCase()) {
+    out = s.replace(/\S+/g, (w) => (/\d/.test(w) || (/^[A-Z.&'’-]{2,6}$/.test(w) && !/[AEIOUY]/.test(w.replace(/[^A-Z]/g, ""))) ? w : w.toLowerCase()));
+  }
+  const i = out.search(/[A-Za-zÀ-ÖØ-öø-ÿ]/);
+  return i < 0 ? out : out.slice(0, i) + out.charAt(i).toUpperCase() + out.slice(i + 1);
+}

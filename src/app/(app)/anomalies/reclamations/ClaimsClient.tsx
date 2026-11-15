@@ -5,7 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { addClaimAction, deleteClaimAction, setClaimStatusAction, updateClaimAction, type ClaimInput, type ClaimStatus } from "@/lib/actions/claims";
 import { readRow, type RowFields } from "@/lib/client/rowClipboard";
 import { useI18n } from "@/lib/i18n/client";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, sentence } from "@/lib/format";
 import { appConfirm } from "@/components/Confirm";
 import { Icon } from "@/components/Icon";
 import { MoneyInput } from "@/components/MoneyInput";
@@ -69,7 +69,7 @@ export function ClaimsBoard({ rows, suppliers, canCreate, canManage }: { rows: C
   const cols: Col<ClaimRow>[] = [
     { key: "id", width: "3rem", label: c.number, text: (r) => String(r.id), sort: (r) => r.id },
     { key: "date", width: "5rem", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateIso },
-    { key: "supplier", width: "9%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => (r.supplierId ? <Link className="text-brand-700 hover:underline" href={`/mercurial/fournisseurs/${r.supplierId}`}>{r.supplier}</Link> : r.supplier || "—") },
+    { key: "supplier", width: "9%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => (r.supplierId ? <Link className="text-brand-700 hover:underline" href={`/mercurial/fournisseurs/${r.supplierId}`}>{sentence(r.supplier)}</Link> : sentence(r.supplier) || "—") },
     { key: "reference", width: "8%", label: t.anomalies.blInvoice, text: (r) => r.reference, render: (r) => (r.receptionId ? <Link className="text-brand-700 hover:underline" href={`/receptions/${r.receptionId}`}>{r.reference || "—"}</Link> : r.reference || "—") },
     { key: "product", width: "10%", label: t.common.product, text: (r) => r.product },
     { key: "subject", label: c.subject, text: (r) => r.subject, className: "whitespace-pre-line" },

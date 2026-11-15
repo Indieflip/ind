@@ -4,6 +4,10 @@ import { useI18n } from "@/lib/i18n/client";
 import { ActiveFilters, FilterInput, Pager, ResetFilters } from "./FilterInput";
 import { useTable, type ColumnDef } from "./useTable";
 import { RowMenu, type RowAction } from "./RowMenu";
+import { sentence } from "@/lib/format";
+
+/** Colonnes dont le texte reste tel quel : produits du mercurial, références, numéros */
+const KEEP = new Set(["product", "products", "name", "item", "reference", "bl", "number", "id"]);
 import type { RowFields } from "@/lib/client/rowClipboard";
 
 export interface Col<R> extends ColumnDef<R> {
@@ -13,6 +17,8 @@ export interface Col<R> extends ColumnDef<R> {
   render?: (r: R) => React.ReactNode;
   href?: (r: R) => string | null;
   sortable?: boolean;
+  /** Garder le texte tel quel (produits du mercurial, références) ; sinon : première lettre en majuscule */
+  keepCase?: boolean;
   /** Largeur de la colonne (tableau à largeur fixe), ex. "8%" */
   width?: string;
 }
@@ -110,7 +116,7 @@ export function DataTable<R>({
               {selectable && <th className="bg-white" />}
               {cols.map((c) => (
                 <th key={c.key} className="bg-white py-1.5">
-                  {c.filterable !== false && <FilterInput value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} options={tb.options[c.key]} />}
+                  {c.filterable !== false && <FilterInput value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} options={c.keepCase || KEEP.has(c.key) ? tb.options[c.key] : [...new Set((tb.options[c.key] ?? []).map(sentence))]} />}
                 </th>
               ))}
               <th className="bg-white py-1.5 text-right">
@@ -142,7 +148,8 @@ export function DataTable<R>({
                     </td>
                   )}
                   {cols.map((c) => {
-                    const content = c.render ? c.render(r) : c.text(r) || "—";
+                    const keep = c.keepCase || KEEP.has(c.key);
+                    const content = c.render ? c.render(r) : (keep ? c.text(r) : sentence(c.text(r))) || "—";
                     const href = c.href?.(r);
                     return (
                       <td key={c.key} className={`${c.align === "right" ? "text-right tabular-nums" : c.align === "center" ? "text-center" : ""} ${c.className ?? ""}`}>

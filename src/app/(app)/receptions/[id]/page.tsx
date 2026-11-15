@@ -5,12 +5,12 @@ import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
-import { fmtDate, fmtDateTime, fmtMoney, fmtNum, fmtPct, num } from "@/lib/format";
+import { fmtDate, fmtDateTime, fmtMoney, fmtNum, fmtPct, num, sentence } from "@/lib/format";
 import { checkPrice } from "@/lib/pricing";
 import { StatusBadge, decisionStyles } from "@/components/DecisionBadge";
 import { Icon } from "@/components/Icon";
 import { receptionNumbers } from "@/lib/server/queries";
-import { PrintButton, DeleteReceptionButton, ConsolidateOneButton, AddNote } from "./Actions";
+import { AnomalyActionField, PrintButton, DeleteReceptionButton, ConsolidateOneButton, AddNote } from "./Actions";
 
 const isPdf = (url: string) => /\.pdf($|\?)/i.test(url) || url.startsWith("data:application/pdf");
 
@@ -86,7 +86,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
         <div className="flex flex-wrap items-start justify-between gap-4 bg-gradient-to-r from-brand-700 to-brand-600 px-5 py-4 text-white">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wider text-white/70">{t.receptions.detail} · {t.receptions.numberLong} {seq ?? "—"}</p>
-            <h1 className="mt-0.5 text-2xl font-bold leading-tight">{rec.supplierName}</h1>
+            <h1 className="mt-0.5 text-2xl font-bold leading-tight">{sentence(rec.supplierName)}</h1>
             <p className="mt-1 flex items-center gap-1.5 text-sm text-white/85"><Icon name="truck" className="h-4 w-4" /> {fmtDateTime(rec.deliveredAt, locale)}</p>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -255,13 +255,14 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
             <ul className="divide-y divide-stone-100">
               {recAnomalies.map((a) => (
                 <li key={a.id} className="flex flex-wrap items-start justify-between gap-2 px-5 py-2.5 text-sm">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium">
                       {a.number ? <span className="mr-1.5 text-stone-500">N° {a.number}</span> : null}
                       {t.anomalies.types[a.type]}{a.productName ? ` · ${a.productName}` : ""}
                     </p>
                     <p className="text-stone-600">{a.description}</p>
-                    {(a.followUp || a.result) && <p className="text-xs text-stone-500">{[a.followUp, a.result].filter(Boolean).join(" — ")}</p>}
+                    <AnomalyActionField id={a.id} initial={a.followUp ?? ""} editable={can.manageAnomalies(user.role) && !a.consolidatedAt} label={t.receptions.actions} saveLabel={t.common.save} savedLabel={t.receptions.actionSaved} />
+                    {a.result && <p className="text-xs text-stone-500">{t.anomalies.result} : {a.result}</p>}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <StatusBadge status={a.status} label={t.anomalies.statuses[a.status]} />

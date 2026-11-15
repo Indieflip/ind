@@ -100,6 +100,8 @@ export const en: Dict = {
     page: "page",
   },
   receptions: {
+    actions: "Actions",
+    actionSaved: "Action saved (also shown in the Issues table).",
     anomalyCount: "issue(s)",
     toFollow: "to follow up",
     seeAnomalies: "See issues",
@@ -299,6 +301,8 @@ export const en: Dict = {
     empty: "No price changes match these filters.",
   },
   suppliers: {
+    contact: "Contact details",
+    saved: "Contact details saved.",
     askDelete: "Ask for deletion",
     delete: "Delete supplier",
     deleteTitle: "Delete supplier",
@@ -329,6 +333,7 @@ export const en: Dict = {
     empty: "No suppliers yet. Import your price list or add a supplier.",
   },
   anomalies: {
+    texts: { missing: "missing", extra: "extra", invoiced: "invoiced", checked: "checked", temperature: "temperature", maximum: "maximum", dlcExpired: "use-by date passed", dlcShort: "use-by date too short", insteadOf: "instead of" },
     number: "No.",
     provisional: "Grey No.: provisional, confirmed when consolidated",
     blInvoice: "Note / invoice",
@@ -590,6 +595,7 @@ export const en: Dict = {
     create: "Create a claim",
   },
   search: {
+    placeholderShort: "Search the app…",
     groups: { receptions: "Deliveries", suppliers: "Suppliers", products: "Products", anomalies: "Issues", protocols: "Procedures" },
     allResults: "See all results for",
     title: "Search",

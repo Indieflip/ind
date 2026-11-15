@@ -98,6 +98,8 @@ export const fr = {
     page: "page",
   },
   receptions: {
+    actions: "Actions",
+    actionSaved: "Action enregistrée (visible aussi dans le tableau Anomalies).",
     anomalyCount: "anomalie(s)",
     toFollow: "à suivre",
     seeAnomalies: "Voir les anomalies",
@@ -301,6 +303,8 @@ export const fr = {
     empty: "Aucun écart pour ces critères.",
   },
   suppliers: {
+    contact: "Coordonnées",
+    saved: "Coordonnées enregistrées.",
     askDelete: "Demander la suppression",
     delete: "Supprimer le fournisseur",
     deleteTitle: "Supprimer le fournisseur",
@@ -331,6 +335,7 @@ export const fr = {
     empty: "Aucun fournisseur. Importez votre mercurial ou ajoutez un fournisseur.",
   },
   anomalies: {
+    texts: { missing: "manque", extra: "en trop", invoiced: "facturé", checked: "contrôlé", temperature: "température", maximum: "maximum", dlcExpired: "DLC dépassée", dlcShort: "DLC trop courte", insteadOf: "au lieu de" },
     number: "N°",
     provisional: "N° en gris : provisoire, il sera validé à la consolidation",
     blInvoice: "BL / Facture",
@@ -592,6 +597,7 @@ export const fr = {
     create: "Créer une réclamation",
   },
   search: {
+    placeholderShort: "Rechercher dans l'appli…",
     groups: { receptions: "Réceptions", suppliers: "Fournisseurs", products: "Produits", anomalies: "Anomalies", protocols: "Protocoles" },
     allResults: "Voir tous les résultats pour",
     title: "Recherche",

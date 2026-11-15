@@ -211,6 +211,50 @@ await db.execute(sql`with base as (select coalesce(max(number), 0) as m from ano
   todo as (select id, row_number() over (order by consolidated_at, created_at, id) as rn from anomalies where consolidated_at is not null and number is null)
   update anomalies a set number = base.m + todo.rn from todo, base where a.id = todo.id`);
 
+// Libellés d'anomalies plus clairs (une fois) : « Anomalie détectée — PRODUIT : Quantité manquante (-50 Pièce) »
+// devient « Anomalie détectée : manque 50 pièces (facturé 100, contrôlé 50) » (le produit a sa colonne)
+if (!(await db.execute(sql`select 1 from app_settings where key = 'anomaly_texts_v3'`)).rows.length) {
+  const { rows } = await db.execute(sql`select a.id, a.description, a.product_name, l.qty_ordered, l.qty_received, l.unit, l.temperature, l.dlc, c.conform_max
+    from anomalies a left join reception_lines l on l.id = a.line_id left join categories c on c.id = l.category_id
+    where a.imported = false`);
+  const n3 = (v) => String(Math.round(Number(v) * 1000) / 1000).replace(".", ",");
+  const qty = (n, unit) => {
+    const v = Math.abs(Math.round(n * 1000) / 1000);
+    const u = (unit || "").toLowerCase();
+    return `${String(v).replace(".", ",")} ${v > 1 && !/^(kg|g|l|ml|cl)$/.test(u) && !/[sx]$/.test(u) ? u + "s" : u}`.trim();
+  };
+  const dmy = (d) => String(d).slice(0, 10).split("-").reverse().map((p, i) => (i === 2 ? p.slice(2) : p)).join("/");
+  for (const a of rows) {
+    let d = a.description ?? "";
+    const m = /^(Anomalie détectée|Réserve|Refus|Prix bloqué non respecté) — (.*?) : (.*)$/s.exec(d);
+    if (!m) continue;
+    const [, head, , rest0] = m;
+    let rest = rest0;
+    const facts = [];
+    if (a.qty_ordered != null && a.qty_received != null && Number(a.qty_ordered) !== Number(a.qty_received)) {
+      const diff = Number(a.qty_received) - Number(a.qty_ordered);
+      facts.push(`${diff < 0 ? `manque ${qty(diff, a.unit)}` : `${qty(diff, a.unit)} en trop`} (facturé ${n3(a.qty_ordered)}, contrôlé ${n3(a.qty_received)})`);
+    }
+    if (head === "Prix bloqué non respecté") {
+      const p = /^([\d,]+ €) \(prix bloqué (.+?), ([+-]?[\d.,]+) %\)$/.exec(rest);
+      if (p) rest = `${p[1]} au lieu de ${p[2]} (${p[3].replace(".", ",")} %)`;
+      d = `${head} : ${rest}`;
+    } else if (head === "Anomalie détectée") {
+      const parts = [];
+      if (/Quantité/i.test(rest) && facts.length) parts.push(...facts);
+      if (/Température/i.test(rest) && a.temperature != null) parts.push(`température ${String(a.temperature).replace(".", ",")} °C${a.conform_max != null ? ` (maximum ${String(a.conform_max).replace(".", ",")} °C)` : ""}`);
+      if (/DLC dépassée/i.test(rest) && a.dlc) parts.push(`DLC dépassée (${dmy(a.dlc)})`);
+      else if (/DLC/i.test(rest) && a.dlc) parts.push(`DLC trop courte (${dmy(a.dlc)})`);
+      d = `${head} : ${parts.length ? parts.join(" ; ") : rest}`;
+    } else {
+      const reason = rest.replace(/\s*\([+-]?[\d.,]+ [^)]*\)\s*$/, "").trim();
+      d = `${head} : ${[reason.toLowerCase(), ...facts].filter(Boolean).join(" ; ")}`;
+    }
+    if (d !== a.description) await db.execute(sql`update anomalies set description = ${d} where id = ${a.id}`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('anomaly_texts_v3', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

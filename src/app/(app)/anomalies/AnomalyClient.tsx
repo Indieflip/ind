@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { consolidateAnomaliesAction, createAnomalyAction, updateAnomalyAction } from "@/lib/actions/anomalies";
 import { useI18n } from "@/lib/i18n/client";
-import { fmtDate, fmtMoney } from "@/lib/format";
+import { fmtDate, fmtMoney, sentence } from "@/lib/format";
 import { Icon } from "@/components/Icon";
 import { MoneyInput } from "@/components/MoneyInput";
 import { StatusBadge } from "@/components/DecisionBadge";
@@ -116,7 +116,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
     },
     { key: "date", width: "5.25rem", label: a.deliveryDate, text: (r) => r.date, sort: (r) => r.dateSort, className: "" },
     { key: "nature", width: "4.5rem", label: a.nature, text: (r) => r.nature },
-    { key: "supplier", width: "7.5%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => (r.supplierId ? <Link className="text-brand-700 hover:underline" href={`/mercurial/fournisseurs/${r.supplierId}`}>{r.supplier}</Link> : r.supplier) },
+    { key: "supplier", width: "7.5%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => (r.supplierId ? <Link className="text-brand-700 hover:underline" href={`/mercurial/fournisseurs/${r.supplierId}`}>{sentence(r.supplier)}</Link> : sentence(r.supplier)) },
     { key: "reference", width: "7%", label: a.blInvoice, text: (r) => r.reference, render: (r) => (r.receptionId ? <Link className="text-brand-700 hover:underline" href={`/receptions/${r.receptionId}`}>{r.reference || "—"}</Link> : r.reference || "—") },
     { key: "product", width: "8.5%", label: t.common.product, text: (r) => r.product },
     { key: "problem", label: a.problem, text: (r) => r.problem, className: "whitespace-pre-wrap" },
@@ -152,7 +152,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
             {due.map((r) => (
               <li key={r.id} className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-red-700">{fmtDate(r.nextActionAt, locale)}</span>
-                <strong>{r.supplier}</strong> · {r.product || r.problem}
+                <strong>{sentence(r.supplier)}</strong> · {r.product || r.problem}
                 {canManage && <button className="ml-auto text-xs font-semibold text-red-800 underline" onClick={() => setEdit(r)}>{a.followUpNow}</button>}
               </li>
             ))}
@@ -219,7 +219,7 @@ function AnomalyEditor({ row, onClose, today }: { row: AnomalyRow; onClose: () =
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-start justify-between gap-2">
           <div>
-            <h2 className="font-semibold">{row.supplier}</h2>
+            <h2 className="font-semibold">{sentence(row.supplier)}</h2>
             <p className="text-sm text-stone-600">{row.date} · {row.product}</p>
           </div>
           <button className="btn-ghost p-1.5" onClick={onClose} aria-label={t.common.close}><Icon name="x" className="h-4 w-4" /></button>

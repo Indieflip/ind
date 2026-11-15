@@ -44,7 +44,8 @@ export function lineFromProduct(p: CatalogProduct | null, extra: Partial<DraftLi
     key: uuid(),
     productId: p?.id ?? null,
     productName: p?.name ?? "",
-    unit: p?.unit ?? "Kg",
+    // Produit sans unité au mercurial : « Pièce » (jamais « Kg » par défaut, ce qui en ferait un écart de pesée)
+    unit: p ? p.unit || "Pièce" : "Kg",
     categoryId: p?.categoryId ?? null,
     qtyOrdered: "",
     qtyReceived: "",
@@ -184,7 +185,7 @@ export function toPayload(d: Draft): ReceptionPayload {
       .map((l) => ({
         productId: l.productId,
         productName: l.productName.trim(),
-        unit: l.unit || "Kg",
+        unit: l.unit || "Pièce",
         categoryId: l.categoryId,
         qtyOrdered: num(l.qtyOrdered),
         qtyReceived: num(l.qtyReceived),

@@ -1,4 +1,5 @@
 "use client";
+import { sentence } from "@/lib/format";
 import { MoneyInput } from "@/components/MoneyInput";
 import { appConfirm } from "@/components/Confirm";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -119,7 +120,7 @@ function FvRow({ r, currentMonth, editable, shownMonths, units }: { r: Row; curr
   if (!edit) {
     return (
       <tr className={r.locked ? "bg-sky-50 hover:bg-sky-100" : "hover:bg-stone-50"} title={r.locked ? t.fv.lockedHint : undefined}>
-        <td className={`${td} whitespace-nowrap text-stone-500`}>{r.supplier}</td>
+        <td className={`${td} whitespace-nowrap text-stone-500`}>{sentence(r.supplier)}</td>
         <td className={`${td} sticky left-0 font-medium ${r.locked ? "bg-sky-50 text-sky-900" : "bg-white"}`}>{r.locked && "🔒 "}{r.product}</td>
         <td className={td}>{r.unit}</td>
         {cells.map((i) => (

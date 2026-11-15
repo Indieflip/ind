@@ -48,24 +48,41 @@ export function ImportCatalog() {
 
 export function SupplierInfo({ id, name, email, phone, notes, active }: { id: number; name: string; email: string; phone: string; notes: string; active: boolean }) {
   const { t } = useI18n();
+  const router = useRouter();
   const [pending, start] = useTransition();
-  const save = (data: Parameters<typeof updateSupplierAction>[1]) => start(() => updateSupplierAction(id, data));
+  const initial = { name, email, phone, notes };
+  const [v, setV] = useState(initial);
+  const [saved, setSaved] = useState(false);
+  const dirty = v.name !== name || v.email !== email || v.phone !== phone || v.notes !== notes;
+  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => { setV({ ...v, [k]: e.target.value }); setSaved(false); };
   return (
-    <div className="card grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-      <label><span className="label">{t.suppliers.supplierName}</span><input className="input" defaultValue={name} onBlur={(e) => e.target.value !== name && save({ name: e.target.value })} /></label>
-      <label><span className="label">{t.suppliers.email}</span><input className="input" type="email" defaultValue={email} onBlur={(e) => e.target.value !== email && save({ email: e.target.value })} /></label>
-      <label><span className="label">{t.suppliers.phone}</span><input className="input" defaultValue={phone} onBlur={(e) => e.target.value !== phone && save({ phone: e.target.value })} /></label>
-      <label><span className="label">{t.common.notes}</span><input className="input" defaultValue={notes} onBlur={(e) => e.target.value !== notes && save({ notes: e.target.value })} /></label>
-      <div className="sm:col-span-2 lg:col-span-4">
+    <form
+      className="card grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!v.name.trim()) return;
+        start(async () => { await updateSupplierAction(id, v); setSaved(true); router.refresh(); });
+      }}
+    >
+      <h2 className="text-sm font-semibold sm:col-span-2 lg:col-span-4">{t.suppliers.contact}</h2>
+      <label><span className="label">{t.suppliers.supplierName} *</span><input className="input" required value={v.name} onChange={set("name")} /></label>
+      <label><span className="label">{t.suppliers.email}</span><input className="input" type="email" value={v.email} onChange={set("email")} /></label>
+      <label><span className="label">{t.suppliers.phone}</span><input className="input" value={v.phone} onChange={set("phone")} /></label>
+      <label><span className="label">{t.common.notes}</span><input className="input" value={v.notes} onChange={set("notes")} /></label>
+      <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
+        <button className="btn-primary" disabled={pending || !dirty}><Icon name="check" className="h-4 w-4" /> {t.common.save}</button>
+        {dirty && <button type="button" className="btn-ghost" onClick={() => setV(initial)}>{t.common.cancel}</button>}
+        {saved && !dirty && <span className="text-sm text-emerald-700">{t.suppliers.saved}</span>}
         <button
-          className={active ? "btn-ghost text-red-600" : "btn-secondary"}
+          type="button"
+          className={`ml-auto ${active ? "btn-ghost text-red-600" : "btn-secondary"}`}
           disabled={pending}
-          onClick={async () => { if (await appConfirm(active ? t.suppliers.deleteWarning : `${t.suppliers.reactivate} ?`)) save({ active: !active }); }}
+          onClick={async () => { if (await appConfirm(active ? t.suppliers.deleteWarning : `${t.suppliers.reactivate} ?`)) start(async () => { await updateSupplierAction(id, { active: !active }); router.refresh(); }); }}
         >
           {active ? t.suppliers.deactivate : t.suppliers.reactivate}
         </button>
       </div>
-    </div>
+    </form>
   );
 }
 

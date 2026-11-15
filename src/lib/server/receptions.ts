@@ -192,7 +192,7 @@ async function writeContent(
   }
 
   // Unités saisies pendant le bon : ajoutées à la liste des unités
-  for (const l of p.lines) l.unit = unitName(l.unit) || "Kg";
+  for (const l of p.lines) l.unit = unitName(l.unit) || "Pièce";
   for (const unit of new Set(p.lines.map((l) => l.unit).filter(Boolean))) {
     await tx.insert(schema.units).values({ name: unit }).onConflictDoNothing();
   }
@@ -263,7 +263,7 @@ async function writeContent(
         // Prix bloqué : pas de variation, une anomalie à réclamer au fournisseur
         await tx.insert(schema.anomalies).values({
           receptionId: recId, supplierId, supplierName, productName: l.productName, type: "locked_price", nature: natureOf(l.categoryId), reference: lineRef(l),
-          description: `${t.anomalies.types.locked_price} — ${l.productName} : ${fmtEuro(l.unitPrice)} (${t.wizard.lockedRange} ${fmtEuro(ref.min ?? ref.max)}${ref.min != null && ref.max != null && ref.min !== ref.max ? ` – ${fmtEuro(ref.max)}` : ""}, ${check.pct > 0 ? "+" : ""}${String(check.pct).replace(".", ",")} %)`,
+          description: `${t.anomalies.types.locked_price} : ${fmtEuro(l.unitPrice)} ${t.anomalies.texts.insteadOf} ${fmtEuro(ref.min ?? ref.max)}${ref.min != null && ref.max != null && ref.min !== ref.max ? ` – ${fmtEuro(ref.max)}` : ""} (${check.pct > 0 ? "+" : ""}${String(check.pct).replace(".", ",")} %)`,
           createdBy: user.id, createdAt: date,
         });
       }
@@ -306,28 +306,22 @@ async function writeContent(
       date,
     ).issues.filter((i) => i !== "temp_missing" && !(unitName(l.unit) === "Kg" && (i === "qty_less" || i === "qty_more")));
     // (au kg, un écart de poids va seulement dans Écarts pesées)
+    // Texte clair : « manque 50 pièces (facturé 100, contrôlé 50) », « température 8 °C (maximum 4 °C) »…
+    const facts = describeLine(l, detected, cat, t);
     if (l.decision === "conform" && detected.length && !keep.products.has(l.productName.toLowerCase())) {
       const first = detected[0];
-      let detail = "";
-      if (l.qtyOrdered != null && l.qtyReceived != null && l.qtyReceived !== l.qtyOrdered) {
-        const diff = Math.round((l.qtyReceived - l.qtyOrdered) * 1000) / 1000;
-        detail = ` (${diff > 0 ? "+" : ""}${diff} ${l.unit})`;
-      }
       await tx.insert(schema.anomalies).values({
         receptionId: recId, lineId: line.id, supplierId, supplierName, productName: l.productName,
         nature: natureOf(l.categoryId), reference: lineRef(l),
         type: first.startsWith("temp") ? "temperature" : first.startsWith("dlc") ? "dlc" : first === "qty_less" ? "missing" : "quantity",
-        description: `${t.anomalies.detected} — ${l.productName} : ${detected.map((i) => (t.issues as Record<string, string>)[i] ?? i).join(", ")}${detail}${l.temperature != null && first.startsWith("temp") ? ` (${l.temperature} °C)` : ""}`,
+        description: `${t.anomalies.detected} : ${facts.join(" ; ")}`,
         photoUrl: l.photos[0] ?? null, createdBy: user.id, createdAt: date,
       });
     }
     if (l.decision !== "conform" && !keep.products.has(l.productName.toLowerCase())) {
-      const reasonLabel = l.reason ? (t.reasons as Record<string, string>)[l.reason] ?? l.reason : t.decision[l.decision];
-      let detail = "";
-      if (l.qtyOrdered != null && l.qtyReceived != null && l.qtyReceived !== l.qtyOrdered) {
-        const diff = Math.round((l.qtyReceived - l.qtyOrdered) * 1000) / 1000;
-        detail = ` (${diff > 0 ? "+" : ""}${diff} ${l.unit})`;
-      }
+      const reasonLabel = l.reason ? (t.reasons as Record<string, string>)[l.reason] ?? l.reason : "";
+      const qtyFacts = describeLine(l, ["qty_less", "qty_more"], cat, t);
+      const why = [reasonLabel.toLowerCase(), ...(facts.length ? facts : qtyFacts)].filter(Boolean);
       await tx.insert(schema.anomalies).values({
         receptionId: recId,
         lineId: line.id,
@@ -337,7 +331,7 @@ async function writeContent(
         nature: natureOf(l.categoryId),
         reference: lineRef(l),
         type: (l.reason && reasonToAnomaly[l.reason]) || (l.qtyReceived != null && l.qtyOrdered != null && l.qtyReceived < l.qtyOrdered ? "missing" : "other"),
-        description: `${t.decision[l.decision]} — ${l.productName} : ${reasonLabel}${detail}`,
+        description: `${t.decision[l.decision]}${why.length ? ` : ${[...new Set(why)].join(" ; ")}` : ""}`,
         photoUrl: l.photos[0] ?? null,
         createdBy: user.id,
         createdAt: date,
@@ -508,4 +502,37 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
     await writeContent(tx, id, supplier, p, user, t, keep, claims, unchanged);
     return id;
   });
+}
+
+/** Quantité lisible : « 50 pièces », « 2,5 kg », « 1 carton » */
+function qtyText(n: number, unit: string) {
+  const v = Math.abs(Math.round(n * 1000) / 1000);
+  const u = (unit || "").toLowerCase();
+  const plural = v > 1 && !/^(kg|g|l|ml|cl)$/.test(u) && !/[sx]$/.test(u) ? `${u}s` : u;
+  return `${String(v).replace(".", ",")} ${plural}`.trim();
+}
+
+/** Constats clairs d'une ligne de bon, pour la colonne « Problème » des anomalies */
+function describeLine(
+  l: { qtyOrdered: number | null; qtyReceived: number | null; temperature: number | null; dlc: string | null; unit: string },
+  issues: string[],
+  cat: { conformMax: number | null; reserveMax: number | null } | undefined,
+  t: ReturnType<typeof dictFor>,
+) {
+  const x = t.anomalies.texts;
+  const out: string[] = [];
+  const num3 = (n: number) => String(Math.round(n * 1000) / 1000).replace(".", ",");
+  const dmy = (d: string) => d.split("-").reverse().map((p, i) => (i === 2 ? p.slice(2) : p)).join("/");
+  for (const i of issues) {
+    if ((i === "qty_less" || i === "qty_more") && l.qtyOrdered != null && l.qtyReceived != null && l.qtyOrdered !== l.qtyReceived) {
+      const diff = l.qtyReceived - l.qtyOrdered;
+      const q = qtyText(diff, l.unit);
+      out.push(`${diff < 0 ? `${x.missing} ${q}` : `${q} ${x.extra}`} (${x.invoiced} ${num3(l.qtyOrdered)}, ${x.checked} ${num3(l.qtyReceived)})`);
+    } else if ((i === "temp_over" || i === "temp_limit") && l.temperature != null) {
+      const max = cat?.conformMax;
+      out.push(`${x.temperature} ${String(l.temperature).replace(".", ",")} °C${max != null ? ` (${x.maximum} ${String(max).replace(".", ",")} °C)` : ""}`);
+    } else if (i === "dlc_expired" && l.dlc) out.push(`${x.dlcExpired} (${dmy(l.dlc)})`);
+    else if (i === "dlc_short" && l.dlc) out.push(`${x.dlcShort} (${dmy(l.dlc)})`);
+  }
+  return [...new Set(out)];
 }

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "./Icon";
+import { GlobalSearch } from "./GlobalSearch";
 import { LocaleSwitch } from "./LocaleSwitch";
 import { logoutAction } from "@/lib/actions/auth";
 
@@ -16,6 +17,7 @@ export function AppNav(props: {
   restaurant: string;
   appName: string;
   moreLabel: string;
+  search: { label: string; placeholder: string; button: string };
 }) {
   const path = usePathname();
   const active = (href: string) => path === href || path.startsWith(href + "/");
@@ -30,6 +32,7 @@ export function AppNav(props: {
             <div className="text-xs leading-snug text-stone-500">{props.restaurant}</div>
           </div>
         </div>
+        <div className="px-3 pb-3"><GlobalSearch compact {...props.search} /></div>
         <nav className="flex-1 space-y-1 px-3">
           {props.items.map((i) => (
             <Link
@@ -73,6 +76,7 @@ export function AppNav(props: {
           </form>
         </div>
       </header>
+      <div className="no-print border-b border-stone-200 bg-white px-4 py-2 lg:hidden"><GlobalSearch compact {...props.search} /></div>
       <MobileTabs items={props.items} active={active} moreLabel={props.moreLabel} />
     </>
   );

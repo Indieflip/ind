@@ -93,10 +93,14 @@ function LineCard({
   const ev = evaluate(line, catalog);
   const [swap, setSwap] = useState(false);
   const [swapQ, setSwapQ] = useState("");
-  const swapResults = useMemo(
-    () => (catalog && swapQ.trim().length >= 2 ? catalog.products.filter((p) => p.supplierId === supplierId && matches(p.name, swapQ)).slice(0, 8) : []),
-    [catalog, swapQ, supplierId],
-  );
+  const [swapBrowse, setSwapBrowse] = useState(false);
+  const swapResults = useMemo(() => {
+    if (!catalog || (!swapBrowse && swapQ.trim().length < 2)) return [];
+    const own = catalog.products.filter((p) => p.supplierId === supplierId && (!swapQ.trim() || matches(p.name, swapQ))).sort((a, b) => az(a.name, b.name));
+    return swapBrowse ? own : own.slice(0, 8);
+  }, [catalog, swapQ, supplierId, swapBrowse]);
+  // Hygiène : pas de DLC ni de lot
+  const noDlc = cat?.code === "hygiene";
   const pc = priceCheck(line);
   const lo = line.mercurialMin ?? line.mercurialPrice;
   const hi = line.mercurialPrice ?? line.mercurialMin;
@@ -146,8 +150,19 @@ function LineCard({
       {swap && (
         <div className="mb-3 rounded-lg border border-brand-200 bg-brand-50 p-2">
           <p className="mb-1 text-xs text-stone-600">{t.wizard.changeProductHint}</p>
-          <input className="input py-1.5 text-sm" autoFocus value={swapQ} placeholder={t.wizard.searchProduct} onChange={(e) => setSwapQ(e.target.value)} />
-          <ul className="mt-1 max-h-48 overflow-y-auto">
+          <div className="relative">
+            <input className="input py-1.5 pr-10 text-sm" autoFocus value={swapQ} placeholder={t.wizard.searchProduct} onChange={(e) => setSwapQ(e.target.value)} />
+            <button
+              type="button"
+              className={`absolute bottom-1 right-1 top-1 flex w-8 items-center justify-center rounded-md ${swapBrowse ? "bg-brand-100 text-brand-700" : "text-stone-500 hover:bg-stone-100"}`}
+              title={t.wizard.supplierProducts}
+              aria-label={t.wizard.supplierProducts}
+              onClick={() => setSwapBrowse((v) => !v)}
+            >
+              {swapBrowse ? "▴" : "▾"}
+            </button>
+          </div>
+          <ul className="mt-1 max-h-64 overflow-y-auto">
             {swapResults.map((p) => (
               <li key={p.id}>
                 <button
@@ -187,11 +202,13 @@ function LineCard({
             <input className={`input py-2 ${ev.issues.includes("temp_missing") ? "border-amber-400" : ""}`} inputMode="decimal" value={line.temperature} onChange={(e) => onChange({ temperature: e.target.value })} />
           </div>
         )}
-        <div>
-          <label className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.dlc}{dlcRequired(line, catalog) && <span className="ml-0.5 text-red-600">*</span>}</label>
-          <input type="date" className={`input py-2 ${needsDlc(line, catalog) ? "border-amber-400 bg-amber-50" : ""}`} value={line.dlc} onChange={(e) => onChange({ dlc: e.target.value })} />
-        </div>
-        {field("lot", t.wizard.lot)}
+        {!noDlc && (
+          <div>
+            <label className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.dlc}{dlcRequired(line, catalog) && <span className="ml-0.5 text-red-600">*</span>}</label>
+            <input type="date" className={`input py-2 ${needsDlc(line, catalog) ? "border-amber-400 bg-amber-50" : ""}`} value={line.dlc} onChange={(e) => onChange({ dlc: e.target.value })} />
+          </div>
+        )}
+        {!noDlc && field("lot", t.wizard.lot)}
         <div>
           <label className="mb-0.5 block text-xs font-medium text-stone-600">
             {t.wizard.unitPrice}

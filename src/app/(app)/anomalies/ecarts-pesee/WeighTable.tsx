@@ -6,7 +6,7 @@ import { addWeighGapAction, updateWeighGapAction, type WeighGapInput } from "@/l
 import { PasteRowButton } from "@/components/table/RowMenu";
 import { copyRow, type RowFields } from "@/lib/client/rowClipboard";
 import { useI18n } from "@/lib/i18n/client";
-import { fmtDate, fmtMoney } from "@/lib/format";
+import { fmtDate, fmtMoney, sentence } from "@/lib/format";
 import { Icon } from "@/components/Icon";
 import { MoneyInput } from "@/components/MoneyInput";
 import { DataTable, type Col } from "@/components/table/DataTable";
@@ -40,7 +40,7 @@ export function WeighTable({ rows, canEdit, suppliers }: { rows: WeighRow[]; can
   const cols: Col<WeighRow>[] = [
     { key: "date", width: "4.75rem", label: w.date, text: (r) => r.date, sort: (r) => r.dateIso },
     { key: "nature", width: "4.5rem", label: w.nature, text: (r) => r.nature },
-    { key: "supplier", width: "7%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => (r.supplierId ? <Link href={`/mercurial/fournisseurs/${r.supplierId}`} className="text-brand-700 hover:underline">{r.supplier}</Link> : r.supplier || "—") },
+    { key: "supplier", width: "7%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => (r.supplierId ? <Link href={`/mercurial/fournisseurs/${r.supplierId}`} className="text-brand-700 hover:underline">{sentence(r.supplier)}</Link> : sentence(r.supplier) || "—") },
     { key: "reference", width: "7%", label: t.anomalies.blInvoice, text: (r) => r.reference, render: (r) => (r.receptionId ? <Link href={`/receptions/${r.receptionId}`} className="text-brand-700 hover:underline">{r.reference || "—"}</Link> : r.reference || "—") },
     { key: "product", width: "11%", label: t.common.product, text: (r) => r.product, render: (r) => <span title={r.original ? `${t.maj.original} : ${r.original}` : undefined}>{r.product}</span> },
     { key: "qtyInvoiced", width: "3.75rem", label: w.qtyInvoiced, align: "right", text: (r) => kg(r.qtyInvoiced), sort: (r) => r.qtyInvoiced, filterable: false },

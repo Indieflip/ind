@@ -11,7 +11,7 @@ interface Hit { group: string; title: string; meta: string; href: string }
  * Champ « Recherche » : les résultats s'affichent au fil de la saisie (fournisseurs, produits, réceptions,
  * anomalies, protocoles) ; « Rechercher » (ou Entrée) ouvre la page de résultats complète.
  */
-export function GlobalSearch({ value = "", label, placeholder, button }: { value?: string; label: string; placeholder: string; button: string }) {
+export function GlobalSearch({ value = "", label, placeholder, button, compact }: { value?: string; label: string; placeholder: string; button: string; compact?: boolean }) {
   const { t } = useI18n();
   const router = useRouter();
   const [q, setQ] = useState(value);
@@ -37,7 +37,7 @@ export function GlobalSearch({ value = "", label, placeholder, button }: { value
   return (
     <form
       role="search"
-      className="no-print mb-4 flex gap-2"
+      className={`no-print flex gap-2 ${compact ? "" : "mb-4"}`}
       onSubmit={(e) => {
         e.preventDefault();
         if (!q.trim()) return;
@@ -56,13 +56,13 @@ export function GlobalSearch({ value = "", label, placeholder, button }: { value
             onChange={(e) => { setQ(e.target.value); setOpen(true); }}
             onFocus={() => setOpen(true)}
             onBlur={() => setTimeout(() => setOpen(false), 200)}
-            className="input pl-10"
+            className={`input pl-10 ${compact ? "py-1.5 text-sm" : ""}`}
             placeholder={placeholder}
             autoComplete="off"
           />
         </label>
         {open && q.trim().length >= 2 && (
-          <div className="absolute inset-x-0 top-full z-40 mt-1 max-h-[60vh] overflow-y-auto rounded-xl border border-stone-200 bg-white py-1 shadow-xl">
+          <div className={`absolute top-full z-50 mt-1 ${compact ? "left-0 w-[min(26rem,calc(100vw-2rem))]" : "inset-x-0"} max-h-[60vh] overflow-y-auto rounded-xl border border-stone-200 bg-white py-1 shadow-xl`}>
             {loading && hits.length === 0 && <p className="px-3 py-2 text-sm text-stone-500">{t.common.loading}</p>}
             {!loading && hits.length === 0 && <p className="px-3 py-2 text-sm text-stone-500">{t.search.none} « {q.trim()} »</p>}
             {hits.map((h, i) => (
@@ -82,7 +82,11 @@ export function GlobalSearch({ value = "", label, placeholder, button }: { value
           </div>
         )}
       </div>
-      <button className="btn-primary">{button}</button>
+      {compact ? (
+        <button className="btn-primary shrink-0 px-2.5 py-1.5" title={button} aria-label={button}><Icon name="search" className="h-4 w-4" /></button>
+      ) : (
+        <button className="btn-primary">{button}</button>
+      )}
     </form>
   );
 }

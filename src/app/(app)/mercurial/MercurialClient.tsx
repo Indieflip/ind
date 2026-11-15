@@ -8,7 +8,7 @@ import {
   addMercurialRowAction, addUnitAction, deleteUnitAction, renameUnitAction, setProductActiveAction, updateMercurialRowAction,
 } from "@/lib/actions/mercurial";
 import { useI18n } from "@/lib/i18n/client";
-import { fmtMoney } from "@/lib/format";
+import { fmtMoney, sentence } from "@/lib/format";
 import { Icon } from "@/components/Icon";
 import { UnitSelect } from "@/components/UnitSelect";
 import { NatureSelect } from "@/components/NatureSelect";
@@ -238,7 +238,7 @@ function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; supp
   if (!edit) {
     return (
       <tr className={r.active ? "" : "opacity-50"}>
-        <td className="text-stone-600">{r.supplier}</td>
+        <td className="text-stone-600">{sentence(r.supplier)}</td>
         <td className="text-stone-600">{r.fv ? <span className="badge bg-lime-100 text-lime-800">{r.nature ?? m.fvTag}</span> : r.nature ?? ""}</td>
         <td className="font-medium">
           {r.name}

@@ -5,7 +5,7 @@ import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
-import { fmtDateTime, num } from "@/lib/format";
+import { fmtDateTime, num, sentence } from "@/lib/format";
 import { fvRange, parisMonth } from "@/lib/pricing";
 import { one, type SP } from "@/lib/server/queries";
 import { Icon } from "@/components/Icon";
@@ -65,7 +65,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
         <div className="w-full max-w-xs"><SupplierSearch suppliers={allSuppliers} /></div>
       </div>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h1 className="text-2xl font-bold">{supplier.name}</h1>
+        <h1 className="text-2xl font-bold">{sentence(supplier.name)}</h1>
         {can.deleteSupplier(user.role) ? (
           <DeleteSupplier id={supplier.id} name={supplier.name} others={allSuppliers} />
         ) : (

@@ -115,7 +115,7 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
               {
                 ...lineFromProduct(product, { fromBl: true }),
                 productName: product?.name ?? r.name,
-                unit: product?.unit ?? r.unit ?? "Kg",
+                unit: product?.unit || r.unit || "Pièce",
                 qtyOrdered: r.quantity != null ? String(r.quantity) : "",
                 qtyReceived: r.quantity != null ? String(r.quantity) : "",
                 unitPrice: r.unitPrice != null ? String(r.unitPrice) : "",

@@ -63,6 +63,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         restaurant={await getRestaurantName()}
         appName={t.app.name}
         moreLabel={t.nav.more}
+        search={{ label: t.search.title, placeholder: t.search.placeholderShort, button: t.search.button }}
       />
       <div className="min-w-0 flex-1 pb-24 lg:pb-0">
         {!can.receive(user.role) && (
