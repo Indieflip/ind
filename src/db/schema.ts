@@ -248,6 +248,8 @@ export const anomalies = pgTable(
     photoUrl: text("photo_url"),
     /** Ligne reprise du fichier « Suivi contrôle » (remplacée à chaque nouvel import) */
     imported: boolean("imported").notNull().default(false),
+    /** N° définitif, attribué par ordre à la consolidation (unique) */
+    number: integer("number").unique(),
     createdBy: integer("created_by").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     closedAt: timestamp("closed_at", { withTimezone: true }),
@@ -339,6 +341,10 @@ export const weighGaps = pgTable(
     gapAmount: numeric("gap_amount", { precision: 12, scale: 4 }),
     detail: text("detail"),
     claimDate: date("claim_date"),
+    /** Rapprochement avec les listes du mercurial et document du bon (« Facture 123 du 12/11/26 ») */
+    supplierId: integer("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
+    productId: integer("product_id").references(() => products.id, { onDelete: "set null" }),
+    reference: text("reference"),
     receptionId: integer("reception_id").references(() => receptions.id, { onDelete: "cascade" }),
     position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

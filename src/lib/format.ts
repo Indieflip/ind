@@ -28,20 +28,29 @@ export function fmtPct(v: number | null | undefined) {
 
 const TZ = "Europe/Paris";
 
+/** Dates écrites dans un texte : JJ/MM/AAAA → JJ/MM/AA (format de l'établissement) */
+export function shortDates(s: string) {
+  return s.replace(/\b(\d{1,2})\/(\d{1,2})\/(?:19|20)(\d{2})(?!\d)/g, "$1/$2/$3");
+}
+
 export function fmtDate(d: Date | string | null | undefined, locale = "fr") {
   if (!d) return "—";
   const date = typeof d === "string" ? new Date(d.length === 10 ? d + "T12:00:00" : d) : d;
-  return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "fr-FR", { dateStyle: "short", timeZone: TZ }).format(date);
+  // Format de l'établissement : JJ/MM/AA
+  return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: TZ }).format(date);
 }
 
 export function fmtDateTime(d: Date | string | null | undefined, locale = "fr") {
   if (!d) return "—";
   const date = typeof d === "string" ? new Date(d) : d;
   return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "fr-FR", {
-    dateStyle: "short",
-    timeStyle: "short",
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
     timeZone: TZ,
-  }).format(date);
+  }).format(date).replace(",", "");
 }
 
 /** CSV lisible par Excel FR : séparateur « ; », BOM UTF-8 */

@@ -1,11 +1,12 @@
 "use server";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/db";
 import { assertUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { num } from "@/lib/format";
 import { storeFile, parseDataUrl } from "@/lib/storage";
+import { matchProduct } from "@/lib/server/maj";
 
 const TYPES = schema.anomalyTypeEnum.enumValues;
 const STATUSES = schema.anomalyStatusEnum.enumValues;
@@ -73,25 +74,66 @@ export async function consolidateAnomaliesAction(ids: number[]) {
   const user = await assertUser(can.consolidate);
   const clean = ids.filter((n) => Number.isInteger(n));
   if (!clean.length) return { count: 0 };
-  const done = await getDb()
-    .update(schema.anomalies)
-    .set({ consolidatedAt: new Date(), consolidatedBy: user.id })
-    .where(and(inArray(schema.anomalies.id, clean), isNull(schema.anomalies.consolidatedAt)))
-    .returning({ id: schema.anomalies.id });
+  // N° définitif attribué à la consolidation, dans l'ordre des dates, à la suite du dernier numéro (unique)
+  const done = await getDb().transaction(async (tx) => {
+    await tx.execute(sql`lock table anomalies in share row exclusive mode`);
+    const rows = await tx
+      .select({ id: schema.anomalies.id })
+      .from(schema.anomalies)
+      .where(and(inArray(schema.anomalies.id, clean), isNull(schema.anomalies.consolidatedAt)))
+      .orderBy(asc(schema.anomalies.createdAt), asc(schema.anomalies.id));
+    const [{ max }] = await tx.select({ max: sql<number>`coalesce(max(${schema.anomalies.number}), 0)::int` }).from(schema.anomalies);
+    let n = max;
+    for (const r of rows) {
+      await tx.update(schema.anomalies).set({ consolidatedAt: new Date(), consolidatedBy: user.id, number: ++n }).where(eq(schema.anomalies.id, r.id));
+    }
+    return rows;
+  });
   revalidatePath("/anomalies", "layout");
   return { count: done.length };
 }
 
-/** Écarts de pesée : détail et date de réclamation */
-export async function updateWeighGapAction(id: number, data: { detail?: string; claimDate?: string; acceptableLoss?: string }) {
+/** Écarts de pesée : modification d'une ligne (l'écart en kg et en € est recalculé) */
+export interface WeighGapInput {
+  date?: string; nature?: string; supplierId?: number | null; reference?: string; product?: string;
+  qtyInvoiced?: string; unitPrice?: string; qtyWeighed?: string; acceptableLoss?: string; detail?: string; claimDate?: string;
+}
+
+export async function updateWeighGapAction(id: number, data: WeighGapInput) {
   await assertUser(can.manageAnomalies);
+  const db = getDb();
+  const [g] = await db.select().from(schema.weighGaps).where(eq(schema.weighGaps.id, id));
+  if (!g) return { error: "not_found" };
+  const isoDate = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+  const n = (v: string | undefined, old: string | null) => (v === undefined ? num(old) : num(v));
   const set: Partial<typeof schema.weighGaps.$inferInsert> = {};
-  if (data.detail !== undefined) set.detail = data.detail.trim() || null;
-  if (data.claimDate !== undefined) set.claimDate = /^\d{4}-\d{2}-\d{2}$/.test(data.claimDate) ? data.claimDate : null;
-  if (data.acceptableLoss !== undefined) {
-    const n = num(data.acceptableLoss);
-    set.acceptableLoss = n != null ? String(n) : null;
+  if (data.date !== undefined && isoDate(data.date)) set.date = data.date;
+  if (data.nature !== undefined) set.nature = data.nature.trim() || null;
+  if (data.supplierId !== undefined) set.supplierId = data.supplierId;
+  if (data.reference !== undefined) set.reference = data.reference.trim() || null;
+  if (data.product !== undefined && data.product.trim()) {
+    set.product = data.product.trim();
+    const products = await db.select({ id: schema.products.id, name: schema.products.name, supplierId: schema.products.supplierId }).from(schema.products);
+    set.productId = matchProduct(set.product, set.supplierId ?? g.supplierId, products)?.id ?? null;
   }
-  await getDb().update(schema.weighGaps).set(set).where(eq(schema.weighGaps.id, id));
+  if (data.detail !== undefined) set.detail = data.detail.trim() || null;
+  if (data.claimDate !== undefined) set.claimDate = isoDate(data.claimDate);
+  const inv = n(data.qtyInvoiced, g.qtyInvoiced);
+  const price = n(data.unitPrice, g.unitPrice);
+  const weighed = n(data.qtyWeighed, g.qtyWeighed);
+  const loss = n(data.acceptableLoss, g.acceptableLoss);
+  const str = (v: number | null) => (v == null ? null : String(v));
+  set.qtyInvoiced = str(inv);
+  set.unitPrice = str(price);
+  set.qtyWeighed = str(weighed);
+  set.acceptableLoss = str(loss);
+  // Écart = facturé − contrôlé − perte acceptable ; écart € = écart × prix unitaire
+  if (inv != null && weighed != null) {
+    const gap = Math.round((inv - weighed - (loss ?? 0)) * 1000) / 1000;
+    set.gapQty = String(gap);
+    set.gapAmount = price != null ? String(Math.round(gap * price * 10000) / 10000) : null;
+  }
+  await db.update(schema.weighGaps).set(set).where(eq(schema.weighGaps.id, id));
   revalidatePath("/anomalies", "layout");
+  return { ok: true };
 }

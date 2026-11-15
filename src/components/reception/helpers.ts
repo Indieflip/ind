@@ -1,6 +1,6 @@
 import { evaluateLine, type Evaluation } from "@/lib/rules";
 import { checkPrice } from "@/lib/pricing";
-import { num } from "@/lib/format";
+import { fmtDate, num } from "@/lib/format";
 import type { Catalog, CatalogProduct, DocRef, Draft, DraftLine, ReceptionPayload } from "@/lib/reception-types";
 import type { Dict } from "@/lib/i18n";
 
@@ -152,7 +152,7 @@ export function buildReservesText(d: Draft, t: Dict, catalog: Catalog | undefine
     if (qo != null && qr != null && qo !== qr) bits.push(`${t.wizard.received.toLowerCase()} ${qr} / ${qo} ${l.unit}`);
     const temp = num(l.temperature);
     if (temp != null && (ev.issues.includes("temp_over") || ev.issues.includes("temp_limit"))) bits.push(`${temp} °C`);
-    if (l.dlc && (ev.issues.includes("dlc_expired") || ev.issues.includes("dlc_short"))) bits.push(`DLC ${l.dlc.split("-").reverse().join("/")}`);
+    if (l.dlc && (ev.issues.includes("dlc_expired") || ev.issues.includes("dlc_short"))) bits.push(`DLC ${fmtDate(l.dlc)}`);
     parts.push(`${l.decision === "refuse" ? t.decision.refuse.toUpperCase() : t.decision.reserve.toUpperCase()} – ${l.productName} : ${[...new Set(bits)].join(", ")}`);
   }
   const truck = num(d.truckTemp);

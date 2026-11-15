@@ -131,7 +131,9 @@ async function writeContent(
     return code === "meat" ? "viande" : code === "fish" ? "poisson" : null;
   };
   const deliveryDay = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(date);
-  const natureOf = (cid: number | null) => cats.find((c) => c.id === cid)?.nameFr ?? null;
+  // Nature courte, comme dans le fichier de suivi : Viande, Poisson, Fruits & Légumes…
+  const SHORT: Record<string, string> = { meat: "Viande", fish: "Poisson", produce: "Fruits & Légumes" };
+  const natureOf = (cid: number | null) => { const c = cats.find((x) => x.id === cid); return c ? SHORT[c.code] ?? c.nameFr : null; };
   const firstDoc = p.documents?.[0] ?? (p.blNumber ? { type: "bl" as const, number: p.blNumber } : null);
   /** Référence du document (« BL 123 », « Facture 456 ») reprise sur les anomalies */
   // « Facture 123 du 12/11/26 » : type, numéro et date du document
@@ -148,25 +150,34 @@ async function writeContent(
     await tx.insert(schema.meatFishEntries).values({ kind, date: deliveryDay, product: l.productName, unit: l.unit, qty: String(qty), receptionId: recId, supplierName });
   }
 
-  // Écarts de pesée : produit au kg dont le poids pesé est inférieur au poids facturé,
-  // au-delà de la marge acceptée (10 g ou 0,10 €)
+  // Écarts de pesée : produit au kg dont le poids contrôlé diffère du poids facturé (en moins ou en plus),
+  // au-delà de la marge acceptée (10 g ou 0,10 €). Ces écarts vont uniquement dans Anomalies > Écarts pesées.
+  // Le détail, la réclamation et la perte acceptable déjà saisis sont conservés si le bon est modifié.
+  const oldGaps = await tx.select().from(schema.weighGaps).where(eq(schema.weighGaps.receptionId, recId));
   await tx.delete(schema.weighGaps).where(eq(schema.weighGaps.receptionId, recId));
   for (const l of p.lines) {
     if (unitName(l.unit) !== "Kg" || l.qtyOrdered == null || l.qtyReceived == null) continue;
     const gapQty = Math.round((l.qtyOrdered - l.qtyReceived) * 1000) / 1000;
     const gapAmount = l.unitPrice != null ? Math.round(gapQty * l.unitPrice * 10000) / 10000 : null;
-    if (gapQty <= 0.01 && (gapAmount == null || gapAmount <= 0.1)) continue;
-    if (gapQty <= 0) continue;
+    if (gapQty === 0) continue;
+    if (Math.abs(gapQty) <= 0.01 && (gapAmount == null || Math.abs(gapAmount) <= 0.1)) continue;
+    const prev = oldGaps.find((g) => g.product.toLowerCase() === l.productName.toLowerCase());
     await tx.insert(schema.weighGaps).values({
       date: deliveryDay,
-      nature: cats.find((c) => c.id === l.categoryId)?.nameFr ?? null,
+      nature: natureOf(l.categoryId),
       supplierRef: lineRef(l) ? `${supplierName} : ${lineRef(l)}` : supplierName,
+      supplierId,
+      productId: l.productId,
+      reference: lineRef(l),
       product: l.productName,
       qtyInvoiced: String(l.qtyOrdered),
       unitPrice: l.unitPrice != null ? String(l.unitPrice) : null,
       qtyWeighed: String(l.qtyReceived),
       gapQty: String(gapQty),
       gapAmount: gapAmount != null ? String(gapAmount) : null,
+      acceptableLoss: prev?.acceptableLoss ?? null,
+      detail: prev?.detail ?? null,
+      claimDate: prev?.claimDate ?? null,
       receptionId: recId,
     });
   }
@@ -293,7 +304,8 @@ async function writeContent(
       { qtyOrdered: l.qtyOrdered, qtyReceived: l.qtyReceived, temperature: l.temperature, dlc: l.dlc, categoryId: l.categoryId },
       cat ? { ...cat, conformMax: cat.conformMax, reserveMax: cat.reserveMax } : undefined,
       date,
-    ).issues.filter((i) => i !== "temp_missing");
+    ).issues.filter((i) => i !== "temp_missing" && !(unitName(l.unit) === "Kg" && (i === "qty_less" || i === "qty_more")));
+    // (au kg, un écart de poids va seulement dans Écarts pesées)
     if (l.decision === "conform" && detected.length && !keep.products.has(l.productName.toLowerCase())) {
       const first = detected[0];
       let detail = "";

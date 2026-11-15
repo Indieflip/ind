@@ -1,64 +1,122 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { updateWeighGapAction } from "@/lib/actions/anomalies";
+import { updateWeighGapAction, type WeighGapInput } from "@/lib/actions/anomalies";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtDate, fmtMoney } from "@/lib/format";
+import { Icon } from "@/components/Icon";
+import { MoneyInput } from "@/components/MoneyInput";
 import { DataTable, type Col } from "@/components/table/DataTable";
 
 export interface WeighRow {
-  id: number; date: string; dateSort: string; nature: string; supplier: string; product: string;
+  id: number; date: string; dateIso: string; nature: string; supplier: string; supplierId: number | null; reference: string;
+  product: string; original: string | null; rawProduct: string;
   qtyInvoiced: number | null; unitPrice: number | null; qtyWeighed: number | null; loss: number | null;
   gapQty: number | null; gapAmount: number | null; detail: string; claimDate: string; receptionId: number | null;
 }
 
 const kg = (n: number | null) => (n == null ? "" : n.toLocaleString("fr-FR", { maximumFractionDigits: 3 }));
+const NATURES = ["Viande", "Poisson", "Fruits & Légumes", "Crèmerie", "Épicerie", "Boisson", "Boulangerie", "Autre"];
 
-export function WeighTable({ rows, canEdit }: { rows: WeighRow[]; canEdit: boolean }) {
+export function WeighTable({ rows, canEdit, suppliers }: { rows: WeighRow[]; canEdit: boolean; suppliers: { id: number; name: string }[] }) {
   const { t, locale } = useI18n();
   const w = t.weigh;
   const [sel, setSel] = useState<Set<string | number>>(new Set());
+  const [edit, setEdit] = useState<WeighRow | null>(null);
   const picked = rows.filter((r) => sel.has(r.id));
   const total = (picked.length ? picked : rows).reduce((s, r) => s + (r.gapAmount ?? 0), 0);
+  const signed = (n: number | null) => (n == null ? "" : n < 0 ? <span className="text-sky-700">{kg(n)}</span> : kg(n));
   const cols: Col<WeighRow>[] = [
-    { key: "date", width: "5rem", label: w.date, text: (r) => r.date, sort: (r) => r.dateSort },
+    { key: "date", width: "4.75rem", label: w.date, text: (r) => r.date, sort: (r) => r.dateIso },
     { key: "nature", width: "4.5rem", label: w.nature, text: (r) => r.nature },
-    { key: "supplier", width: "9%", label: w.supplierRef, text: (r) => r.supplier, render: (r) => (r.receptionId ? <Link href={`/receptions/${r.receptionId}`} className="text-brand-700 hover:underline">{r.supplier}</Link> : r.supplier) },
-    { key: "product", width: "10%", label: t.common.product, text: (r) => r.product },
-    { key: "qtyInvoiced", width: "4.25rem", label: w.qtyInvoiced, align: "right", text: (r) => kg(r.qtyInvoiced), sort: (r) => r.qtyInvoiced, filterable: false },
-    { key: "unitPrice", width: "4.25rem", label: w.unitPrice, align: "right", text: (r) => (r.unitPrice != null ? fmtMoney(r.unitPrice, locale) : ""), sort: (r) => r.unitPrice, filterable: false },
-    { key: "qtyWeighed", width: "4.25rem", label: w.qtyWeighed, align: "right", text: (r) => kg(r.qtyWeighed), sort: (r) => r.qtyWeighed, filterable: false },
-    { key: "loss", width: "4.25rem", label: w.loss, align: "right", text: (r) => kg(r.loss), sort: (r) => r.loss, filterable: false, render: (r) => (canEdit ? <Cell row={r} field="acceptableLoss" value={r.loss != null ? String(r.loss).replace(".", ",") : ""} className="text-right" /> : kg(r.loss)) },
-    { key: "gapQty", width: "4.25rem", label: w.gapQty, align: "right", text: (r) => kg(r.gapQty), sort: (r) => r.gapQty, filterable: false },
-    { key: "gapAmount", width: "4.25rem", label: w.gapAmount, align: "right", text: (r) => (r.gapAmount != null ? fmtMoney(r.gapAmount, locale) : ""), sort: (r) => r.gapAmount, filterable: false, className: "font-semibold" },
-    { key: "detail", label: w.detail, text: (r) => r.detail, render: (r) => (canEdit ? <Cell row={r} field="detail" value={r.detail} multiline /> : r.detail) },
-    { key: "claim", width: "6rem", label: w.claim, text: (r) => (r.claimDate ? fmtDate(r.claimDate, locale) : ""), sort: (r) => r.claimDate, render: (r) => (canEdit ? <Cell row={r} field="claimDate" value={r.claimDate} type="date" /> : r.claimDate ? fmtDate(r.claimDate, locale) : "") },
+    { key: "supplier", width: "7%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => (r.supplierId ? <Link href={`/mercurial/fournisseurs/${r.supplierId}`} className="text-brand-700 hover:underline">{r.supplier}</Link> : r.supplier || "—") },
+    { key: "reference", width: "7%", label: t.anomalies.blInvoice, text: (r) => r.reference, render: (r) => (r.receptionId ? <Link href={`/receptions/${r.receptionId}`} className="text-brand-700 hover:underline">{r.reference || "—"}</Link> : r.reference || "—") },
+    { key: "product", width: "11%", label: t.common.product, text: (r) => r.product, render: (r) => <>{r.product}{r.original && <span className="block text-[11px] text-stone-400" title={t.maj.original}>{r.original}</span>}</> },
+    { key: "qtyInvoiced", width: "3.75rem", label: w.qtyInvoiced, align: "right", text: (r) => kg(r.qtyInvoiced), sort: (r) => r.qtyInvoiced, filterable: false },
+    { key: "unitPrice", width: "3.9rem", label: w.unitPrice, align: "right", text: (r) => (r.unitPrice != null ? fmtMoney(r.unitPrice, locale) : ""), sort: (r) => r.unitPrice, filterable: false },
+    { key: "qtyWeighed", width: "3.6rem", label: w.qtyWeighed, align: "right", text: (r) => kg(r.qtyWeighed), sort: (r) => r.qtyWeighed, filterable: false },
+    { key: "loss", width: "4.1rem", label: w.loss, align: "right", text: (r) => kg(r.loss), sort: (r) => r.loss, filterable: false },
+    { key: "gapQty", width: "3.6rem", label: w.gapQty, align: "right", text: (r) => kg(r.gapQty), sort: (r) => r.gapQty, filterable: false, render: (r) => signed(r.gapQty) },
+    { key: "gapAmount", width: "3.9rem", label: w.gapAmount, align: "right", text: (r) => (r.gapAmount != null ? fmtMoney(r.gapAmount, locale) : ""), sort: (r) => r.gapAmount, filterable: false, className: "font-semibold" },
+    { key: "detail", label: w.detail, text: (r) => r.detail, className: "whitespace-pre-line" },
+    { key: "claim", width: "4.75rem", label: w.claim, text: (r) => (r.claimDate ? fmtDate(r.claimDate, locale) : ""), sort: (r) => r.claimDate },
+    ...(canEdit
+      ? [{ key: "edit", width: "2rem", label: "", text: () => "", sortable: false, filterable: false, render: (r: WeighRow) => <button type="button" className="btn-ghost p-1.5" title={t.common.edit} onClick={() => setEdit(r)}><Icon name="edit" className="h-4 w-4" /></button> } as Col<WeighRow>]
+      : []),
   ];
   return (
     <>
       <div className="mb-2 text-sm text-stone-700">
         {w.total}{picked.length ? ` (${picked.length})` : ""} : <strong>{fmtMoney(total, locale)}</strong>
+        <span className="ml-3 text-xs text-stone-500">{w.signHint}</span>
       </div>
       <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} selectable selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} dense fixed />
+      {edit && <WeighEditor row={edit} suppliers={suppliers} onClose={() => setEdit(null)} />}
     </>
   );
 }
 
-/** Champ éditable enregistré à la sortie du champ */
-function Cell({ row, field, value, type = "text", className = "", multiline }: { row: WeighRow; field: "detail" | "claimDate" | "acceptableLoss"; value: string; type?: string; className?: string; multiline?: boolean }) {
-  const [v, setV] = useState(value);
+function WeighEditor({ row, suppliers, onClose }: { row: WeighRow; suppliers: { id: number; name: string }[]; onClose: () => void }) {
+  const { t } = useI18n();
+  const w = t.weigh;
+  const router = useRouter();
+  const s = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
+  const [v, setV] = useState({
+    date: row.dateIso, nature: row.nature, supplierId: row.supplierId ? String(row.supplierId) : "", reference: row.reference, product: row.rawProduct,
+    qtyInvoiced: s(row.qtyInvoiced), unitPrice: s(row.unitPrice), qtyWeighed: s(row.qtyWeighed), acceptableLoss: s(row.loss), detail: row.detail, claimDate: row.claimDate,
+  });
   const [pending, start] = useTransition();
-  const save = () => { if (v !== value) start(async () => { await updateWeighGapAction(row.id, { [field]: v }); }); };
-  if (multiline)
-    return <textarea rows={Math.min(4, Math.max(1, v.split("\n").length))} className={`w-full min-w-0 resize-y rounded border border-transparent bg-transparent px-1 py-0.5 text-xs hover:border-stone-300 focus:border-brand-500 focus:bg-white ${pending ? "opacity-50" : ""}`} value={v} onChange={(e) => setV(e.target.value)} onBlur={save} />;
+  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setV({ ...v, [k]: e.target.value });
+  const n = (x: string) => (x.trim() ? Number(x.replace(",", ".")) : null);
+  const gap = n(v.qtyInvoiced) != null && n(v.qtyWeighed) != null ? Math.round((n(v.qtyInvoiced)! - n(v.qtyWeighed)! - (n(v.acceptableLoss) ?? 0)) * 1000) / 1000 : null;
+  const input = (k: keyof typeof v, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
+    <label><span className="label">{label}</span><input className="input" value={v[k]} onChange={set(k)} {...props} /></label>
+  );
   return (
-    <input
-      type={type}
-      inputMode={field === "acceptableLoss" ? "decimal" : undefined}
-      className={`w-full min-w-0 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs hover:border-stone-300 focus:border-brand-500 focus:bg-white ${pending ? "opacity-50" : ""} ${className}`}
-      value={v}
-      onChange={(e) => setV(e.target.value)}
-      onBlur={save}
-    />
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 sm:items-center" onClick={onClose}>
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <h2 className="font-semibold">{w.editTitle}</h2>
+          <button className="btn-ghost p-1.5" onClick={onClose} aria-label={t.common.close}><Icon name="x" className="h-4 w-4" /></button>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {input("date", w.date, { type: "date" })}
+          <label><span className="label">{w.nature}</span><input className="input" list="weigh-natures" value={v.nature} onChange={set("nature")} /></label>
+          <datalist id="weigh-natures">{NATURES.map((x) => <option key={x} value={x} />)}</datalist>
+          <label>
+            <span className="label">{t.common.supplier}</span>
+            <select className="input" value={v.supplierId} onChange={set("supplierId")}>
+              <option value="">—</option>
+              {suppliers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+          </label>
+          {input("reference", t.anomalies.blInvoice)}
+          <div className="sm:col-span-2">{input("product", t.common.product)}</div>
+          {input("qtyInvoiced", w.qtyInvoiced, { inputMode: "decimal" })}
+          <label><span className="label">{w.unitPrice}</span><MoneyInput value={v.unitPrice} onChange={set("unitPrice")} /></label>
+          {input("qtyWeighed", w.qtyWeighed, { inputMode: "decimal" })}
+          {input("acceptableLoss", w.loss, { inputMode: "decimal" })}
+          <p className="text-sm text-stone-600 sm:col-span-2">{w.gapQty} : <strong>{gap == null ? "—" : gap.toLocaleString("fr-FR", { maximumFractionDigits: 3 })}</strong>{gap != null && n(v.unitPrice) != null && <> · {w.gapAmount} : <strong>{(gap * n(v.unitPrice)!).toLocaleString("fr-FR", { style: "currency", currency: "EUR" })}</strong></>}</p>
+          <label className="sm:col-span-2"><span className="label">{w.detail}</span><textarea className="input" rows={2} value={v.detail} onChange={set("detail")} /></label>
+          {input("claimDate", w.claim, { type: "date" })}
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button className="btn-secondary" onClick={onClose}>{t.common.cancel}</button>
+          <button
+            className="btn-primary"
+            disabled={pending}
+            onClick={() => start(async () => {
+              const data: WeighGapInput = { ...v, supplierId: v.supplierId ? Number(v.supplierId) : null };
+              await updateWeighGapAction(row.id, data);
+              onClose();
+              router.refresh();
+            })}
+          >
+            {t.common.save}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

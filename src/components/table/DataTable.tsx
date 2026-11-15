@@ -20,7 +20,7 @@ export function SortTh({ label, active, dir, onClick, align }: { label: string; 
   const { t } = useI18n();
   return (
     <th className={align === "right" ? "text-right" : align === "center" ? "text-center" : ""}>
-      <button type="button" onClick={onClick} className={`inline-flex items-center gap-1 text-left hover:text-stone-900 ${align === "right" ? "flex-row-reverse text-right" : ""}`} title={active && dir === "asc" ? t.receptions.sortDesc : t.receptions.sortAsc}>
+      <button type="button" onClick={onClick} className={`inline-flex items-start gap-1 text-left hover:text-stone-900 ${align === "right" ? "flex-row-reverse text-right" : ""}`} title={active && dir === "asc" ? t.receptions.sortDesc : t.receptions.sortAsc}>
         {label}
         <span className={`text-[10px] ${active ? "text-brand-600" : "text-stone-300"}`}>{active ? (dir === "asc" ? "▲" : "▼") : "▲▼"}</span>
       </button>
@@ -71,7 +71,7 @@ export function DataTable<R>({
     <div className="card overflow-hidden">
       <ActiveFilters filters={tb.filters} labels={Object.fromEntries(cols.map((c) => [c.key, c.label]))} onChange={tb.setFilter} onReset={tb.reset} count={tb.filtered.length} total={rows.length} />
       <div className={`${maxHeight} min-h-48 overflow-auto`}>
-        <table className={`table ${dense ? "text-xs [&_th]:text-xs" : ""} ${fixed ? "table-fixed [&_td]:break-words [&_td]:px-1.5 [&_th]:px-1.5" : ""}`}>
+        <table className={`table ${dense ? "text-xs [&_th]:text-xs" : ""} ${fixed ? "table-fixed [&_td]:break-words [&_td]:px-1.5 [&_th]:px-1.5 [&_thead_tr:first-child_th]:whitespace-normal [&_thead_tr:first-child_th]:text-left [&_thead_tr:first-child_th]:align-top [&_thead_tr:first-child_th]:font-bold [&_thead_tr:first-child_th]:text-stone-800" : ""}`}>
           {(fixed || cols.some((c) => c.width)) && (
             <colgroup>
               {selectable && <col style={{ width: "2rem" }} />}
@@ -94,9 +94,9 @@ export function DataTable<R>({
               )}
               {cols.map((c) =>
                 c.sortable === false ? (
-                  <th key={c.key} className={c.align === "right" ? "text-right" : ""}>{c.label}</th>
+                  <th key={c.key} className={c.align === "right" && !fixed ? "text-right" : ""}>{c.label}</th>
                 ) : (
-                  <SortTh key={c.key} label={c.label} align={c.align} active={tb.sort?.key === c.key} dir={tb.sort?.dir} onClick={() => tb.toggleSort(c.key)} />
+                  <SortTh key={c.key} label={c.label} align={fixed ? undefined : c.align} active={tb.sort?.key === c.key} dir={tb.sort?.dir} onClick={() => tb.toggleSort(c.key)} />
                 ),
               )}
               <th className="w-px" />

@@ -190,6 +190,27 @@ const tares = "## Liste des contenants (tares)\nPoids des contenants à déduire
   }
 }
 
+// Format de date de l'établissement : JJ/MM/AA (les dates écrites en JJ/MM/AAAA dans les textes sont raccourcies)
+{
+  const fix = [["maj_log", ["reference", "detail", "claim", "item"]], ["anomalies", ["reference", "description", "follow_up", "result"]], ["weigh_gaps", ["supplier_ref", "detail", "reference"]], ["reception_notes", ["text"]]];
+  for (const [table, cols] of fix) {
+    for (const c of cols) {
+      await db.execute(sql.raw(`update ${table} set ${c} = regexp_replace(${c}, '(\\d{1,2})/(\\d{1,2})/(19|20)(\\d{2})(?!\\d)', '\\1/\\2/\\4', 'g') where ${c} ~ '\\d{1,2}/\\d{1,2}/(19|20)\\d{2}'`));
+    }
+  }
+}
+
+// Nature courte des anomalies et écarts de pesée (comme le fichier de suivi)
+for (const [from, to] of [["Viandes, volailles, charcuterie", "Viande"], ["Poissons et fruits de mer", "Poisson"], ["Fruits et légumes", "Fruits & Légumes"]]) {
+  await db.execute(sql`update anomalies set nature = ${to} where nature = ${from}`);
+  await db.execute(sql`update weigh_gaps set nature = ${to} where nature = ${from}`);
+}
+
+// N° des anomalies déjà consolidées (définitif, unique, dans l'ordre des dates)
+await db.execute(sql`with base as (select coalesce(max(number), 0) as m from anomalies),
+  todo as (select id, row_number() over (order by consolidated_at, created_at, id) as rn from anomalies where consolidated_at is not null and number is null)
+  update anomalies a set number = base.m + todo.rn from todo, base where a.id = todo.id`);
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

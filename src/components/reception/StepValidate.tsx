@@ -1,5 +1,6 @@
 "use client";
 import { useI18n } from "@/lib/i18n/client";
+import { fmtDate, fmtDateTime } from "@/lib/format";
 import type { Catalog, Draft } from "@/lib/reception-types";
 import { decisionStyles } from "../DecisionBadge";
 import { docNumbers, docsOf, lineDoc, needsDlc, needsTemp, priceGap } from "./helpers";
@@ -36,8 +37,8 @@ export function StepValidate({
         <p className="mb-3 text-xs text-stone-500">{w.recapHint}</p>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <div><dt className="text-stone-500">{t.common.supplier}</dt><dd className="font-semibold">{dash(draft.supplierName)}</dd></div>
-          <div><dt className="text-stone-500">{w.dateTime}</dt><dd className="font-medium">{draft.deliveredAt.replace("T", " ")}</dd></div>
-          <div className="col-span-2"><dt className="text-stone-500">{w.docType}</dt><dd className="font-medium">{docsOf(draft).filter((x) => x.number.trim()).map((x) => `${w.docTypes[x.type]} ${x.number}`).join(" · ") || "—"}</dd></div>
+          <div><dt className="text-stone-500">{w.dateTime}</dt><dd className="font-medium">{fmtDateTime(draft.deliveredAt)}</dd></div>
+          <div className="col-span-2"><dt className="text-stone-500">{w.docType}</dt><dd className="font-medium">{docsOf(draft).filter((x) => x.number.trim()).map((x) => `${w.docTypes[x.type]} ${x.number}${x.date ? ` du ${fmtDate(x.date)}` : ""}`).join(" · ") || "—"}</dd></div>
           <div><dt className="text-stone-500">{w.driverName}</dt><dd className="font-medium">{dash(draft.driverName)}</dd></div>
           <div><dt className="text-stone-500">{t.receptions.truckTemp}</dt><dd className="font-medium">{draft.truckTemp ? `${draft.truckTemp} °C` : "—"}</dd></div>
           <div><dt className="text-stone-500">{t.receptions.vehicleClean}</dt><dd className="font-medium">{draft.vehicleClean == null ? "—" : draft.vehicleClean ? t.common.yes : t.common.no}</dd></div>
@@ -63,7 +64,7 @@ export function StepValidate({
                     <td className="py-1.5 pr-2 font-medium">{l.productName}</td>
                     <td className="px-1 text-right tabular-nums">{dash(l.qtyReceived)}{l.qtyOrdered && l.qtyOrdered !== l.qtyReceived ? ` / ${l.qtyOrdered}` : ""} {l.unit}</td>
                     <td className="px-1 text-right tabular-nums">{dash(l.temperature)}</td>
-                    <td className="px-1 whitespace-nowrap">{l.dlc ? l.dlc.split("-").reverse().join("/") : "—"}</td>
+                    <td className="px-1 whitespace-nowrap">{l.dlc ? fmtDate(l.dlc) : "—"}</td>
                     <td className="px-1 text-right tabular-nums">{dash(l.unitPrice)}</td>
                     <td className="pl-1">{l.decision ? <span className={`badge ${decisionStyles[l.decision].badge}`}>{t.decision[l.decision]}</span> : <span className="badge bg-amber-100 text-amber-900">{w.toDecide}</span>}</td>
                   </tr>

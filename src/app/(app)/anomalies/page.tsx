@@ -45,9 +45,14 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
       .leftJoin(schema.suppliers, eq(schema.suppliers.id, a.supplierId)),
   ]);
   const extra = new Map(docs.map((d) => [d.id, d]));
+  // N° : définitif une fois consolidée ; avant, numéro provisoire (suite des numéros, par date)
+  const maxNum = consolidated.reduce((m, c) => Math.max(m, c.a.number ?? 0), 0);
+  const provisional = new Map([...active].sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime() || x.id - y.id).map((x, i) => [x.id, maxNum + i + 1]));
   const day = today();
   const toRow = (x: typeof active[number]) => ({
     id: x.id,
+    number: x.number ?? provisional.get(x.id) ?? null,
+    numberFinal: x.number != null,
     date: fmtDate(x.createdAt, locale),
     dateSort: x.createdAt.toISOString(),
     nature: x.nature ?? "",

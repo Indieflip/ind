@@ -3,6 +3,7 @@ import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { bestMatch } from "@/lib/fuzzy";
 import { nameKey, normalize } from "@/lib/search";
+import { shortDates } from "@/lib/format";
 import { getSetting, setSetting } from "@/lib/settings";
 
 type Row = typeof schema.majLog.$inferSelect;
@@ -42,6 +43,10 @@ const COUNTRIES: [string, RegExp][] = [
   ["PANAMA", /\bpanama\b/], ["COSTA RICA", /\bcosta rica\b/], ["TURQUIE", /\bturquie\b/], ["ARGENTINE", /\bargentine\b/], ["PORTUGAL", /\bportugal\b/],
   ["PAYS-BAS", /\b(pays bas|hollande)\b/], ["ALLEMAGNE", /\ballemagne\b/], ["SENEGAL", /\bsenegal\b/], ["ECOSSE", /\becosse\b/], ["NORVEGE", /\bnorvege\b/],
   ["THAILANDE", /\bthailande\b/], ["ISRAEL", /\bisrael\b/], ["EGYPTE", /\begypte\b/], ["AFRIQUE DU SUD", /\b(afrique du sud|sud africaine)\b/],
+  ["CROATIE", /\bcroatie\b/], ["GRECE", /\bgrece\b/], ["IRLANDE", /\birlande\b/], ["ROYAUME-UNI", /\b(royaume uni|angleterre|uk)\b/], ["DANEMARK", /\bdanemark\b/],
+  ["POLOGNE", /\bpologne\b/], ["HONGRIE", /\bhongrie\b/], ["ISLANDE", /\bislande\b/], ["VIETNAM", /\bvietnam\b/], ["INDE", /\binde\b/], ["CHINE", /\bchine\b/],
+  ["MADAGASCAR", /\bmadagascar\b/], ["COTE D'IVOIRE", /\bcote d ivoire\b/], ["TUNISIE", /\btunisie\b/], ["ALGERIE", /\balgerie\b/], ["ETATS-UNIS", /\b(etats unis|usa)\b/],
+  ["CANADA", /\bcanada\b/], ["AUSTRALIE", /\baustralie\b/], ["JAPON", /\bjapon\b/], ["URUGUAY", /\buruguay\b/], ["IRAN", /\biran\b/], ["NIGERIA", /\bnigeria\b/],
   ["CHILI", /\bchili\b/], ["BRESIL", /\bbresil\b/], ["MEXIQUE", /\bmexique\b/], ["COLOMBIE", /\bcolombie\b/], ["NOUVELLE-ZELANDE", /\bnouvelle zelande\b/],
 ];
 const countriesOf = (s: string) => { const n = normalize(s); return COUNTRIES.filter(([, re]) => re.test(n)).map(([c]) => c); };
@@ -73,6 +78,7 @@ export function cleanReference(ref: string | null, supplierKeys: string[]) {
   }
   s = out.join(" ").replace(/\bbond? de livraison\b/gi, "BL").replace(/\bfacture\b/gi, "Facture").replace(/^[\s:/-]+|[\s:/-]+$/g, "").replace(/\s+/g, " ");
   s = s.replace(/\(\s*\)/g, "").trim();
+  s = shortDates(s);
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : ref;
 }
 
@@ -124,12 +130,12 @@ export async function normalizeMajLog() {
         const need = digits(item);
         const origin = countriesOf(item);
         const sameNumbers = (x: { name: string }) => { const have = new Set(digits(x.name)); return need.every((d) => have.has(d)); };
-        const sameOrigin = (x: { name: string }) => { const c = countriesOf(x.name); return !origin.length || !c.length || c.some((k) => origin.includes(k)); };
+        const sameOrigin = (x: { name: string }) => { const c = countriesOf(x.name); return !origin.length || c.some((k) => origin.includes(k)); };
         const own = supplierId ? products.filter((p) => p.supplierId === supplierId) : [];
         const exact = own.find((p) => normalize(p.name) === n) ?? products.find((p) => normalize(p.name) === n);
         let p =
           exact ??
-          (own.length ? bestMatch(item, own.filter((x) => sameNumbers(x) && sameOrigin(x)), (x) => x.name, 0.6) : undefined) ??
+          (own.length ? bestMatch(item, own.filter((x) => sameNumbers(x) && sameOrigin(x)), (x) => x.name, 0.7) : undefined) ??
           bestMatch(item, products.filter((x) => sameNumbers(x) && sameOrigin(x)), (x) => x.name, 0.8);
         if (!p && own.length && origin.length) {
           // Même produit, autre origine (« Courgette … ESP » / « Courgette … (ITALIE) ») : nouveau produit au mercurial
@@ -166,9 +172,9 @@ export async function normalizeMajLog() {
 
 /** Une seule fois sur les données déjà importées (relancé à chaque évolution de la règle) */
 export async function ensureMajNormalized() {
-  if (await getSetting("maj_normalized_v3")) return;
+  if (await getSetting("maj_normalized_v4")) return;
   await normalizeMajLog();
-  await setSetting("maj_normalized_v3", "1");
+  await setSetting("maj_normalized_v4", "1");
 }
 
 /** Rapprochement d'un texte (« Supviande », « Giney's », « Producteur Réunis »…) avec la liste des fournisseurs */
@@ -201,4 +207,50 @@ export async function ensureAnomaliesLinked() {
     }
   }
   await setSetting("anomalies_linked_v1", "1");
+}
+
+type ProductLite = { id: number; name: string; supplierId: number };
+
+/** Produit du mercurial correspondant à un libellé (mêmes nombres et même origine exigés pour un rapprochement approché) */
+export function matchProduct(item: string, supplierId: number | null, products: ProductLite[]) {
+  const n = normalize(item);
+  if (!n) return undefined;
+  const digits = (x: string) => normalize(x).split(" ").filter((w) => /\d/.test(w)).map((w) => w.replace(/(gr|g|kg|ml|cl|l|u|x)$/, ""));
+  const need = digits(item);
+  const origin = countriesOf(item);
+  const ok = (x: { name: string }) => {
+    const have = new Set(digits(x.name));
+    const c = countriesOf(x.name);
+    return need.every((d) => have.has(d)) && (!origin.length || c.some((k) => origin.includes(k)));
+  };
+  const own = supplierId ? products.filter((p) => p.supplierId === supplierId) : [];
+  return (
+    own.find((p) => normalize(p.name) === n) ??
+    products.find((p) => normalize(p.name) === n) ??
+    (own.length ? bestMatch(item, own.filter(ok), (x) => x.name, 0.7) : undefined) ??
+    bestMatch(item, products.filter(ok), (x) => x.name, 0.8)
+  );
+}
+
+/**
+ * Écarts de pesée repris du fichier : fournisseur et produit rattachés aux listes du mercurial,
+ * colonne BL / Facture sans le nom du fournisseur.
+ */
+export async function linkWeighGaps(force = false) {
+  if (!force && (await getSetting("weigh_linked_v2"))) return;
+  const db = getDb();
+  const m = await supplierMatcher();
+  const products = await db.select({ id: schema.products.id, name: schema.products.name, supplierId: schema.products.supplierId }).from(schema.products);
+  const rows = await db.select().from(schema.weighGaps);
+  for (const g of rows) {
+    const [sup, ...rest] = (g.supplierRef ?? "").split(/\s+:\s+/);
+    const supplierId = g.supplierId ?? m.find(sup) ?? m.find(g.supplierRef);
+    const reference = g.reference ?? (cleanReference(rest.join(" : "), m.keys) || null);
+    // Les lignes venues d'un bon gardent le produit du bon ; les autres sont rapprochées à nouveau
+    const productId = g.receptionId && g.productId ? g.productId : matchProduct(g.product, supplierId, products)?.id ?? null;
+    if (supplierId !== g.supplierId || reference !== g.reference || productId !== g.productId) {
+      await db.update(schema.weighGaps).set({ supplierId, reference, productId }).where(eq(schema.weighGaps.id, g.id));
+    }
+  }
+  await setSetting("weigh_linked_v2", "1");
 }

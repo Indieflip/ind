@@ -9,6 +9,7 @@ import { fmtDate, fmtDateTime, fmtMoney, fmtNum, fmtPct, num } from "@/lib/forma
 import { checkPrice } from "@/lib/pricing";
 import { StatusBadge, decisionStyles } from "@/components/DecisionBadge";
 import { Icon } from "@/components/Icon";
+import { receptionNumbers } from "@/lib/server/queries";
 import { PrintButton, DeleteReceptionButton, ConsolidateOneButton, AddNote } from "./Actions";
 
 const isPdf = (url: string) => /\.pdf($|\?)/i.test(url) || url.startsWith("data:application/pdf");
@@ -45,6 +46,8 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
     return c ? (locale === "en" ? c.nameEn : c.nameFr) : "—";
   };
   const blPhotos = photos.filter((p) => p.kind === "bl");
+  const docs = ((rec.documents as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[] | null) ?? (rec.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : [])) as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[];
+  const seq = (await receptionNumbers()).get(rec.id);
   const showPrices = can.viewPrices(user.role) || can.receive(user.role);
 
   return (
@@ -74,35 +77,81 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
         </div>
       )}
 
-      <section className="card p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-stone-500">{t.receptions.detail}</p>
-            <h1 className="text-2xl font-bold">{rec.supplierName}</h1>
-            <p className="text-sm text-stone-600">{fmtDateTime(rec.deliveredAt, locale)}</p>
+      {/* Partie administrative : en-tête, documents, livraison, véhicule, traçabilité */}
+      <section className="card overflow-hidden">
+        <div className="flex flex-wrap items-start justify-between gap-4 bg-gradient-to-r from-brand-700 to-brand-600 px-5 py-4 text-white">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/70">{t.receptions.detail} · {t.receptions.numberLong} {seq ?? "—"}</p>
+            <h1 className="mt-0.5 text-2xl font-bold leading-tight">{rec.supplierName}</h1>
+            <p className="mt-1 flex items-center gap-1.5 text-sm text-white/85"><Icon name="truck" className="h-4 w-4" /> {fmtDateTime(rec.deliveredAt, locale)}</p>
           </div>
-          <StatusBadge status={rec.status} label={t.receptionStatus[rec.status]} />
+          <div className="flex flex-col items-end gap-2">
+            <span className="rounded-full bg-white px-1 py-0.5"><StatusBadge status={rec.status} label={t.receptionStatus[rec.status]} /></span>
+            {showPrices && total > 0 && (
+              <div className="text-right">
+                <p className="text-[11px] uppercase tracking-wide text-white/70">{t.receptions.total}</p>
+                <p className="text-xl font-bold tabular-nums">{fmtMoney(total, locale)}</p>
+              </div>
+            )}
+          </div>
         </div>
-        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
-          <div className="col-span-2">
-            <dt className="text-stone-500">{t.wizard.docType}</dt>
-            <dd className="font-semibold">
-              {((rec.documents as { type: "bl" | "facture" | "autre"; number: string }[] | null) ?? (rec.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : []))
-                .map((d) => `${t.wizard.docTypes[d.type]} ${d.number}`)
-                .join(" · ") || "—"}
-            </dd>
+
+        <div className="grid gap-px bg-stone-200 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="bg-white p-4">
+            <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-stone-500"><Icon name="file" className="h-4 w-4" /> {t.receptions.documents}</h2>
+            {docs.length === 0 ? <p className="text-sm text-stone-500">{t.receptions.noBl}</p> : (
+              <ul className="space-y-1.5">
+                {docs.map((d) => (
+                  <li key={d.number} className="flex flex-wrap items-center gap-1.5 text-sm">
+                    <span className={`badge ${d.type === "facture" ? "bg-sky-100 text-sky-800" : d.type === "autre" ? "bg-stone-100 text-stone-700" : "bg-brand-50 text-brand-800"}`}>{t.wizard.docTypes[d.type]}</span>
+                    <span className="font-semibold">{d.number}</span>
+                    {d.date && <span className="text-xs text-stone-500">{t.receptions.docOf} {fmtDate(d.date, locale)}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {blPhotos.length > 0 && <p className="mt-2 text-xs text-stone-500">📎 {blPhotos.length} {t.receptions.attached}</p>}
           </div>
-          <div><dt className="text-stone-500">{t.receptions.driver}</dt><dd className="font-medium">{rec.driverName ?? "—"}</dd></div>
-          <div><dt className="text-stone-500">{t.receptions.truckTemp}</dt><dd className="font-medium">{rec.truckTemp != null ? `${fmtNum(rec.truckTemp, locale, 1)} °C` : "—"}</dd></div>
-          <div><dt className="text-stone-500">{t.receptions.vehicleClean}</dt><dd className="font-medium">{rec.vehicleClean == null ? "—" : rec.vehicleClean ? t.common.yes : t.common.no}</dd></div>
-          <div><dt className="text-stone-500">{t.receptions.createdBy}</dt><dd className="font-medium">{author?.name ?? "—"}</dd></div>
-          {rec.updatedAt && (
-            <div><dt className="text-stone-500">{t.receptions.editedOn}</dt><dd className="font-medium">{fmtDateTime(rec.updatedAt, locale)}{editor ? ` ${t.receptions.editedBy} ${editor.name}` : ""}</dd></div>
-          )}
-          {showPrices && total > 0 && (
-            <div><dt className="text-stone-500">{t.receptions.total}</dt><dd className="font-semibold">{fmtMoney(total, locale)}</dd></div>
-          )}
-        </dl>
+
+          <div className="bg-white p-4">
+            <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-stone-500"><Icon name="truck" className="h-4 w-4" /> {t.receptions.delivery}</h2>
+            <dl className="space-y-1.5 text-sm">
+              <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.wizard.dateTime}</dt><dd className="text-right font-medium">{fmtDateTime(rec.deliveredAt, locale)}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.driver}</dt><dd className="text-right font-medium">{rec.driverName ?? "—"}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.signature}</dt><dd className="text-right font-medium">{rec.signatureUrl ? `✓ ${rec.signerName ?? ""}` : "—"}</dd></div>
+            </dl>
+          </div>
+
+          <div className="bg-white p-4">
+            <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-stone-500"><Icon name="thermo" className="h-4 w-4" /> {t.receptions.vehicle}</h2>
+            <div className="flex flex-wrap gap-2">
+              <div className={`flex-1 rounded-lg px-3 py-2 ${rec.truckTemp == null ? "bg-stone-50 text-stone-500" : rec.truckTemp > 4 ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-800"}`}>
+                <p className="text-[11px] font-semibold uppercase">{t.receptions.truckTemp}</p>
+                <p className="text-lg font-bold tabular-nums">{rec.truckTemp != null ? `${fmtNum(rec.truckTemp, locale, 1)} °C` : "—"}</p>
+              </div>
+              <div className={`flex-1 rounded-lg px-3 py-2 ${rec.vehicleClean == null ? "bg-stone-50 text-stone-500" : rec.vehicleClean ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"}`}>
+                <p className="text-[11px] font-semibold uppercase">{t.receptions.vehicleClean}</p>
+                <p className="text-lg font-bold">{rec.vehicleClean == null ? "—" : rec.vehicleClean ? t.common.yes : t.common.no}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4">
+            <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-stone-500"><Icon name="check" className="h-4 w-4" /> {t.receptions.summary}</h2>
+            <div className="mb-2 grid grid-cols-3 gap-1.5 text-center">
+              {(["conform", "reserve", "refuse"] as const).map((d) => (
+                <div key={d} className={`rounded-lg py-1.5 ${decisionStyles[d].badge}`}>
+                  <p className="text-lg font-bold leading-none">{lines.filter((l) => l.decision === d).length}</p>
+                  <p className="text-[10px] font-semibold">{t.decision[d]}</p>
+                </div>
+              ))}
+            </div>
+            <dl className="space-y-1 text-xs">
+              <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.createdBy}</dt><dd className="text-right font-medium">{author?.name ?? "—"}</dd></div>
+              {rec.updatedAt && <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.editedOn}</dt><dd className="text-right font-medium">{fmtDateTime(rec.updatedAt, locale)}{editor ? ` · ${editor.name}` : ""}</dd></div>}
+            </dl>
+          </div>
+        </div>
       </section>
 
       {/* Mobile : une carte par produit */}

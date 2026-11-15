@@ -3,12 +3,12 @@ import { unitName } from "@/lib/units";
 import ExcelJS from "exceljs";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { num } from "@/lib/format";
+import { num, shortDates } from "@/lib/format";
 import { nameKey, normalize } from "@/lib/search";
 import { categoryCodeFromNature } from "@/lib/nature";
 import { setSetting } from "@/lib/settings";
 import { syncFvProducts } from "./fv";
-import { cleanReference, normalizeMajLog, supplierMatcher } from "./maj";
+import { cleanReference, linkWeighGaps, normalizeMajLog, supplierMatcher } from "./maj";
 
 type Cell = string | number | Date | null;
 
@@ -137,7 +137,7 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
       if (sheets.info === false) wsInfo = undefined;
       const control = { weighGaps: 0, anomalies: 0, protocols: [] as string[] };
       const headerIndex = (rows: Cell[][], first: string) => rows.findIndex((r) => normalize(String(r[0] ?? "")) === normalize(first));
-      const multiline = (c: Cell) => (text(c) ?? "").replace(/^"+|"+$/g, "").trim();
+      const multiline = (c: Cell) => shortDates((text(c) ?? "").replace(/^"+|"+$/g, "").trim());
 
       if (wsGap) {
         const rows = rowsOf(wsGap, 12);
@@ -158,6 +158,7 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
           await tx.delete(schema.weighGaps).where(isNull(schema.weighGaps.receptionId));
           for (let k = 0; k < gaps.length; k += 200) await tx.insert(schema.weighGaps).values(gaps.slice(k, k + 200));
         });
+        await linkWeighGaps(true);
         control.weighGaps = gaps.length;
       }
 
@@ -359,7 +360,7 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
         }
       });
       await normalizeMajLog();
-      await setSetting("maj_normalized_v3", "1");
+      await setSetting("maj_normalized_v4", "1");
       report.maj = rows.length;
     }
   }

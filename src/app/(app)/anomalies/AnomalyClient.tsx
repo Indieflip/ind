@@ -71,7 +71,7 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
 }
 
 export interface AnomalyRow {
-  id: number; date: string; dateSort: string; nature: string; supplier: string; supplierId: number | null; reference: string; product: string; problem: string;
+  id: number; number: number | null; numberFinal: boolean; date: string; dateSort: string; nature: string; supplier: string; supplierId: number | null; reference: string; product: string; problem: string;
   action: string; lastActionAt: string; result: string; saving: number | null; status: string; statusLabel: string;
   type: string; nextActionAt: string; due: boolean; receptionId: number | null; photoUrl: string | null; consolidated?: string;
 }
@@ -88,6 +88,10 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
   const due = rows.filter((r) => r.due);
   const totalSaving = [...rows, ...consolidated].reduce((s, r) => s + (r.saving ?? 0), 0);
   const cols: Col<AnomalyRow>[] = [
+    {
+      key: "number", width: "3.25rem", label: a.number, text: (r) => (r.number != null ? String(r.number) : ""), sort: (r) => r.number,
+      render: (r) => (r.number == null ? "—" : r.numberFinal ? <strong>{r.number}</strong> : <span className="italic text-stone-400" title={a.provisional}>{r.number}</span>),
+    },
     { key: "date", width: "5.25rem", label: a.deliveryDate, text: (r) => r.date, sort: (r) => r.dateSort, className: "" },
     { key: "nature", width: "4.5rem", label: a.nature, text: (r) => r.nature },
     { key: "supplier", width: "7.5%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => (r.supplierId ? <Link className="text-brand-700 hover:underline" href={`/mercurial/fournisseurs/${r.supplierId}`}>{r.supplier}</Link> : r.supplier) },
@@ -151,6 +155,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
             <Icon name="layers" className="h-4 w-4" /> {a.consolidate} {sel.size > 0 && `(${sel.size})`}
           </button>
         )}
+        <span className="text-xs italic text-stone-400">{a.provisional}</span>
         <span className="text-stone-500">{rows.length} {a.openCount} · {a.saving} : {fmtMoney(totalSaving, locale)}</span>
       </div>
       <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} empty={a.empty} selectable={canConsolidate} selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} dense fixed rowClassName={(r) => (r.due ? "bg-red-50/60" : "")} />

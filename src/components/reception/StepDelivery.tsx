@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/lib/i18n/client";
 import type { Catalog, DocRef, Draft } from "@/lib/reception-types";
 import { docsOf } from "./helpers";
+import { fmtDate } from "@/lib/format";
 import { appConfirm } from "../Confirm";
 import { Icon } from "../Icon";
 import { matches } from "./helpers";
@@ -214,7 +215,7 @@ function DocDuplicate({ draft, editId, number, others }: { draft: Draft; editId?
     <p className="col-span-2 rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-800">
       {twice ? w.docTwice : (
         <>
-          {w.docUsed} {dup!.seq ? `n° ${dup!.seq}` : ""} {w.docUsedOf} {new Date(dup!.deliveredAt).toLocaleDateString(locale === "en" ? "en-GB" : "fr-FR")}.{" "}
+          {w.docUsed} {dup!.seq ? `n° ${dup!.seq}` : ""} {w.docUsedOf} {fmtDate(dup!.deliveredAt, locale)}.{" "}
           <Link href={`/receptions/${dup!.receptionId}`} target="_blank" className="font-semibold underline">{w.docOpen}</Link>
         </>
       )}
