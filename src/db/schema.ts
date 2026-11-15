@@ -304,6 +304,24 @@ export const bakeryEntries = pgTable(
   (t) => [uniqueIndex("bakery_reception_idx").on(t.receptionId), index("bakery_date_idx").on(t.date)],
 );
 
+/** Suivi des kg facturés de viande et de poisson (Mercurial > Viande et Poisson) */
+export const meatFishEntries = pgTable(
+  "meat_fish_entries",
+  {
+    id: serial("id").primaryKey(),
+    kind: text("kind").notNull(), // viande | poisson
+    date: date("date").notNull(),
+    product: text("product").notNull(),
+    unit: text("unit"),
+    qty: numeric("qty", { precision: 12, scale: 3 }).notNull(),
+    /** Ligne de bon d'origine (null = importé du fichier) */
+    receptionId: integer("reception_id").references(() => receptions.id, { onDelete: "cascade" }),
+    supplierName: text("supplier_name"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("mf_kind_date_idx").on(t.kind, t.date), index("mf_reception_idx").on(t.receptionId)],
+);
+
 /** Protocoles (ex. Process pèse), modifiables par l'administrateur */
 export const protocols = pgTable("protocols", {
   id: serial("id").primaryKey(),

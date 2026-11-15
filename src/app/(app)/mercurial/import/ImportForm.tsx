@@ -45,6 +45,7 @@ export function ImportForm() {
           {r.maj != null && <p>{x.maj} : {r.maj} {x.lines}</p>}
           {r.fv != null && <p>{x.fv} : {r.fv} {x.lines}{r.fvLocked ? ` (${r.fvLocked} 🔒)` : ""}</p>}
           {r.bakery && <p>{x.bakery} : {r.bakery.days} {x.days}</p>}
+          {r.meatFish && <p>{r.meatFish.kind === "viande" ? t.meatFish.meat : t.meatFish.fish} {r.meatFish.year} : {r.meatFish.entries} {x.mfEntries}, {r.meatFish.products} {x.mfProducts}, {r.meatFish.months} {x.mfMonths}</p>}
           {r.lockedList && <p>{x.locked} : {r.lockedList.matched} / {r.lockedList.listed} {x.lockedMatched}</p>}
           {r.missing.length > 0 && <p className="text-amber-700">{x.missing} : {r.missing.join(", ")}</p>}
         </div>

@@ -20,7 +20,7 @@ export async function importExcelAction(_p: { report?: ImportReport; error?: str
     });
     await getDb().insert(schema.imports).values({
       fileName: file.name,
-      products: report.mercurial?.fileProducts ?? null,
+      products: report.mercurial?.fileProducts ?? report.meatFish?.products ?? null,
       suppliers: report.mercurial?.fileSuppliers ?? null,
       details: report,
       createdBy: user.id,

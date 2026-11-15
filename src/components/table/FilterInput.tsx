@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { suggest } from "@/lib/search";
 import { useI18n } from "@/lib/i18n/client";
 
@@ -10,6 +10,25 @@ import { useI18n } from "@/lib/i18n/client";
 export function FilterInput({ value, onChange, options = [], placeholder }: { value: string; onChange: (v: string) => void; options?: string[]; placeholder?: string }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number; width: number; up: boolean } | null>(null);
+  // La liste s'affiche par-dessus la page (position fixe) : jamais coupée par le cadre d'un petit tableau
+  useEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = box.current?.getBoundingClientRect();
+      if (!r) return;
+      const up = window.innerHeight - r.bottom < 260 && r.top > 260;
+      setPos({ left: r.left, top: up ? r.top - 4 : r.bottom + 4, width: r.width, up });
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open]);
   // Plusieurs choix possibles : « choix 1|choix 2|texte en cours »
   const parts = value.split("|");
   const chips = parts.slice(0, -1).filter(Boolean);
@@ -21,7 +40,7 @@ export function FilterInput({ value, onChange, options = [], placeholder }: { va
     return text ? suggest(pool, text, 50) : open ? pool.slice(0, 300) : [];
   }, [options, text, chips, open]);
   return (
-    <div className="relative min-w-0">
+    <div className="relative min-w-0" ref={box}>
       <div className="flex min-h-[1.9rem] flex-wrap items-center gap-1 rounded-lg border border-stone-300 bg-white py-0.5 pl-1 pr-6 focus-within:border-brand-500">
         {chips.map((c, i) => (
           <span key={c} className="inline-flex max-w-full items-center gap-0.5 rounded bg-brand-50 px-1.5 py-0.5 text-[11px] font-medium text-brand-700">
@@ -55,8 +74,11 @@ export function FilterInput({ value, onChange, options = [], placeholder }: { va
           ×
         </button>
       )}
-      {open && list.length > 0 && (
-        <ul className="absolute left-0 z-30 mt-1 max-h-64 w-max min-w-full max-w-72 overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 text-left text-xs font-normal normal-case shadow-lg">
+      {open && list.length > 0 && pos && (
+        <ul
+          className="fixed z-[80] max-h-64 w-max max-w-72 overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 text-left text-xs font-normal normal-case shadow-lg"
+          style={{ left: pos.left, minWidth: Math.max(pos.width, 160), ...(pos.up ? { bottom: window.innerHeight - pos.top } : { top: pos.top }) }}
+        >
           {list.map((o) => (
             <li key={o}>
               {/* Choisir une valeur l'ajoute (sélection multiple) */}

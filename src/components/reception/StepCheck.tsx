@@ -9,6 +9,7 @@ import { fmtMoney, fmtPct } from "@/lib/format";
 import { decisionStyles } from "../DecisionBadge";
 import { Icon } from "../Icon";
 import { UnitSelect } from "../UnitSelect";
+import { similarity } from "@/lib/fuzzy";
 import { PhotoButton, Thumbs } from "./PhotoButton";
 import { evaluate, isBakerySupplier, lineFromProduct, matches, priceCheck, suggestedReason, withAutoDecision } from "./helpers";
 
@@ -39,6 +40,7 @@ export function StepCheck({
           key={l.key}
           line={l}
           catalog={catalog}
+          supplierId={draft.supplierId}
           onChange={(patch) => updateLine(l.key, patch)}
           onRemove={async () => await appConfirm(t.wizard.removeLineConfirm) && setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
         />
@@ -51,17 +53,25 @@ export function StepCheck({
 function LineCard({
   line,
   catalog,
+  supplierId,
   onChange,
   onRemove,
 }: {
   line: DraftLine;
   catalog?: Catalog;
+  supplierId: number | null;
   onChange: (patch: Partial<DraftLine>) => void;
   onRemove: () => void;
 }) {
   const { t, locale } = useI18n();
   const cat = catalog?.categories.find((c) => c.id === line.categoryId);
   const ev = evaluate(line, catalog);
+  const [swap, setSwap] = useState(false);
+  const [swapQ, setSwapQ] = useState("");
+  const swapResults = useMemo(
+    () => (catalog && swapQ.trim().length >= 2 ? catalog.products.filter((p) => p.supplierId === supplierId && matches(p.name, swapQ)).slice(0, 8) : []),
+    [catalog, swapQ, supplierId],
+  );
   const pc = priceCheck(line);
   const lo = line.mercurialMin ?? line.mercurialPrice;
   const hi = line.mercurialPrice ?? line.mercurialMin;
@@ -80,7 +90,10 @@ function LineCard({
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="min-w-0">
           {line.productId ? (
-            <h3 className="font-semibold leading-tight">{line.productName}</h3>
+            <h3 className="font-semibold leading-tight">
+              {line.productName}
+              <button type="button" className="ml-2 text-xs font-normal text-brand-700 underline" onClick={() => setSwap((v) => !v)}>{t.wizard.changeProduct}</button>
+            </h3>
           ) : (
             <input className="input py-1.5 font-semibold" value={line.productName} placeholder={t.wizard.productName} onChange={(e) => onChange({ productName: e.target.value })} />
           )}
@@ -104,6 +117,31 @@ function LineCard({
           <Icon name="trash" className="h-4 w-4" />
         </button>
       </div>
+
+      {swap && (
+        <div className="mb-3 rounded-lg border border-brand-200 bg-brand-50 p-2">
+          <p className="mb-1 text-xs text-stone-600">{t.wizard.changeProductHint}</p>
+          <input className="input py-1.5 text-sm" autoFocus value={swapQ} placeholder={t.wizard.searchProduct} onChange={(e) => setSwapQ(e.target.value)} />
+          <ul className="mt-1 max-h-48 overflow-y-auto">
+            {swapResults.map((p) => (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  className="flex w-full justify-between px-2 py-1.5 text-left text-sm hover:bg-white"
+                  onClick={() => {
+                    // On remplace le produit, les quantités, température, DLC, lot et prix saisis sont gardés
+                    onChange({ productId: p.id, productName: p.name, unit: p.unit, categoryId: p.categoryId, mercurialPrice: p.price, mercurialMin: p.priceMin, priceLocked: p.locked });
+                    setSwap(false);
+                    setSwapQ("");
+                  }}
+                >
+                  <span>{p.name}</span><span className="text-xs text-stone-500">{p.unit}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-2">
         {field("qtyOrdered", t.wizard.ordered, { inputMode: "decimal" })}
@@ -187,6 +225,15 @@ function AddProduct({ draft, setDraft, catalog }: { draft: Draft; setDraft: (fn:
   const [q, setQ] = useState("");
   const [custom, setCustom] = useState<null | { name: string; unit: string; categoryId: string }>(null);
 
+  // Produits proches déjà au mercurial du fournisseur : évite de créer un doublon
+  const similar = useMemo(() => {
+    if (!custom || custom.name.trim().length < 3 || !catalog) return [];
+    return catalog.products
+      .filter((p) => p.supplierId === draft.supplierId)
+      .filter((p) => matches(p.name, custom.name) || similarity(p.name, custom.name) >= 0.4)
+      .slice(0, 5);
+  }, [custom, catalog, draft.supplierId]);
+
   const results = useMemo(() => {
     if (!catalog || q.trim().length < 2) return [];
     const own = catalog.products.filter((p) => p.supplierId === draft.supplierId && matches(p.name, q));
@@ -239,6 +286,29 @@ function AddProduct({ draft, setDraft, catalog }: { draft: Draft; setDraft: (fn:
             </select>
           </div>
           <p className="text-xs text-stone-500">{t.common.supplier} : <strong>{draft.supplierName}</strong></p>
+          {similar.length > 0 && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-sm">
+              <p className="mb-1 text-xs font-semibold text-amber-900">{t.mercurial.similarTitle}</p>
+              <ul className="space-y-1">
+                {similar.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-2">
+                    <span>{p.name} <span className="text-xs text-stone-500">({p.unit})</span></span>
+                    <button
+                      type="button"
+                      className="btn-secondary px-2 py-1 text-xs"
+                      onClick={() => {
+                        setDraft((d) => ({ ...d, lines: [...d.lines, lineFromProduct(p)] }));
+                        setCustom(null);
+                        setQ("");
+                      }}
+                    >
+                      {t.mercurial.similarUse}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="flex gap-2">
             <button type="button" className="btn-ghost flex-1" onClick={() => setCustom(null)}>{t.common.cancel}</button>
             <button
@@ -252,7 +322,7 @@ function AddProduct({ draft, setDraft, catalog }: { draft: Draft; setDraft: (fn:
                 setQ("");
               }}
             >
-              {t.common.add}
+              {similar.length ? t.mercurial.createAnyway : t.common.add}
             </button>
           </div>
         </div>

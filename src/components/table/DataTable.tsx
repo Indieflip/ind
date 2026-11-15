@@ -65,7 +65,7 @@ export function DataTable<R>({
   return (
     <div className="card overflow-hidden">
       <ActiveFilters filters={tb.filters} labels={Object.fromEntries(cols.map((c) => [c.key, c.label]))} onChange={tb.setFilter} onReset={tb.reset} count={tb.filtered.length} total={rows.length} />
-      <div className={`${maxHeight} overflow-auto`}>
+      <div className={`${maxHeight} min-h-48 overflow-auto`}>
         <table className={`table ${dense ? "text-xs [&_th]:text-xs" : ""}`}>
           <thead className="sticky top-0 z-10">
             <tr>

@@ -50,6 +50,13 @@
       "when": 1794711047760,
       "tag": "0006_conformity_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794738739250,
+      "tag": "0007_meat_fish",
+      "breakpoints": true
     }
   ]
 }

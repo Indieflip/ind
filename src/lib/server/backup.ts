@@ -33,7 +33,7 @@ export async function buildBackup(): Promise<{ buffer: Buffer; fileName: string 
     prods.map(({ p, s }) => [s, p.nature, p.name, p.unit, num(p.priceMin), num(p.price), p.priceLocked, p.active, !!p.fvItemId]));
 
   const sup = await db.select().from(schema.suppliers).orderBy(asc(schema.suppliers.name));
-  sheet("Fournisseurs", ["Fournisseur", "E-mail", "Téléphone", "Notes", "Actif"], sup.map((s) => [s.name, s.email, s.phone, s.notes, s.active]));
+  sheet("Fournisseurs", ["Fournisseur", "Mail", "Téléphone", "Notes", "Actif"], sup.map((s) => [s.name, s.email, s.phone, s.notes, s.active]));
 
   const pc = await db.select().from(schema.priceChanges).orderBy(desc(schema.priceChanges.date));
   sheet("Suivi des prix", ["Date", "Fournisseur", "Produit", "Unité", "Ancien", "Nouveau", "%", "Type", "Origine", "Réf. facture", "Réclamation"],

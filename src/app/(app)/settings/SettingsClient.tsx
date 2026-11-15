@@ -1,7 +1,7 @@
 "use client";
 import { appConfirm, appAlert } from "@/components/Confirm";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { addUserAction, changePasswordAction, updateConformityAction, deleteUserAction, updateUserProfileAction, saveBackupSettingsAction, saveRightsAction, setRestaurantAction, updateCategoryAction, updateUserAction } from "@/lib/actions/settings";
+import { addUserAction, changePasswordAction, setCompanyFieldAction, updateConformityAction, deleteUserAction, updateUserProfileAction, saveBackupSettingsAction, saveRightsAction, setRestaurantAction, updateCategoryAction, updateUserAction } from "@/lib/actions/settings";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/client";
@@ -278,5 +278,46 @@ export function ConformityRow({ c }: { c: { id: number; name: string; conformRul
       {area("reserveRules", "bg-amber-50/40")}
       {area("refuseRules", "bg-red-50/40")}
     </tr>
+  );
+}
+
+type CompanyKey = "company_legal_name" | "restaurant_name" | "company_address" | "company_phone" | "company_email";
+
+/** Onglet Company : enregistrement de chaque champ en quittant le champ */
+export function CompanyForm({ initial }: { initial: Record<CompanyKey, string> }) {
+  const { t } = useI18n();
+  const s = t.settings;
+  const [, start] = useTransition();
+  const [state, setState] = useState<Record<string, "saved" | "error" | undefined>>({});
+  const field = (key: CompanyKey, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
+    <label className="block">
+      <span className="label">
+        {label}
+        {state[key] === "saved" && <Icon name="check" className="ml-1 inline h-4 w-4 text-emerald-600" />}
+        {state[key] === "error" && <span className="ml-1 text-xs text-red-600">{t.backup.emailInvalid}</span>}
+      </span>
+      <input
+        className="input"
+        defaultValue={initial[key]}
+        onBlur={(e) => {
+          if (e.target.value === initial[key]) return;
+          start(async () => {
+            const r = await setCompanyFieldAction(key, e.target.value);
+            setState((x) => ({ ...x, [key]: r.ok ? "saved" : "error" }));
+            if (r.ok) initial[key] = e.target.value;
+          });
+        }}
+        {...props}
+      />
+    </label>
+  );
+  return (
+    <div className="grid max-w-3xl gap-3 sm:grid-cols-2">
+      {field("company_legal_name", s.legalName, { placeholder: "SAS New York New York" })}
+      {field("restaurant_name", s.restaurantName)}
+      <div className="sm:col-span-2">{field("company_address", s.address, { placeholder: "1 Boulevard de la Croisette, 06400 Cannes" })}</div>
+      {field("company_phone", s.phone, { type: "tel", placeholder: "04 93 00 00 00" })}
+      {field("company_email", s.contactEmail, { type: "email", placeholder: "contact@exemple.fr" })}
+    </div>
   );
 }

@@ -29,6 +29,8 @@ export function StepDelivery({ draft, setDraft, catalog }: { draft: Draft; setDr
               <Icon name="search" className="pointer-events-none absolute left-3 top-3 h-5 w-5 text-stone-400" />
               <input className="input pl-10" placeholder={t.wizard.searchSupplier} value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
+            {!catalog && <p className="mt-2 animate-pulse text-sm text-stone-500">{t.common.loading}</p>}
+            {catalog && (
             <ul className="mt-2 max-h-72 divide-y divide-stone-100 overflow-y-auto rounded-lg border border-stone-200">
               {suppliers.map((s) => (
                 <li key={s.id}>
@@ -65,6 +67,7 @@ export function StepDelivery({ draft, setDraft, catalog }: { draft: Draft; setDr
                 </button>
               </li>
             </ul>
+            )}
           </>
         )}
         {draft.otherSupplier && !picking && (

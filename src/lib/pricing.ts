@@ -30,7 +30,8 @@ export function checkPrice(price: number | null | undefined, ref: PriceRef): Pri
   const r = normalizeRef(ref);
   if (!r) return { kind: "new" };
   if (price > r.max + EPS) return ref.locked ? { kind: "locked", bound: r.max, pct: pct(price, r.max) } : { kind: "increase", bound: r.max, pct: pct(price, r.max) };
-  if (price < r.min - EPS) return ref.locked ? { kind: "locked", bound: r.min, pct: pct(price, r.min) } : { kind: "decrease", bound: r.min, pct: pct(price, r.min) };
+  // Prix bloqué : seul un tarif SUPÉRIEUR au prix bloqué est une anomalie ; un tarif inférieur est accepté
+  if (price < r.min - EPS) return ref.locked ? { kind: "ok" } : { kind: "decrease", bound: r.min, pct: pct(price, r.min) };
   return { kind: "ok" };
 }
 

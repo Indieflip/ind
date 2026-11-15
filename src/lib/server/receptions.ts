@@ -1,5 +1,6 @@
 import "server-only";
 import { unitName } from "@/lib/units";
+import { normalize } from "@/lib/search";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
@@ -118,6 +119,21 @@ async function writeContent(
     await tx.insert(schema.receptionPhotos).values({ receptionId: recId, kind: "bl", url });
   }
 
+  // Suivi Viande / Poisson : kg facturés des produits de ces catégories, à la date de livraison
+  await tx.delete(schema.meatFishEntries).where(eq(schema.meatFishEntries.receptionId, recId));
+  const cats = await tx.select({ id: schema.categories.id, code: schema.categories.code }).from(schema.categories);
+  const kindOf = (cid: number | null) => {
+    const code = cats.find((c) => c.id === cid)?.code;
+    return code === "meat" ? "viande" : code === "fish" ? "poisson" : null;
+  };
+  const deliveryDay = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(date);
+  for (const l of p.lines) {
+    const kind = kindOf(l.categoryId);
+    const qty = l.qtyOrdered ?? l.qtyReceived; // quantité facturée (BL / facture)
+    if (!kind || qty == null || qty === 0 || l.decision === "refuse") continue;
+    await tx.insert(schema.meatFishEntries).values({ kind, date: deliveryDay, product: l.productName, unit: l.unit, qty: String(qty), receptionId: recId, supplierName });
+  }
+
   // Suivi boulangerie : une ligne par bon (date de livraison)
   await tx.delete(schema.bakeryEntries).where(eq(schema.bakeryEntries.receptionId, recId));
   const b = p.bakery;
@@ -139,9 +155,9 @@ async function writeContent(
 
     if (!product) {
       // Produit hors liste : on le cherche chez ce fournisseur, sinon on l'ajoute au mercurial
-      product = await tx.query.products.findFirst({
-        where: and(eq(schema.products.supplierId, supplierId), eq(sql`lower(${schema.products.name})`, l.productName.toLowerCase())),
-      });
+      // (accents, majuscules et ponctuation ignorés pour ne pas créer de doublon)
+      const sameSupplier = await tx.select().from(schema.products).where(eq(schema.products.supplierId, supplierId));
+      product = sameSupplier.find((x) => normalize(x.name) === normalize(l.productName));
       if (!product) {
         [product] = await tx
           .insert(schema.products)

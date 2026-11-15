@@ -1,6 +1,6 @@
 "use client";
 import { MoneyInput } from "@/components/MoneyInput";
-import { appConfirm } from "@/components/Confirm";
+import { appAlert, appConfirm } from "@/components/Confirm";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -12,6 +12,8 @@ import { fmtMoney } from "@/lib/format";
 import { Icon } from "@/components/Icon";
 import { UnitSelect } from "@/components/UnitSelect";
 import { NatureSelect } from "@/components/NatureSelect";
+import { matches } from "@/lib/search";
+import { similarity } from "@/lib/fuzzy";
 import { SupplierCombo } from "@/components/SupplierCombo";
 import { ActiveFilters, FilterInput, Pager, ResetFilters } from "@/components/table/FilterInput";
 import { useTable, type ColumnDef } from "@/components/table/useTable";
@@ -25,7 +27,7 @@ interface Row {
   fv: boolean;
 }
 
-export function AddRow({ suppliers, units, natures, fixedSupplier }: { suppliers: Opt[]; units: string[]; natures: string[]; fixedSupplier?: Opt }) {
+export function AddRow({ suppliers, units, natures, fixedSupplier, existing = [] }: { suppliers: Opt[]; units: string[]; natures: string[]; fixedSupplier?: Opt; existing?: { supplierId: number; name: string }[] }) {
   const { t } = useI18n();
   const m = t.mercurial;
   const router = useRouter();
@@ -34,11 +36,21 @@ export function AddRow({ suppliers, units, natures, fixedSupplier }: { suppliers
   const [unit, setUnit] = useState(units[0] ?? "Kg");
   const [natureKey, setNatureKey] = useState(0);
   const [supplierKey] = useState(0);
+  const [name, setName] = useState("");
+  // Produits proches chez ce fournisseur : avertit avant de créer un doublon
+  const similar = useMemo(
+    () =>
+      supplierId && name.trim().length >= 3
+        ? existing.filter((e) => String(e.supplierId) === supplierId && (matches(e.name, name) || similarity(e.name, name) >= 0.4)).slice(0, 5)
+        : [],
+    [existing, supplierId, name],
+  );
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (state?.ok) {
       const keep = supplierId; // on garde le fournisseur pour enchaîner les saisies
       ref.current?.reset();
+      setName("");
       setSupplierId(keep);
       setNatureKey((k) => k + 1);
       (ref.current?.querySelector('input[name="name"]') as HTMLInputElement | null)?.focus();
@@ -67,7 +79,16 @@ export function AddRow({ suppliers, units, natures, fixedSupplier }: { suppliers
           />
           )}
         </div>
-        <label><span className="label">{m.products} *</span><input name="name" className="input" required /></label>
+        <label className="relative">
+          <span className="label">{m.products} *</span>
+          <input name="name" className="input" required value={name} onChange={(e) => setName(e.target.value)} />
+          {similar.length > 0 && (
+            <div className="absolute left-0 right-0 z-20 mt-1 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs shadow">
+              <p className="mb-1 font-semibold text-amber-900">{m.similarTitle}</p>
+              <ul className="list-disc pl-4 text-stone-700">{similar.map((x) => <li key={x.name}>{x.name}</li>)}</ul>
+            </div>
+          )}
+        </label>
         <label><span className="label">{t.common.unit} *</span><UnitSelect name="unit" value={unit} units={units} onChange={setUnit} required /></label>
         <label><span className="label">{m.priceMin}</span><MoneyInput name="priceMin" /></label>
         <label><span className="label">{m.priceMax}</span><MoneyInput name="price" /></label>
@@ -167,10 +188,9 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
         <label className="flex items-center gap-2">
           <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} /> {m.showInactive}
         </label>
-        <span className="text-stone-500">{tb.active ? "" : `${tb.filtered.length} ${m.count}`}{editable && ` · ${m.priceTraced}`}</span>
+        <span className="text-stone-500">{tb.filtered.length} {m.count}{editable && ` · ${m.priceTraced}`}</span>
       </div>
       <div className="card overflow-hidden">
-        <ActiveFilters filters={tb.filters} labels={Object.fromEntries(Object.entries(labels).map(([k, v]) => [k, v[0]]))} onChange={tb.setFilter} onReset={tb.reset} count={tb.filtered.length} total={base.length} unit={m.count} />
         <div className="max-h-[75vh] overflow-y-auto">
           <table className="table">
             <colgroup>
@@ -207,7 +227,12 @@ function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; supp
   const [edit, setEdit] = useState(false);
   const [pending, start] = useTransition();
   const [unit, setUnit] = useState(r.unit);
-  const save = (data: Parameters<typeof updateMercurialRowAction>[1]) => start(() => updateMercurialRowAction(r.id, data));
+  const save = (data: Parameters<typeof updateMercurialRowAction>[1]) =>
+    start(async () => {
+      const res = await updateMercurialRowAction(r.id, data);
+      // Modification refusée : elle créerait un doublon chez ce fournisseur
+      if (res && "error" in res && res.error === "exists") await appAlert(m.duplicateEdit);
+    });
   const str = (n: number | null) => (n != null ? String(n).replace(".", ",") : "");
 
   if (!edit) {

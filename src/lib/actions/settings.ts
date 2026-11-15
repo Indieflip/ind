@@ -124,3 +124,16 @@ export async function updateConformityAction(id: number, data: { conformRules?: 
   revalidatePath("/settings/reglementation", "layout");
   revalidatePath("/protocoles");
 }
+
+const COMPANY_KEYS = ["company_legal_name", "restaurant_name", "company_address", "company_phone", "company_email"] as const;
+
+/** Champs de l'onglet Company (raison sociale, établissement, adresse, téléphone, mail) */
+export async function setCompanyFieldAction(key: string, value: string) {
+  await assertUser((r) => r === "admin");
+  if (!(COMPANY_KEYS as readonly string[]).includes(key)) return { error: "invalid" };
+  const v = value.trim();
+  if (key === "company_email" && v && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return { error: "email" };
+  await setSetting(key, v);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}

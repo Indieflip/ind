@@ -1,7 +1,7 @@
 import "server-only";
 import { unitName } from "@/lib/units";
 import ExcelJS from "exceljs";
-import { eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { num } from "@/lib/format";
 import { nameKey, normalize } from "@/lib/search";
@@ -58,6 +58,7 @@ export interface ImportReport {
   fvLocked?: number;
   bakery?: { days: number; prices: Record<string, number | null> };
   lockedList?: { listed: number; matched: number };
+  meatFish?: { kind: string; year: number; entries: number; products: number; months: number };
   missing: string[];
 }
 
@@ -66,6 +67,59 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
   await wb.xlsx.load(buffer);
   const report: ImportReport = { missing: [] };
   const db = getDb();
+
+  // ---------- Suivi Viande / Poisson : « Suivi des réceptions de viandes|poisson - 2026 »
+  {
+    const intro = wb.worksheets[0] ? rowsOf(wb.worksheets[0], 3).flat().map((c) => String(c ?? "")).join(" ") : "";
+    const m = /suivi des r[ée]ceptions de (viande|poisson)s?\s*-?\s*(20\d\d)?/i.exec(intro);
+    if (m) {
+      const kind = normalize(m[1]).startsWith("viande") ? "viande" : "poisson";
+      const year = Number(m[2]) || new Date().getFullYear();
+      const MONTHS = ["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout", "septembre", "octobre", "novembre", "decembre"];
+      const entries: { date: string; product: string; unit: string | null; qty: number }[] = [];
+      let months = 0;
+      for (const ws of wb.worksheets) {
+        const mi = MONTHS.findIndex((x) => normalize(ws.name).startsWith(x));
+        if (mi < 0) continue;
+        months++;
+        const rows = rowsOf(ws, 40);
+        // Ligne d'en-tête : numéros des jours ; un ou deux blocs (1→17 puis 18→31)
+        const hi = rows.findIndex((r) => r.filter((c) => typeof c === "number" && c >= 1 && c <= 31 && Number.isInteger(c)).length >= 10);
+        if (hi < 0) continue;
+        const header = rows[hi];
+        const segments: { start: number; cols: { col: number; day: number }[] }[] = [];
+        for (let c = 0; c < header.length; c++) {
+          const v = header[c];
+          if (typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 31) {
+            const last = segments[segments.length - 1];
+            if (last && last.cols[last.cols.length - 1].col === c - 1) last.cols.push({ col: c, day: v });
+            else segments.push({ start: c, cols: [{ col: c, day: v }] });
+          }
+        }
+        for (const r of rows.slice(hi + 1)) {
+          for (const seg of segments) {
+            const product = text(r[seg.start - 2]);
+            if (!product || product.startsWith("-")) continue;
+            const unit = text(r[seg.start - 1]);
+            for (const { col, day } of seg.cols) {
+              const q = price(r[col]);
+              if (q == null || q === 0) continue;
+              const d = new Date(Date.UTC(year, mi, day));
+              if (d.getUTCMonth() !== mi) continue;
+              entries.push({ date: d.toISOString().slice(0, 10), product, unit: unitName(unit) || null, qty: q });
+            }
+          }
+        }
+      }
+      await db.transaction(async (tx) => {
+        await tx.delete(schema.meatFishEntries).where(and(eq(schema.meatFishEntries.kind, kind), isNull(schema.meatFishEntries.receptionId), sql`extract(year from ${schema.meatFishEntries.date}) = ${year}`));
+        for (const e of entries) await tx.insert(schema.meatFishEntries).values({ kind, date: e.date, product: e.product, unit: e.unit, qty: String(e.qty) });
+      });
+      report.meatFish = { kind, year, entries: entries.length, products: new Set(entries.map((e) => normalize(e.product))).size, months };
+      return report;
+    }
+  }
+
 
   // ---------- Mercurial : Fournisseur | Service | Nature | Produits | Unite | - | +
   if (sheets.mercurial) {

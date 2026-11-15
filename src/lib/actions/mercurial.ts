@@ -8,6 +8,7 @@ import { can } from "@/lib/permissions";
 import { num } from "@/lib/format";
 import { priceDiffPct } from "@/lib/rules";
 import { categoryCodeFromNature } from "@/lib/nature";
+import { normalize } from "@/lib/search";
 
 async function categoryIdFor(nature: string | null) {
   const code = categoryCodeFromNature(nature);
@@ -46,10 +47,9 @@ export async function addMercurialRowAction(_p: R, form: FormData): Promise<R> {
     supplierId = found?.id ?? (await db.insert(schema.suppliers).values({ name: newSupplier }).returning())[0].id;
   }
   if (!supplierId || !name || !unit) return { error: "invalid" };
-  const dup = await db.query.products.findFirst({
-    where: and(eq(schema.products.supplierId, supplierId), eq(sql`lower(${schema.products.name})`, name.toLowerCase())),
-  });
-  if (dup) return { error: "exists" };
+  // Doublon : même fournisseur, même nom à l'accent / la majuscule / la ponctuation près
+  const same = await db.select({ id: schema.products.id, name: schema.products.name }).from(schema.products).where(eq(schema.products.supplierId, supplierId));
+  if (same.some((x) => normalize(x.name) === normalize(name))) return { error: "exists" };
   await db.insert(schema.products).values({
     supplierId, name, unit, categoryId, service, nature, priceLocked,
     price: price != null ? String(price) : null,
@@ -67,10 +67,17 @@ export async function updateMercurialRowAction(
   const user = await assertUser(can.editMercurial);
   const db = getDb();
   const product = await db.query.products.findFirst({ where: eq(schema.products.id, id) });
-  if (!product) return;
+  if (!product) return { error: "not_found" };
   const set: Partial<typeof schema.products.$inferInsert> = {};
   if (data.supplierId) set.supplierId = data.supplierId;
   if (data.name?.trim()) set.name = data.name.trim();
+  // Modification qui créerait un doublon chez le fournisseur : refusée
+  if (set.name || set.supplierId) {
+    const sid = set.supplierId ?? product.supplierId;
+    const nm = set.name ?? product.name;
+    const same = await db.select({ id: schema.products.id, name: schema.products.name }).from(schema.products).where(eq(schema.products.supplierId, sid));
+    if (same.some((x) => x.id !== id && normalize(x.name) === normalize(nm))) return { error: "exists" };
+  }
   if (data.unit?.trim()) set.unit = await ensureUnit(data.unit);
   if (data.service !== undefined) set.service = data.service.trim() || null;
   if (data.priceLocked !== undefined) set.priceLocked = data.priceLocked;
@@ -108,6 +115,7 @@ export async function updateMercurialRowAction(
   if (Object.keys(set).length) await db.update(schema.products).set(set).where(eq(schema.products.id, id));
   refresh();
   revalidatePath("/prices");
+  return { ok: true };
 }
 
 export async function setProductActiveAction(id: number, active: boolean) {

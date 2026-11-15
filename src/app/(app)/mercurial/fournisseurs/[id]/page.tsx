@@ -76,7 +76,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
           {editable && (
             <SupplierInfo id={supplier.id} name={supplier.name} email={supplier.email ?? ""} phone={supplier.phone ?? ""} notes={supplier.notes ?? ""} active={supplier.active} />
           )}
-          {editable && <AddRow suppliers={allSuppliers} units={units} natures={natures} fixedSupplier={{ id: supplier.id, name: supplier.name }} />}
+          {editable && <AddRow suppliers={allSuppliers} units={units} natures={natures} fixedSupplier={{ id: supplier.id, name: supplier.name }} existing={rows.filter((r) => r.active).map((r) => ({ supplierId: r.supplierId, name: r.name }))} />}
           <h2 className="pt-2 text-lg font-semibold">{t.suppliers.productList}</h2>
           <MercurialTable rows={rows} suppliers={allSuppliers} units={units} natures={natures} editable={editable} />
         </>
