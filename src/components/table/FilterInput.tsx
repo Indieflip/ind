@@ -20,7 +20,7 @@ export function FilterInput({ value, onChange, options = [], placeholder }: { va
     return text ? suggest(pool, text, 8) : open ? pool.slice(0, 8) : [];
   }, [options, text, chips, open]);
   return (
-    <div className="relative min-w-24">
+    <div className="relative min-w-0">
       <div className="flex min-h-[1.9rem] flex-wrap items-center gap-1 rounded-lg border border-stone-300 bg-white py-0.5 pl-1 pr-6 focus-within:border-brand-500">
         {chips.map((c, i) => (
           <span key={c} className="inline-flex max-w-full items-center gap-0.5 rounded bg-brand-50 px-1.5 py-0.5 text-[11px] font-medium text-brand-700">
@@ -29,7 +29,8 @@ export function FilterInput({ value, onChange, options = [], placeholder }: { va
           </span>
         ))}
         <input
-          className="min-w-10 flex-1 bg-transparent px-1 py-0.5 text-xs font-normal outline-none"
+          size={1}
+          className="w-0 min-w-8 flex-1 bg-transparent px-1 py-0.5 text-xs font-normal outline-none"
           value={text}
           placeholder={chips.length ? "" : placeholder ?? t.table.filter}
           onChange={(e) => { set(chips, e.target.value); setOpen(true); }}
@@ -74,7 +75,7 @@ export function FilterInput({ value, onChange, options = [], placeholder }: { va
 export function ResetFilters({ onClick, active }: { onClick: () => void; active: boolean }) {
   const { t } = useI18n();
   return (
-    <button type="button" className={`btn px-2 py-1 text-xs ${active ? "bg-stone-800 text-white hover:bg-stone-900" : "border border-stone-200 bg-white text-stone-400"}`} disabled={!active} onClick={onClick}>
+    <button type="button" className={`btn px-1.5 py-1 text-[11px] ${active ? "bg-stone-800 text-white hover:bg-stone-900" : "border border-stone-200 bg-white text-stone-400"}`} disabled={!active} onClick={onClick}>
       {t.table.reset}
     </button>
   );
@@ -99,6 +100,48 @@ export function Pager({ page, pages, total, pageSize, onPage }: { page: number; 
         <button type="button" className="btn-secondary px-2 py-1 text-xs" disabled={page >= pages - 1} onClick={() => onPage(page + 1)}>›</button>
         <span className="ml-2">{t.table.page}</span>
       </div>
+    </div>
+  );
+}
+
+/** Résultat du filtrage : nombre de lignes et filtres actifs (cliquer × pour en retirer un) */
+export function ActiveFilters({
+  filters,
+  labels,
+  onChange,
+  onReset,
+  count,
+  total,
+  unit,
+}: {
+  filters: Record<string, string>;
+  labels: Record<string, string>;
+  onChange: (key: string, v: string) => void;
+  onReset: () => void;
+  count: number;
+  total: number;
+  unit?: string;
+}) {
+  const { t } = useI18n();
+  const active = Object.entries(filters).flatMap(([k, v]) =>
+    v.split("|").map((x) => x.trim()).filter(Boolean).map((term) => ({ k, term, all: v })),
+  );
+  if (!active.length) return null;
+  const remove = (k: string, term: string, all: string) =>
+    onChange(k, all.split("|").filter((x) => x.trim() !== term).join("|").replace(/^\|+|\|+$/g, ""));
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-brand-100 bg-brand-50 px-3 py-2 text-sm">
+      <strong className="text-brand-800">{count} {unit ?? t.table.results}</strong>
+      <span className="text-xs text-stone-500">/ {total}</span>
+      <span className="text-stone-300">|</span>
+      {active.map(({ k, term, all }) => (
+        <span key={k + term} className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-white px-2 py-0.5 text-xs">
+          <span className="text-stone-500">{labels[k] ?? k} :</span>
+          <strong className="text-stone-800">{term}</strong>
+          <button type="button" className="text-stone-400 hover:text-red-600" aria-label={t.table.clear} onClick={() => remove(k, term, all)}>×</button>
+        </span>
+      ))}
+      <button type="button" className="ml-auto text-xs font-semibold text-brand-700 underline" onClick={onReset}>{t.table.reset}</button>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 import { MoneyInput } from "@/components/MoneyInput";
 import { appConfirm } from "@/components/Confirm";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { FilterInput, Pager, ResetFilters } from "@/components/table/FilterInput";
+import { ActiveFilters, FilterInput, Pager, ResetFilters } from "@/components/table/FilterInput";
 import { useTable, type ColumnDef } from "@/components/table/useTable";
 import { addFvAction, deleteFvAction, updateFvAction } from "@/lib/actions/fv";
 import { useI18n } from "@/lib/i18n/client";
@@ -16,6 +16,8 @@ const money = (n: number | null | undefined) => (n == null ? "" : `${cell(n)} �
 export function FvTable({ rows, months, currentMonth, editable }: { rows: Row[]; months: string[]; currentMonth: number; editable: boolean }) {
   const { t } = useI18n();
   const [lockedOnly, setLockedOnly] = useState(false);
+  const [view, setView] = useState<number>(currentMonth >= 0 ? currentMonth : new Date().getMonth());
+  const shownMonths = view === -1 ? months.map((_, i) => i) : [view];
   const cols: ColumnDef<Row>[] = useMemo(
     () => [
       { key: "supplier", text: (r) => r.supplier },
@@ -43,41 +45,49 @@ export function FvTable({ rows, months, currentMonth, editable }: { rows: Row[];
         <label className="flex items-center gap-2 rounded bg-sky-50 px-2 py-1 text-sky-900">
           <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={lockedOnly} onChange={(e) => setLockedOnly(e.target.checked)} /> 🔒 {t.mercurial.lockedOnly}
         </label>
+        <label className="flex items-center gap-2">
+          {t.fv.month}
+          <select className="input w-48 py-1.5" value={view} onChange={(e) => setView(Number(e.target.value))}>
+            {months.map((m, i) => <option key={m} value={i}>{m.charAt(0).toUpperCase() + m.slice(1)}{i === currentMonth ? ` (${t.fv.current})` : ""}</option>)}
+            <option value={-1}>{t.fv.allMonths}</option>
+          </select>
+        </label>
         <span className="text-stone-500">{tb.filtered.length} / {rows.length} {t.mercurial.count}</span>
       </div>
       <div className="card overflow-hidden">
-        <div className="max-h-[75vh] overflow-auto">
-          <table className="w-full border-separate border-spacing-0 text-left text-xs">
+        <ActiveFilters filters={tb.filters} labels={{ supplier: t.fv.supplier, product: t.common.product, unit: t.common.unit }} onChange={tb.setFilter} onReset={tb.reset} count={tb.filtered.length} total={base.length} unit={t.mercurial.count} />
+        <div className={`max-h-[75vh] ${view === -1 ? "overflow-auto" : "overflow-y-auto"}`}>
+          <table className={`w-full border-separate border-spacing-0 text-left ${view === -1 ? "text-xs" : "text-sm"}`}>
             <thead className="sticky top-0 z-10 bg-stone-50">
               <tr>
                 {sortTh("supplier", t.fv.supplier)}
-                <th rowSpan={2} className="sticky left-0 z-20 min-w-56 border-b border-stone-200 bg-stone-50 px-2 py-2 font-semibold">
+                <th rowSpan={2} className="sticky left-0 z-20 border-b border-stone-200 bg-stone-50 px-2 py-2 font-semibold">
                   <button type="button" className="inline-flex items-center gap-1" onClick={() => tb.toggleSort("product")}>
                     {t.common.product}
                     <span className={`text-[10px] ${tb.sort?.key === "product" ? "text-brand-600" : "text-stone-300"}`}>{tb.sort?.key === "product" ? (tb.sort.dir === "asc" ? "▲" : "▼") : "▲▼"}</span>
                   </button>
                 </th>
                 {sortTh("unit", t.common.unit)}
-                {months.map((m, i) => (
-                  <th key={m} colSpan={2} className={`border-b border-l border-stone-200 px-2 py-1 text-center font-semibold capitalize ${i === currentMonth ? "bg-brand-50 text-brand-700" : ""}`}>{m}</th>
+                {shownMonths.map((i) => (
+                  <th key={i} colSpan={2} className={`border-b border-l border-stone-200 px-2 py-1 text-center font-semibold capitalize ${i === currentMonth ? "bg-brand-50 text-brand-700" : ""}`}>{months[i]}</th>
                 ))}
                 <th rowSpan={2} className="border-b border-stone-200" />
               </tr>
               <tr>
-                {months.map((m, i) => (
-                  <FragmentPair key={m} highlight={i === currentMonth} minus={t.fv.minus} plus={t.fv.plus} />
+                {shownMonths.map((i) => (
+                  <FragmentPair key={i} highlight={i === currentMonth} minus={t.fv.minus} plus={t.fv.plus} />
                 ))}
               </tr>
               <tr>
                 <th className={fcell}><FilterInput value={tb.filters.supplier ?? ""} onChange={(v) => tb.setFilter("supplier", v)} options={tb.options.supplier} /></th>
                 <th className={`${fcell} sticky left-0 z-20`}><FilterInput value={tb.filters.product ?? ""} onChange={(v) => tb.setFilter("product", v)} options={tb.options.product} /></th>
                 <th className={fcell}><FilterInput value={tb.filters.unit ?? ""} onChange={(v) => tb.setFilter("unit", v)} options={tb.options.unit} /></th>
-                <th colSpan={24} className={fcell} />
+                <th colSpan={shownMonths.length * 2} className={fcell} />
                 <th className={`${fcell} text-right`}><ResetFilters onClick={tb.reset} active={tb.active} /></th>
               </tr>
             </thead>
             <tbody>
-              {tb.pageRows.map((r) => <FvRow key={r.id} r={r} currentMonth={currentMonth} editable={editable} />)}
+              {tb.pageRows.map((r) => <FvRow key={r.id} r={r} currentMonth={currentMonth} editable={editable} shownMonths={shownMonths} />)}
             </tbody>
           </table>
         </div>
@@ -97,7 +107,8 @@ function FragmentPair({ highlight, minus, plus }: { highlight: boolean; minus: s
   );
 }
 
-function FvRow({ r, currentMonth, editable }: { r: Row; currentMonth: number; editable: boolean }) {
+function FvRow({ r, currentMonth, editable, shownMonths }: { r: Row; currentMonth: number; editable: boolean; shownMonths: number[] }) {
+  const cells = shownMonths.flatMap((m) => [m * 2, m * 2 + 1]);
   const { t } = useI18n();
   const [edit, setEdit] = useState(false);
   const [pending, start] = useTransition();
@@ -109,7 +120,7 @@ function FvRow({ r, currentMonth, editable }: { r: Row; currentMonth: number; ed
         <td className={`${td} whitespace-nowrap text-stone-500`}>{r.supplier}</td>
         <td className={`${td} sticky left-0 font-medium ${r.locked ? "bg-sky-50 text-sky-900" : "bg-white"}`}>{r.locked && "🔒 "}{r.product}</td>
         <td className={td}>{r.unit}</td>
-        {Array.from({ length: 24 }, (_, i) => (
+        {cells.map((i) => (
           <td key={i} className={`${td} whitespace-nowrap text-right tabular-nums ${i % 2 === 0 ? "border-l border-stone-100 text-stone-500" : ""} ${Math.floor(i / 2) === currentMonth ? "bg-brand-50/60" : ""}`}>{money(r.prices[i])}</td>
         ))}
         {editable && (
@@ -130,7 +141,7 @@ function FvRow({ r, currentMonth, editable }: { r: Row; currentMonth: number; ed
         </label>
       </td>
       <td className={td}><input className="input w-14 px-1.5 py-1 text-xs" defaultValue={r.unit ?? ""} onBlur={(e) => start(() => updateFvAction(r.id, { unit: e.target.value }))} /></td>
-      {prices.map((p, i) => (
+      {cells.map((i) => [prices[i], i] as const).map(([p, i]) => (
         <td key={i} className={`${td} whitespace-nowrap ${i % 2 === 0 ? "border-l border-stone-100" : ""}`}>
           <MoneyInput
             className="input w-20 px-1.5 py-1 text-right text-xs"

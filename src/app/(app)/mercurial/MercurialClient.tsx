@@ -13,7 +13,7 @@ import { Icon } from "@/components/Icon";
 import { UnitSelect } from "@/components/UnitSelect";
 import { NatureSelect } from "@/components/NatureSelect";
 import { SupplierCombo } from "@/components/SupplierCombo";
-import { FilterInput, Pager, ResetFilters } from "@/components/table/FilterInput";
+import { ActiveFilters, FilterInput, Pager, ResetFilters } from "@/components/table/FilterInput";
 import { useTable, type ColumnDef } from "@/components/table/useTable";
 import { SortTh } from "@/components/table/DataTable";
 
@@ -93,16 +93,14 @@ export function UnitsPanel({ units }: { units: Opt[] }) {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   return (
-    <div className="card space-y-3 p-4">
-      <div>
-        <h2 className="font-semibold">{t.mercurial.units}</h2>
-        <p className="text-xs text-stone-500">{t.mercurial.unitsHint}</p>
-      </div>
-      <ul className="flex max-h-48 flex-wrap gap-2 overflow-y-auto">
+    <div className="card space-y-2 p-3">
+      <h2 className="text-sm font-semibold">{t.mercurial.units}</h2>
+      <ul className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto">
         {units.map((u) => (
-          <li key={u.id} className="flex items-center gap-1 rounded-full border border-stone-300 bg-white py-0.5 pl-3 pr-1 text-sm">
+          <li key={u.id} className="flex items-center gap-0.5 rounded-full border border-stone-300 bg-white py-0 pl-2 pr-0.5 text-xs">
             <input
-              className="w-20 bg-transparent outline-none"
+              className="bg-transparent outline-none"
+              size={Math.max(3, u.name.length)}
               defaultValue={u.name}
               onBlur={(e) => e.target.value.trim() && e.target.value !== u.name && start(() => renameUnitAction(u.id, e.target.value))}
             />
@@ -124,8 +122,8 @@ export function UnitsPanel({ units }: { units: Opt[] }) {
         ))}
       </ul>
       <div className="flex gap-2">
-        <input className="input py-2" value={name} placeholder={t.mercurial.addUnit} onChange={(e) => setName(e.target.value)} />
-        <button type="button" className="btn-secondary py-2" disabled={!name.trim() || pending} onClick={() => start(async () => { await addUnitAction(name); setName(""); })}>
+        <input className="input py-1.5 text-sm" value={name} placeholder={t.mercurial.addUnit} onChange={(e) => setName(e.target.value)} />
+        <button type="button" className="btn-secondary py-1.5" disabled={!name.trim() || pending} onClick={() => start(async () => { await addUnitAction(name); setName(""); })}>
           <Icon name="plus" className="h-4 w-4" />
         </button>
       </div>
@@ -169,11 +167,15 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
         <label className="flex items-center gap-2">
           <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} /> {m.showInactive}
         </label>
-        <span className="text-stone-500">{tb.filtered.length} / {rows.length} {m.count}{editable && ` · ${m.priceTraced}`}</span>
+        <span className="text-stone-500">{tb.active ? "" : `${tb.filtered.length} ${m.count}`}{editable && ` · ${m.priceTraced}`}</span>
       </div>
       <div className="card overflow-hidden">
-        <div className="max-h-[75vh] overflow-auto">
+        <ActiveFilters filters={tb.filters} labels={Object.fromEntries(Object.entries(labels).map(([k, v]) => [k, v[0]]))} onChange={tb.setFilter} onReset={tb.reset} count={tb.filtered.length} total={base.length} unit={m.count} />
+        <div className="max-h-[75vh] overflow-y-auto">
           <table className="table">
+            <colgroup>
+              <col className="w-[15%]" /><col className="w-[12%]" /><col /><col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[9%]" />
+            </colgroup>
             <thead className="sticky top-0 z-10">
               <tr>
                 {cols.map((c) => <SortTh key={c.key} label={labels[c.key][0]} align={labels[c.key][1]} active={tb.sort?.key === c.key} dir={tb.sort?.dir} onClick={() => tb.toggleSort(c.key)} />)}
@@ -211,7 +213,7 @@ function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; supp
   if (!edit) {
     return (
       <tr className={r.active ? "" : "opacity-50"}>
-        <td className="whitespace-nowrap text-stone-600">{r.supplier}</td>
+        <td className="text-stone-600">{r.supplier}</td>
         <td className="text-stone-600">{r.nature ?? ""}</td>
         <td className="font-medium">
           {r.name}
@@ -222,30 +224,30 @@ function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; supp
         <td className="whitespace-nowrap text-right tabular-nums">{r.priceMin != null ? fmtMoney(r.priceMin, locale) : ""}</td>
         <td className="whitespace-nowrap text-right tabular-nums">{r.price != null ? fmtMoney(r.price, locale) : ""}</td>
         <td className="text-right">
-          {editable && !r.fv && <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setEdit(true)}><Icon name="edit" className="h-3.5 w-3.5" /> {t.common.edit}</button>}
-          {editable && r.fv && <Link href="/mercurial/fruits-legumes" className="btn-ghost px-2 py-1 text-xs" title={m.fvEdit}><Icon name="leaf" className="h-3.5 w-3.5" /> {t.common.edit}</Link>}
+          {editable && !r.fv && <button className="btn-ghost px-1.5 py-1 text-xs" onClick={() => setEdit(true)} title={t.common.edit}><Icon name="edit" className="h-3.5 w-3.5" /> <span className="hidden xl:inline">{t.common.edit}</span></button>}
+          {editable && r.fv && <Link href="/mercurial/fruits-legumes" className="btn-ghost px-1.5 py-1 text-xs" title={m.fvEdit}><Icon name="leaf" className="h-3.5 w-3.5" /> <span className="hidden xl:inline">{t.common.edit}</span></Link>}
         </td>
       </tr>
     );
   }
   return (
     <tr className="bg-brand-50/40 align-top">
-      <td className="min-w-40">
+      <td>
         <select className="input py-1.5" defaultValue={r.supplierId} onChange={(e) => save({ supplierId: Number(e.target.value) })}>
           {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </td>
-      <td className="min-w-56"><NatureSelect value={r.nature ?? ""} options={natures} onChange={(v) => save({ nature: v })} /></td>
-      <td className="min-w-56">
+      <td><NatureSelect value={r.nature ?? ""} options={natures} onChange={(v) => save({ nature: v })} /></td>
+      <td>
         <input className="input py-1.5 font-medium" defaultValue={r.name} onBlur={(e) => e.target.value.trim() && e.target.value !== r.name && save({ name: e.target.value })} />
         <label className="mt-1.5 flex items-center gap-2 text-xs" title={m.lockedHint}>
           <input type="checkbox" defaultChecked={r.priceLocked} className="h-4 w-4 accent-brand-600" onChange={(e) => save({ priceLocked: e.target.checked })} /> 🔒 {m.locked}
         </label>
       </td>
-      <td className="min-w-24"><UnitSelect className="input py-1.5" value={unit} units={units} onChange={(u) => { setUnit(u); save({ unit: u }); }} /></td>
-      <td className="min-w-24"><MoneyInput className="input py-1.5 text-right" defaultValue={str(r.priceMin)} onBlur={(e) => e.target.value !== str(r.priceMin) && save({ priceMin: e.target.value })} /></td>
-      <td className="min-w-24"><MoneyInput className="input py-1.5 text-right" defaultValue={str(r.price)} onBlur={(e) => e.target.value !== str(r.price) && save({ price: e.target.value })} /></td>
-      <td className="whitespace-nowrap text-right">
+      <td><UnitSelect className="input py-1.5" value={unit} units={units} onChange={(u) => { setUnit(u); save({ unit: u }); }} /></td>
+      <td><MoneyInput className="input py-1.5 text-right" defaultValue={str(r.priceMin)} onBlur={(e) => e.target.value !== str(r.priceMin) && save({ priceMin: e.target.value })} /></td>
+      <td><MoneyInput className="input py-1.5 text-right" defaultValue={str(r.price)} onBlur={(e) => e.target.value !== str(r.price) && save({ price: e.target.value })} /></td>
+      <td className="text-right">
         <button
           type="button"
           className="btn-ghost px-2 py-1 text-xs text-red-600"

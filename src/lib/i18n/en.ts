@@ -91,6 +91,7 @@ export const en: Dict = {
     qty_more: "Quantity above delivery note",
   },
   table: {
+    results: "result(s)",
     filter: "Filter…",
     clear: "Clear",
     reset: "Reset",
@@ -374,6 +375,8 @@ export const en: Dict = {
     priceTraced: "A price change is recorded in Price tracking.",
   },
   excelImport: {
+    locked: "Liste → locked prices (Supplier, Product, Unit)",
+    lockedMatched: "products set to locked price",
     intro: "Upload the price-list Excel file (.xlsx). Each ticked sheet replaces the matching data in the app.",
     sheets: "Sheets to import",
     mercurial: "Mercurial → Price list > Products",
@@ -412,6 +415,9 @@ export const en: Dict = {
     confirmOne: "This delivery can no longer be edited or deleted. Consolidate?",
   },
   fv: {
+    month: "Month shown",
+    current: "current",
+    allMonths: "All 12 months",
     monthHint: "Current month prices are shown in Price list > Products (min / max) and used to check delivery notes.",
     locked: "Locked price",
     lockedHint: "Locked price: a different price on a delivery note creates an issue (no price change).",

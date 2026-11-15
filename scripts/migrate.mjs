@@ -160,5 +160,46 @@ for (const c of temps) {
   await db.execute(sql`update categories set conform_rules = ${conform}, reserve_rules = ${reserve}, refuse_rules = ${refuse} where id = ${c.id}`);
 }
 
+// Liste des prix bloqués fruits et légumes (fichier Appli.xlsx), appliquée une seule fois
+const { readFileSync } = await import("node:fs");
+const norm = (n) => String(n).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+const seeded = (await db.execute(sql`select 1 from app_settings where key = 'seed_locked_fv_v1'`)).rows.length > 0;
+if (!seeded) {
+  const list = JSON.parse(readFileSync(new URL("./data/locked-fv.json", import.meta.url), "utf8"));
+  const wanted = new Set(list.products.map(norm));
+  const items = (await db.execute(sql`select id, product from fv_items`)).rows;
+  let n = 0;
+  for (const it of items) if (wanted.has(norm(it.product))) { await db.execute(sql`update fv_items set locked = true where id = ${it.id}`); n++; }
+  // Ne marquer comme fait qu'une fois les fruits et légumes présents (sinon on réessaie au prochain déploiement)
+  if (items.length) await db.execute(sql`insert into app_settings (key, value) values ('seed_locked_fv_v1', ${String(n)}) on conflict do nothing`);
+  console.log(`[migrate] prix bloqués appliqués : ${n}`);
+}
+
+// Fruits et légumes → produits du mercurial (même fournisseur, prix du mois, prix bloqué), à chaque déploiement
+{
+  const year = new Date().getFullYear();
+  const items = (await db.execute(sql`select id, supplier, product, unit, locked from fv_items where year = ${year}`)).rows;
+  if (items.length) {
+    const produce = (await db.execute(sql`select id from categories where code = 'produce'`)).rows[0]?.id ?? null;
+    const supRows = (await db.execute(sql`select id, name from suppliers order by id`)).rows;
+    const supByKey = new Map();
+    for (const s of supRows) if (!supByKey.has(key(s.name))) supByKey.set(key(s.name), s.id);
+    const linked = new Map((await db.execute(sql`select id, fv_item_id from products where fv_item_id is not null`)).rows.map((r) => [r.fv_item_id, r.id]));
+    const cap = (u) => { const x = String(u ?? "").trim().toLowerCase(); return x ? x[0].toUpperCase() + x.slice(1) : "Kg"; };
+    for (const it of items) {
+      let sid = supByKey.get(key(it.supplier));
+      if (!sid) {
+        sid = (await db.execute(sql`insert into suppliers (name) values (${it.supplier}) on conflict (name) do update set name = excluded.name returning id`)).rows[0].id;
+        supByKey.set(key(it.supplier), sid);
+      }
+      const pid = linked.get(it.id);
+      if (pid) await db.execute(sql`update products set supplier_id = ${sid}, name = ${it.product}, unit = ${cap(it.unit)}, price_locked = ${it.locked}, active = true where id = ${pid}`);
+      else await db.execute(sql`insert into products (supplier_id, name, unit, nature, category_id, price_locked, active, fv_item_id) values (${sid}, ${it.product}, ${cap(it.unit)}, 'Fruits & légumes', ${produce}, ${it.locked}, true, ${it.id})`);
+    }
+    await db.execute(sql`update products set active = false where fv_item_id is not null and fv_item_id not in (select id from fv_items where year = ${year})`);
+    console.log(`[migrate] fruits et légumes synchronisés : ${items.length}`);
+  }
+}
+
 console.log("[migrate] base à jour.");
 await close();

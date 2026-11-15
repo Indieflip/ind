@@ -44,7 +44,7 @@ export default async function MercurialPage() {
       </PageHeader>
       <p className="-mt-3 mb-4 text-sm text-stone-600">{t.mercurial.intro}</p>
       {editable && (
-        <div className="mb-4 grid items-start gap-4 xl:grid-cols-[2fr_1fr]">
+        <div className="mb-4 grid items-start gap-4 xl:grid-cols-[3fr_1fr]">
           <AddRow suppliers={supplierRows} units={units.map((u) => u.name)} natures={natures} />
           <UnitsPanel units={units.map((u) => ({ id: u.id, name: u.name }))} />
         </div>

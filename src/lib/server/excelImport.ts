@@ -57,10 +57,11 @@ export interface ImportReport {
   fv?: number;
   fvLocked?: number;
   bakery?: { days: number; prices: Record<string, number | null> };
+  lockedList?: { listed: number; matched: number };
   missing: string[];
 }
 
-export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: boolean; maj: boolean; fv: boolean; bakery: boolean }): Promise<ImportReport> {
+export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: boolean; maj: boolean; fv: boolean; bakery: boolean; locked?: boolean }): Promise<ImportReport> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer);
   const report: ImportReport = { missing: [] };
@@ -276,6 +277,27 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
       });
       for (const [k, v] of Object.entries(prices)) if (v != null) await setSetting(`bakery_price_${k}`, String(v));
       report.bakery = { days, prices };
+    }
+  }
+  // ---------- Liste des prix bloqués : onglet « Liste » (Prestataire | Produit | Unité)
+  if (sheets.locked !== false) {
+    const ws = findSheet(wb, "Liste");
+    if (ws) {
+      const names = rowsOf(ws, 3).map((r) => text(r[1])).filter((n): n is string => !!n && normalize(n) !== "produit");
+      const wanted = new Set(names.map(normalize));
+      const items = await db.select({ id: schema.fvItems.id, product: schema.fvItems.product }).from(schema.fvItems);
+      let matched = 0;
+      for (const it of items) {
+        if (wanted.has(normalize(it.product))) {
+          await db.update(schema.fvItems).set({ locked: true }).where(eq(schema.fvItems.id, it.id));
+          matched++;
+        }
+      }
+      // Produits du mercurial de même nom (hors fruits et légumes) : prix bloqué aussi
+      const prods = await db.select({ id: schema.products.id, name: schema.products.name }).from(schema.products).where(isNull(schema.products.fvItemId));
+      for (const p of prods) if (wanted.has(normalize(p.name))) await db.update(schema.products).set({ priceLocked: true }).where(eq(schema.products.id, p.id));
+      await syncFvProducts();
+      report.lockedList = { listed: names.length, matched };
     }
   }
   return report;

@@ -137,7 +137,7 @@ export function PricesTable({ rows, editable }: { rows: PriceRow[]; editable: bo
     { key: "type", label: t.prices.type, text: (r) => r.typeLabel, options: Object.values(t.prices.types) },
     { key: "source", label: t.prices.source, text: (r) => r.source, className: "text-xs text-stone-500" },
     {
-      key: "claim", label: t.prices.claim, text: (r) => r.claim, className: "min-w-64",
+      key: "claim", label: t.prices.claim, text: (r) => r.claim, className: "min-w-36",
       render: (r) => (editable ? <ClaimCell id={r.id} initial={r.claim} placeholder={t.prices.claimPlaceholder} /> : <span className="text-sm">{r.claim || "—"}</span>),
     },
   ];

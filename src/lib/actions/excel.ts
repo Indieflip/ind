@@ -16,6 +16,7 @@ export async function importExcelAction(_p: { report?: ImportReport; error?: str
       maj: form.get("maj") === "on",
       fv: form.get("fv") === "on",
       bakery: form.get("bakery") === "on",
+      locked: form.get("locked") === "on",
     });
     await getDb().insert(schema.imports).values({
       fileName: file.name,

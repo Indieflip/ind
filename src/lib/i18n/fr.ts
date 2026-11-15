@@ -89,6 +89,7 @@ export const fr = {
     qty_more: "Quantité supérieure au BL",
   },
   table: {
+    results: "résultat(s)",
     filter: "Filtrer…",
     clear: "Effacer",
     reset: "Réinitialiser",
@@ -376,6 +377,8 @@ export const fr = {
     priceTraced: "Un changement de prix est enregistré dans le Suivi des prix.",
   },
   excelImport: {
+    locked: "Liste → prix bloqués (Prestataire, Produit, Unité)",
+    lockedMatched: "produits passés en prix bloqué",
     intro: "Chargez le fichier Excel du mercurial (.xlsx). Chaque onglet coché remplace les données correspondantes de l'application.",
     sheets: "Onglets à importer",
     mercurial: "Mercurial → Mercurial > Produits",
@@ -414,6 +417,9 @@ export const fr = {
     confirmOne: "Ce bon ne pourra plus être modifié ni supprimé. Consolider ?",
   },
   fv: {
+    month: "Mois affiché",
+    current: "en cours",
+    allMonths: "Les 12 mois",
     monthHint: "Les prix du mois en cours sont repris dans Mercurial > Produits (prix minimum / maximum) et servent à contrôler les BL.",
     locked: "Prix bloqué",
     lockedHint: "Prix bloqué : un prix différent sur un BL crée une anomalie (pas de variation de prix).",

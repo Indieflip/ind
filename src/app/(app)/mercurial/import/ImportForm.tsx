@@ -25,6 +25,7 @@ export function ImportForm() {
               ["maj", x.maj],
               ["fv", x.fv],
               ["bakery", x.bakery],
+              ["locked", x.locked],
             ] as const
           ).map(([k, label]) => (
             <label key={k} className="flex items-start gap-2 text-sm">
@@ -44,6 +45,7 @@ export function ImportForm() {
           {r.maj != null && <p>{x.maj} : {r.maj} {x.lines}</p>}
           {r.fv != null && <p>{x.fv} : {r.fv} {x.lines}{r.fvLocked ? ` (${r.fvLocked} 🔒)` : ""}</p>}
           {r.bakery && <p>{x.bakery} : {r.bakery.days} {x.days}</p>}
+          {r.lockedList && <p>{x.locked} : {r.lockedList.matched} / {r.lockedList.listed} {x.lockedMatched}</p>}
           {r.missing.length > 0 && <p className="text-amber-700">{x.missing} : {r.missing.join(", ")}</p>}
         </div>
       )}

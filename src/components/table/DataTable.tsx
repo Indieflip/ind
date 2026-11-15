@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/client";
-import { FilterInput, Pager, ResetFilters } from "./FilterInput";
+import { ActiveFilters, FilterInput, Pager, ResetFilters } from "./FilterInput";
 import { useTable, type ColumnDef } from "./useTable";
 
 export interface Col<R> extends ColumnDef<R> {
@@ -18,7 +18,7 @@ export function SortTh({ label, active, dir, onClick, align }: { label: string; 
   const { t } = useI18n();
   return (
     <th className={align === "right" ? "text-right" : align === "center" ? "text-center" : ""}>
-      <button type="button" onClick={onClick} className={`inline-flex items-center gap-1 hover:text-stone-900 ${align === "right" ? "flex-row-reverse" : ""}`} title={active && dir === "asc" ? t.receptions.sortDesc : t.receptions.sortAsc}>
+      <button type="button" onClick={onClick} className={`inline-flex items-center gap-1 text-left hover:text-stone-900 ${align === "right" ? "flex-row-reverse text-right" : ""}`} title={active && dir === "asc" ? t.receptions.sortDesc : t.receptions.sortAsc}>
         {label}
         <span className={`text-[10px] ${active ? "text-brand-600" : "text-stone-300"}`}>{active ? (dir === "asc" ? "▲" : "▼") : "▲▼"}</span>
       </button>
@@ -42,6 +42,7 @@ export function DataTable<R>({
   onSelectionChange,
   rowClassName,
   maxHeight = "max-h-[75vh]",
+  dense,
 }: {
   rows: R[];
   cols: Col<R>[];
@@ -54,6 +55,8 @@ export function DataTable<R>({
   onSelectionChange?: (s: Set<string | number>) => void;
   rowClassName?: (r: R) => string;
   maxHeight?: string;
+  /** Texte plus petit pour les tableaux à nombreuses colonnes */
+  dense?: boolean;
 }) {
   const { t } = useI18n();
   const tb = useTable(rows, cols, { pageSize, defaultSort });
@@ -61,9 +64,9 @@ export function DataTable<R>({
   const allOn = tb.filtered.length > 0 && tb.filtered.every((r) => sel.has(rowKey(r)));
   return (
     <div className="card overflow-hidden">
-      {tb.active && <p className="border-b border-stone-100 px-3 py-1.5 text-xs text-stone-500">{tb.filtered.length} / {rows.length}</p>}
+      <ActiveFilters filters={tb.filters} labels={Object.fromEntries(cols.map((c) => [c.key, c.label]))} onChange={tb.setFilter} onReset={tb.reset} count={tb.filtered.length} total={rows.length} />
       <div className={`${maxHeight} overflow-auto`}>
-        <table className="table">
+        <table className={`table ${dense ? "text-xs [&_th]:text-xs" : ""}`}>
           <thead className="sticky top-0 z-10">
             <tr>
               {selectable && (

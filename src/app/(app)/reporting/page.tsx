@@ -104,7 +104,7 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
 
       <section className="card mb-6 overflow-x-auto">
         <h2 className="px-4 pt-4 font-semibold">{t.reporting.bySupplier}</h2>
-        <div className="p-3">
+        <div className="pt-2">
           <SupplierStats
             rows={bySupplier.rows.map((r) => ({
               supplier: r.supplier, receptions: r.receptions, lines: r.lines,
