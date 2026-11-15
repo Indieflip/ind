@@ -6,6 +6,7 @@ export const UNIT_ALIASES: Record<string, string> = {
   Boîte: "Boite",
   Seaux: "Seau",
   Sceaux: "Seau",
+  Btl: "Bouteille",
 };
 
 /** Unité normalisée : première lettre en majuscule (« kg » → « Kg », « POT » → « Pot ») et alias fusionnés */
