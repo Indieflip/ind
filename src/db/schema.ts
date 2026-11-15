@@ -444,3 +444,45 @@ export const containers = pgTable("containers", {
   position: integer("position").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Demandes à l'administrateur (ex. « j'ai créé un doublon, il faut le supprimer ») */
+export const adminRequests = pgTable("admin_requests", {
+  id: serial("id").primaryKey(),
+  subject: text("subject").notNull(),
+  message: text("message"),
+  url: text("url"),
+  /** open | done | refused */
+  status: text("status").notNull().default("open"),
+  response: text("response"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  handledBy: integer("handled_by").references(() => users.id, { onDelete: "set null" }),
+  handledAt: timestamp("handled_at", { withTimezone: true }),
+});
+
+/** Réclamations auprès des fournisseurs (Anomalies > Réclamations) */
+export const claims = pgTable(
+  "claims",
+  {
+    id: serial("id").primaryKey(),
+    date: date("date").notNull(),
+    supplierId: integer("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
+    supplierName: text("supplier_name"),
+    reference: text("reference"),
+    product: text("product"),
+    subject: text("subject").notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2 }),
+    credit: numeric("credit", { precision: 12, scale: 2 }),
+    notes: text("notes"),
+    /** en_cours | cloturee | annulee */
+    status: text("status").notNull().default("en_cours"),
+    anomalyId: integer("anomaly_id").references(() => anomalies.id, { onDelete: "set null" }),
+    weighGapId: integer("weigh_gap_id").references(() => weighGaps.id, { onDelete: "set null" }),
+    receptionId: integer("reception_id").references(() => receptions.id, { onDelete: "set null" }),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+  },
+  (t) => [index("claims_status_idx").on(t.status)],
+);

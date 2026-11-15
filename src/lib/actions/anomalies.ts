@@ -137,3 +137,12 @@ export async function updateWeighGapAction(id: number, data: WeighGapInput) {
   revalidatePath("/anomalies", "layout");
   return { ok: true };
 }
+
+/** Nouvel écart de pesée saisi à la main (ou collé depuis un autre tableau) */
+export async function addWeighGapAction(data: WeighGapInput) {
+  await assertUser(can.manageAnomalies);
+  if (!data.product?.trim()) return { error: "product" };
+  const date = data.date && /^\d{4}-\d{2}-\d{2}$/.test(data.date) ? data.date : new Date().toISOString().slice(0, 10);
+  const [row] = await getDb().insert(schema.weighGaps).values({ date, product: data.product.trim(), position: -1 }).returning({ id: schema.weighGaps.id });
+  return updateWeighGapAction(row.id, { ...data, date });
+}

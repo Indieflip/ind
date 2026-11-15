@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/client";
 import type { Catalog, DocRef, Draft } from "@/lib/reception-types";
 import { docsOf } from "./helpers";
@@ -15,6 +15,7 @@ export function StepDelivery({ draft, setDraft, catalog, editId }: { draft: Draf
   const suppliers = useMemo(() => (catalog?.suppliers ?? []).filter((s) => !q || matches(s.name, q)), [catalog, q]);
   const selected = catalog?.suppliers.find((s) => s.id === draft.supplierId);
   const [picking, setPicking] = useState(!draft.supplierId && !draft.otherSupplier);
+  const listRef = useRef<HTMLUListElement>(null);
 
   return (
     <>
@@ -29,13 +30,16 @@ export function StepDelivery({ draft, setDraft, catalog, editId }: { draft: Draf
           </div>
         ) : (
           <>
-            <div className="relative">
-              <Icon name="search" className="pointer-events-none absolute left-3 top-3 h-5 w-5 text-stone-400" />
-              <input className="input pl-10" placeholder={t.wizard.searchSupplier} value={q} onChange={(e) => setQ(e.target.value)} />
-            </div>
+            <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); listRef.current?.querySelector("button")?.focus(); }}>
+              <div className="relative flex-1">
+                <Icon name="search" className="pointer-events-none absolute left-3 top-3 h-5 w-5 text-stone-400" />
+                <input className="input pl-10" placeholder={t.wizard.searchSupplier} value={q} onChange={(e) => setQ(e.target.value)} />
+              </div>
+              <button className="btn-primary shrink-0 px-3">{t.search.button}</button>
+            </form>
             {!catalog && <p className="mt-2 animate-pulse text-sm text-stone-500">{t.common.loading}</p>}
             {catalog && (
-            <ul className="mt-2 max-h-72 divide-y divide-stone-100 overflow-y-auto rounded-lg border border-stone-200">
+            <ul ref={listRef} className="mt-2 max-h-72 divide-y divide-stone-100 overflow-y-auto rounded-lg border border-stone-200">
               {suppliers.map((s) => (
                 <li key={s.id}>
                   <button

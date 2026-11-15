@@ -10,7 +10,7 @@ import { fvRange, parisMonth } from "@/lib/pricing";
 import { one, type SP } from "@/lib/server/queries";
 import { Icon } from "@/components/Icon";
 import { StatusBadge } from "@/components/DecisionBadge";
-import { SupplierAnomalies, SupplierInfo, SupplierReceptions, SupplierSearch } from "../SupplierClient";
+import { SupplierAnomalies, SupplierInfo, SupplierReceptions, SupplierSearch, DeleteSupplier } from "../SupplierClient";
 import { AddRow, MercurialTable } from "../../MercurialClient";
 
 export default async function SupplierPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SP> }) {
@@ -64,7 +64,16 @@ export default async function SupplierPage({ params, searchParams }: { params: P
         <Link href="/mercurial/fournisseurs" className="btn-ghost -ml-2 px-2"><Icon name="chevronLeft" className="h-4 w-4" /> {t.suppliers.title}</Link>
         <div className="w-full max-w-xs"><SupplierSearch suppliers={allSuppliers} /></div>
       </div>
-      <h1 className="text-2xl font-bold">{supplier.name}</h1>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h1 className="text-2xl font-bold">{supplier.name}</h1>
+        {can.deleteSupplier(user.role) ? (
+          <DeleteSupplier id={supplier.id} name={supplier.name} others={allSuppliers} />
+        ) : (
+          <Link className="btn-ghost text-sm text-stone-600" href={`/demandes?subject=${encodeURIComponent(`${t.suppliers.askDelete} : ${supplier.name}`)}&url=${encodeURIComponent(`/mercurial/fournisseurs/${supplier.id}`)}`}>
+            <Icon name="inbox" className="h-4 w-4" /> {t.suppliers.askDelete}
+          </Link>
+        )}
+      </div>
       <nav className="flex gap-1 border-b border-stone-200">
         <Link href={`/mercurial/fournisseurs/${id}`} className={tabCls(tab === "products")}>{t.mercurial.tabProducts} ({rows.filter((r) => r.active).length})</Link>
         <Link href={`/mercurial/fournisseurs/${id}?tab=receptions`} className={tabCls(tab === "receptions")}>{t.nav.receptions} ({recents.length})</Link>

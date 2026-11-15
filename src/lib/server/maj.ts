@@ -189,12 +189,30 @@ export async function supplierMatcher() {
     for (const s of list) for (const k of s.keys) if (t.includes(` ${k} `) && (!best || k.length > best.len)) best = { id: s.id, len: k.length };
     return best?.id ?? null;
   };
-  return { find, keys, name: (id: number | null) => suppliers.find((s) => s.id === id)?.name ?? null };
+  /**
+   * Nom de fournisseur écrit approximativement (« La Bande à Bonno » = LA BANDE A BONO, « Peimeon » = PEIMON,
+   * « Boulpat » = BOUL'PAT SERVICE) : une lettre d'écart, ou début du nom.
+   */
+  const fuzzy = (name: string | null | undefined) => {
+    const c = nameKey(deApos(name ?? "")).replace(/ /g, "");
+    if (c.length < 5) return null;
+    let best: { id: number; d: number } | null = null;
+    for (const s of list) {
+      for (const k of s.keys) {
+        const a = k.replace(/ /g, "");
+        if (a.length < 4) continue;
+        const d = a.startsWith(c) || c.startsWith(a) ? 0.5 : levenshtein(a, c);
+        if (d <= (Math.min(a.length, c.length) >= 8 ? 2 : 1) && (!best || d < best.d)) best = { id: s.id, d };
+      }
+    }
+    return best?.id ?? null;
+  };
+  return { find: (text: string | null | undefined) => find(text) ?? fuzzy(text?.split(/\s*[:/]\s*/)[0]), keys, name: (id: number | null) => suppliers.find((s) => s.id === id)?.name ?? null };
 }
 
 /** Anomalies reprises du fichier : fournisseur rattaché à la liste et nom retiré de la colonne BL / Facture (une seule fois) */
 export async function ensureAnomaliesLinked() {
-  if (await getSetting("anomalies_linked_v1")) return;
+  if (await getSetting("anomalies_linked_v2")) return;
   const m = await supplierMatcher();
   const db = getDb();
   const rows = await db.select().from(schema.anomalies);
@@ -206,7 +224,7 @@ export async function ensureAnomaliesLinked() {
       await db.update(schema.anomalies).set({ supplierId, reference }).where(eq(schema.anomalies.id, a.id));
     }
   }
-  await setSetting("anomalies_linked_v1", "1");
+  await setSetting("anomalies_linked_v2", "1");
 }
 
 type ProductLite = { id: number; name: string; supplierId: number };
@@ -237,7 +255,7 @@ export function matchProduct(item: string, supplierId: number | null, products: 
  * colonne BL / Facture sans le nom du fournisseur.
  */
 export async function linkWeighGaps(force = false) {
-  if (!force && (await getSetting("weigh_linked_v2"))) return;
+  if (!force && (await getSetting("weigh_linked_v3"))) return;
   const db = getDb();
   const m = await supplierMatcher();
   const products = await db.select({ id: schema.products.id, name: schema.products.name, supplierId: schema.products.supplierId }).from(schema.products);
@@ -252,5 +270,20 @@ export async function linkWeighGaps(force = false) {
       await db.update(schema.weighGaps).set({ supplierId, reference, productId }).where(eq(schema.weighGaps.id, g.id));
     }
   }
-  await setSetting("weigh_linked_v2", "1");
+  await setSetting("weigh_linked_v3", "1");
+}
+
+function levenshtein(a: string, b: string) {
+  if (Math.abs(a.length - b.length) > 3) return 99;
+  const prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let diag = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = prev[j];
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = tmp;
+    }
+  }
+  return prev[b.length];
 }

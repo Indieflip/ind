@@ -26,7 +26,12 @@ export function MajLog({ rows, editable }: { rows: Row[]; editable: boolean }) {
         <h1 className="text-2xl font-bold tracking-tight">{m.title}</h1>
         <a className="btn-secondary py-2" href="/api/export/maj">{t.common.exportCsv}</a>
       </div>
-      <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} />
+      <DataTable
+        rows={rows}
+        cols={cols}
+        rowKey={(r) => r.id}
+        copy={{ source: m.title, fields: (r) => ({ date: r.date ?? "", nature: r.nature ?? "", product: r.item ?? "", supplier: r.supplier ?? "", supplierId: r.supplierId ? String(r.supplierId) : "", reference: r.reference ?? "", description: `${r.item ?? ""} : ${r.detail ?? ""}`, detail: r.detail ?? "" }) }}
+      />
     </section>
   );
 }

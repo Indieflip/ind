@@ -11,6 +11,8 @@ import { StatusBadge } from "@/components/DecisionBadge";
 import { appConfirm } from "@/components/Confirm";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { PhotoButton, Thumbs } from "@/components/reception/PhotoButton";
+import { PasteRowButton } from "@/components/table/RowMenu";
+import { copyRow, type RowFields } from "@/lib/client/rowClipboard";
 
 const NATURES = ["Viande", "Poisson", "Fruits & Légumes", "Crèmerie", "Épicerie", "Boisson", "Boulangerie", "Autre"];
 
@@ -18,23 +20,32 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
   const { t } = useI18n();
   const [open, setOpen] = useState(!!preselect);
   const [photo, setPhoto] = useState("");
+  // Ligne collée depuis un autre tableau : valeurs proposées, modifiables avant d'enregistrer
+  const [pre, setPre] = useState<RowFields>({});
+  const [formKey, setFormKey] = useState(0);
   const [state, action, pending] = useActionState(createAnomalyAction, undefined);
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => {
     if (state?.ok) { ref.current?.reset(); setPhoto(""); setOpen(false); }
   }, [state]);
   if (!open) {
-    return <button className="btn-primary no-print mb-4" onClick={() => setOpen(true)}><Icon name="plus" className="h-4 w-4" /> {t.anomalies.new}</button>;
+    return (
+      <div className="no-print mb-4 flex flex-wrap items-center gap-2">
+        <button className="btn-primary" onClick={() => setOpen(true)}><Icon name="plus" className="h-4 w-4" /> {t.anomalies.new}</button>
+        <PasteRowButton onPaste={(f) => { setPre(f); setFormKey((k) => k + 1); setOpen(true); }} />
+      </div>
+    );
   }
+  const recPre = pre.receptionId && receptions.some((r) => String(r.id) === pre.receptionId) ? pre.receptionId : preselect ?? "";
   return (
-    <form ref={ref} action={action} id="new" className="no-print card mb-4 space-y-3 p-4">
+    <form key={formKey} ref={ref} action={action} id="new" className="no-print card mb-4 space-y-3 p-4">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold">{t.anomalies.new}</h2>
         <button type="button" className="btn-ghost p-1.5" onClick={() => setOpen(false)}><Icon name="x" className="h-4 w-4" /></button>
       </div>
       <label className="block">
         <span className="label">{t.anomalies.chooseReception} *</span>
-        <select name="receptionId" className="input" required defaultValue={preselect ?? ""}>
+        <select name="receptionId" className="input" required defaultValue={recPre}>
           <option value="" />
           {receptions.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
         </select>
@@ -43,7 +54,7 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
       <div className="grid gap-3 sm:grid-cols-4">
         <label>
           <span className="label">{t.anomalies.nature}</span>
-          <input name="nature" className="input" list="anomaly-natures" />
+          <input name="nature" className="input" list="anomaly-natures" defaultValue={pre.nature ?? ""} />
           <datalist id="anomaly-natures">{NATURES.map((n) => <option key={n} value={n} />)}</datalist>
         </label>
         <label>
@@ -52,12 +63,12 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
             {Object.entries(t.anomalies.types).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </label>
-        <label><span className="label">{t.common.product}</span><input name="productName" className="input" /></label>
+        <label><span className="label">{t.common.product}</span><input name="productName" className="input" defaultValue={pre.product ?? ""} /></label>
         <label><span className="label">{t.anomalies.nextAction}</span><input type="date" name="nextActionAt" className="input" /></label>
       </div>
       <label className="block">
         <span className="label">{t.anomalies.problem} *</span>
-        <textarea name="description" className="input" rows={2} required placeholder={t.anomalies.descriptionPlaceholder} />
+        <textarea name="description" className="input" rows={2} required placeholder={t.anomalies.descriptionPlaceholder} defaultValue={pre.description ?? pre.detail ?? ""} />
       </label>
       <input type="hidden" name="photo" value={photo} />
       <Thumbs photos={photo ? [photo] : []} onRemove={async () => { if (await appConfirm(t.wizard.removePhotoConfirm)) setPhoto(""); }} />
@@ -86,6 +97,17 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
   const [showDone, setShowDone] = useState(false);
   const [pending, start] = useTransition();
   const due = rows.filter((r) => r.due);
+  // Menu ⋮ : copier la ligne (à coller dans un autre tableau) ou en faire une réclamation
+  const fieldsOf = (r: AnomalyRow): RowFields => ({
+    date: r.dateSort.slice(0, 10), nature: r.nature, supplier: r.supplier, supplierId: r.supplierId ? String(r.supplierId) : "", reference: r.reference,
+    product: r.product, description: r.problem, action: r.action, result: r.result, amount: r.saving != null ? String(r.saving) : "",
+    receptionId: r.receptionId ? String(r.receptionId) : "", anomalyId: String(r.id),
+  });
+  const copySpec = {
+    source: a.title,
+    fields: fieldsOf,
+    actions: (r: AnomalyRow) => [{ label: `⚑ ${t.claims.create}`, onClick: () => { copyRow(a.title, fieldsOf(r)); router.push("/anomalies/reclamations?from=row"); } }],
+  };
   const totalSaving = [...rows, ...consolidated].reduce((s, r) => s + (r.saving ?? 0), 0);
   const cols: Col<AnomalyRow>[] = [
     {
@@ -158,7 +180,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
         <span className="text-xs italic text-stone-400">{a.provisional}</span>
         <span className="text-stone-500">{rows.length} {a.openCount} · {a.saving} : {fmtMoney(totalSaving, locale)}</span>
       </div>
-      <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} empty={a.empty} selectable={canConsolidate} selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} dense fixed rowClassName={(r) => (r.due ? "bg-red-50/60" : "")} />
+      <DataTable copy={copySpec} rows={rows} cols={cols} rowKey={(r) => r.id} empty={a.empty} selectable={canConsolidate} selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} dense fixed rowClassName={(r) => (r.due ? "bg-red-50/60" : "")} />
 
       <button className="btn-ghost mt-4 px-0 text-sm text-brand-700" onClick={() => setShowDone((v) => !v)}>
         {showDone ? "▾" : "▸"} {a.consolidatedList} ({consolidated.length})
@@ -171,6 +193,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
             rowKey={(r) => r.id}
             dense
             fixed
+            copy={copySpec}
             maxHeight="max-h-[60vh]"
           />
         </div>

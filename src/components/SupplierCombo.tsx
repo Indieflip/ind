@@ -11,6 +11,7 @@ export function SupplierCombo({
   placeholder,
   extraOption,
   required,
+  searchButton,
 }: {
   suppliers: { id: number; name: string }[];
   name?: string;
@@ -20,6 +21,8 @@ export function SupplierCombo({
   /** Option supplémentaire en bas de liste (ex. « + Rajout fournisseur ») */
   extraOption?: { label: string; onPick: () => void };
   required?: boolean;
+  /** Bouton « Rechercher » : valide la recherche (premier fournisseur trouvé) */
+  searchButton?: string;
 }) {
   const current = suppliers.find((s) => s.id === value);
   const [text, setText] = useState(current?.name ?? "");
@@ -33,9 +36,11 @@ export function SupplierCombo({
     onChange?.(s?.id ?? null);
     setOpen(false);
   };
+  const submit = () => { if (list[0]) pick(list[0]); };
   return (
     <div className="relative">
       <input type="hidden" name={name} value={id ?? ""} />
+      <div className={searchButton ? "flex gap-2" : ""}>
       <input
         className={`input ${required && !id && text ? "border-amber-400" : ""}`}
         value={text}
@@ -51,7 +56,10 @@ export function SupplierCombo({
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onKeyDown={(e) => { if (searchButton && e.key === "Enter") { e.preventDefault(); submit(); } }}
       />
+      {searchButton && <button type="button" className="btn-primary shrink-0" onClick={submit}>{searchButton}</button>}
+      </div>
       {open && (
         <ul className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 shadow-lg">
           {list.map((n) => (

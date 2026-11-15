@@ -27,10 +27,10 @@ export default async function SuppliersPage() {
   return (
     <>
       <PageHeader title={`${t.suppliers.title} · ${t.suppliers.mercurial}`} />
-      {editable && (
+      {(editable || can.createSupplier(user.role)) && (
         <div className="mb-4 grid gap-4 lg:grid-cols-2">
-          <AddSupplier />
-          <ImportCatalog />
+          {can.createSupplier(user.role) && <AddSupplier />}
+          {editable && <ImportCatalog />}
         </div>
       )}
       <div className="no-print mb-4 max-w-sm"><SupplierSearch suppliers={rows.map((r) => ({ id: r.id, name: r.name }))} /></div>

@@ -6,7 +6,7 @@ import { Icon } from "./Icon";
 import { LocaleSwitch } from "./LocaleSwitch";
 import { logoutAction } from "@/lib/actions/auth";
 
-export interface NavItem { href: string; label: string; icon: string }
+export interface NavItem { href: string; label: string; icon: string; badge?: number }
 
 export function AppNav(props: {
   items: NavItem[];
@@ -39,6 +39,7 @@ export function AppNav(props: {
             >
               <Icon name={i.icon} />
               {i.label}
+              {!!i.badge && <span className="ml-auto rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white">{i.badge}</span>}
             </Link>
           ))}
         </nav>
@@ -92,6 +93,7 @@ function MobileTabs({ items, active, moreLabel }: { items: NavItem[]; active: (h
             {more.map((i) => (
               <Link key={i.href} href={i.href} onClick={() => setOpen(false)} className={`flex items-center gap-3 rounded-lg px-3 py-3 font-medium ${active(i.href) ? "bg-brand-50 text-brand-700" : "text-stone-700"}`}>
                 <Icon name={i.icon} /> {i.label}
+                {!!i.badge && <span className="ml-auto rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white">{i.badge}</span>}
               </Link>
             ))}
           </div>

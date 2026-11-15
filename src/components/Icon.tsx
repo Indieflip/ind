@@ -1,5 +1,6 @@
 const paths: Record<string, string> = {
   truck: "M3 7h11v9H3zM14 10h4l3 3v3h-7zM7 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+  inbox: "M4 4h16v16H4zM4 13h4l2 3h4l2-3h4",
   alert: "M12 3 2 20h20L12 3zM12 10v4M12 17h.01",
   euro: "M17 6a7 7 0 1 0 0 12M4 10h9M4 14h9",
   box: "M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10",

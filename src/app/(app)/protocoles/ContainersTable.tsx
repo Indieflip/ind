@@ -7,6 +7,7 @@ import { fmtNum } from "@/lib/format";
 import { appConfirm } from "@/components/Confirm";
 import { Icon } from "@/components/Icon";
 import { DataTable, type Col } from "@/components/table/DataTable";
+import { PasteRowButton } from "@/components/table/RowMenu";
 
 export interface ContainerRow { id: number; supplier: string; product: string; tare: number | null; container: string }
 
@@ -62,7 +63,10 @@ export function ContainersTable({ rows, editable }: { rows: ContainerRow[]; edit
           <p className="text-sm text-stone-600">{c.intro}</p>
         </div>
         {editable && !adding && edit == null && (
+          <div className="flex items-center gap-2">
+          <PasteRowButton onPaste={(f) => { setAdding(true); setEdit(null); setForm({ supplier: f.supplier ?? "", product: f.product ?? "", tare: (f.tare ?? "").replace(".", ","), container: f.container ?? f.detail ?? "" }); }} />
           <button type="button" className="btn-primary h-9 w-9 shrink-0 p-0 text-xl" title={c.add} aria-label={c.add} onClick={() => { setAdding(true); setForm(empty); }}>+</button>
+          </div>
         )}
       </div>
       {(adding || edit != null) && (
@@ -78,7 +82,8 @@ export function ContainersTable({ rows, editable }: { rows: ContainerRow[]; edit
           <datalist id="container-suppliers">{[...new Set(rows.map((r) => r.supplier).filter(Boolean))].map((s) => <option key={s} value={s} />)}</datalist>
         </div>
       )}
-      <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} defaultSort={{ key: "supplier", dir: "asc" }} dense fixed maxHeight="max-h-[70vh]" />
+      <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} defaultSort={{ key: "supplier", dir: "asc" }} dense fixed maxHeight="max-h-[70vh]"
+        copy={{ source: c.title, fields: (r) => ({ supplier: r.supplier, product: r.product, tare: r.tare != null ? String(r.tare) : "", container: r.container }) }} />
     </section>
   );
 }

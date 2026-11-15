@@ -18,6 +18,8 @@ export const RIGHTS = [
   // Mercurial
   { key: "importFile", tab: "mercurial", defaults: { econome: false, comptable: false, invite: false } },
   { key: "editMercurial", tab: "mercurial", defaults: { econome: false, comptable: false, invite: false } },
+  { key: "createSupplier", tab: "mercurial", defaults: { econome: true, comptable: true, invite: true } },
+  { key: "deleteSupplier", tab: "mercurial", defaults: { econome: false, comptable: false, invite: false } },
   { key: "editFv", tab: "fruitsVeg", defaults: { econome: false, comptable: false, invite: false } },
   { key: "editPrices", tab: "prices", defaults: { econome: false, comptable: false, invite: false } },
   // Consultation
@@ -77,6 +79,9 @@ export const can = {
   viewSuppliers: all,
   editMercurial: (r: Role) => has(r, "editMercurial"),
   editSuppliers: (r: Role) => has(r, "editMercurial"),
+  createSupplier: (r: Role) => has(r, "createSupplier"),
+  /** Supprimer un fournisseur : administrateur seulement par défaut */
+  deleteSupplier: (r: Role) => has(r, "deleteSupplier"),
   importFile: (r: Role) => has(r, "importFile"),
   viewFv: all,
   editFv: (r: Role) => has(r, "editFv"),

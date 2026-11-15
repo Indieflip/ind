@@ -3,6 +3,8 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n/client";
 import { ActiveFilters, FilterInput, Pager, ResetFilters } from "./FilterInput";
 import { useTable, type ColumnDef } from "./useTable";
+import { RowMenu, type RowAction } from "./RowMenu";
+import type { RowFields } from "@/lib/client/rowClipboard";
 
 export interface Col<R> extends ColumnDef<R> {
   label: string;
@@ -46,6 +48,7 @@ export function DataTable<R>({
   maxHeight = "max-h-[75vh]",
   dense,
   fixed,
+  copy,
 }: {
   rows: R[];
   cols: Col<R>[];
@@ -62,6 +65,8 @@ export function DataTable<R>({
   dense?: boolean;
   /** Colonnes de largeur fixe (Col.width) : le tableau tient dans la page, le texte passe à la ligne */
   fixed?: boolean;
+  /** Menu ⋮ : champs de la ligne à copier (pour la coller dans un autre tableau) et actions de la ligne */
+  copy?: { source: string; fields: (r: R) => RowFields; actions?: (r: R) => RowAction[] };
 }) {
   const { t } = useI18n();
   const tb = useTable(rows, cols, { pageSize, defaultSort });
@@ -145,7 +150,7 @@ export function DataTable<R>({
                       </td>
                     );
                   })}
-                  <td />
+                  <td className="px-0 text-right">{copy && <RowMenu source={copy.source} fields={copy.fields(r)} actions={copy.actions?.(r)} />}</td>
                 </tr>
               );
             })}

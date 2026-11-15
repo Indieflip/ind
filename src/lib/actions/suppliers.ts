@@ -1,5 +1,5 @@
 "use server";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { unitName } from "@/lib/units";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/db";
@@ -10,11 +10,48 @@ import { num } from "@/lib/format";
 type R = { ok?: boolean; error?: string; message?: string } | undefined;
 
 export async function addSupplierAction(_p: R, form: FormData): Promise<R> {
-  await assertUser(can.editSuppliers);
+  await assertUser(can.createSupplier);
   const name = String(form.get("name") ?? "").trim();
   if (!name) return { error: "invalid" };
   await getDb().insert(schema.suppliers).values({ name }).onConflictDoNothing();
   revalidatePath("/mercurial", "layout");
+  return { ok: true };
+}
+
+/**
+ * Suppression d'un fournisseur (administrateur). Ses produits, réceptions, anomalies et historiques
+ * sont soit rattachés à un autre fournisseur (cas d'un doublon), soit détachés (les bons gardent le nom écrit).
+ */
+export async function deleteSupplierAction(id: number, transferTo: number | null) {
+  await assertUser(can.deleteSupplier);
+  const db = getDb();
+  if (transferTo === id) return { error: "same" };
+  await db.transaction(async (tx) => {
+    const target = transferTo ? await tx.query.suppliers.findFirst({ where: eq(schema.suppliers.id, transferTo) }) : null;
+    if (target) {
+      await tx.update(schema.products).set({ supplierId: target.id }).where(eq(schema.products.supplierId, id));
+      await tx.update(schema.receptions).set({ supplierId: target.id, supplierName: target.name }).where(eq(schema.receptions.supplierId, id));
+      await tx.update(schema.anomalies).set({ supplierId: target.id, supplierName: target.name }).where(eq(schema.anomalies.supplierId, id));
+      await tx.update(schema.priceChanges).set({ supplierId: target.id, supplierName: target.name }).where(eq(schema.priceChanges.supplierId, id));
+      await tx.update(schema.weighGaps).set({ supplierId: target.id }).where(eq(schema.weighGaps.supplierId, id));
+      await tx.update(schema.majLog).set({ supplierId: target.id }).where(eq(schema.majLog.supplierId, id));
+      await tx.execute(sql`update claims set supplier_id = ${target.id}, supplier_name = ${target.name} where supplier_id = ${id}`);
+    } else {
+      // Sans transfert : les bons, anomalies et écarts gardent le nom écrit ; les produits du fournisseur sont retirés
+      const prods = (await tx.select({ id: schema.products.id }).from(schema.products).where(eq(schema.products.supplierId, id))).map((p) => p.id);
+      if (prods.length) {
+        await tx.update(schema.receptionLines).set({ productId: null }).where(inArray(schema.receptionLines.productId, prods));
+        await tx.update(schema.priceChanges).set({ productId: null }).where(inArray(schema.priceChanges.productId, prods));
+        await tx.delete(schema.products).where(inArray(schema.products.id, prods));
+      }
+      await tx.update(schema.receptions).set({ supplierId: null }).where(eq(schema.receptions.supplierId, id));
+      await tx.update(schema.anomalies).set({ supplierId: null }).where(eq(schema.anomalies.supplierId, id));
+      await tx.update(schema.priceChanges).set({ supplierId: null }).where(eq(schema.priceChanges.supplierId, id));
+      await tx.execute(sql`update claims set supplier_id = null where supplier_id = ${id}`);
+    }
+    await tx.delete(schema.suppliers).where(eq(schema.suppliers.id, id));
+  });
+  revalidatePath("/", "layout");
   return { ok: true };
 }
 

@@ -48,6 +48,10 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
   const blPhotos = photos.filter((p) => p.kind === "bl");
   const docs = ((rec.documents as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[] | null) ?? (rec.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : [])) as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[];
   const seq = (await receptionNumbers()).get(rec.id);
+  const [recAnomalies, recGaps] = await Promise.all([
+    db.select().from(schema.anomalies).where(eq(schema.anomalies.receptionId, rec.id)).orderBy(asc(schema.anomalies.id)),
+    db.select().from(schema.weighGaps).where(eq(schema.weighGaps.receptionId, rec.id)).orderBy(asc(schema.weighGaps.id)),
+  ]);
   const showPrices = can.viewPrices(user.role) || can.receive(user.role);
 
   return (
@@ -236,6 +240,56 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
           </tbody>
         </table>
       </section>
+
+      {(recAnomalies.length > 0 || recGaps.length > 0) && (
+        <section className="card overflow-hidden border-l-4 border-l-red-400">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 px-5 py-3">
+            <h2 className="flex items-center gap-2 font-semibold"><Icon name="alert" className="h-5 w-5 text-red-600" /> {t.nav.anomalies}</h2>
+            <div className="flex flex-wrap gap-1.5 text-xs">
+              {recAnomalies.length > 0 && <span className="badge bg-red-100 text-red-800">{recAnomalies.length} {t.receptions.anomalyCount}</span>}
+              {recAnomalies.filter((a) => a.status === "open").length > 0 && <span className="badge bg-amber-100 text-amber-900">{recAnomalies.filter((a) => a.status === "open").length} {t.receptions.toFollow}</span>}
+              {recGaps.length > 0 && <span className="badge bg-sky-100 text-sky-800">{recGaps.length} {t.weigh.title.toLowerCase()} · {fmtMoney(recGaps.reduce((x, g) => x + (num(g.gapAmount) ?? 0), 0), locale)}</span>}
+            </div>
+          </div>
+          {recAnomalies.length > 0 && (
+            <ul className="divide-y divide-stone-100">
+              {recAnomalies.map((a) => (
+                <li key={a.id} className="flex flex-wrap items-start justify-between gap-2 px-5 py-2.5 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium">
+                      {a.number ? <span className="mr-1.5 text-stone-500">N° {a.number}</span> : null}
+                      {t.anomalies.types[a.type]}{a.productName ? ` · ${a.productName}` : ""}
+                    </p>
+                    <p className="text-stone-600">{a.description}</p>
+                    {(a.followUp || a.result) && <p className="text-xs text-stone-500">{[a.followUp, a.result].filter(Boolean).join(" — ")}</p>}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <StatusBadge status={a.status} label={t.anomalies.statuses[a.status]} />
+                    {a.creditAmount && <span className="text-xs text-stone-600">{t.anomalies.saving} {fmtMoney(num(a.creditAmount), locale)}</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {recGaps.length > 0 && (
+            <div className="border-t border-stone-100 px-5 py-3">
+              <p className="mb-1 text-xs font-bold uppercase tracking-wide text-stone-500">{t.weigh.title}</p>
+              <ul className="space-y-1 text-sm">
+                {recGaps.map((g) => (
+                  <li key={g.id} className="flex flex-wrap justify-between gap-2">
+                    <span>{g.product} : {t.wizard.ordered} {fmtNum(num(g.qtyInvoiced), locale, 3)} kg · {t.wizard.received} {fmtNum(num(g.qtyWeighed), locale, 3)} kg</span>
+                    <span className={`font-semibold tabular-nums ${(num(g.gapQty) ?? 0) < 0 ? "text-sky-700" : "text-red-700"}`}>{fmtNum(num(g.gapQty), locale, 3)} kg{g.gapAmount ? ` · ${fmtMoney(num(g.gapAmount), locale)}` : ""}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="no-print flex gap-3 border-t border-stone-100 px-5 py-2 text-sm">
+            <Link href="/anomalies" className="font-medium text-brand-700 hover:underline">{t.receptions.seeAnomalies} →</Link>
+            {recGaps.length > 0 && <Link href="/anomalies/ecarts-pesee" className="font-medium text-brand-700 hover:underline">{t.weigh.title} →</Link>}
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <section className="card p-5">

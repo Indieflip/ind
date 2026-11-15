@@ -2,7 +2,7 @@
 import { MoneyInput } from "@/components/MoneyInput";
 import { appConfirm } from "@/components/Confirm";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { addProductAction, addSupplierAction, importCatalogAction, updateProductAction, updateSupplierAction } from "@/lib/actions/suppliers";
+import { addProductAction, addSupplierAction, deleteSupplierAction, importCatalogAction, updateProductAction, updateSupplierAction } from "@/lib/actions/suppliers";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtMoney } from "@/lib/format";
 import { Icon } from "@/components/Icon";
@@ -99,7 +99,7 @@ export function AddProduct({ supplierId, categories, units }: { supplierId: numb
 export function SupplierSearch({ suppliers }: { suppliers: { id: number; name: string }[] }) {
   const { t } = useI18n();
   const router = useRouter();
-  return <SupplierCombo key={suppliers.length} suppliers={suppliers} name="goto" placeholder={t.suppliers.searchSupplier} onChange={(id) => id && router.push(`/mercurial/fournisseurs/${id}`)} />;
+  return <SupplierCombo key={suppliers.length} suppliers={suppliers} name="goto" placeholder={t.suppliers.searchSupplier} searchButton={t.search.button} onChange={(id) => id && router.push(`/mercurial/fournisseurs/${id}`)} />;
 }
 
 interface AnomalyRow { id: number; date: string; dateSort: string; type: string; product: string; description: string; status: string; statusLabel: string; receptionId: number | null }
@@ -136,4 +136,52 @@ export function SupplierReceptions({ rows }: { rows: RecRow[] }) {
     { key: "author", label: t.receptions.createdBy, text: (r) => r.author ?? "" },
   ];
   return <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} empty={t.receptions.empty} defaultSort={{ key: "date", dir: "desc" }} />;
+}
+
+/** Suppression d'un fournisseur (administrateur), avec transfert possible vers un autre fournisseur (doublon) */
+export function DeleteSupplier({ id, name, others }: { id: number; name: string; others: { id: number; name: string }[] }) {
+  const { t } = useI18n();
+  const s = t.suppliers;
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [target, setTarget] = useState("");
+  const [pending, start] = useTransition();
+  if (!open) {
+    return (
+      <button type="button" className="btn-ghost text-red-600 hover:bg-red-50" onClick={() => setOpen(true)}>
+        <Icon name="trash" className="h-4 w-4" /> {s.delete}
+      </button>
+    );
+  }
+  return (
+    <div className="card w-full space-y-3 border-red-200 bg-red-50/40 p-4">
+      <h2 className="font-semibold text-red-800">{s.deleteTitle} « {name} »</h2>
+      <label className="block">
+        <span className="label">{s.transferTo}</span>
+        <select className="input" value={target} onChange={(e) => setTarget(e.target.value)}>
+          <option value="">{s.noTransfer}</option>
+          {others.filter((o) => o.id !== id).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+        <span className="mt-1 block text-xs text-stone-600">{target ? s.transferHint : s.noTransferHint}</span>
+      </label>
+      <div className="flex gap-2">
+        <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>{t.common.cancel}</button>
+        <button
+          type="button"
+          className="btn bg-red-600 text-white hover:bg-red-700"
+          disabled={pending}
+          onClick={async () => {
+            if (!(await appConfirm(`${s.deleteConfirm}\n${name}`, { danger: true }))) return;
+            start(async () => {
+              await deleteSupplierAction(id, target ? Number(target) : null);
+              router.push(target ? `/mercurial/fournisseurs/${target}` : "/mercurial/fournisseurs");
+              router.refresh();
+            });
+          }}
+        >
+          <Icon name="trash" className="h-4 w-4" /> {s.delete}
+        </button>
+      </div>
+    </div>
+  );
 }

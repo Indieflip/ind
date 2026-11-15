@@ -2,7 +2,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { updateWeighGapAction, type WeighGapInput } from "@/lib/actions/anomalies";
+import { addWeighGapAction, updateWeighGapAction, type WeighGapInput } from "@/lib/actions/anomalies";
+import { PasteRowButton } from "@/components/table/RowMenu";
+import { copyRow, type RowFields } from "@/lib/client/rowClipboard";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import { Icon } from "@/components/Icon";
@@ -23,7 +25,15 @@ export function WeighTable({ rows, canEdit, suppliers }: { rows: WeighRow[]; can
   const { t, locale } = useI18n();
   const w = t.weigh;
   const [sel, setSel] = useState<Set<string | number>>(new Set());
-  const [edit, setEdit] = useState<WeighRow | null>(null);
+  const [edit, setEdit] = useState<{ row: WeighRow | null; pre?: RowFields } | null>(null);
+  const router = useRouter();
+  const fieldsOf = (r: WeighRow): RowFields => ({
+    date: r.dateIso, nature: r.nature, supplier: r.supplier, supplierId: r.supplierId ? String(r.supplierId) : "", reference: r.reference, product: r.product,
+    qtyInvoiced: r.qtyInvoiced != null ? String(r.qtyInvoiced) : "", qtyWeighed: r.qtyWeighed != null ? String(r.qtyWeighed) : "", unitPrice: r.unitPrice != null ? String(r.unitPrice) : "",
+    amount: r.gapAmount != null ? String(r.gapAmount) : "", unit: "Kg",
+    description: `${w.gapQty} ${kg(r.gapQty)} kg${r.gapAmount != null ? ` (${fmtMoney(r.gapAmount, locale)})` : ""} — ${r.product}`,
+    detail: r.detail, receptionId: r.receptionId ? String(r.receptionId) : "", weighGapId: String(r.id),
+  });
   const picked = rows.filter((r) => sel.has(r.id));
   const total = (picked.length ? picked : rows).reduce((s, r) => s + (r.gapAmount ?? 0), 0);
   const signed = (n: number | null) => (n == null ? "" : n < 0 ? <span className="text-sky-700">{kg(n)}</span> : kg(n));
@@ -32,7 +42,7 @@ export function WeighTable({ rows, canEdit, suppliers }: { rows: WeighRow[]; can
     { key: "nature", width: "4.5rem", label: w.nature, text: (r) => r.nature },
     { key: "supplier", width: "7%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => (r.supplierId ? <Link href={`/mercurial/fournisseurs/${r.supplierId}`} className="text-brand-700 hover:underline">{r.supplier}</Link> : r.supplier || "—") },
     { key: "reference", width: "7%", label: t.anomalies.blInvoice, text: (r) => r.reference, render: (r) => (r.receptionId ? <Link href={`/receptions/${r.receptionId}`} className="text-brand-700 hover:underline">{r.reference || "—"}</Link> : r.reference || "—") },
-    { key: "product", width: "11%", label: t.common.product, text: (r) => r.product, render: (r) => <>{r.product}{r.original && <span className="block text-[11px] text-stone-400" title={t.maj.original}>{r.original}</span>}</> },
+    { key: "product", width: "11%", label: t.common.product, text: (r) => r.product, render: (r) => <span title={r.original ? `${t.maj.original} : ${r.original}` : undefined}>{r.product}</span> },
     { key: "qtyInvoiced", width: "3.75rem", label: w.qtyInvoiced, align: "right", text: (r) => kg(r.qtyInvoiced), sort: (r) => r.qtyInvoiced, filterable: false },
     { key: "unitPrice", width: "3.9rem", label: w.unitPrice, align: "right", text: (r) => (r.unitPrice != null ? fmtMoney(r.unitPrice, locale) : ""), sort: (r) => r.unitPrice, filterable: false },
     { key: "qtyWeighed", width: "3.6rem", label: w.qtyWeighed, align: "right", text: (r) => kg(r.qtyWeighed), sort: (r) => r.qtyWeighed, filterable: false },
@@ -42,30 +52,48 @@ export function WeighTable({ rows, canEdit, suppliers }: { rows: WeighRow[]; can
     { key: "detail", label: w.detail, text: (r) => r.detail, className: "whitespace-pre-line" },
     { key: "claim", width: "4.75rem", label: w.claim, text: (r) => (r.claimDate ? fmtDate(r.claimDate, locale) : ""), sort: (r) => r.claimDate },
     ...(canEdit
-      ? [{ key: "edit", width: "2rem", label: "", text: () => "", sortable: false, filterable: false, render: (r: WeighRow) => <button type="button" className="btn-ghost p-1.5" title={t.common.edit} onClick={() => setEdit(r)}><Icon name="edit" className="h-4 w-4" /></button> } as Col<WeighRow>]
+      ? [{ key: "edit", width: "2rem", label: "", text: () => "", sortable: false, filterable: false, render: (r: WeighRow) => <button type="button" className="btn-ghost p-1.5" title={t.common.edit} onClick={() => setEdit({ row: r })}><Icon name="edit" className="h-4 w-4" /></button> } as Col<WeighRow>]
       : []),
   ];
   return (
     <>
+      {canEdit && (
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <button type="button" className="btn-primary py-1.5" onClick={() => setEdit({ row: null })}><Icon name="plus" className="h-4 w-4" /> {w.add}</button>
+          <PasteRowButton onPaste={(f) => setEdit({ row: null, pre: f })} />
+        </div>
+      )}
       <div className="mb-2 text-sm text-stone-700">
         {w.total}{picked.length ? ` (${picked.length})` : ""} : <strong>{fmtMoney(total, locale)}</strong>
         <span className="ml-3 text-xs text-stone-500">{w.signHint}</span>
       </div>
-      <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} selectable selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} dense fixed />
-      {edit && <WeighEditor row={edit} suppliers={suppliers} onClose={() => setEdit(null)} />}
+      <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} selectable selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} dense fixed
+        copy={{ source: w.title, fields: fieldsOf, actions: (r) => [{ label: `⚑ ${t.claims.create}`, onClick: () => { copyRow(w.title, fieldsOf(r)); router.push("/anomalies/reclamations?from=row"); } }] }}
+      />
+      {edit && <WeighEditor row={edit.row} pre={edit.pre} suppliers={suppliers} onClose={() => setEdit(null)} />}
     </>
   );
 }
 
-function WeighEditor({ row, suppliers, onClose }: { row: WeighRow; suppliers: { id: number; name: string }[]; onClose: () => void }) {
+function WeighEditor({ row, pre = {}, suppliers, onClose }: { row: WeighRow | null; pre?: RowFields; suppliers: { id: number; name: string }[]; onClose: () => void }) {
   const { t } = useI18n();
   const w = t.weigh;
   const router = useRouter();
   const s = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
-  const [v, setV] = useState({
-    date: row.dateIso, nature: row.nature, supplierId: row.supplierId ? String(row.supplierId) : "", reference: row.reference, product: row.rawProduct,
-    qtyInvoiced: s(row.qtyInvoiced), unitPrice: s(row.unitPrice), qtyWeighed: s(row.qtyWeighed), acceptableLoss: s(row.loss), detail: row.detail, claimDate: row.claimDate,
-  });
+  const preSupplier = pre.supplierId ? pre.supplierId : suppliers.find((x) => x.name.toLowerCase() === (pre.supplier ?? "").toLowerCase())?.id.toString() ?? "";
+  const dec = (x?: string) => (x ?? "").replace(".", ",");
+  const [v, setV] = useState(
+    row
+      ? {
+          date: row.dateIso, nature: row.nature, supplierId: row.supplierId ? String(row.supplierId) : "", reference: row.reference, product: row.rawProduct,
+          qtyInvoiced: s(row.qtyInvoiced), unitPrice: s(row.unitPrice), qtyWeighed: s(row.qtyWeighed), acceptableLoss: s(row.loss), detail: row.detail, claimDate: row.claimDate,
+        }
+      : {
+          date: pre.date && /^\d{4}-\d{2}-\d{2}$/.test(pre.date) ? pre.date : new Date().toISOString().slice(0, 10), nature: pre.nature ?? "", supplierId: preSupplier,
+          reference: pre.reference ?? "", product: pre.product ?? "", qtyInvoiced: dec(pre.qtyInvoiced), unitPrice: dec(pre.unitPrice), qtyWeighed: dec(pre.qtyWeighed),
+          acceptableLoss: "", detail: pre.detail ?? pre.description ?? "", claimDate: "",
+        },
+  );
   const [pending, start] = useTransition();
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setV({ ...v, [k]: e.target.value });
   const n = (x: string) => (x.trim() ? Number(x.replace(",", ".")) : null);
@@ -77,7 +105,7 @@ function WeighEditor({ row, suppliers, onClose }: { row: WeighRow; suppliers: { 
     <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 sm:items-center" onClick={onClose}>
       <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-start justify-between gap-2">
-          <h2 className="font-semibold">{w.editTitle}</h2>
+          <h2 className="font-semibold">{row ? w.editTitle : w.add}</h2>
           <button className="btn-ghost p-1.5" onClick={onClose} aria-label={t.common.close}><Icon name="x" className="h-4 w-4" /></button>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -105,10 +133,11 @@ function WeighEditor({ row, suppliers, onClose }: { row: WeighRow; suppliers: { 
           <button className="btn-secondary" onClick={onClose}>{t.common.cancel}</button>
           <button
             className="btn-primary"
-            disabled={pending}
+            disabled={pending || !v.product.trim()}
             onClick={() => start(async () => {
               const data: WeighGapInput = { ...v, supplierId: v.supplierId ? Number(v.supplierId) : null };
-              await updateWeighGapAction(row.id, data);
+              if (row) await updateWeighGapAction(row.id, data);
+              else await addWeighGapAction(data);
               onClose();
               router.refresh();
             })}

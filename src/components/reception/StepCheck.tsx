@@ -277,7 +277,7 @@ function AddProduct({ draft, setDraft, catalog, doc }: { draft: Draft; setDraft:
         <>
           <div className="relative">
             <Icon name="search" className="pointer-events-none absolute left-3 top-3 h-5 w-5 text-stone-400" />
-            <input className="input pl-10 pr-12" placeholder={t.wizard.searchProduct} value={q} onChange={(e) => setQ(e.target.value)} />
+            <input className="input pl-10 pr-12" placeholder={t.wizard.searchProduct} value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setBrowse(true); } }} />
             <button
               type="button"
               className={`absolute right-1 top-1 bottom-1 flex w-10 items-center justify-center rounded-md text-lg ${browse ? "bg-brand-50 text-brand-700" : "text-stone-500 hover:bg-stone-100"}`}
@@ -288,6 +288,7 @@ function AddProduct({ draft, setDraft, catalog, doc }: { draft: Draft; setDraft:
               {browse ? "▴" : "▾"}
             </button>
           </div>
+          <button type="button" className="btn-secondary w-full py-2 sm:w-auto" onClick={() => setBrowse(true)}><Icon name="search" className="h-4 w-4" /> {t.search.button}</button>
           {browse && results.length === 0 && <p className="text-xs text-stone-500">{t.wizard.noSupplierProducts}</p>}
           {results.length > 0 && (
             <ul className="max-h-72 divide-y divide-stone-100 overflow-y-auto rounded-lg border border-stone-200">

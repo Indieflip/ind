@@ -4,7 +4,7 @@ import { can } from "@/lib/permissions";
 import { AppNav, type NavItem } from "@/components/AppNav";
 import { getRestaurantName } from "@/lib/settings";
 import { backupSettings, lastBackup } from "@/lib/server/backup";
-import { and, count, isNotNull, isNull, lte, ne } from "drizzle-orm";
+import { and, count, eq, isNotNull, isNull, lte, ne } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await requireUser();
   const { t } = await getDict();
   const r = user.role;
+  // Demandes à l'administrateur en attente
+  let pendingRequests = 0;
+  if (r === "admin") {
+    try {
+      const [row] = await getDb().select({ n: count() }).from(schema.adminRequests).where(eq(schema.adminRequests.status, "open"));
+      pendingRequests = row?.n ?? 0;
+    } catch { /* base indisponible */ }
+  }
   const items: NavItem[] = [
     { href: "/receptions", label: t.nav.receptions, icon: "truck", show: can.viewReceptions(r) },
     { href: "/mercurial", label: t.nav.mercurial, icon: "list", show: can.viewMercurial(r) },
@@ -21,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/reporting", label: t.nav.reporting, icon: "chart", show: true },
     { href: "/consolidation", label: t.nav.consolidation, icon: "layers", show: can.viewConsolidation(r) },
     { href: "/protocoles", label: t.nav.protocols, icon: "book", show: can.viewProtocols(r) },
+    { href: "/demandes", label: t.nav.requests, icon: "inbox", show: true, badge: r === "admin" ? pendingRequests : 0 },
     { href: "/settings", label: t.nav.settings, icon: "gear", show: r === "admin" },
   ].filter((i) => i.show) as NavItem[];
 
@@ -63,6 +72,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="no-print flex flex-wrap items-center justify-center gap-2 border-b border-sky-200 bg-sky-50 px-4 py-2 text-center text-sm text-sky-900">
             {backupReminder}
             <a href="/settings/import-export#sauvegarde" className="font-semibold underline">{t.backup.reminderLink}</a>
+          </div>
+        )}
+        {pendingRequests > 0 && (
+          <div className="no-print flex flex-wrap items-center justify-center gap-2 border-b border-violet-200 bg-violet-50 px-4 py-2 text-center text-sm text-violet-900">
+            <strong>{pendingRequests}</strong> {t.requests.pending}
+            <a href="/demandes" className="font-semibold underline">{t.anomalies.reminderLink}</a>
           </div>
         )}
         {dueAnomalies > 0 && (

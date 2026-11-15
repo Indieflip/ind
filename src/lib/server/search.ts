@@ -24,7 +24,8 @@ export async function globalSearch(q: string) {
   const docs = sql`coalesce(${r.documents}::text, '')`;
   const lines = sql`coalesce((select string_agg(coalesce(${l.productName}, '') || ' ' || coalesce(${l.lot}, ''), ' ') from ${l} where ${l.receptionId} = ${r.id}), '')`;
   const notes = sql`coalesce((select string_agg(${n.text}, ' ') from ${n} where ${n.receptionId} = ${r.id}), '')`;
-  const [receptions, anomalies, gaps, products, suppliers, maj, protocols] = await Promise.all([
+  const c = schema.claims;
+  const [receptions, anomalies, gaps, products, suppliers, maj, protocols, claims] = await Promise.all([
     db.select({ id: r.id, supplierName: r.supplierName, blNumber: r.blNumber, documents: r.documents, deliveredAt: r.deliveredAt, status: r.status, consolidatedAt: r.consolidatedAt })
       .from(r).where(where([r.supplierName, r.blNumber, docs, r.driverName, r.reservesText, lines, notes], words)).orderBy(desc(r.deliveredAt)).limit(50),
     db.select({ id: a.id, supplierName: a.supplierName, productName: a.productName, description: a.description, reference: a.reference, createdAt: a.createdAt, status: a.status, receptionId: a.receptionId })
@@ -37,6 +38,8 @@ export async function globalSearch(q: string) {
     db.select({ id: m.id, date: m.date, item: m.item, detail: m.detail, reference: m.reference })
       .from(m).where(where([m.item, m.detail, m.reference, m.nature], words)).orderBy(desc(m.date)).limit(30),
     db.select({ id: pr.id, title: pr.title }).from(pr).where(where([pr.title, pr.content], words)).limit(20),
+    db.select({ id: c.id, date: c.date, supplierName: c.supplierName, subject: c.subject, status: c.status, reference: c.reference })
+      .from(c).where(where([c.supplierName, c.reference, c.product, c.subject, c.notes], words)).orderBy(desc(c.date)).limit(30),
   ]);
-  return { receptions, anomalies, gaps, products, suppliers, maj, protocols };
+  return { receptions, anomalies, gaps, products, suppliers, maj, protocols, claims };
 }
