@@ -68,6 +68,15 @@ await db.execute(sql`delete from units u where exists (select 1 from units v whe
   and upper(left(lower(v.name), 1)) || substr(lower(v.name), 2) = upper(left(lower(u.name), 1)) || substr(lower(u.name), 2))`);
 await db.execute(sql`update units set name = upper(left(lower(name), 1)) || substr(lower(name), 2) where name <> upper(left(lower(name), 1)) || substr(lower(name), 2)`);
 
+// Unités en double sous deux écritures : fusion (Pce → Pièce, Bte → Boite, Seaux / Sceaux → Seau)
+const aliases = { Pce: "Pièce", Piece: "Pièce", Bte: "Boite", "Boîte": "Boite", Seaux: "Seau", Sceaux: "Seau" };
+for (const [from, to] of Object.entries(aliases)) {
+  await db.execute(sql`insert into units (name) select ${to} where exists (select 1 from units where name = ${from}) on conflict (name) do nothing`);
+  await db.execute(sql`update products set unit = ${to} where unit = ${from}`);
+  await db.execute(sql`update reception_lines set unit = ${to} where unit = ${from}`);
+  await db.execute(sql`delete from units where name = ${from}`);
+}
+
 // Premier protocole (modifiable ensuite dans l'onglet Protocoles)
 const processPese = `## 1. Préparation et vérification de l'instrument
 
@@ -185,7 +194,7 @@ if (!seeded) {
     const supByKey = new Map();
     for (const s of supRows) if (!supByKey.has(key(s.name))) supByKey.set(key(s.name), s.id);
     const linked = new Map((await db.execute(sql`select id, fv_item_id from products where fv_item_id is not null`)).rows.map((r) => [r.fv_item_id, r.id]));
-    const cap = (u) => { const x = String(u ?? "").trim().toLowerCase(); return x ? x[0].toUpperCase() + x.slice(1) : "Kg"; };
+    const cap = (u) => { const x = String(u ?? "").trim().toLowerCase(); const n = x ? x[0].toUpperCase() + x.slice(1) : "Kg"; return aliases[n] ?? n; };
     for (const it of items) {
       let sid = supByKey.get(key(it.supplier));
       if (!sid) {
