@@ -1,5 +1,6 @@
 "use client";
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/lib/i18n/client";
 import type { Catalog, DocRef, Draft } from "@/lib/reception-types";
 import { docsOf } from "./helpers";
@@ -7,7 +8,7 @@ import { appConfirm } from "../Confirm";
 import { Icon } from "../Icon";
 import { matches } from "./helpers";
 
-export function StepDelivery({ draft, setDraft, catalog }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; catalog?: Catalog }) {
+export function StepDelivery({ draft, setDraft, catalog, editId }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; catalog?: Catalog; editId?: number }) {
   const { t } = useI18n();
   const [q, setQ] = useState("");
   const suppliers = useMemo(() => (catalog?.suppliers ?? []).filter((s) => !q || matches(s.name, q)), [catalog, q]);
@@ -93,7 +94,7 @@ export function StepDelivery({ draft, setDraft, catalog }: { draft: Draft; setDr
             onChange={(e) => setDraft((d) => ({ ...d, deliveredAt: e.target.value }))}
           />
         </div>
-        <Documents draft={draft} setDraft={setDraft} />
+        <Documents draft={draft} setDraft={setDraft} editId={editId} />
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">{t.wizard.driverName}</label>
@@ -140,7 +141,7 @@ export function StepDelivery({ draft, setDraft, catalog }: { draft: Draft; setDr
 }
 
 /** Documents de la livraison : type (bon de livraison, facture, autre) + numéro, plusieurs possibles */
-function Documents({ draft, setDraft }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void }) {
+function Documents({ draft, setDraft, editId }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; editId?: number }) {
   const { t } = useI18n();
   const w = t.wizard;
   const docs = docsOf(draft);
@@ -149,7 +150,7 @@ function Documents({ draft, setDraft }: { draft: Draft; setDraft: (fn: (d: Draft
   return (
     <div className="space-y-2">
       {docs.map((doc, i) => (
-        <div key={i} className="grid grid-cols-[1fr_1.2fr_auto] items-end gap-2">
+        <div key={i} className={`grid grid-cols-2 items-end gap-2 ${docs.length > 1 ? "rounded-lg border border-stone-200 p-2" : ""}`}>
           <label>
             <span className="label">{w.docType}</span>
             <select className="input" value={doc.type} onChange={(e) => update(docs.map((x, j) => (j === i ? { ...x, type: e.target.value as DocRef["type"] } : x)))}>
@@ -159,10 +160,15 @@ function Documents({ draft, setDraft }: { draft: Draft; setDraft: (fn: (d: Draft
             </select>
           </label>
           <label>
+            <span className="label">{w.docDate}</span>
+            <input type="date" className="input" value={doc.date ?? ""} onChange={(e) => update(docs.map((x, j) => (j === i ? { ...x, date: e.target.value } : x)))} />
+          </label>
+          <div className="col-span-2 flex items-end gap-2">
+          <label className="flex-1">
             <span className="label">{w.blNumber}</span>
             <input className="input" value={doc.number} onChange={(e) => update(docs.map((x, j) => (j === i ? { ...x, number: e.target.value } : x)))} />
           </label>
-          {docs.length > 1 ? (
+          {docs.length > 1 && (
             <button
               type="button"
               className="btn-ghost mb-0.5 p-2 text-stone-400 hover:text-red-600"
@@ -171,12 +177,47 @@ function Documents({ draft, setDraft }: { draft: Draft; setDraft: (fn: (d: Draft
             >
               <Icon name="trash" className="h-4 w-4" />
             </button>
-          ) : <span className="w-9" />}
+          )}
+          </div>
+          <DocDuplicate draft={draft} editId={editId} number={doc.number} others={docs.filter((_, j) => j !== i).map((x) => x.number.trim())} />
         </div>
       ))}
       <button type="button" className="btn-ghost px-2 py-1 text-sm text-brand-700" onClick={() => update([...docs, { type: "facture", number: "" }])}>
         <Icon name="plus" className="h-4 w-4" /> {w.addDocument}
       </button>
     </div>
+  );
+}
+
+/** Avertit si le numéro est déjà utilisé (sur ce bon ou sur une autre réception du même fournisseur) */
+function DocDuplicate({ draft, editId, number, others }: { draft: Draft; editId?: number; number: string; others: string[] }) {
+  const { t, locale } = useI18n();
+  const w = t.wizard;
+  const n = number.trim();
+  const [dup, setDup] = useState<null | { receptionId: number; seq: number | null; deliveredAt: string }>(null);
+  useEffect(() => {
+    setDup(null);
+    if (!n || (!draft.supplierId && !draft.supplierName.trim())) return;
+    const ctl = new AbortController();
+    const timer = setTimeout(() => {
+      const qs = new URLSearchParams({ number: n, supplierId: String(draft.supplierId ?? ""), supplierName: draft.supplierName, exclude: String(editId ?? "") });
+      fetch(`/api/receptions/doc-check?${qs}`, { signal: ctl.signal })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => setDup(j?.duplicate ?? null))
+        .catch(() => {});
+    }, 400);
+    return () => { clearTimeout(timer); ctl.abort(); };
+  }, [n, draft.supplierId, draft.supplierName, editId]);
+  const twice = !!n && others.some((o) => o.toLowerCase() === n.toLowerCase());
+  if (!twice && !dup) return null;
+  return (
+    <p className="col-span-2 rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-800">
+      {twice ? w.docTwice : (
+        <>
+          {w.docUsed} {dup!.seq ? `n° ${dup!.seq}` : ""} {w.docUsedOf} {new Date(dup!.deliveredAt).toLocaleDateString(locale === "en" ? "en-GB" : "fr-FR")}.{" "}
+          <Link href={`/receptions/${dup!.receptionId}`} target="_blank" className="font-semibold underline">{w.docOpen}</Link>
+        </>
+      )}
+    </p>
   );
 }

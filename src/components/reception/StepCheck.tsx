@@ -11,7 +11,7 @@ import { Icon } from "../Icon";
 import { UnitSelect } from "../UnitSelect";
 import { similarity } from "@/lib/fuzzy";
 import { PhotoButton, Thumbs } from "./PhotoButton";
-import { docNumbers, docsOf, evaluate, isBakerySupplier, lineDoc, lineFromProduct, matches, priceCheck, suggestedReason, withAutoDecision } from "./helpers";
+import { dlcRequired, needsDlc, docNumbers, docsOf, evaluate, isBakerySupplier, lineDoc, lineFromProduct, matches, priceCheck, suggestedReason, withAutoDecision } from "./helpers";
 import { az } from "@/lib/search";
 
 const DEFAULT_UNITS = ["Pièce", "Kg", "Litre", "Sachet"];
@@ -32,7 +32,8 @@ export function StepCheck({
   // Saisie par document : avec plusieurs BL / factures, les produits sont saisis document par document
   const docs = docsOf(draft).filter((x) => x.number.trim());
   const nums = docNumbers(draft);
-  const [active, setActive] = useState(nums[0] ?? "");
+  const firstUndecided = draft.lines.find((l) => !l.decision);
+  const [active, setActive] = useState(firstUndecided ? lineDoc(draft, firstUndecided) : nums[0] ?? "");
   const current = nums.includes(active) ? active : nums[0] ?? "";
   const multi = nums.length > 1;
   const shown = multi ? draft.lines.filter((l) => lineDoc(draft, l) === current) : draft.lines;
@@ -110,7 +111,7 @@ function LineCard({
   );
 
   return (
-    <article className={`card border-l-4 ${style.border} p-4`}>
+    <article id={`line-${line.key}`} className={`card scroll-mt-32 border-l-4 ${style.border} p-4 ${!line.decision ? "ring-2 ring-amber-300" : ""}`}>
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="min-w-0">
           {line.productId ? (
@@ -186,7 +187,10 @@ function LineCard({
             <input className={`input py-2 ${ev.issues.includes("temp_missing") ? "border-amber-400" : ""}`} inputMode="decimal" value={line.temperature} onChange={(e) => onChange({ temperature: e.target.value })} />
           </div>
         )}
-        {field("dlc", t.wizard.dlc, { type: "date" })}
+        <div>
+          <label className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.dlc}{dlcRequired(line, catalog) && <span className="ml-0.5 text-red-600">*</span>}</label>
+          <input type="date" className={`input py-2 ${needsDlc(line, catalog) ? "border-amber-400 bg-amber-50" : ""}`} value={line.dlc} onChange={(e) => onChange({ dlc: e.target.value })} />
+        </div>
         {field("lot", t.wizard.lot)}
         <div>
           <label className="mb-0.5 block text-xs font-medium text-stone-600">

@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { assertUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
-import { LockedError, payloadSchema, updateReception } from "@/lib/server/receptions";
+import { DuplicateDocError, LockedError, payloadSchema, updateReception } from "@/lib/server/receptions";
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   let user;
@@ -19,6 +19,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     res = await updateReception(id, parsed.data, user);
   } catch (e) {
     if (e instanceof LockedError) return Response.json({ error: "consolidated" }, { status: 409 });
+    if (e instanceof DuplicateDocError) return Response.json({ error: "duplicate_doc", duplicate: e.info }, { status: 409 });
     throw e;
   }
   if (res == null) return Response.json({ error: "not_found" }, { status: 404 });

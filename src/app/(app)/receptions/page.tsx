@@ -6,6 +6,7 @@ import { fmtDateTime } from "@/lib/format";
 import { listReceptions, one, receptionFilters, type SP } from "@/lib/server/queries";
 import { Field, PageHeader, qs } from "@/components/ui";
 import { Icon } from "@/components/Icon";
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { DraftBanner, DeleteDraftButton } from "@/components/reception/DraftBanner";
 import { ReceptionsTable } from "./ReceptionsTable";
 import { desc, eq } from "drizzle-orm";
@@ -26,6 +27,7 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
   ]);
   return (
     <>
+      <GlobalSearch label={t.search.title} placeholder={t.search.placeholder} button={t.search.button} />
       <PageHeader title={t.receptions.title}>
         <a className="btn-secondary" href={`/api/export/receptions${qs({ ...f })}`}>
           <Icon name="download" className="h-4 w-4" /> {t.common.exportCsv}

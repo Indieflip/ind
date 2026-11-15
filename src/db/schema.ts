@@ -146,7 +146,7 @@ export const receptions = pgTable(
     updatedBy: integer("updated_by").references(() => users.id),
     updatedAt: timestamp("updated_at", { withTimezone: true }),
     /** Documents de la livraison : [{ type: "bl" | "facture" | "autre", number }] */
-    documents: jsonb("documents").$type<{ type: string; number: string }[]>(),
+    documents: jsonb("documents").$type<{ type: string; number: string; date?: string | null }[]>(),
     /** Consolidation = validation : le bon ne peut plus être modifié ni supprimé */
     consolidatedAt: timestamp("consolidated_at", { withTimezone: true }),
     consolidatedBy: integer("consolidated_by").references(() => users.id),

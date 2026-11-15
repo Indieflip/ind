@@ -24,10 +24,10 @@ export function AppNav(props: {
       {/* Ordinateur : barre latérale */}
       <aside className="no-print sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-stone-200 bg-white lg:flex">
         <div className="flex items-center gap-3 px-5 py-5">
-          <img src="/icon.svg" alt="" className="h-9 w-9" />
+          <img src="/icon.svg" alt="" className="h-9 w-9 shrink-0" />
           <div className="min-w-0">
-            <div className="truncate text-sm font-bold">{props.appName}</div>
-            <div className="truncate text-xs text-stone-500">{props.restaurant}</div>
+            <div className="text-sm font-bold leading-snug">{props.appName}</div>
+            <div className="text-xs leading-snug text-stone-500">{props.restaurant}</div>
           </div>
         </div>
         <nav className="flex-1 space-y-1 px-3">
@@ -60,7 +60,10 @@ export function AppNav(props: {
       <header className="no-print sticky top-0 z-20 flex items-center justify-between border-b border-stone-200 bg-white/95 px-4 py-2.5 backdrop-blur lg:hidden" style={{ paddingTop: "max(0.625rem, env(safe-area-inset-top))" }}>
         <div className="flex items-center gap-2">
           <img src="/icon.svg" alt="" className="h-7 w-7" />
-          <span className="text-sm font-bold">{props.appName}</span>
+          <div className="min-w-0 leading-tight">
+            <div className="text-sm font-bold">{props.appName}</div>
+            <div className="text-[11px] text-stone-500">{props.restaurant}</div>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <LocaleSwitch />

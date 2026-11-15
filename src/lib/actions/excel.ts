@@ -9,7 +9,7 @@ export async function importExcelAction(_p: { report?: ImportReport; error?: str
   const user = await assertUser(can.importFile);
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) return { error: "nofile" };
-  if (!/\.xlsx$/i.test(file.name)) return { error: "format" };
+  if (!/\.xls[xm]$/i.test(file.name)) return { error: "format" };
   try {
     const report = await importWorkbook(await file.arrayBuffer(), {
       mercurial: form.get("mercurial") === "on",

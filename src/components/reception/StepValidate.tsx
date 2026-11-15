@@ -2,7 +2,7 @@
 import { useI18n } from "@/lib/i18n/client";
 import type { Catalog, Draft } from "@/lib/reception-types";
 import { decisionStyles } from "../DecisionBadge";
-import { docNumbers, docsOf, lineDoc, needsTemp, priceGap } from "./helpers";
+import { docNumbers, docsOf, lineDoc, needsDlc, needsTemp, priceGap } from "./helpers";
 import { SignaturePad } from "./SignaturePad";
 
 export function StepValidate({
@@ -23,6 +23,7 @@ export function StepValidate({
     return g != null && g !== 0;
   }).length;
   const missingTemps = draft.lines.filter((l) => needsTemp(l, catalog));
+  const missingDlc = draft.lines.filter((l) => needsDlc(l, catalog));
   const undecided = draft.lines.filter((l) => !l.decision);
 
   const w = t.wizard;
@@ -90,6 +91,14 @@ export function StepValidate({
         <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
           <strong>{undecided.length}</strong> {w.undecided} :
           <ul className="mt-1 list-inside list-disc">{undecided.map((l) => <li key={l.key}>{l.productName}</li>)}</ul>
+          <button type="button" className="btn-secondary mt-2" onClick={() => setDraft((d) => ({ ...d, step: 2 }))}>{t.common.back}</button>
+        </section>
+      )}
+
+      {missingDlc.length > 0 && (
+        <section className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+          <strong>{missingDlc.length}</strong> {w.missingDlc} :
+          <ul className="mt-1 list-inside list-disc">{missingDlc.map((l) => <li key={l.key}>{l.productName}</li>)}</ul>
           <button type="button" className="btn-secondary mt-2" onClick={() => setDraft((d) => ({ ...d, step: 2 }))}>{t.common.back}</button>
         </section>
       )}

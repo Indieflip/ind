@@ -124,6 +124,16 @@ export function priceGap(line: DraftLine) {
   return c.kind === "increase" || c.kind === "decrease" || c.kind === "locked" ? c.pct : null;
 }
 
+/** Catégories dont la DLC / DDM est obligatoire : viandes, poissons, surgelés */
+export const DLC_REQUIRED = ["meat", "fish", "frozen"];
+export function dlcRequired(line: DraftLine, catalog: Catalog | undefined) {
+  const cat = catalog?.categories.find((c) => c.id === line.categoryId);
+  return !!cat && DLC_REQUIRED.includes(cat.code);
+}
+export function needsDlc(line: DraftLine, catalog: Catalog | undefined) {
+  return dlcRequired(line, catalog) && !line.dlc && line.decision !== "refuse";
+}
+
 export function needsTemp(line: DraftLine, catalog: Catalog | undefined) {
   const cat = catalog?.categories.find((c) => c.id === line.categoryId);
   return !!cat?.tempRequired && num(line.temperature) == null && line.decision !== "refuse";
@@ -158,7 +168,7 @@ export function toPayload(d: Draft): ReceptionPayload {
     supplierName: d.supplierName.trim(),
     deliveredAt: new Date(d.deliveredAt).toISOString(),
     blNumber: docsOf(d).find((x) => x.number.trim())?.number.trim() || d.blNumber.trim() || null,
-    documents: docsOf(d).filter((x) => x.number.trim()).map((x) => ({ type: x.type, number: x.number.trim() })),
+    documents: docsOf(d).filter((x) => x.number.trim()).map((x) => ({ type: x.type, number: x.number.trim(), date: x.date || undefined })),
     driverName: d.driverName.trim() || null,
     truckTemp: num(d.truckTemp),
     vehicleClean: d.vehicleClean,

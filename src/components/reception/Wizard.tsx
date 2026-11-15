@@ -7,7 +7,7 @@ import { useI18n } from "@/lib/i18n/client";
 import type { Catalog, Draft, DraftLine } from "@/lib/reception-types";
 import { clearDraft, enqueue, fetchCatalog, loadCatalogCache, loadDraft, saveDraft, saveServerDraft, sendReception } from "@/lib/client/offline";
 import { Icon } from "../Icon";
-import { buildReservesText, docsOf, lineFromProduct, newDraft, toPayload, withAutoDecision } from "./helpers";
+import { buildReservesText, docsOf, needsDlc, lineFromProduct, newDraft, toPayload, withAutoDecision } from "./helpers";
 import { StepDelivery } from "./StepDelivery";
 import { StepPhoto } from "./StepPhoto";
 import { ReadingBanner } from "./ReadingBanner";
@@ -182,7 +182,17 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
     if (!draft) return;
     const undecided = draft.lines.filter((l) => !l.decision);
     if (undecided.length) {
+      // On ramène l'utilisateur sur le premier produit à décider (sinon le bouton semble ne rien faire)
       setError(`${undecided.length} ${t.wizard.undecided}`);
+      if (draft.step !== 2) go(2);
+      setTimeout(() => document.getElementById(`line-${undecided[0].key}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+      return;
+    }
+    const noDlc = draft.lines.filter((l) => needsDlc(l, catalog));
+    if (noDlc.length) {
+      setError(`${noDlc.length} ${t.wizard.missingDlc}`);
+      if (draft.step !== 2) go(2);
+      setTimeout(() => document.getElementById(`line-${noDlc[0].key}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
       return;
     }
     setSaving(true);
@@ -198,7 +208,10 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
       await clearDraft();
       setDone({ id });
     } catch (e) {
-      if (editId || (e as { fatal?: boolean }).fatal) {
+      if ((e as Error).message === "duplicate_doc") {
+        setError(t.wizard.docDuplicateSave);
+        go(1);
+      } else if (editId || (e as { fatal?: boolean }).fatal) {
         setError(`${t.common.error} : ${(e as Error).message}`);
       } else {
         await enqueue(payload);
@@ -281,11 +294,20 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
           />
         )}
         {draft.step > 0 && draft.step < 3 && <ReadingBanner draft={draft} count={readCount || draft.lines.filter((l) => l.fromBl).length} onRetry={() => readBl(draft)} />}
-        {draft.step === 1 && <StepDelivery draft={draft} setDraft={setDraft} catalog={catalog} />}
+        {draft.step === 1 && <StepDelivery draft={draft} setDraft={setDraft} catalog={catalog} editId={editId} />}
         {draft.step === 2 && <StepCheck draft={draft} setDraft={setDraft} updateLine={updateLine} catalog={catalog} />}
         {draft.step === 3 && <StepValidate draft={draft} setDraft={setDraft} catalog={catalog} autoReserves={autoReserves} />}
-        {info && <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{info}</p>}
-        {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        {(info || error) && (
+          <div className="pointer-events-none fixed inset-x-0 bottom-24 z-30 mx-auto max-w-2xl px-3">
+            {info && <p className="pointer-events-auto rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 shadow-lg">{info}</p>}
+            {error && (
+              <p className="pointer-events-auto flex items-start justify-between gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700 shadow-lg">
+                {error}
+                <button type="button" className="text-red-400" aria-label={t.common.close} onClick={() => setError("")}>✕</button>
+              </p>
+            )}
+          </div>
+        )}
         {draft.step === 0 && !editId && (
           <button
             type="button"

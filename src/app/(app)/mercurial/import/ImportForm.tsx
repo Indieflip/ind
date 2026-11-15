@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { importExcelAction } from "@/lib/actions/excel";
 import { useI18n } from "@/lib/i18n/client";
@@ -12,13 +12,41 @@ export function ImportForm() {
   const r = state?.report;
   const router = useRouter();
   const form = useRef<HTMLFormElement>(null);
-  // Après chaque import : le champ fichier est vidé
-  useEffect(() => { if (state) form.current?.reset(); if (r) router.refresh(); }, [state, r, router]);
+  const input = useRef<HTMLInputElement>(null);
+  const [fileName, setFileName] = useState("");
+  const [inputKey, setInputKey] = useState(0);
+  const [showReport, setShowReport] = useState(true);
+  const clearFile = () => { setFileName(""); setInputKey((k) => k + 1); };
+  // Après chaque import : le champ fichier est vidé, on peut en choisir un autre
+  useEffect(() => { if (state) clearFile(); if (r) router.refresh(); }, [state, r, router]);
   return (
     <div className="max-w-2xl space-y-4">
-      <form ref={form} action={action} className="card space-y-4 p-4">
+      <form ref={form} action={(fd) => { setShowReport(true); action(fd); }} className="card space-y-4 p-4">
         <p className="text-sm text-stone-600">{x.intro}</p>
-        <input type="file" name="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required className="block text-sm" />
+        <ul className="list-inside list-disc text-xs text-stone-500">{x.kinds.map((k) => <li key={k}>{k}</li>)}</ul>
+        <input
+          key={inputKey}
+          ref={input}
+          type="file"
+          name="file"
+          accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          required
+          className="sr-only"
+          onChange={(e) => { setFileName(e.target.files?.[0]?.name ?? ""); setShowReport(false); }}
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="btn-secondary" onClick={() => input.current?.click()}>
+            <Icon name="file" className="h-4 w-4" /> {fileName ? x.changeFile : x.chooseFile}
+          </button>
+          {fileName ? (
+            <span className="flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-1 text-sm font-medium text-brand-800">
+              {fileName}
+              <button type="button" className="px-1 text-stone-500 hover:text-red-600" aria-label={x.removeFile} title={x.removeFile} onClick={clearFile}>✕</button>
+            </span>
+          ) : (
+            <span className="text-sm text-stone-500">{x.noFile}</span>
+          )}
+        </div>
         <fieldset className="space-y-2">
           <legend className="label">{x.sheets}</legend>
           {(
@@ -37,10 +65,10 @@ export function ImportForm() {
           ))}
         </fieldset>
         <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">{x.warning}</p>
-        <button className="btn-primary" disabled={pending}><Icon name="download" className="h-4 w-4 rotate-180" /> {pending ? x.running : x.run}</button>
+        <button className="btn-primary" disabled={pending || !fileName}><Icon name="download" className="h-4 w-4 rotate-180" /> {pending ? x.running : x.run}</button>
         {state?.error && <p className="text-sm text-red-600">{x.errors[state.error as keyof typeof x.errors] ?? t.common.error}</p>}
       </form>
-      {r && (
+      {r && showReport && (
         <div className="card space-y-1 p-4 text-sm">
           <h2 className="mb-2 font-semibold text-emerald-700">{x.done}</h2>
           {r.mercurial && <p>{x.mercurial} : {r.mercurial.created} {x.created}, {r.mercurial.updated} {x.updated}, {r.mercurial.deactivated} {x.deactivated}, {r.mercurial.suppliers} {x.newSuppliers}</p>}

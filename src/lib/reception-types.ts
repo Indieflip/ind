@@ -72,7 +72,7 @@ export interface DraftLine {
 }
 
 export type DocType = "bl" | "facture" | "autre";
-export interface DocRef { type: DocType; number: string }
+export interface DocRef { type: DocType; number: string; /** Date figurant sur le document (AAAA-MM-JJ) */ date?: string }
 
 export interface Draft {
   clientUuid: string;

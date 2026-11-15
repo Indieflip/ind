@@ -1,11 +1,11 @@
 import "server-only";
 import { unitName } from "@/lib/units";
-import { normalize } from "@/lib/search";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { nameKey, normalize } from "@/lib/search";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { num } from "@/lib/format";
-import { receptionStatus } from "@/lib/rules";
+import { evaluateLine, receptionStatus } from "@/lib/rules";
 import { checkPrice, fvRange, parisMonth, type PriceCheck, type PriceRef } from "@/lib/pricing";
 
 const fmtEuro = (n: number | null | undefined) => (n == null ? "—" : `${n.toFixed(2).replace(".", ",")} €`);
@@ -35,7 +35,7 @@ export const payloadSchema = z.object({
   supplierName: z.string().trim().min(1).max(200),
   deliveredAt: z.string().datetime({ offset: true }),
   blNumber: z.string().max(100).nullable(),
-  documents: z.array(z.object({ type: z.enum(["bl", "facture", "autre"]), number: z.string().max(100) })).max(10).optional(),
+  documents: z.array(z.object({ type: z.enum(["bl", "facture", "autre"]), number: z.string().max(100), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish() })).max(10).optional(),
   driverName: z.string().max(100).nullable(),
   truckTemp: z.number().nullable(),
   vehicleClean: z.boolean().nullable(),
@@ -110,7 +110,7 @@ async function writeContent(
   p: Payload,
   user: SessionUser,
   t: Dict,
-  keep: { products: Set<string>; hygiene: boolean; missingBl?: boolean; locked?: Set<number> } = { products: new Set(), hygiene: false },
+  keep: { products: Set<string>; hygiene: boolean; missingBl?: boolean; locked?: Set<number>; truck?: boolean } = { products: new Set(), hygiene: false },
   claims: Map<number, string> = new Map(),
   /** Modification : produits dont le prix du bon n'a pas changé → ni écart ni mercurial touchés (prix de référence d'origine conservé) */
   unchanged: Map<number, PriceRef> = new Map(),
@@ -124,7 +124,7 @@ async function writeContent(
 
   // Suivi Viande / Poisson : kg facturés des produits de ces catégories, à la date de livraison
   await tx.delete(schema.meatFishEntries).where(eq(schema.meatFishEntries.receptionId, recId));
-  const cats = await tx.select({ id: schema.categories.id, code: schema.categories.code, nameFr: schema.categories.nameFr }).from(schema.categories);
+  const cats = await tx.select().from(schema.categories);
   const kindOf = (cid: number | null) => {
     const code = cats.find((c) => c.id === cid)?.code;
     return code === "meat" ? "viande" : code === "fish" ? "poisson" : null;
@@ -285,7 +285,29 @@ async function writeContent(
       await tx.insert(schema.receptionPhotos).values({ receptionId: recId, lineId: line.id, kind: "issue", url });
     }
 
-    // Onglet Anomalies : une anomalie par produit en réserve ou refusé
+    // Onglet Anomalies : une anomalie par produit en réserve ou refusé, ou dès qu'un contrôle détecte un problème
+    // (température, DLC, quantité), même si le produit a été accepté
+    const cat = cats.find((c) => c.id === l.categoryId);
+    const detected = evaluateLine(
+      { qtyOrdered: l.qtyOrdered, qtyReceived: l.qtyReceived, temperature: l.temperature, dlc: l.dlc, categoryId: l.categoryId },
+      cat ? { ...cat, conformMax: cat.conformMax, reserveMax: cat.reserveMax } : undefined,
+      date,
+    ).issues.filter((i) => i !== "temp_missing");
+    if (l.decision === "conform" && detected.length && !keep.products.has(l.productName.toLowerCase())) {
+      const first = detected[0];
+      let detail = "";
+      if (l.qtyOrdered != null && l.qtyReceived != null && l.qtyReceived !== l.qtyOrdered) {
+        const diff = Math.round((l.qtyReceived - l.qtyOrdered) * 1000) / 1000;
+        detail = ` (${diff > 0 ? "+" : ""}${diff} ${l.unit})`;
+      }
+      await tx.insert(schema.anomalies).values({
+        receptionId: recId, lineId: line.id, supplierId, supplierName, productName: l.productName,
+        nature: natureOf(l.categoryId), reference: lineRef(l),
+        type: first.startsWith("temp") ? "temperature" : first.startsWith("dlc") ? "dlc" : first === "qty_less" ? "missing" : "quantity",
+        description: `${t.anomalies.detected} — ${l.productName} : ${detected.map((i) => (t.issues as Record<string, string>)[i] ?? i).join(", ")}${detail}${l.temperature != null && first.startsWith("temp") ? ` (${l.temperature} °C)` : ""}`,
+        photoUrl: l.photos[0] ?? null, createdBy: user.id, createdAt: date,
+      });
+    }
     if (l.decision !== "conform" && !keep.products.has(l.productName.toLowerCase())) {
       const reasonLabel = l.reason ? (t.reasons as Record<string, string>)[l.reason] ?? l.reason : t.decision[l.decision];
       let detail = "";
@@ -318,6 +340,14 @@ async function writeContent(
     });
   }
 
+  // Température du camion trop élevée (au-delà de 4 °C)
+  if (p.truckTemp != null && p.truckTemp > 4 && !keep.truck) {
+    await tx.insert(schema.anomalies).values({
+      receptionId: recId, supplierId, supplierName, type: "temperature", reference: docRef,
+      description: `${t.wizard.truckTemp} : ${String(p.truckTemp).replace(".", ",")} °C`, createdBy: user.id, createdAt: date,
+    });
+  }
+
   if (p.vehicleClean === false && !keep.hygiene) {
     await tx.insert(schema.anomalies).values({
       receptionId: recId, supplierId, supplierName, type: "hygiene", reference: docRef,
@@ -326,6 +356,36 @@ async function writeContent(
   }
 }
 
+/** Un numéro de BL / facture ne peut servir qu'à une seule réception par fournisseur */
+export class DuplicateDocError extends Error {
+  constructor(public info: { receptionId: number; number: string; deliveredAt: Date }) {
+    super("duplicate_doc");
+  }
+}
+
+const docKey = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "");
+
+export async function findDocDuplicate(q: { supplierId: number | null; supplierName: string; numbers: string[]; excludeId?: number | null }) {
+  const wanted = new Set(q.numbers.map(docKey).filter(Boolean));
+  if (!wanted.size) return null;
+  const r = schema.receptions;
+  const rows = await getDb()
+    .select({ id: r.id, supplierId: r.supplierId, supplierName: r.supplierName, blNumber: r.blNumber, documents: r.documents, deliveredAt: r.deliveredAt })
+    .from(r)
+    .where(q.supplierId ? eq(r.supplierId, q.supplierId) : sql`true`);
+  const key = nameKey(q.supplierName);
+  for (const x of rows) {
+    if (x.id === q.excludeId) continue;
+    if (!q.supplierId && nameKey(x.supplierName) !== key) continue;
+    const nums = [...(x.documents ?? []).map((d) => d.number), ...(x.blNumber ? [x.blNumber] : [])];
+    const hit = nums.find((n) => wanted.has(docKey(n)));
+    if (hit) return { receptionId: x.id, number: hit, deliveredAt: x.deliveredAt };
+  }
+  return null;
+}
+
+const payloadNumbers = (p: Payload) => [...(p.documents ?? []).map((d) => d.number), ...(p.blNumber ? [p.blNumber] : [])];
+
 /** Enregistre une réception complète (idempotent grâce à clientUuid). */
 export async function saveReception(p: Payload, user: SessionUser): Promise<number> {
   const db = getDb();
@@ -333,6 +393,8 @@ export async function saveReception(p: Payload, user: SessionUser): Promise<numb
 
   const existing = await db.query.receptions.findFirst({ where: eq(schema.receptions.clientUuid, p.clientUuid), columns: { id: true } });
   if (existing) return existing.id;
+  const dup = await findDocDuplicate({ supplierId: p.supplierId, supplierName: p.supplierName, numbers: payloadNumbers(p) });
+  if (dup) throw new DuplicateDocError(dup);
 
   return db.transaction(async (tx) => {
     const supplier = await resolveSupplier(tx, p);
@@ -357,6 +419,8 @@ export class LockedError extends Error {}
 export async function updateReception(id: number, p: Payload, user: SessionUser): Promise<number | null> {
   const db = getDb();
   const t = dictFor(user.locale);
+  const dup = await findDocDuplicate({ supplierId: p.supplierId, supplierName: p.supplierName, numbers: payloadNumbers(p), excludeId: id });
+  if (dup) throw new DuplicateDocError(dup);
   return db.transaction(async (tx) => {
     const rec = await tx.query.receptions.findFirst({ where: eq(schema.receptions.id, id) });
     if (!rec) return null;
@@ -403,18 +467,22 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
 
     // 2. Anomalies : on garde celles déjà traitées
     const anomalies = await tx.select().from(schema.anomalies).where(eq(schema.anomalies.receptionId, id));
-    const keep = { products: new Set<string>(), hygiene: false, missingBl: false, locked: new Set<number>() };
+    const keep = { products: new Set<string>(), hygiene: false, missingBl: false, locked: new Set<number>(), truck: false };
+    // Une anomalie déjà suivie (action, relance, résultat, consolidation) n'est jamais recréée ni supprimée
+    const touched = (a: (typeof anomalies)[number]) => a.status !== "open" || !!a.followUp || !!a.nextActionAt || !!a.result || !!a.consolidatedAt || !!a.lastActionAt;
     for (const a of anomalies) {
-      if (a.status === "open") continue;
+      if (!touched(a)) continue;
       if (a.type === "missing_bl") keep.missingBl = true;
       else if (a.type === "locked_price") {
         const pr = a.productName ? oldLines.find((o) => o.productName === a.productName) : undefined;
         if (pr?.productId) keep.locked.add(pr.productId);
       }
       else if (a.type === "hygiene" && !a.productName) keep.hygiene = true;
+      else if (a.type === "temperature" && !a.productName) keep.truck = true;
       else if (a.productName) keep.products.add(a.productName.toLowerCase());
     }
-    await tx.delete(schema.anomalies).where(and(eq(schema.anomalies.receptionId, id), eq(schema.anomalies.status, "open")));
+    const drop = anomalies.filter((a) => !touched(a)).map((a) => a.id);
+    if (drop.length) await tx.delete(schema.anomalies).where(inArray(schema.anomalies.id, drop));
 
     // 3. Réécrire le contenu
     await tx.delete(schema.receptionPhotos).where(eq(schema.receptionPhotos.receptionId, id));

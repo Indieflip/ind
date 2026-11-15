@@ -243,7 +243,9 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
         const table = ["| Prestataire | Produit | Tare (kg) | Contenant |", ...rowsOut.map((r) => `| ${r.join(" | ")} |`)];
         const section = ["## Liste des contenants (tares)", "Poids des contenants à déduire du poids pesé (poids net = poids total − tares).", ...table].join("\n");
         const [p] = await db.select().from(schema.protocols).where(sql`lower(${schema.protocols.title}) = lower('Process pèse')`).limit(1);
-        const base = (p?.content ?? "").split(/\n## Liste des contenants/)[0].trimEnd();
+        const intro = "Tares des contenants : voir la « Liste des contenants (tares) » en bas de ce protocole (poids en kg à déduire du poids pesé).";
+        let base = (p?.content ?? "").split(/\n## Liste des contenants/)[0].trimEnd();
+        if (!base.startsWith("Tares des contenants : voir")) base = `${intro}\n\n${base}`;
         await upsertProtocol("Process pèse", base ? `${base}\n\n${section}` : section, 1);
       }
 
@@ -351,7 +353,7 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
         }
       });
       await normalizeMajLog();
-      await setSetting("maj_normalized_v1", "1");
+      await setSetting("maj_normalized_v3", "1");
       report.maj = rows.length;
     }
   }
