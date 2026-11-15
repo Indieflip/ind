@@ -60,8 +60,10 @@ export interface DraftLine {
   mercurialPrice: number | null;
   mercurialMin?: number | null;
   priceLocked?: boolean;
-  decision: Decision;
-  decisionManual: boolean;
+  /** Choisie par l'utilisateur (jamais cochée automatiquement) ; null = pas encore choisie */
+  decision: Decision | null;
+  /** Ancien champ, conservé pour les brouillons existants */
+  decisionManual?: boolean;
   reason: Reason | "";
   photos: string[]; // data URL ou URL déjà envoyée
   fromBl?: boolean;

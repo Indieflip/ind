@@ -1,4 +1,5 @@
 "use client";
+import { appConfirm } from "@/components/Confirm";
 import { useI18n } from "@/lib/i18n/client";
 import type { Draft } from "@/lib/reception-types";
 import { Icon } from "../Icon";
@@ -27,8 +28,8 @@ export function StepPhoto({
         <p className="text-sm text-stone-600">{w.photoHint}</p>
         <Thumbs
           photos={draft.blPhotos}
-          onRemove={(i) => {
-            if (!confirm(w.removePhotoConfirm)) return;
+          onRemove={async (i) => {
+            if (!await appConfirm(w.removePhotoConfirm)) return;
             setDraft((d) => ({ ...d, blPhotos: d.blPhotos.filter((_, j) => j !== i), photoOk: false, blRead: "idle" }));
           }}
         />
@@ -51,8 +52,8 @@ export function StepPhoto({
             <button
               type="button"
               className="btn-secondary btn-lg"
-              onClick={() => {
-                if (confirm(w.retakeConfirm)) setDraft((d) => ({ ...d, blPhotos: [], photoOk: false, blRead: "idle" }));
+              onClick={async () => {
+                if (await appConfirm(w.retakeConfirm)) setDraft((d) => ({ ...d, blPhotos: [], photoOk: false, blRead: "idle" }));
               }}
             >
               {w.photoCheckNo}

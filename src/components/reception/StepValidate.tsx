@@ -23,6 +23,7 @@ export function StepValidate({
     return g != null && g !== 0;
   }).length;
   const missingTemps = draft.lines.filter((l) => needsTemp(l, catalog));
+  const undecided = draft.lines.filter((l) => !l.decision);
 
   const w = t.wizard;
   const dash = (v: string | null | undefined) => (v && String(v).trim() ? v : "—");
@@ -61,7 +62,7 @@ export function StepValidate({
                     <td className="px-1 text-right tabular-nums">{dash(l.temperature)}</td>
                     <td className="px-1 whitespace-nowrap">{l.dlc ? l.dlc.split("-").reverse().join("/") : "—"}</td>
                     <td className="px-1 text-right tabular-nums">{dash(l.unitPrice)}</td>
-                    <td className="pl-1"><span className={`badge ${decisionStyles[l.decision].badge}`}>{t.decision[l.decision]}</span></td>
+                    <td className="pl-1">{l.decision ? <span className={`badge ${decisionStyles[l.decision].badge}`}>{t.decision[l.decision]}</span> : <span className="badge bg-amber-100 text-amber-900">{w.toDecide}</span>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -82,6 +83,14 @@ export function StepValidate({
         </div>
         {gaps > 0 && <p className="mt-3 text-sm text-stone-700"><strong>{gaps}</strong> {t.wizard.priceGaps}</p>}
       </section>
+
+      {undecided.length > 0 && (
+        <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <strong>{undecided.length}</strong> {w.undecided} :
+          <ul className="mt-1 list-inside list-disc">{undecided.map((l) => <li key={l.key}>{l.productName}</li>)}</ul>
+          <button type="button" className="btn-secondary mt-2" onClick={() => setDraft((d) => ({ ...d, step: 2 }))}>{t.common.back}</button>
+        </section>
+      )}
 
       {missingTemps.length > 0 && (
         <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">

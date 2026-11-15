@@ -14,7 +14,7 @@ export async function addSupplierAction(_p: R, form: FormData): Promise<R> {
   const name = String(form.get("name") ?? "").trim();
   if (!name) return { error: "invalid" };
   await getDb().insert(schema.suppliers).values({ name }).onConflictDoNothing();
-  revalidatePath("/mercurial/fournisseurs");
+  revalidatePath("/mercurial", "layout");
   return { ok: true };
 }
 
@@ -27,8 +27,7 @@ export async function updateSupplierAction(id: number, data: { name?: string; em
   if (data.notes !== undefined) set.notes = data.notes.trim() || null;
   if (data.active !== undefined) set.active = data.active;
   await getDb().update(schema.suppliers).set(set).where(eq(schema.suppliers.id, id));
-  revalidatePath(`/mercurial/fournisseurs/${id}`);
-  revalidatePath("/mercurial/fournisseurs");
+  revalidatePath("/mercurial", "layout");
 }
 
 export async function addProductAction(_p: R, form: FormData): Promise<R> {
@@ -40,7 +39,7 @@ export async function addProductAction(_p: R, form: FormData): Promise<R> {
   const price = num(form.get("price"));
   if (!supplierId || !name || !unit || !categoryId) return { error: "invalid" };
   await getDb().insert(schema.products).values({ supplierId, name, unit, categoryId, price: price != null ? String(price) : null });
-  revalidatePath(`/mercurial/fournisseurs/${supplierId}`);
+  revalidatePath("/mercurial", "layout");
   return { ok: true };
 }
 
@@ -52,7 +51,7 @@ export async function updateProductAction(id: number, data: { name?: string; uni
   if (data.categoryId !== undefined) set.categoryId = data.categoryId;
   if (data.active !== undefined) set.active = data.active;
   const [p] = await getDb().update(schema.products).set(set).where(eq(schema.products.id, id)).returning();
-  if (p) revalidatePath(`/mercurial/fournisseurs/${p.supplierId}`);
+  if (p) revalidatePath("/mercurial", "layout");
 }
 
 function norm(s: string) {
@@ -114,6 +113,6 @@ export async function importCatalogAction(_p: R, form: FormData): Promise<R> {
       created++;
     }
   }
-  revalidatePath("/mercurial/fournisseurs");
+  revalidatePath("/mercurial", "layout");
   return { ok: true, message: `+${created} / ~${updated} / ${skipped}` };
 }

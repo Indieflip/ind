@@ -54,8 +54,7 @@ export function lineFromProduct(p: CatalogProduct | null, extra: Partial<DraftLi
     mercurialPrice: p?.price ?? null,
     mercurialMin: p?.priceMin ?? null,
     priceLocked: p?.locked ?? false,
-    decision: "conform",
-    decisionManual: false,
+    decision: null,
     reason: "",
     photos: [],
     ...extra,
@@ -76,20 +75,26 @@ export function evaluate(line: DraftLine, catalog: Catalog | undefined): Evaluat
   );
 }
 
-/** Recalcule la décision proposée si elle n'a pas été forcée à la main */
-export function withAutoDecision(line: DraftLine, catalog: Catalog | undefined): DraftLine {
-  if (line.decisionManual) return line;
-  const ev = evaluate(line, catalog);
-  let reason = line.reason;
-  if (ev.decision !== "conform" && !reason) {
-    if (ev.issues.includes("temp_over") || ev.issues.includes("temp_limit")) reason = "temperature";
-    else if (ev.issues.includes("dlc_expired") || ev.issues.includes("dlc_short")) reason = "dlc";
-    else if (ev.issues.includes("qty_less") && num(line.qtyReceived) === 0) reason = "missing";
-    else if (ev.issues.includes("qty_less") || ev.issues.includes("qty_more")) reason = "quantity";
-  }
-  if (ev.decision === "conform" && !line.decisionManual) reason = "";
-  return { ...line, decision: ev.decision, reason };
+/** Décision proposée par les règles (affichée, jamais cochée automatiquement) */
+export function suggestedDecision(line: DraftLine, catalog: Catalog | undefined) {
+  return evaluate(line, catalog).decision;
 }
+
+/** Motif proposé pour une réserve ou un refus, d'après les contrôles */
+export function suggestedReason(line: DraftLine, catalog: Catalog | undefined): DraftLine["reason"] {
+  const ev = evaluate(line, catalog);
+  if (ev.issues.includes("temp_over") || ev.issues.includes("temp_limit")) return "temperature";
+  if (ev.issues.includes("dlc_expired") || ev.issues.includes("dlc_short")) return "dlc";
+  if (ev.issues.includes("qty_less") && num(line.qtyReceived) === 0) return "missing";
+  if (ev.issues.includes("qty_less") || ev.issues.includes("qty_more")) return "quantity";
+  return "";
+}
+
+/** Conservé pour compatibilité : ne modifie plus la décision */
+export function withAutoDecision(line: DraftLine, _catalog: Catalog | undefined): DraftLine {
+  return line;
+}
+
 
 /** Comparaison du prix saisi avec la tranche min – max (ou le prix bloqué) */
 export function priceCheck(line: DraftLine) {
@@ -111,7 +116,7 @@ export function needsTemp(line: DraftLine, catalog: Catalog | undefined) {
 export function buildReservesText(d: Draft, t: Dict, catalog: Catalog | undefined): string {
   const parts: string[] = [];
   for (const l of d.lines) {
-    if (l.decision === "conform") continue;
+    if (!l.decision || l.decision === "conform") continue;
     const ev = evaluate(l, catalog);
     const bits: string[] = [];
     if (l.reason) bits.push((t.reasons as Record<string, string>)[l.reason] ?? l.reason);
@@ -159,7 +164,7 @@ export function toPayload(d: Draft): ReceptionPayload {
         dlc: l.dlc || null,
         lot: l.lot.trim() || null,
         unitPrice: num(l.unitPrice),
-        decision: l.decision,
+        decision: l.decision ?? "conform",
         reason: l.reason || null,
         photos: l.photos,
       })),

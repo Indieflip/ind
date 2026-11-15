@@ -130,5 +130,19 @@ const receptionProcess = `## Avant de commencer
 await db.execute(sql`insert into protocols (title, content, position)
   select 'Réception d''une livraison', ${receptionProcess}, 0 where not exists (select 1 from protocols where title = 'Réception d''une livraison')`);
 
+// Fruits et légumes : rattacher les produits au fournisseur existant de même nom
+// (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
+const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
+const sups = (await db.execute(sql`select id, name from suppliers order by id`)).rows;
+const mainByKey = new Map();
+for (const s of sups) if (!mainByKey.has(key(s.name))) mainByKey.set(key(s.name), s.id);
+for (const s of sups) {
+  const main = mainByKey.get(key(s.name));
+  if (main !== s.id) {
+    await db.execute(sql`update products set supplier_id = ${main} where supplier_id = ${s.id} and fv_item_id is not null`);
+    await db.execute(sql`update suppliers set active = false where id = ${s.id} and not exists (select 1 from products p where p.supplier_id = ${s.id} and p.active)`);
+  }
+}
+
 console.log("[migrate] base à jour.");
 await close();

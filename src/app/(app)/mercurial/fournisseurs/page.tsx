@@ -1,27 +1,26 @@
 import Link from "next/link";
-import { asc, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
 import { Empty, PageHeader } from "@/components/ui";
-import { AddSupplier, ImportCatalog } from "./SupplierClient";
+import { AddSupplier, ImportCatalog, SupplierSearch } from "./SupplierClient";
 
-export default async function SuppliersPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+export default async function SuppliersPage() {
   const user = await requireUser(can.viewSuppliers);
   const { t } = await getDict();
-  const q = ((await searchParams).q ?? "").trim();
   const s = schema.suppliers;
   const rows = await getDb()
     .select({
       id: s.id,
       name: s.name,
       active: s.active,
-      products: sql<number>`(select count(*)::int from products p where p.supplier_id = ${s.id} and p.active)`,
-      lastDelivery: sql<string | null>`(select max(delivered_at) from receptions r where r.supplier_id = ${s.id})`,
+      // Colonne qualifiée : sans « suppliers. », l'id serait celui du produit dans la sous-requête
+      products: sql<number>`(select count(*)::int from products p where p.supplier_id = "suppliers"."id" and p.active)`,
     })
     .from(s)
-    .where(q ? sql`${s.name} ilike ${"%" + q + "%"}` : undefined)
+    .where(eq(s.active, true))
     .orderBy(asc(s.name));
   const editable = can.editSuppliers(user.role);
 
@@ -34,9 +33,7 @@ export default async function SuppliersPage({ searchParams }: { searchParams: Pr
           <ImportCatalog />
         </div>
       )}
-      <form className="no-print mb-4">
-        <input name="q" defaultValue={q} className="input max-w-sm" placeholder={`${t.common.search}…`} />
-      </form>
+      <div className="no-print mb-4 max-w-sm"><SupplierSearch suppliers={rows.map((r) => ({ id: r.id, name: r.name }))} /></div>
       {rows.length === 0 ? (
         <Empty>{t.suppliers.empty}</Empty>
       ) : (

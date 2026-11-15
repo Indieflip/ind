@@ -7,7 +7,7 @@ import { csvResponse } from "@/lib/format";
 
 export async function GET() {
   const user = await getUser();
-  if (!user || !can.viewReporting(user.role)) return new Response("Forbidden", { status: 403 });
+  if (!user) return new Response("Unauthorized", { status: 401 });
   const m = dictFor(user.locale).maj;
   const rows = await getDb().select().from(schema.majLog).orderBy(asc(schema.majLog.position));
   const fmt = (d: string | null) => (d ? d.split("-").reverse().join("/") : "");

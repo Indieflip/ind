@@ -1,9 +1,16 @@
 "use client";
+import { MoneyInput } from "@/components/MoneyInput";
+import { appConfirm } from "@/components/Confirm";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { addProductAction, addSupplierAction, importCatalogAction, updateProductAction, updateSupplierAction } from "@/lib/actions/suppliers";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtMoney } from "@/lib/format";
 import { Icon } from "@/components/Icon";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { SupplierCombo } from "@/components/SupplierCombo";
+import { StatusBadge } from "@/components/DecisionBadge";
+import { DataTable, type Col } from "@/components/table/DataTable";
 import { UnitSelect } from "@/components/UnitSelect";
 
 export function AddSupplier() {
@@ -53,7 +60,7 @@ export function SupplierInfo({ id, name, email, phone, notes, active }: { id: nu
         <button
           className={active ? "btn-ghost text-red-600" : "btn-secondary"}
           disabled={pending}
-          onClick={() => { if (confirm(active ? t.suppliers.deleteWarning : `${t.suppliers.reactivate} ?`)) save({ active: !active }); }}
+          onClick={async () => { if (await appConfirm(active ? t.suppliers.deleteWarning : `${t.suppliers.reactivate} ?`)) save({ active: !active }); }}
         >
           {active ? t.suppliers.deactivate : t.suppliers.reactivate}
         </button>
@@ -82,58 +89,35 @@ export function AddProduct({ supplierId, categories, units }: { supplierId: numb
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </label>
-      <label><span className="label">{t.common.price} HT</span><input name="price" className="input" inputMode="decimal" /></label>
+      <label><span className="label">{t.common.price} HT</span><MoneyInput name="price" /></label>
       <button className="btn-primary" disabled={pending}><Icon name="plus" className="h-4 w-4" />{t.common.add}</button>
     </form>
   );
 }
 
-export function ProductRow({
-  p,
-  editable,
-}: {
-  p: { id: number; name: string; unit: string; nature: string | null; priceMin: string | null; price: string | null; priceLocked: boolean; active: boolean };
-  editable: boolean;
-}) {
-  const { t, locale } = useI18n();
-  const m = t.mercurial;
-  const [pending, start] = useTransition();
-  const [edit, setEdit] = useState(false);
-  const lo = p.priceMin ?? p.price;
-  const hi = p.price ?? p.priceMin;
-  if (!editable || !edit) {
-    return (
-      <tr className={p.active ? "" : "opacity-50"}>
-        <td className="font-medium">{p.name}{p.priceLocked && <span className="ml-1.5 badge bg-sky-100 text-sky-800">🔒 {m.locked}</span>}</td>
-        <td>{p.unit}</td>
-        <td className="text-stone-600">{p.nature ?? "—"}</td>
-        <td className="text-right tabular-nums">{fmtMoney(p.priceMin, locale)}</td>
-        <td className="text-right tabular-nums">{fmtMoney(p.price, locale)}</td>
-        <td className="whitespace-nowrap text-right tabular-nums text-stone-600">{lo == null ? "—" : lo === hi ? fmtMoney(lo, locale) : `${fmtMoney(lo, locale)} – ${fmtMoney(hi, locale)}`}</td>
-        <td className="text-right">
-          {editable && <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setEdit(true)}>{t.common.edit}</button>}
-        </td>
-      </tr>
-    );
-  }
+/** Recherche d'un fournisseur : saisie avec suggestions, ouvre son compte */
+export function SupplierSearch({ suppliers }: { suppliers: { id: number; name: string }[] }) {
+  const { t } = useI18n();
+  const router = useRouter();
+  return <SupplierCombo key={suppliers.length} suppliers={suppliers} name="goto" placeholder={t.suppliers.searchSupplier} onChange={(id) => id && router.push(`/mercurial/fournisseurs/${id}`)} />;
+}
+
+interface AnomalyRow { id: number; date: string; dateSort: string; type: string; product: string; description: string; status: string; statusLabel: string; receptionId: number | null }
+
+export function SupplierAnomalies({ rows, supplierId }: { rows: AnomalyRow[]; supplierId: number }) {
+  const { t } = useI18n();
+  const cols: Col<AnomalyRow>[] = [
+    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, className: "whitespace-nowrap" },
+    { key: "type", label: t.anomalies.type, text: (r) => r.type },
+    { key: "product", label: t.common.product, text: (r) => r.product },
+    { key: "description", label: t.anomalies.description, text: (r) => r.description },
+    { key: "status", label: t.common.status, text: (r) => r.statusLabel, render: (r) => <StatusBadge status={r.status} label={r.statusLabel} /> },
+    { key: "bl", label: t.receptions.bl, text: () => "", sortable: false, filterable: false, render: (r) => (r.receptionId ? <Link className="text-brand-700" href={`/receptions/${r.receptionId}`}>→</Link> : "") },
+  ];
   return (
-    <tr>
-      <td><input className="input py-1.5" defaultValue={p.name} onBlur={(e) => start(() => updateProductAction(p.id, { name: e.target.value }))} /></td>
-      <td><input className="input w-24 py-1.5" list="units-list" defaultValue={p.unit} onBlur={(e) => start(() => updateProductAction(p.id, { unit: e.target.value }))} /></td>
-      <td className="text-stone-600">{p.nature ?? "—"}</td>
-      <td className="text-right text-xs text-stone-500">{fmtMoney(p.priceMin, locale)}</td>
-      <td className="text-right text-xs text-stone-500">{fmtMoney(p.price, locale)}</td>
-      <td />
-      <td className="whitespace-nowrap text-right">
-        <button
-          className="btn-ghost px-2 py-1 text-xs text-red-600"
-          disabled={pending}
-          onClick={() => { if (confirm(p.active ? t.suppliers.deleteWarning : `${t.suppliers.reactivate} ?`)) start(() => updateProductAction(p.id, { active: !p.active })); }}
-        >
-          {p.active ? t.suppliers.deactivate : t.suppliers.reactivate}
-        </button>
-        <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setEdit(false)}><Icon name="check" className="h-4 w-4" /></button>
-      </td>
-    </tr>
+    <>
+      <div className="flex justify-end"><Link href={`/anomalies?supplier=${supplierId}&status=`} className="text-sm text-brand-700 underline">{t.nav.anomalies} →</Link></div>
+      <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} empty={t.mercurial.noAnomalies} defaultSort={{ key: "date", dir: "desc" }} />
+    </>
   );
 }

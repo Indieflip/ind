@@ -21,3 +21,22 @@ export async function deleteReceptionAction(id: number) {
   revalidatePath("/receptions");
   redirect("/receptions");
 }
+
+/** Suppression groupée (bons non consolidés uniquement) */
+export async function deleteReceptionsAction(ids: number[]) {
+  await assertUser(can.deleteDraftReception);
+  const db = getDb();
+  let count = 0;
+  for (const id of ids.filter((n) => Number.isInteger(n))) {
+    const rec = await db.query.receptions.findFirst({ where: eq(schema.receptions.id, id), columns: { consolidatedAt: true } });
+    if (!rec || rec.consolidatedAt) continue;
+    await db.transaction(async (tx) => {
+      await tx.update(schema.priceChanges).set({ receptionId: null }).where(eq(schema.priceChanges.receptionId, id));
+      await tx.delete(schema.anomalies).where(eq(schema.anomalies.receptionId, id));
+      await tx.delete(schema.receptions).where(eq(schema.receptions.id, id));
+    });
+    count++;
+  }
+  revalidatePath("/receptions");
+  return { count };
+}

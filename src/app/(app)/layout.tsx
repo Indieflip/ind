@@ -16,11 +16,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/consolidation", label: t.nav.consolidation, icon: "layers", show: can.viewConsolidation(r) },
     { href: "/anomalies", label: t.nav.anomalies, icon: "alert", show: can.viewAnomalies(r) },
     { href: "/mercurial", label: t.nav.mercurial, icon: "list", show: can.viewMercurial(r) },
-    { href: "/fruits-legumes", label: t.nav.fruitsVeg, icon: "leaf", show: can.viewFv(r) },
     { href: "/prices", label: t.nav.prices, icon: "euro", show: can.viewPrices(r) },
-    { href: "/reporting", label: t.nav.reporting, icon: "chart", show: can.viewReporting(r) },
+    { href: "/reporting", label: t.nav.reporting, icon: "chart", show: true },
     { href: "/protocoles", label: t.nav.protocols, icon: "book", show: can.viewProtocols(r) },
-    { href: "/settings", label: t.nav.settings, icon: "gear", show: can.manageSettings(r) },
+    { href: "/settings", label: t.nav.settings, icon: "gear", show: r === "admin" },
   ].filter((i) => i.show) as NavItem[];
 
   // Rappel de sauvegarde pour l'administrateur quand l'envoi automatique n'a pas pris le relais
@@ -50,7 +49,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {backupReminder && (
           <div className="no-print flex flex-wrap items-center justify-center gap-2 border-b border-sky-200 bg-sky-50 px-4 py-2 text-center text-sm text-sky-900">
             {backupReminder}
-            <a href="/settings#sauvegarde" className="font-semibold underline">{t.backup.reminderLink}</a>
+            <a href="/settings/import-export#sauvegarde" className="font-semibold underline">{t.backup.reminderLink}</a>
           </div>
         )}
         <main className="mx-auto max-w-7xl p-4 sm:p-6">{children}</main>

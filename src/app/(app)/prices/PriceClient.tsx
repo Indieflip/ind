@@ -1,9 +1,11 @@
 "use client";
+import { MoneyInput } from "@/components/MoneyInput";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { addPriceLineAction, saveClaimAction } from "@/lib/actions/prices";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtMoney } from "@/lib/format";
 import { Icon } from "@/components/Icon";
+import { DataTable, type Col } from "@/components/table/DataTable";
 
 /** Réclamation : enregistrée dès qu'on quitte le champ */
 export function ClaimCell({ id, initial, placeholder }: { id: number; initial: string; placeholder: string }) {
@@ -87,7 +89,7 @@ export function AddPriceLine({ suppliers, products }: { suppliers: { id: number;
         </label>
         <label>
           <span className="label">{t.prices.new}</span>
-          <input className="input" name="newPrice" inputMode="decimal" required />
+          <MoneyInput name="newPrice" required />
         </label>
         <label>
           <span className="label">{t.prices.source}</span>
@@ -109,4 +111,35 @@ export function AddPriceLine({ suppliers, products }: { suppliers: { id: number;
       <button className="btn-primary" disabled={pending}>{t.common.save}</button>
     </form>
   );
+}
+
+export interface PriceRow {
+  id: number; date: string; dateSort: string; supplier: string; product: string; unit: string;
+  old: string; oldN: number | null; new: string; newN: number | null; type: string; typeLabel: string;
+  pct: number | null; pctLabel: string; source: string; claim: string;
+}
+
+/** Suivi des prix : en-têtes triables et filtrables, réclamation modifiable */
+export function PricesTable({ rows, editable }: { rows: PriceRow[]; editable: boolean }) {
+  const { t } = useI18n();
+  const cols: Col<PriceRow>[] = [
+    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, className: "whitespace-nowrap" },
+    { key: "supplier", label: t.common.supplier, text: (r) => r.supplier },
+    { key: "product", label: t.common.product, text: (r) => r.product, render: (r) => <>{r.product}<span className="text-xs text-stone-400"> / {r.unit}</span></> },
+    { key: "old", label: t.prices.old, align: "right", text: (r) => r.old, sort: (r) => r.oldN },
+    { key: "new", label: t.prices.new, align: "right", text: (r) => r.new, sort: (r) => r.newN, className: "font-medium" },
+    {
+      key: "gap", label: t.prices.gap, align: "right", text: (r) => r.pctLabel, sort: (r) => r.pct,
+      render: (r) => r.type === "new_product"
+        ? <span className="badge bg-sky-100 text-sky-800">{r.pctLabel}</span>
+        : <span className={`font-semibold ${r.type === "increase" ? "text-red-600" : "text-emerald-600"}`}>{r.pctLabel}</span>,
+    },
+    { key: "type", label: t.prices.type, text: (r) => r.typeLabel, options: Object.values(t.prices.types) },
+    { key: "source", label: t.prices.source, text: (r) => r.source, className: "text-xs text-stone-500" },
+    {
+      key: "claim", label: t.prices.claim, text: (r) => r.claim, className: "min-w-64",
+      render: (r) => (editable ? <ClaimCell id={r.id} initial={r.claim} placeholder={t.prices.claimPlaceholder} /> : <span className="text-sm">{r.claim || "—"}</span>),
+    },
+  ];
+  return <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} empty={t.prices.empty} defaultSort={{ key: "date", dir: "desc" }} />;
 }

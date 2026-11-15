@@ -1,4 +1,5 @@
 "use client";
+import { appConfirm } from "@/components/Confirm";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteProtocolAction, saveProtocolAction } from "@/lib/actions/protocols";
@@ -60,7 +61,7 @@ export function ProtocolEditor({ id, title, content }: { id: number | null; titl
         </button>
         <button className="btn-ghost" onClick={() => router.push(id ? `/protocoles?id=${id}` : "/protocoles")}>{t.common.cancel}</button>
         {id && (
-          <button className="btn-ghost ml-auto text-red-600" disabled={pending} onClick={() => confirm(t.protocols.deleteConfirm) && start(async () => { await deleteProtocolAction(id); router.push("/protocoles"); })}>
+          <button className="btn-ghost ml-auto text-red-600" disabled={pending} onClick={async () => await appConfirm(t.protocols.deleteConfirm) && start(async () => { await deleteProtocolAction(id); router.push("/protocoles"); })}>
             <Icon name="trash" className="h-4 w-4" /> {t.common.delete}
           </button>
         )}

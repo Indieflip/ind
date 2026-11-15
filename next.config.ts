@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   async redirects() {
     return [
+      { source: "/fruits-legumes", destination: "/mercurial/fruits-legumes", permanent: true },
       { source: "/suppliers", destination: "/mercurial/fournisseurs", permanent: true },
       { source: "/suppliers/:id", destination: "/mercurial/fournisseurs/:id", permanent: true },
     ];

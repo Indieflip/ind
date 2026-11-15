@@ -51,7 +51,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
                   <h1 className="text-2xl font-bold">{t.protocols.thresholds}</h1>
                   <p className="text-sm text-stone-600">{t.protocols.thresholdsIntro}</p>
                 </div>
-                {can.manageSettings(user.role) && <Link href="/settings#seuils" className="btn-secondary no-print"><Icon name="gear" className="h-4 w-4" /> {t.nav.settings}</Link>}
+                {can.manageSettings(user.role) && <Link href="/settings/reglementation#seuils" className="btn-secondary no-print"><Icon name="gear" className="h-4 w-4" /> {t.nav.settings}</Link>}
               </div>
               <div className="overflow-x-auto">
                 <table className="table">

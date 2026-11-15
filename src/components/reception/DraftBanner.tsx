@@ -1,4 +1,5 @@
 "use client";
+import { appConfirm } from "@/components/Confirm";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -56,7 +57,7 @@ export function DraftBanner() {
           className={`${draft ? "btn-secondary" : "btn-primary"} btn-lg`}
           onClick={async () => {
             if (draft) {
-              if (!confirm(t.wizard.discardConfirm)) return;
+              if (!await appConfirm(t.wizard.discardConfirm)) return;
               await clearDraft();
             }
             router.push("/receptions/new?new=1");
@@ -78,7 +79,7 @@ export function DeleteDraftButton({ id, confirmText, label }: { id: number; conf
       aria-label={label}
       disabled={busy}
       onClick={async () => {
-        if (!confirm(confirmText)) return;
+        if (!await appConfirm(confirmText)) return;
         setBusy(true);
         await fetch(`/api/drafts/${id}`, { method: "DELETE" });
         router.refresh();

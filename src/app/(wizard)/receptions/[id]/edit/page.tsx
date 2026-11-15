@@ -5,7 +5,6 @@ import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { num } from "@/lib/format";
-import { evaluateLine } from "@/lib/rules";
 import { getDict } from "@/lib/i18n/server";
 import { buildReservesText } from "@/components/reception/helpers";
 import { Wizard } from "@/components/reception/Wizard";
@@ -53,14 +52,7 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     mercurialMin: num(l.mercurialMin),
     priceLocked: l.priceLocked,
     decision: l.decision,
-    // Décision forcée à la main à l'origine si elle diffère de la règle automatique : on la garde.
-    // Sinon elle se recalcule quand on corrige une quantité, une température ou une DLC.
-    decisionManual:
-      evaluateLine(
-        { qtyOrdered: num(l.qtyOrdered), qtyReceived: num(l.qtyReceived), temperature: l.temperature, dlc: l.dlc, categoryId: l.categoryId },
-        categories.find((c) => c.id === l.categoryId),
-        rec.deliveredAt,
-      ).decision !== l.decision,
+
     reason: (l.reason ?? "") as DraftLine["reason"],
     photos: photos.filter((p) => p.lineId === l.id).map((p) => p.url),
   }));

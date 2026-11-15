@@ -3,6 +3,7 @@ import "./globals.css";
 import { getLocale } from "@/lib/i18n/server";
 import { I18nProvider } from "@/lib/i18n/client";
 import { ServiceWorker } from "@/components/ServiceWorker";
+import { ConfirmHost } from "@/components/Confirm";
 
 export const metadata: Metadata = {
   title: "Réception marchandises",
@@ -24,7 +25,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={locale}>
       <body className="min-h-dvh antialiased">
-        <I18nProvider locale={locale}>{children}</I18nProvider>
+        <I18nProvider locale={locale}>
+          {children}
+          <ConfirmHost />
+        </I18nProvider>
         <ServiceWorker />
       </body>
     </html>

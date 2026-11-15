@@ -22,7 +22,6 @@ export const RIGHTS = [
   { key: "editPrices", tab: "prices", defaults: { econome: false, comptable: false, invite: false } },
   // Consultation
   { key: "viewPrices", tab: "prices", defaults: { econome: true, comptable: true, invite: true } },
-  { key: "viewReporting", tab: "reporting", defaults: { econome: true, comptable: true, invite: false } },
   // Protocoles
   { key: "editProtocols", tab: "protocols", defaults: { econome: false, comptable: false, invite: false } },
   // Réglages
@@ -83,10 +82,11 @@ export const can = {
   editFv: (r: Role) => has(r, "editFv"),
   viewPrices: (r: Role) => has(r, "viewPrices"),
   editPrices: (r: Role) => has(r, "editPrices"),
-  viewReporting: (r: Role) => has(r, "viewReporting"),
+  viewReporting: all,
   viewProtocols: all,
   editProtocols: (r: Role) => has(r, "editProtocols"),
-  manageSettings: (r: Role) => has(r, "manageUsers") || has(r, "manageRights") || has(r, "backup"),
+  /** Le menu Réglages est réservé à l'administrateur */
+  manageSettings: (r: Role) => r === "admin",
   manageUsers: (r: Role) => has(r, "manageUsers"),
   manageRights: (r: Role) => has(r, "manageRights"),
   backup: (r: Role) => has(r, "backup"),

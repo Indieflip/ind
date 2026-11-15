@@ -6,7 +6,7 @@ import { can } from "@/lib/permissions";
 import { num } from "@/lib/format";
 import { getBakeryPrices, getBakerySupplier } from "@/lib/settings";
 import { PageHeader } from "@/components/ui";
-import { AddBakeryRow, BakeryProducts, BakeryTable } from "./BakeryClient";
+import { BakeryProducts, BakeryTable } from "./BakeryClient";
 
 export default async function BakeryPage() {
   const user = await requireUser(can.viewMercurial);
@@ -24,7 +24,6 @@ export default async function BakeryPage() {
       <PageHeader title={b.title} />
       <p className="-mt-3 mb-4 max-w-3xl text-sm text-stone-600">{b.intro}</p>
       <BakeryProducts prices={prices} supplier={supplier} suppliers={suppliers.map((s) => s.name)} editable={editable} />
-      {editable && <AddBakeryRow />}
       {entries.length === 0 ? (
         <p className="card p-6 text-center text-sm text-stone-500">{b.empty}</p>
       ) : (

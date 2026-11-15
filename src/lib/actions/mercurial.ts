@@ -18,8 +18,7 @@ async function categoryIdFor(nature: string | null) {
 type R = { ok?: boolean; error?: string } | undefined;
 
 function refresh() {
-  revalidatePath("/mercurial");
-  revalidatePath("/mercurial/fournisseurs", "layout");
+  revalidatePath("/mercurial", "layout");
 }
 
 async function ensureUnit(name: string) {

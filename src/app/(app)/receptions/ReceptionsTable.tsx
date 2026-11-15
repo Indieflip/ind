@@ -1,0 +1,84 @@
+"use client";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { deleteReceptionsAction } from "@/lib/actions/receptions";
+import { useI18n } from "@/lib/i18n/client";
+import { DataTable, type Col } from "@/components/table/DataTable";
+import { StatusBadge } from "@/components/DecisionBadge";
+import { Icon } from "@/components/Icon";
+import { appConfirm } from "@/components/Confirm";
+
+export interface ReceptionRow {
+  id: number;
+  number: number;
+  blNumber: string | null;
+  date: string; // affichage
+  dateSort: string; // ISO
+  supplierName: string;
+  lineCount: number;
+  status: string;
+  statusLabel: string;
+  consolidated: boolean;
+  author: string | null;
+}
+
+export function ReceptionsTable({ rows, canDelete }: { rows: ReceptionRow[]; canDelete: boolean }) {
+  const { t } = useI18n();
+  const router = useRouter();
+  const [sel, setSel] = useState<Set<string | number>>(new Set());
+  const [pending, start] = useTransition();
+  const stateLabel = (r: ReceptionRow) => (r.consolidated ? t.receptions.consolidated : t.receptions.toConsolidate);
+  const cols: Col<ReceptionRow>[] = [
+    { key: "number", label: t.receptions.number, align: "right", text: (r) => String(r.number), sort: (r) => r.number },
+    { key: "bl", label: t.receptions.bl, text: (r) => r.blNumber ?? "", href: (r) => `/receptions/${r.id}`, render: (r) => r.blNumber || t.receptions.noBl },
+    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, href: (r) => `/receptions/${r.id}`, className: "whitespace-nowrap" },
+    { key: "supplier", label: t.common.supplier, text: (r) => r.supplierName },
+    { key: "lines", label: t.mercurial.products, align: "right", text: (r) => String(r.lineCount), sort: (r) => r.lineCount },
+    { key: "status", label: t.common.status, text: (r) => r.statusLabel, options: Object.values(t.receptionStatus), render: (r) => <StatusBadge status={r.status} label={r.statusLabel} /> },
+    {
+      key: "state", label: t.nav.consolidation, text: stateLabel, options: [t.receptions.consolidated, t.receptions.toConsolidate],
+      render: (r) => r.consolidated
+        ? <span className="badge bg-emerald-50 text-emerald-800"><Icon name="check" className="mr-0.5 h-3 w-3" />{t.receptions.consolidated}</span>
+        : <span className="text-xs text-stone-500">{t.receptions.toConsolidate}</span>,
+    },
+    { key: "author", label: t.receptions.createdBy, text: (r) => r.author ?? "" },
+  ];
+  const selectedRows = rows.filter((r) => sel.has(r.id));
+  const deletable = selectedRows.filter((r) => !r.consolidated);
+
+  return (
+    <>
+      {canDelete && sel.size > 0 && (
+        <div className="no-print mb-2 flex flex-wrap items-center gap-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-800">
+          <strong>{sel.size}</strong> {t.receptions.selected}
+          {deletable.length < selectedRows.length && <span className="text-xs text-stone-600">({selectedRows.length - deletable.length} {t.receptions.consolidatedKept})</span>}
+          <button
+            className="btn-danger ml-auto px-3 py-1.5"
+            disabled={pending || deletable.length === 0}
+            onClick={async () => {
+              if (!(await appConfirm(`${t.receptions.deleteManyConfirm} (${deletable.length})`))) return;
+              start(async () => {
+                await deleteReceptionsAction(deletable.map((r) => r.id));
+                setSel(new Set());
+                router.refresh();
+              });
+            }}
+          >
+            <Icon name="trash" className="h-4 w-4" /> {t.common.delete} ({deletable.length})
+          </button>
+          <button className="btn-ghost px-2 py-1.5" onClick={() => setSel(new Set())}>{t.consolidation.selectNone}</button>
+        </div>
+      )}
+      <DataTable
+        rows={rows}
+        cols={cols}
+        rowKey={(r) => r.id}
+        empty={t.receptions.empty}
+        defaultSort={{ key: "date", dir: "desc" }}
+        selectable={canDelete}
+        selection={sel}
+        onSelectionChange={setSel}
+      />
+    </>
+  );
+}

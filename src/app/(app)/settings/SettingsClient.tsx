@@ -1,4 +1,5 @@
 "use client";
+import { appConfirm, appAlert } from "@/components/Confirm";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { addUserAction, deleteUserAction, saveBackupSettingsAction, saveRightsAction, setRestaurantAction, updateCategoryAction, updateUserAction } from "@/lib/actions/settings";
 import { useRouter } from "next/navigation";
@@ -38,7 +39,7 @@ export function UserRow({ user, isMe }: { user: { id: number; name: string; emai
       </td>
       <td>
         <div className="flex gap-1">
-          <div className="w-44"><PasswordInput className="input py-1.5" minLength={8} placeholder="••••••••" autoComplete="new-password" value={pw} onChange={(e) => { setPw(e.target.value); setDone(false); }} /></div>
+          <div className="w-44"><PasswordInput className="input py-1.5" minLength={8} placeholder={t.settings.newPasswordPh} autoComplete="new-password" value={pw} onChange={(e) => { setPw(e.target.value); setDone(false); }} /></div>
           <button className="btn-secondary px-2 py-1.5" disabled={pw.length < 8 || pending} onClick={() => start(async () => { await updateUserAction(user.id, { password: pw }); setPw(""); setDone(true); })}>
             <Icon name="check" className="h-4 w-4" />
           </button>
@@ -51,11 +52,11 @@ export function UserRow({ user, isMe }: { user: { id: number; name: string; emai
             className="btn-ghost p-1.5 text-stone-400 hover:text-red-600"
             aria-label={t.common.delete}
             disabled={pending}
-            onClick={() => {
-              if (!confirm(`${t.settings.deleteUserConfirm}\n${user.name}`)) return;
+            onClick={async () => {
+              if (!await appConfirm(`${t.settings.deleteUserConfirm}\n${user.name}`)) return;
               start(async () => {
                 const r = await deleteUserAction(user.id);
-                if (r.error === "used") alert(t.settings.deleteUserUsed);
+                if (r.error === "used") await appAlert(t.settings.deleteUserUsed);
               });
             }}
           >

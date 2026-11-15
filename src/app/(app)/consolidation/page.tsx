@@ -9,7 +9,7 @@ import { fmtDateTime } from "@/lib/format";
 import { dateRange, one, supplierOptions, type SP } from "@/lib/server/queries";
 import { PageHeader } from "@/components/ui";
 import { StatusBadge } from "@/components/DecisionBadge";
-import { ConsolidateForm } from "./ConsolidateForm";
+import { ConsolidateForm, ConsolidatedTable } from "./ConsolidateForm";
 
 export default async function ConsolidationPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser(can.viewConsolidation);
@@ -65,14 +65,13 @@ export default async function ConsolidationPage({ searchParams }: { searchParams
 
       <section className="mb-8">
         <h2 className="mb-2 text-lg font-semibold">{c.toConsolidate} <span className="text-sm font-normal text-stone-500">({pending.length})</span></h2>
-        {pending.length === 0 ? (
-          <p className="card p-6 text-center text-sm text-stone-500">{c.none}</p>
-        ) : (
+        {(
           <ConsolidateForm
             canConsolidate={can.consolidate(user.role)}
             rows={pending.map((p) => ({
               id: p.id,
               date: fmtDateTime(p.deliveredAt, locale),
+              dateSort: p.deliveredAt.toISOString(),
               supplierName: p.supplierName,
               blNumber: p.blNumber,
               status: p.status,
@@ -84,36 +83,14 @@ export default async function ConsolidationPage({ searchParams }: { searchParams
 
       <section>
         <h2 className="mb-2 text-lg font-semibold">{c.consolidated}</h2>
-        {done.length === 0 ? (
-          <p className="card p-6 text-center text-sm text-stone-500">{c.noneConsolidated}</p>
-        ) : (
-          <div className="card overflow-x-auto">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t.receptions.bl}</th>
-                  <th>{t.common.date}</th>
-                  <th>{t.common.supplier}</th>
-                  <th>{t.common.status}</th>
-                  <th>{t.receptions.consolidatedOn}</th>
-                  <th className="text-right">{c.notes}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {done.map((d) => (
-                  <tr key={d.id}>
-                    <td><Link className="font-medium text-brand-700 hover:underline" href={`/receptions/${d.id}`}>{d.blNumber || <span className="italic text-stone-500">{t.receptions.noBl}</span>}</Link></td>
-                    <td className="whitespace-nowrap">{fmtDateTime(d.deliveredAt, locale)}</td>
-                    <td>{d.supplierName}</td>
-                    <td><StatusBadge status={d.status} label={t.receptionStatus[d.status]} /></td>
-                    <td className="whitespace-nowrap text-stone-600">{fmtDateTime(d.consolidatedAt, locale)}{d.byName ? ` ${c.by} ${d.byName}` : ""}</td>
-                    <td className="text-right tabular-nums">{d.notes || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <ConsolidatedTable
+          rows={done.map((d) => ({
+            id: d.id, blNumber: d.blNumber, date: fmtDateTime(d.deliveredAt, locale), dateSort: d.deliveredAt.toISOString(),
+            supplierName: d.supplierName, status: d.status, statusLabel: t.receptionStatus[d.status],
+            consolidated: `${fmtDateTime(d.consolidatedAt, locale)}${d.byName ? ` ${c.by} ${d.byName}` : ""}`,
+            consolidatedSort: d.consolidatedAt ? d.consolidatedAt.toISOString() : "", notes: d.notes,
+          }))}
+        />
       </section>
     </>
   );

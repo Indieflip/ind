@@ -18,7 +18,7 @@ export async function updateFvAction(id: number, data: { supplier?: string; prod
   if (data.prices) set.prices = Array.from({ length: 24 }, (_, i) => num(data.prices![i] ?? null));
   await getDb().update(schema.fvItems).set(set).where(eq(schema.fvItems.id, id));
   if (data.supplier !== undefined || data.product || data.unit !== undefined || data.locked !== undefined) await syncFvProducts();
-  revalidatePath("/fruits-legumes");
+  revalidatePath("/mercurial/fruits-legumes");
 }
 
 export async function addFvAction(_p: { ok?: boolean; error?: string } | undefined, form: FormData) {
@@ -29,7 +29,7 @@ export async function addFvAction(_p: { ok?: boolean; error?: string } | undefin
   if (!supplier || !product || !year) return { error: "invalid" };
   await getDb().insert(schema.fvItems).values({ supplier, product, unit: String(form.get("unit") ?? "").trim() || null, year, prices: Array(24).fill(null), position: 100000, locked: form.get("locked") === "on" });
   await syncFvProducts();
-  revalidatePath("/fruits-legumes");
+  revalidatePath("/mercurial/fruits-legumes");
   return { ok: true };
 }
 
@@ -37,5 +37,5 @@ export async function deleteFvAction(id: number) {
   await assertUser(can.editFv);
   await getDb().delete(schema.fvItems).where(eq(schema.fvItems.id, id));
   await syncFvProducts();
-  revalidatePath("/fruits-legumes");
+  revalidatePath("/mercurial/fruits-legumes");
 }

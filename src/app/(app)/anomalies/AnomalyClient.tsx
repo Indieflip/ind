@@ -1,4 +1,6 @@
 "use client";
+import { MoneyInput } from "@/components/MoneyInput";
+import { appConfirm } from "@/components/Confirm";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { createAnomalyAction, updateAnomalyAction } from "@/lib/actions/anomalies";
 import { useI18n } from "@/lib/i18n/client";
@@ -49,7 +51,7 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
         <textarea name="description" className="input" rows={2} required placeholder={t.anomalies.descriptionPlaceholder} />
       </label>
       <input type="hidden" name="photo" value={photo} />
-      <Thumbs photos={photo ? [photo] : []} onRemove={() => confirm(t.wizard.removePhotoConfirm) && setPhoto("")} />
+      <Thumbs photos={photo ? [photo] : []} onRemove={async () => await appConfirm(t.wizard.removePhotoConfirm) && setPhoto("")} />
       <div className="flex flex-wrap gap-2">
         {!photo && <PhotoButton label={t.common.photo} onPhotos={(p) => setPhoto(p[0])} />}
         <button className="btn-primary" disabled={pending}>{t.common.save}</button>
@@ -67,9 +69,8 @@ export function AnomalyManage({ id, status, creditAmount, followUp }: { id: numb
       <select className="input py-2" defaultValue={status} disabled={pending} onChange={(e) => start(() => updateAnomalyAction(id, { status: e.target.value }))}>
         {Object.entries(t.anomalies.statuses).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
       </select>
-      <input
+      <MoneyInput
         className="input py-2"
-        inputMode="decimal"
         placeholder={t.anomalies.credit}
         defaultValue={creditAmount}
         onBlur={(e) => e.target.value !== creditAmount && start(() => updateAnomalyAction(id, { creditAmount: e.target.value }))}

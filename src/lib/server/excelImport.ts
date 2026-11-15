@@ -4,7 +4,7 @@ import ExcelJS from "exceljs";
 import { eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { num } from "@/lib/format";
-import { normalize } from "@/lib/search";
+import { nameKey, normalize } from "@/lib/search";
 import { categoryCodeFromNature } from "@/lib/nature";
 import { setSetting } from "@/lib/settings";
 import { syncFvProducts } from "./fv";
@@ -75,7 +75,7 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
       const categories = await db.select().from(schema.categories);
       const catId = (nature: string | null) => categories.find((c) => c.code === categoryCodeFromNature(nature))?.id ?? null;
       const supplierIds = new Map<string, number>();
-      for (const s of await db.select().from(schema.suppliers)) supplierIds.set(normalize(s.name), s.id);
+      for (const s of await db.select().from(schema.suppliers).orderBy(schema.suppliers.id)) if (!supplierIds.has(nameKey(s.name))) supplierIds.set(nameKey(s.name), s.id);
       const existing = await db.select().from(schema.products);
       // Clé : fournisseur + produit + rang (le fichier contient quelques doublons volontaires)
       const pool = new Map<string, (typeof existing)[number][]>();
@@ -93,11 +93,11 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
           const supplierName = text(r[0]);
           const productName = text(r[3]);
           if (!supplierName || !productName) continue;
-          let supplierId = supplierIds.get(normalize(supplierName));
+          let supplierId = supplierIds.get(nameKey(supplierName));
           if (!supplierId) {
             supplierId = (await tx.insert(schema.suppliers).values({ name: supplierName }).onConflictDoNothing().returning())[0]?.id;
             if (!supplierId) supplierId = (await tx.query.suppliers.findFirst({ where: eq(schema.suppliers.name, supplierName) }))!.id;
-            supplierIds.set(normalize(supplierName), supplierId);
+            supplierIds.set(nameKey(supplierName), supplierId);
             newSuppliers++;
           }
           const unit = unitName(text(r[4]));

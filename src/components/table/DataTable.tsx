@@ -1,0 +1,143 @@
+"use client";
+import Link from "next/link";
+import { useI18n } from "@/lib/i18n/client";
+import { FilterInput, Pager, ResetFilters } from "./FilterInput";
+import { useTable, type ColumnDef } from "./useTable";
+
+export interface Col<R> extends ColumnDef<R> {
+  label: string;
+  align?: "right" | "center";
+  className?: string;
+  render?: (r: R) => React.ReactNode;
+  href?: (r: R) => string | null;
+  sortable?: boolean;
+}
+
+/** En-tête triable (▲ A→Z / ▼ Z→A) */
+export function SortTh({ label, active, dir, onClick, align }: { label: string; active: boolean; dir?: "asc" | "desc"; onClick: () => void; align?: "right" | "center" }) {
+  const { t } = useI18n();
+  return (
+    <th className={align === "right" ? "text-right" : align === "center" ? "text-center" : ""}>
+      <button type="button" onClick={onClick} className={`inline-flex items-center gap-1 hover:text-stone-900 ${align === "right" ? "flex-row-reverse" : ""}`} title={active && dir === "asc" ? t.receptions.sortDesc : t.receptions.sortAsc}>
+        {label}
+        <span className={`text-[10px] ${active ? "text-brand-600" : "text-stone-300"}`}>{active ? (dir === "asc" ? "▲" : "▼") : "▲▼"}</span>
+      </button>
+    </th>
+  );
+}
+
+/**
+ * Tableau générique : en-têtes triables, ligne de filtres (suggestions, croix, Réinitialiser),
+ * pagination à 1000 lignes. Option de sélection de lignes avec actions groupées.
+ */
+export function DataTable<R>({
+  rows,
+  cols,
+  rowKey,
+  empty,
+  pageSize,
+  defaultSort,
+  selectable,
+  selection,
+  onSelectionChange,
+  rowClassName,
+  maxHeight = "max-h-[75vh]",
+}: {
+  rows: R[];
+  cols: Col<R>[];
+  rowKey: (r: R) => string | number;
+  empty?: string;
+  pageSize?: number;
+  defaultSort?: { key: string; dir: "asc" | "desc" };
+  selectable?: boolean;
+  selection?: Set<string | number>;
+  onSelectionChange?: (s: Set<string | number>) => void;
+  rowClassName?: (r: R) => string;
+  maxHeight?: string;
+}) {
+  const { t } = useI18n();
+  const tb = useTable(rows, cols, { pageSize, defaultSort });
+  const sel = selection ?? new Set<string | number>();
+  const allOn = tb.filtered.length > 0 && tb.filtered.every((r) => sel.has(rowKey(r)));
+  return (
+    <div className="card overflow-hidden">
+      {tb.active && <p className="border-b border-stone-100 px-3 py-1.5 text-xs text-stone-500">{tb.filtered.length} / {rows.length}</p>}
+      <div className={`${maxHeight} overflow-auto`}>
+        <table className="table">
+          <thead className="sticky top-0 z-10">
+            <tr>
+              {selectable && (
+                <th className="w-8">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-brand-600"
+                    checked={allOn}
+                    aria-label={t.consolidation.selectAll}
+                    onChange={() => onSelectionChange?.(allOn ? new Set() : new Set(tb.filtered.map(rowKey)))}
+                  />
+                </th>
+              )}
+              {cols.map((c) =>
+                c.sortable === false ? (
+                  <th key={c.key} className={c.align === "right" ? "text-right" : ""}>{c.label}</th>
+                ) : (
+                  <SortTh key={c.key} label={c.label} align={c.align} active={tb.sort?.key === c.key} dir={tb.sort?.dir} onClick={() => tb.toggleSort(c.key)} />
+                ),
+              )}
+              <th className="w-px" />
+            </tr>
+            <tr>
+              {selectable && <th className="bg-white" />}
+              {cols.map((c) => (
+                <th key={c.key} className="bg-white py-1.5">
+                  {c.filterable !== false && <FilterInput value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} options={tb.options[c.key]} />}
+                </th>
+              ))}
+              <th className="bg-white py-1.5 text-right">
+                <ResetFilters onClick={tb.reset} active={tb.active} />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {tb.pageRows.length === 0 && (
+              <tr><td colSpan={cols.length + 2} className="py-8 text-center text-stone-500">{empty ?? t.table.empty}</td></tr>
+            )}
+            {tb.pageRows.map((r) => {
+              const k = rowKey(r);
+              return (
+                <tr key={k} className={`${sel.has(k) ? "bg-brand-50/60" : "hover:bg-stone-50"} ${rowClassName?.(r) ?? ""}`}>
+                  {selectable && (
+                    <td>
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-brand-600"
+                        checked={sel.has(k)}
+                        onChange={() => {
+                          const n = new Set(sel);
+                          if (n.has(k)) n.delete(k);
+                          else n.add(k);
+                          onSelectionChange?.(n);
+                        }}
+                      />
+                    </td>
+                  )}
+                  {cols.map((c) => {
+                    const content = c.render ? c.render(r) : c.text(r) || "—";
+                    const href = c.href?.(r);
+                    return (
+                      <td key={c.key} className={`${c.align === "right" ? "text-right tabular-nums" : c.align === "center" ? "text-center" : ""} ${c.className ?? ""}`}>
+                        {href ? <Link href={href} className="font-medium text-brand-700 hover:underline">{content}</Link> : content}
+                      </td>
+                    );
+                  })}
+                  <td />
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <Pager page={tb.page} pages={tb.pages} total={tb.filtered.length} pageSize={tb.pageSize} onPage={tb.setPage} />
+    </div>
+  );
+}

@@ -41,3 +41,11 @@ export function suggest(list: string[], query: string, limit = 8) {
     .sort((a, b) => score(b, query) - score(a, query))
     .slice(0, limit);
 }
+
+/** Clé de rapprochement des noms (pluriels et féminins ignorés) : « Producteurs réunies » = « PRODUCTEURS REUNIS » */
+export function nameKey(s: string) {
+  return normalize(s)
+    .split(" ")
+    .map((w) => w.replace(/(es|s|e)$/, ""))
+    .join(" ");
+}

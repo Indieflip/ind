@@ -115,26 +115,55 @@ export function PhotoButton({
 
 const isPdf = (src: string) => src.startsWith("data:application/pdf") || /\.pdf($|\?)/i.test(src);
 
+/** Miniatures cliquables : un clic ouvre la photo en grand pour vérifier sa qualité */
 export function Thumbs({ photos, onRemove }: { photos: string[]; onRemove?: (i: number) => void }) {
+  const { t } = useI18n();
+  const [view, setView] = useState<number | null>(null);
   if (!photos.length) return null;
+  const current = view != null ? photos[view] : null;
   return (
-    <div className="flex flex-wrap gap-2">
-      {photos.map((p, i) => (
-        <div key={i} className="relative">
-          {isPdf(p) ? (
-            <a href={p.startsWith("data:") ? undefined : p} target="_blank" className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border border-stone-200 bg-stone-50 text-xs font-semibold text-stone-600">
-              <Icon name="file" className="h-6 w-6" />PDF
-            </a>
-          ) : (
-            <img src={p} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover" />
-          )}
-          {onRemove && (
-            <button type="button" onClick={() => onRemove(i)} className="absolute -right-2 -top-2 rounded-full bg-stone-800 p-1 text-white" aria-label="×">
-              <Icon name="x" className="h-3 w-3" />
+    <>
+      <div className="flex flex-wrap gap-2">
+        {photos.map((p, i) => (
+          <div key={i} className="relative">
+            <button type="button" onClick={() => setView(i)} className="block rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500" title={t.wizard.viewPhoto}>
+              {isPdf(p) ? (
+                <span className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border border-stone-200 bg-stone-50 text-xs font-semibold text-stone-600">
+                  <Icon name="file" className="h-6 w-6" />PDF
+                </span>
+              ) : (
+                <img src={p} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover" />
+              )}
             </button>
+            {onRemove && (
+              <button type="button" onClick={() => onRemove(i)} className="absolute -right-2 -top-2 rounded-full bg-stone-800 p-1 text-white" aria-label={t.common.delete}>
+                <Icon name="x" className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      {current && (
+        <div className="fixed inset-0 z-[90] flex flex-col bg-black/90" role="dialog" aria-modal="true" onClick={() => setView(null)}>
+          <div className="flex items-center justify-between p-3 text-white" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
+            <span className="text-sm">{(view ?? 0) + 1} / {photos.length}</span>
+            <button type="button" className="rounded-full bg-white/10 p-2" aria-label={t.common.close} onClick={() => setView(null)}><Icon name="x" className="h-5 w-5" /></button>
+          </div>
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-2" onClick={(e) => e.stopPropagation()}>
+            {isPdf(current) ? (
+              <iframe src={current} className="h-full w-full rounded bg-white" title="PDF" />
+            ) : (
+              <img src={current} alt="" className="max-h-full max-w-full object-contain" />
+            )}
+          </div>
+          {photos.length > 1 && (
+            <div className="flex justify-center gap-3 p-3" onClick={(e) => e.stopPropagation()}>
+              <button type="button" className="btn-secondary" disabled={view === 0} onClick={() => setView((v) => Math.max(0, (v ?? 0) - 1))}>‹</button>
+              <button type="button" className="btn-secondary" disabled={view === photos.length - 1} onClick={() => setView((v) => Math.min(photos.length - 1, (v ?? 0) + 1))}>›</button>
+            </div>
           )}
         </div>
-      ))}
-    </div>
+      )}
+    </>
   );
 }

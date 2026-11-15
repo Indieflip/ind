@@ -1,4 +1,5 @@
 "use client";
+import { appConfirm } from "@/components/Confirm";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -23,6 +24,7 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
   const [done, setDone] = useState<null | { id?: number; offline?: boolean }>(null);
   const [error, setError] = useState("");
   const [draftSaving, setDraftSaving] = useState(false);
+  const [info, setInfo] = useState("");
   const [readCount, setReadCount] = useState(0);
   const topRef = useRef<HTMLDivElement>(null);
 
@@ -151,10 +153,11 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
     setDraftSaving(true);
     setError("");
     try {
-      await saveServerDraft(draft);
-      await clearDraft();
-      router.push("/receptions?draft=saved");
-      router.refresh();
+      // On reste sur la page : le brouillon est aussi disponible dans Réceptions > Brouillons en cours
+      const saved = await saveServerDraft(draft);
+      void saved;
+      setInfo(t.wizard.draftSavedHere);
+      setTimeout(() => setInfo(""), 5000);
     } catch {
       setError(t.wizard.draftError);
     } finally {
@@ -173,6 +176,11 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
 
   async function finish() {
     if (!draft) return;
+    const undecided = draft.lines.filter((l) => !l.decision);
+    if (undecided.length) {
+      setError(`${undecided.length} ${t.wizard.undecided}`);
+      return;
+    }
     setSaving(true);
     setError("");
     const payload = toPayload(draft);
@@ -207,15 +215,12 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
         <h1 className="text-xl font-bold">{done.offline ? t.common.offline : t.wizard.savedOk}</h1>
         {done.offline && <p className="text-stone-600">{t.wizard.savedOffline}</p>}
         <div className="flex w-full flex-col gap-2">
-          {done.id && (
-            <Link href={`/receptions/${done.id}`} className="btn-secondary btn-lg">
-              {t.receptions.detail}
-            </Link>
-          )}
+          <Link href="/receptions" className="btn-secondary btn-lg">
+            <Icon name="truck" /> {t.nav.receptions}
+          </Link>
           <button className="btn-primary btn-lg" onClick={() => { setDone(null); setDraftState(newDraft()); router.replace("/receptions/new?new=1"); }}>
             {t.receptions.new}
           </button>
-          <Link href="/receptions" className="btn-ghost">{t.nav.receptions}</Link>
         </div>
       </div>
     );
@@ -275,13 +280,14 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
         {draft.step === 1 && <StepDelivery draft={draft} setDraft={setDraft} catalog={catalog} />}
         {draft.step === 2 && <StepCheck draft={draft} setDraft={setDraft} updateLine={updateLine} catalog={catalog} />}
         {draft.step === 3 && <StepValidate draft={draft} setDraft={setDraft} catalog={catalog} autoReserves={autoReserves} />}
+        {info && <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{info}</p>}
         {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         {draft.step === 0 && !editId && (
           <button
             type="button"
             className="btn-ghost w-full text-red-600"
             onClick={async () => {
-              if (!confirm(t.wizard.discardConfirm)) return;
+              if (!await appConfirm(t.wizard.discardConfirm)) return;
               await clearDraft();
               router.push("/receptions");
             }}
@@ -305,7 +311,7 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
           )}
           {!editId && draft.step >= 1 && (
             <button type="button" className="btn-secondary btn-lg flex-1 px-3" disabled={draftSaving || saving} onClick={saveAsDraft} title={t.wizard.saveDraftHint}>
-              <Icon name="file" /> <span className="hidden sm:inline">{draftSaving ? t.wizard.saving : t.wizard.saveDraft}</span>
+              <Icon name="file" /> <span className="text-xs sm:text-sm">{draftSaving ? t.wizard.saving : t.wizard.saveDraft}</span>
             </button>
           )}
           {draft.step < 3 ? (

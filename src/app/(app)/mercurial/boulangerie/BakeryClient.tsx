@@ -1,10 +1,14 @@
 "use client";
+import { MoneyInput } from "@/components/MoneyInput";
+import { appConfirm } from "@/components/Confirm";
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { addBakeryRowAction, deleteBakeryRowAction, setBakeryPriceAction, setBakeryRemarkAction, setBakerySupplierAction } from "@/lib/actions/bakery";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtDate, fmtMoney, fmtNum } from "@/lib/format";
 import { Icon } from "@/components/Icon";
+import { FilterInput, ResetFilters } from "@/components/table/FilterInput";
+import { matches } from "@/lib/search";
 
 const ITEMS = ["baguette", "hamburger", "rolls", "painDeMie"] as const;
 type Item = (typeof ITEMS)[number];
@@ -16,30 +20,33 @@ export function BakeryProducts({ prices, supplier, suppliers, editable }: { pric
   const str = (n: number | null) => (n != null ? String(n).replace(".", ",") : "");
   return (
     <div className="card mb-4 overflow-x-auto">
-      <table className="table">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4">
+        <h2 className="font-semibold">{t.bakery.productList}</h2>
+        <label className="flex items-center gap-2 text-sm text-stone-600">
+          {t.bakery.supplierSetting}
+          {editable ? (
+            <select className="input w-56 py-1.5" defaultValue={supplier} onChange={(e) => start(() => setBakerySupplierAction(e.target.value))}>
+              {!suppliers.includes(supplier) && <option value={supplier}>{supplier}</option>}
+              {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          ) : (
+            <strong>{supplier}</strong>
+          )}
+        </label>
+      </div>
+      <table className="table mt-2">
         <thead>
-          <tr><th>{t.common.supplier}</th><th>{t.mercurial.products}</th><th>{t.common.unit}</th><th className="text-right">{t.mercurial.priceHt}</th></tr>
+          <tr><th>{t.mercurial.products}</th><th>{t.common.unit}</th><th className="text-right">{t.mercurial.priceHt}</th></tr>
         </thead>
         <tbody>
-          {ITEMS.map((k, i) => (
+          {ITEMS.map((k) => (
             <tr key={k}>
-              <td className="text-stone-600">
-                {i === 0 && editable ? (
-                  <select className="input py-1.5" defaultValue={supplier} title={t.bakery.supplierSetting} onChange={(e) => start(() => setBakerySupplierAction(e.target.value))}>
-                    {!suppliers.includes(supplier) && <option value={supplier}>{supplier}</option>}
-                    {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                ) : (
-                  supplier
-                )}
-              </td>
               <td className="font-medium">{t.bakery[k]}</td>
               <td>Pièce</td>
               <td className="text-right">
                 {editable ? (
-                  <input
+                  <MoneyInput
                     className="input ml-auto w-28 py-1.5 text-right"
-                    inputMode="decimal"
                     defaultValue={str(prices[k])}
                     onBlur={(e) => e.target.value !== str(prices[k]) && start(() => setBakeryPriceAction(k, e.target.value))}
                   />
@@ -81,7 +88,18 @@ export function BakeryTable({ rows, prices, editable }: { rows: Row[]; prices: R
   const months = useMemo(() => [...new Set(rows.map((r) => r.date.slice(0, 7)))].sort().reverse(), [rows]);
   const [month, setMonth] = useState(months[0] ?? "");
   const [sel, setSel] = useState<Set<number>>(new Set());
-  const shown = useMemo(() => rows.filter((r) => !month || r.date.startsWith(month)).sort((a, b2) => b2.date.localeCompare(a.date)), [rows, month]);
+  const [fDate, setFDate] = useState("");
+  const [fRemark, setFRemark] = useState("");
+  const shown = useMemo(
+    () =>
+      rows
+        .filter((r) => !month || r.date.startsWith(month))
+        .filter((r) => !fDate || matches(fmtDate(r.date, locale), fDate))
+        .filter((r) => !fRemark || matches(r.remark ?? "", fRemark))
+        .sort((a, b2) => b2.date.localeCompare(a.date)),
+    [rows, month, fDate, fRemark, locale],
+  );
+  const filtersOn = !!(fDate || fRemark || month);
   const monthLabel = (m: string) => new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "fr-FR", { month: "long", year: "numeric" }).format(new Date(m + "-15"));
 
   const totals = (list: Row[]) => {
@@ -100,7 +118,7 @@ export function BakeryTable({ rows, prices, editable }: { rows: Row[]; prices: R
       <td />
       <td className="font-semibold">{label}</td>
       {ITEMS.map((k) => <td key={k} className="text-right font-semibold tabular-nums">{fmtNum(tt.q[k], locale)}</td>)}
-      <td colSpan={editable ? 3 : 2} className="text-right font-semibold tabular-nums">{tt.amount > 0 ? `${fmtMoney(tt.amount, locale)} HT` : ""}</td>
+      <td colSpan={3} className="text-right font-semibold tabular-nums">{tt.amount > 0 ? `${fmtMoney(tt.amount, locale)} HT` : ""}</td>
     </tr>
   );
 
@@ -128,7 +146,15 @@ export function BakeryTable({ rows, prices, editable }: { rows: Row[]; prices: R
               {ITEMS.map((k) => <th key={k} className="text-right">{b[k]}</th>)}
               <th className="min-w-48">{b.remark}</th>
               <th>{b.bl}</th>
-              {editable && <th />}
+              <th />
+            </tr>
+            <tr>
+              <th className="bg-white" />
+              <th className="bg-white py-1.5"><FilterInput value={fDate} onChange={setFDate} options={shown.map((r) => fmtDate(r.date, locale))} /></th>
+              {ITEMS.map((k) => <th key={k} className="bg-white" />)}
+              <th className="bg-white py-1.5"><FilterInput value={fRemark} onChange={setFRemark} options={[...new Set(rows.map((r) => r.remark ?? "").filter(Boolean))]} /></th>
+              <th className="bg-white" />
+              <th className="bg-white py-1.5 text-right"><ResetFilters active={filtersOn} onClick={() => { setFDate(""); setFRemark(""); setMonth(""); setSel(new Set()); }} /></th>
             </tr>
           </thead>
           <tbody>
@@ -139,7 +165,7 @@ export function BakeryTable({ rows, prices, editable }: { rows: Row[]; prices: R
                 {ITEMS.map((k) => <td key={k} className="text-right tabular-nums">{r[k] != null ? fmtNum(r[k], locale) : ""}</td>)}
                 <td>{editable ? <Remark id={r.id} initial={r.remark ?? ""} /> : r.remark}</td>
                 <td>{r.receptionId ? <Link className="text-brand-700 hover:underline" href={`/receptions/${r.receptionId}`}>→</Link> : <span className="text-xs text-stone-400">{b.manual}</span>}</td>
-                {editable && <td className="text-right">{!r.receptionId && <DeleteBakeryRow id={r.id} />}</td>}
+                <td className="text-right">{editable && !r.receptionId && <DeleteBakeryRow id={r.id} />}</td>
               </tr>
             ))}
           </tbody>
@@ -163,7 +189,7 @@ export function DeleteBakeryRow({ id }: { id: number }) {
   const { t } = useI18n();
   const [pending, start] = useTransition();
   return (
-    <button className="btn-ghost p-1 text-stone-400 hover:text-red-600" disabled={pending} aria-label={t.common.delete} onClick={() => confirm(t.common.confirmDelete) && start(() => deleteBakeryRowAction(id))}>
+    <button className="btn-ghost p-1 text-stone-400 hover:text-red-600" disabled={pending} aria-label={t.common.delete} onClick={async () => await appConfirm(t.common.confirmDelete) && start(() => deleteBakeryRowAction(id))}>
       <Icon name="trash" className="h-4 w-4" />
     </button>
   );

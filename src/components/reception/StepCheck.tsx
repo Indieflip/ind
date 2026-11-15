@@ -1,4 +1,6 @@
 "use client";
+import { MoneyInput } from "@/components/MoneyInput";
+import { appConfirm } from "@/components/Confirm";
 import { useMemo, useState } from "react";
 import { useI18n } from "@/lib/i18n/client";
 import { REASONS, type Catalog, type Draft, type DraftLine } from "@/lib/reception-types";
@@ -8,7 +10,7 @@ import { decisionStyles } from "../DecisionBadge";
 import { Icon } from "../Icon";
 import { UnitSelect } from "../UnitSelect";
 import { PhotoButton, Thumbs } from "./PhotoButton";
-import { evaluate, isBakerySupplier, lineFromProduct, matches, priceCheck, withAutoDecision } from "./helpers";
+import { evaluate, isBakerySupplier, lineFromProduct, matches, priceCheck, suggestedDecision, suggestedReason, withAutoDecision } from "./helpers";
 
 const DEFAULT_UNITS = ["Pièce", "Kg", "Litre", "Sachet"];
 
@@ -38,7 +40,7 @@ export function StepCheck({
           line={l}
           catalog={catalog}
           onChange={(patch) => updateLine(l.key, patch)}
-          onRemove={() => confirm(t.wizard.removeLineConfirm) && setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
+          onRemove={async () => await appConfirm(t.wizard.removeLineConfirm) && setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
         />
       ))}
       <AddProduct draft={draft} setDraft={setDraft} catalog={catalog} />
@@ -64,7 +66,8 @@ function LineCard({
   const lo = line.mercurialMin ?? line.mercurialPrice;
   const hi = line.mercurialPrice ?? line.mercurialMin;
   const rangeLabel = lo == null ? "" : `${t.wizard.mercurial} ${fmtMoney(lo, locale)}${hi != null && hi !== lo ? ` – ${fmtMoney(hi, locale)}` : ""}`;
-  const style = decisionStyles[line.decision];
+  const style = line.decision ? decisionStyles[line.decision] : { border: "border-l-stone-300", badge: "", dot: "" };
+  const proposed = suggestedDecision(line, catalog);
 
   const field = (key: keyof DraftLine, label: string, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
     <div>
@@ -130,7 +133,7 @@ function LineCard({
             <span className="ml-1 font-normal text-stone-400">{rangeLabel}</span>
             {line.priceLocked && <span className="ml-1 badge bg-sky-100 text-sky-800">🔒 {t.wizard.lockedBadge}</span>}
           </label>
-          <input className="input py-2" inputMode="decimal" value={line.unitPrice} onChange={(e) => onChange({ unitPrice: e.target.value })} />
+          <MoneyInput className="input py-2" value={line.unitPrice} onChange={(e) => onChange({ unitPrice: e.target.value })} />
           {pc.kind === "locked" && <p className="mt-0.5 text-xs font-semibold text-red-700">{fmtPct(pc.pct)} · {t.wizard.lockedWarn}</p>}
           {(pc.kind === "increase" || pc.kind === "decrease") && (
             <p className={`mt-0.5 text-xs font-semibold ${pc.kind === "increase" ? "text-red-600" : "text-emerald-600"}`}>{fmtPct(pc.pct)}</p>
@@ -156,20 +159,19 @@ function LineCard({
           <button
             key={d}
             type="button"
-            onClick={() => onChange({ decision: d, decisionManual: true, reason: d === "conform" ? "" : line.reason })}
+            onClick={() => onChange({ decision: d, reason: d === "conform" ? "" : line.reason || suggestedReason(line, catalog) })}
             className={`rounded-lg border px-2 py-2 text-sm font-semibold ${line.decision === d ? decisionStyles[d].badge + " border-transparent" : "border-stone-200 bg-white text-stone-500"}`}
           >
             {t.decision[d]}
           </button>
         ))}
       </div>
-      {line.decisionManual && (
-        <button type="button" className="mt-1 text-xs text-stone-500 underline" onClick={() => onChange({ decisionManual: false })}>
-          {t.wizard.autoDecision}
-        </button>
-      )}
+      <p className={`mt-1 text-xs ${line.decision ? "text-stone-500" : "font-semibold text-amber-700"}`}>
+        {!line.decision && `${t.wizard.chooseDecision} · `}
+        {t.wizard.autoDecision} : {t.decision[proposed]}
+      </p>
 
-      {line.decision !== "conform" && (
+      {line.decision && line.decision !== "conform" && (
         <div className="mt-3 space-y-2">
           <select className="input" value={line.reason} onChange={(e) => onChange({ reason: e.target.value as DraftLine["reason"] })}>
             <option value="">{t.wizard.chooseReason}</option>
@@ -177,7 +179,7 @@ function LineCard({
               <option key={r} value={r}>{t.reasons[r]}</option>
             ))}
           </select>
-          <Thumbs photos={line.photos} onRemove={(i) => confirm(t.wizard.removePhotoConfirm) && onChange({ photos: line.photos.filter((_, j) => j !== i) })} />
+          <Thumbs photos={line.photos} onRemove={async (i) => await appConfirm(t.wizard.removePhotoConfirm) && onChange({ photos: line.photos.filter((_, j) => j !== i) })} />
           <PhotoButton label={t.common.photo} className="btn-secondary w-full" onPhotos={(urls) => onChange({ photos: [...line.photos, ...urls] })} />
         </div>
       )}

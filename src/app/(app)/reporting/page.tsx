@@ -9,6 +9,7 @@ import { Field, FilterBar, PageHeader, Stat, qs } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { MonthlyBars } from "./MonthlyBars";
 import { MajLog } from "./MajLog";
+import { SupplierStats } from "./SupplierStats";
 
 function defaultFrom() {
   const d = new Date();
@@ -17,7 +18,7 @@ function defaultFrom() {
 }
 
 export default async function ReportingPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const user = await requireUser(can.viewReporting);
+  const user = await requireUser();
   const { t, locale } = await getDict();
   const sp = await searchParams;
   const from = one(sp.from) && /^\d{4}-\d{2}-\d{2}$/.test(one(sp.from)!) ? one(sp.from)! : defaultFrom();
@@ -103,52 +104,16 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
 
       <section className="card mb-6 overflow-x-auto">
         <h2 className="px-4 pt-4 font-semibold">{t.reporting.bySupplier}</h2>
-        {bySupplier.rows.length === 0 ? (
-          <p className="p-4 text-sm text-stone-500">{t.reporting.noData}</p>
-        ) : (
-          <table className="table mt-2">
-            <thead>
-              <tr>
-                <th>{t.common.supplier}</th>
-                <th className="text-right">{t.reporting.receptions}</th>
-                <th className="text-right">{t.reporting.lines}</th>
-                <th className="min-w-40">{t.reporting.conformity}</th>
-                <th className="text-right">{t.reporting.reserves}</th>
-                <th className="text-right">{t.reporting.refusals}</th>
-                <th className="text-right">{t.reporting.anomalies}</th>
-                <th className="text-right">{t.reporting.priceIncreases}</th>
-                <th className="text-right">{t.reporting.avgIncrease}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bySupplier.rows.map((r) => {
-                const pct = r.lines ? Math.round((r.conform / r.lines) * 100) : null;
-                return (
-                  <tr key={r.supplier}>
-                    <td className="font-medium">{r.supplier}</td>
-                    <td className="text-right tabular-nums">{r.receptions}</td>
-                    <td className="text-right tabular-nums">{r.lines}</td>
-                    <td>
-                      {pct == null ? "—" : (
-                        <div className="flex items-center gap-2" title={`${r.conform} / ${r.lines}`}>
-                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-100">
-                            <div className="h-full rounded-full bg-brand-500" style={{ width: `${pct}%` }} />
-                          </div>
-                          <span className="w-10 text-right text-xs tabular-nums">{pct} %</span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="text-right tabular-nums">{r.reserves}</td>
-                    <td className="text-right tabular-nums">{r.refusals}</td>
-                    <td className="text-right tabular-nums">{r.anomalies}</td>
-                    <td className="text-right tabular-nums">{r.increases}</td>
-                    <td className="text-right tabular-nums">{fmtPct(r.avg_increase != null ? Math.round(r.avg_increase * 10) / 10 : null)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+        <div className="p-3">
+          <SupplierStats
+            rows={bySupplier.rows.map((r) => ({
+              supplier: r.supplier, receptions: r.receptions, lines: r.lines,
+              pct: r.lines ? Math.round((r.conform / r.lines) * 100) : null, conform: r.conform,
+              reserves: r.reserves, refusals: r.refusals, anomalies: r.anomalies, increases: r.increases,
+              avg: r.avg_increase != null ? Math.round(r.avg_increase * 10) / 10 : null,
+            }))}
+          />
+        </div>
       </section>
 
       <section className="card p-4">
