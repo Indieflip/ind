@@ -322,6 +322,7 @@ export const en: Dict = {
     created: "Reported on",
   },
   mercurial: {
+    tabUpdates: "Price list updates",
     addProduct: "Add a product",
     lockedOnly: "Locked prices only",
     fvTag: "Fruit & veg",
@@ -430,7 +431,7 @@ export const en: Dict = {
     blocked: "Locked prices",
   },
   maj: {
-    title: "Suivi MAJ (update log)",
+    title: "Price list change history",
     intro: "Price-list update history (from the Excel file).",
     date: "Date",
     nature: "Type",

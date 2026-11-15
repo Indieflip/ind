@@ -324,6 +324,7 @@ export const fr = {
     created: "Signalée le",
   },
   mercurial: {
+    tabUpdates: "Mise à jour Mercurial",
     addProduct: "Ajout d'un produit",
     lockedOnly: "Prix bloqués uniquement",
     fvTag: "Fruits et légumes",
@@ -432,7 +433,7 @@ export const fr = {
     blocked: "Prix bloqués",
   },
   maj: {
-    title: "Suivi MAJ",
+    title: "Historique des modifications du Mercurial",
     intro: "Historique des mises à jour du mercurial (repris du fichier Excel).",
     date: "Date",
     nature: "Nature",

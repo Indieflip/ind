@@ -46,6 +46,10 @@ export async function syncFvProducts(tx?: Tx) {
     if (p) await db.update(schema.products).set(values).where(eq(schema.products.id, p.id));
     else await db.insert(schema.products).values(values);
   }
+  for (const u of new Set(items.map((i) => unitName(i.unit)).filter(Boolean))) {
+    await db.insert(schema.units).values({ name: u }).onConflictDoNothing();
+  }
+
   // Doublons de fournisseurs (même nom à l'accent / pluriel près) devenus vides : retirés de la liste
   for (const s of allSuppliers) {
     const main = suppliers.get(nameKey(s.name));

@@ -17,7 +17,8 @@ export function FilterInput({ value, onChange, options = [], placeholder }: { va
   const set = (c: string[], txt: string) => onChange([...c, txt].join("|").replace(/^\|$/, ""));
   const list = useMemo(() => {
     const pool = options.filter((o) => !chips.includes(o));
-    return text ? suggest(pool, text, 8) : open ? pool.slice(0, 8) : [];
+    // Sans saisie : toute la liste (défilante) ; en tapant : les correspondances
+    return text ? suggest(pool, text, 50) : open ? pool.slice(0, 300) : [];
   }, [options, text, chips, open]);
   return (
     <div className="relative min-w-0">
@@ -55,7 +56,7 @@ export function FilterInput({ value, onChange, options = [], placeholder }: { va
         </button>
       )}
       {open && list.length > 0 && (
-        <ul className="absolute left-0 z-30 mt-1 max-h-56 w-max min-w-full max-w-72 overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 text-left text-xs font-normal normal-case shadow-lg">
+        <ul className="absolute left-0 z-30 mt-1 max-h-64 w-max min-w-full max-w-72 overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 text-left text-xs font-normal normal-case shadow-lg">
           {list.map((o) => (
             <li key={o}>
               {/* Choisir une valeur l'ajoute (sélection multiple) */}

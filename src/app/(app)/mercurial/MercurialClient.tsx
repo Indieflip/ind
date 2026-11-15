@@ -145,12 +145,12 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
       { key: "supplier", text: (r) => r.supplier, options: suppliers.map((s) => s.name) },
       { key: "nature", text: (r) => r.nature ?? "", options: natures },
       { key: "name", text: (r) => r.name },
-      { key: "unit", text: (r) => r.unit, options: units },
+      { key: "unit", text: (r) => r.unit, options: [...new Set([...units, ...rows.map((r) => r.unit).filter(Boolean)])].sort((a, b) => a.localeCompare(b, "fr")) },
       { key: "priceMin", text: (r) => money(r.priceMin), sort: (r) => r.priceMin },
       { key: "price", text: (r) => money(r.price), sort: (r) => r.price },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [suppliers, natures, units, locale],
+    [suppliers, natures, units, locale, rows],
   );
   const base = useMemo(() => rows.filter((r) => (showInactive || r.active) && (!lockedOnly || r.priceLocked)), [rows, showInactive, lockedOnly]);
   const tb = useTable(base, cols, { pageSize: 1000 });
@@ -214,11 +214,10 @@ function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; supp
     return (
       <tr className={r.active ? "" : "opacity-50"}>
         <td className="text-stone-600">{r.supplier}</td>
-        <td className="text-stone-600">{r.nature ?? ""}</td>
+        <td className="text-stone-600">{r.fv ? <span className="badge bg-lime-100 text-lime-800">{r.nature ?? m.fvTag}</span> : r.nature ?? ""}</td>
         <td className="font-medium">
           {r.name}
           {r.priceLocked && <span className="ml-1.5 badge bg-sky-100 text-sky-800" title={m.lockedHint}>🔒 {m.locked}</span>}
-          {r.fv && <span className="ml-1.5 badge bg-lime-100 text-lime-800">{m.fvTag}</span>}
         </td>
         <td>{r.unit}</td>
         <td className="whitespace-nowrap text-right tabular-nums">{r.priceMin != null ? fmtMoney(r.priceMin, locale) : ""}</td>

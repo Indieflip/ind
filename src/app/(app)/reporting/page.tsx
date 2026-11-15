@@ -8,7 +8,6 @@ import { one, type SP } from "@/lib/server/queries";
 import { Field, FilterBar, PageHeader, Stat, qs } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { MonthlyBars } from "./MonthlyBars";
-import { MajLog } from "./MajLog";
 import { SupplierStats } from "./SupplierStats";
 
 function defaultFrom() {
@@ -27,7 +26,6 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
   const end = sql`((${to}::date + 1)::timestamp at time zone 'Europe/Paris')`;
   const db = getDb();
 
-  const majRows = await getDb().select().from(schema.majLog).orderBy(asc(schema.majLog.position));
   const [kpi, anomalyKpi, priceKpi, bySupplier, monthly] = await Promise.all([
     db.execute<{ receptions: number; conform: number }>(sql`
       select count(*)::int as receptions, count(*) filter (where status = 'conform')::int as conform
@@ -121,7 +119,6 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
         <p className="mt-1 text-sm text-stone-600">{t.reporting.haccpHint}</p>
         <a className="btn-primary mt-3" href={`/api/export/receptions${qs({ from, to })}`}><Icon name="download" className="h-4 w-4" /> {t.reporting.exportHaccp}</a>
       </section>
-      <MajLog rows={majRows.map((r) => ({ id: r.id, date: r.date, nature: r.nature, item: r.item, detail: r.detail, reference: r.reference, claim: r.claim }))} editable={can.editPrices(user.role)} />
     </>
   );
 }

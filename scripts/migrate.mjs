@@ -197,6 +197,8 @@ if (!seeded) {
       else await db.execute(sql`insert into products (supplier_id, name, unit, nature, category_id, price_locked, active, fv_item_id) values (${sid}, ${it.product}, ${cap(it.unit)}, 'Fruits & légumes', ${produce}, ${it.locked}, true, ${it.id})`);
     }
     await db.execute(sql`update products set active = false where fv_item_id is not null and fv_item_id not in (select id from fv_items where year = ${year})`);
+    // Toutes les unités utilisées par des produits figurent dans la liste des unités
+    await db.execute(sql`insert into units (name) select distinct unit from products where unit is not null and unit <> '' on conflict (name) do nothing`);
     console.log(`[migrate] fruits et légumes synchronisés : ${items.length}`);
   }
 }

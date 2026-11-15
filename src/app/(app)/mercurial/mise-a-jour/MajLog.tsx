@@ -20,12 +20,9 @@ export function MajLog({ rows, editable }: { rows: Row[]; editable: boolean }) {
     { key: "claim", label: m.claim, text: (r) => r.claim ?? "", className: "min-w-56", render: (r) => (editable ? <Claim id={r.id} initial={r.claim ?? ""} /> : r.claim || "—") },
   ];
   return (
-    <section className="mt-6">
-      <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h2 className="font-semibold">{m.title}</h2>
-          <p className="text-xs text-stone-500">{m.intro}</p>
-        </div>
+    <section>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+        <h1 className="text-2xl font-bold tracking-tight">{m.title}</h1>
         <a className="btn-secondary py-2" href="/api/export/maj">{t.common.exportCsv}</a>
       </div>
       <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} />
