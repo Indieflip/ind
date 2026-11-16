@@ -10,8 +10,8 @@ import { appConfirm } from "@/components/Confirm";
 import { Icon } from "@/components/Icon";
 import { DataTable, type Col } from "@/components/table/DataTable";
 
-/** Une anomalie qui compte dans un montant (pour savoir d'où il vient) */
-export interface Contribution { id: number; number: number; final: boolean; date: string; supplier: string; product: string; stage: string; resolution: string | null; amount: number; kind: "credit" | "claimed" }
+/** Une anomalie qui compte dans un montant (pour savoir d'où il vient) — repérée par son N° de réclamation */
+export interface Contribution { id: number; number: number; final: boolean; closed: boolean; date: string; supplier: string; product: string; stage: string; resolution: string | null; amount: number; kind: "credit" | "claimed" }
 
 export interface SupplierLine {
   key: string; supplierId: number | null; name: string; count: number; open: number; obtained: number; pending: number; avgDays: number | null;
@@ -19,7 +19,7 @@ export interface SupplierLine {
 }
 
 /** Liste des anomalies derrière un montant : N° (lien vers la fiche), fournisseur, produit, étape, montant */
-function DetailModal({ title, items, onClose }: { title: string; items: Contribution[]; onClose: () => void }) {
+export function DetailModal({ title, items, onClose }: { title: string; items: Contribution[]; onClose: () => void }) {
   const { t, locale } = useI18n();
   const e = t.savings;
   const total = items.reduce((s, c) => s + c.amount, 0);
@@ -35,11 +35,11 @@ function DetailModal({ title, items, onClose }: { title: string; items: Contribu
         </div>
         <div className="overflow-y-auto p-2">
           <table className="w-full text-left text-sm">
-            <thead className="text-xs text-stone-500"><tr><th className="p-1.5">N°</th><th className="p-1.5">{t.common.date}</th><th className="p-1.5">{t.common.supplier}</th><th className="p-1.5">{t.common.product}</th><th className="p-1.5">{t.common.status}</th><th className="p-1.5 text-right">{e.amount}</th></tr></thead>
+            <thead className="text-xs text-stone-500"><tr><th className="p-1.5">{t.claims.title} N°</th><th className="p-1.5">{t.common.date}</th><th className="p-1.5">{t.common.supplier}</th><th className="p-1.5">{t.common.product}</th><th className="p-1.5">{t.common.status}</th><th className="p-1.5 text-right">{e.amount}</th></tr></thead>
             <tbody>
               {items.map((c) => (
                 <tr key={`${c.kind}-${c.id}`} className="border-t border-stone-100">
-                  <td className="p-1.5"><Link href={`/anomalies/${c.id}`} className={`text-brand-700 hover:underline ${c.final ? "font-semibold" : "italic"}`}>{c.number}</Link></td>
+                  <td className="p-1.5"><Link href={`/anomalies/${c.id}`} className="font-semibold text-brand-700 hover:underline">{c.number}</Link></td>
                   <td className="whitespace-nowrap p-1.5">{c.date}</td>
                   <td className="p-1.5">{sentence(c.supplier)}</td>
                   <td className="p-1.5">{c.product}</td>
@@ -127,6 +127,18 @@ export function SupplierSavings({ rows, suppliers, canManage }: { rows: Supplier
     <>
       <DataTable rows={rows} cols={cols} rowKey={(r) => r.key} defaultSort={{ key: "obtained", dir: "desc" }} dense fixed rowClassName={(r) => (r.supplierId ? "" : "bg-red-50/50")} />
       {detail && <DetailModal title={`${sentence(detail.name)} · ${e.detailTitle}`} items={detail.items} onClose={() => setDetail(null)} />}
+    </>
+  );
+}
+
+/** Un chiffre justifié : au clic, la liste des anomalies (N° de réclamation) qui le composent */
+export function Justified({ title, items, children, className = "" }: { title: string; items: Contribution[]; children: React.ReactNode; className?: string }) {
+  const [open, setOpen] = useState(false);
+  if (!items.length) return <span className={className}>{children}</span>;
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={`underline decoration-dotted underline-offset-2 hover:text-brand-700 ${className}`}>{children}</button>
+      {open && <DetailModal title={title} items={items} onClose={() => setOpen(false)} />}
     </>
   );
 }

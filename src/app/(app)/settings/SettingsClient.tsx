@@ -281,7 +281,7 @@ export function ConformityRow({ c }: { c: { id: number; name: string; conformRul
   );
 }
 
-type CompanyKey = "company_legal_name" | "restaurant_name" | "company_address" | "company_phone" | "company_email";
+type CompanyKey = "company_legal_name" | "restaurant_name" | "company_address" | "company_phone" | "company_email" | "company_siret" | "company_vat";
 
 /** Onglet Company : enregistrement de chaque champ en quittant le champ */
 export function CompanyForm({ initial }: { initial: Record<CompanyKey, string> }) {
@@ -294,7 +294,7 @@ export function CompanyForm({ initial }: { initial: Record<CompanyKey, string> }
       <span className="label">
         {label}
         {state[key] === "saved" && <Icon name="check" className="ml-1 inline h-4 w-4 text-emerald-600" />}
-        {state[key] === "error" && <span className="ml-1 text-xs text-red-600">{t.backup.emailInvalid}</span>}
+        {state[key] === "error" && <span className="ml-1 text-xs text-red-600">{key === "company_siret" ? s.siretInvalid : key === "company_vat" ? s.vatInvalid : t.backup.emailInvalid}</span>}
       </span>
       <input
         className="input"
@@ -318,6 +318,8 @@ export function CompanyForm({ initial }: { initial: Record<CompanyKey, string> }
       <div className="sm:col-span-2">{field("company_address", s.address, { placeholder: "1 Boulevard de la Croisette, 06400 Cannes" })}</div>
       {field("company_phone", s.phone, { type: "tel", placeholder: "04 93 00 00 00" })}
       {field("company_email", s.contactEmail, { type: "email", placeholder: "contact@exemple.fr" })}
+      {field("company_siret", s.siret, { inputMode: "numeric", placeholder: "123 456 789 00012" })}
+      {field("company_vat", s.vat, { placeholder: "FR12 345678901" })}
     </div>
   );
 }

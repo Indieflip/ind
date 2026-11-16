@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { followUpTodayAction, updateAnomalyAction } from "@/lib/actions/anomalies";
-import { MODES, RESOLUTIONS, STAGES, stageOf, stageStyles } from "@/lib/anomaly";
+import { MODES, RESOLUTIONS, STAGES, stageOf, stageStyles, modeIcon } from "@/lib/anomaly";
 import { useI18n } from "@/lib/i18n/client";
 import { Icon } from "@/components/Icon";
 import { MoneyInput } from "@/components/MoneyInput";
@@ -86,7 +86,7 @@ export function AnomalySheetForm({ id, initial, editable }: { id: number; initia
 
       <div>
         <span className="label">{s.mode}</span>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid gap-2 sm:grid-cols-3">
           {MODES.map((m) => (
             <button
               key={m}
@@ -95,7 +95,7 @@ export function AnomalySheetForm({ id, initial, editable }: { id: number; initia
               onClick={() => { setV({ ...v, mode: m }); setSaved(false); }}
               className={`rounded-lg border-2 px-2 py-2 text-left text-sm ${v.mode === m ? "border-brand-600 bg-brand-50 font-semibold text-brand-800" : "border-stone-200 bg-white text-stone-500"}`}
             >
-              {m === "verification" ? "🔍" : "📞"} {t.modes[m]}
+              {modeIcon(m)} {t.modes[m]}
               <span className="block text-[11px] font-normal text-stone-500">{s.modeHints[m]}</span>
             </button>
           ))}

@@ -201,11 +201,13 @@ export async function followUpTodayAction(id: number, note: string) {
  * Clôture de la semaine : les anomalies clôturées ou annulées jusqu'à la fin de la semaine sont consolidées
  * (N° définitif) et le bilan de la semaine est figé (avoirs, livraisons différées, montant encore en attente).
  */
-export async function closeWeekAction(week: string) {
+export async function closeWeekAction(week: string, period: "week" | "month" = "week") {
   const user = await assertUser(can.consolidate);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(week)) return { error: "invalid" };
+  // Fin de la période : semaine (+7 jours) ou mois (1er du mois suivant)
   const end = new Date(`${week}T00:00:00`);
-  end.setDate(end.getDate() + 7);
+  if (period === "month") end.setMonth(end.getMonth() + 1);
+  else end.setDate(end.getDate() + 7);
   const db = getDb();
   return db.transaction(async (tx) => {
     await tx.execute(sql`lock table anomalies in share row exclusive mode`);
@@ -229,7 +231,7 @@ export async function closeWeekAction(week: string) {
       annulee: toClose.filter((r) => r.stage === "annulee").length,
     };
     const values = { closed: toClose.length, credits: String(credits), deferred: String(deferred), pending: String(num(waiting[0]?.s) ?? 0), details, closedBy: user.id, closedAt: new Date() };
-    await tx.insert(schema.weeklyClosings).values({ week, ...values }).onConflictDoUpdate({ target: schema.weeklyClosings.week, set: values });
+    await tx.insert(schema.weeklyClosings).values({ week, period, ...values }).onConflictDoUpdate({ target: [schema.weeklyClosings.period, schema.weeklyClosings.week], set: values });
     revalidatePath("/anomalies", "layout");
     return { ok: true, count: toClose.length };
   });
@@ -252,4 +254,36 @@ export async function deleteSupplierGroupAction(supplierName: string) {
   await getDb().delete(schema.anomalies).where(and(isNull(schema.anomalies.supplierId), isNull(schema.anomalies.consolidatedAt), eq(schema.anomalies.supplierName, supplierName)));
   revalidatePath("/anomalies", "layout");
   return { ok: true };
+}
+
+/** Réclamations : regrouper plusieurs anomalies / écarts sous un même N° (le plus petit) */
+export async function groupClaimsAction(ids: number[]) {
+  await assertUser(can.manageAnomalies);
+  const clean = ids.filter((n) => Number.isInteger(n));
+  if (clean.length < 2) return { error: "invalid" };
+  const db = getDb();
+  const rows = await db.select({ claimNo: schema.anomalies.claimNo }).from(schema.anomalies).where(inArray(schema.anomalies.id, clean));
+  const target = Math.min(...rows.map((r) => r.claimNo ?? Infinity));
+  if (!Number.isFinite(target)) return { error: "invalid" };
+  await db.update(schema.anomalies).set({ claimNo: target }).where(inArray(schema.anomalies.id, clean));
+  revalidatePath("/anomalies", "layout");
+  return { ok: true, claimNo: target };
+}
+
+/** Réclamations : sortir une anomalie d'un regroupement (nouveau N°) */
+export async function ungroupClaimAction(id: number) {
+  await assertUser(can.manageAnomalies);
+  const db = getDb();
+  const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${schema.anomalies.claimNo}), 0)::int` }).from(schema.anomalies);
+  await db.update(schema.anomalies).set({ claimNo: max + 1 }).where(eq(schema.anomalies.id, id));
+  revalidatePath("/anomalies", "layout");
+  return { ok: true };
+}
+
+/** Clôture : activer / désactiver les rappels hebdomadaire et mensuel */
+export async function setClosingReminderAction(period: "week" | "month", on: boolean) {
+  await assertUser(can.consolidate);
+  const { setSetting } = await import("@/lib/settings");
+  await setSetting(period === "week" ? "closing_weekly" : "closing_monthly", on ? "1" : "0");
+  revalidatePath("/", "layout");
 }

@@ -11,8 +11,9 @@ import { AnomaliesBoard, AnomalyForm } from "./AnomalyClient";
 import { lineDocLabel } from "@/lib/documents";
 import { ensureAnomaliesLinked } from "@/lib/server/maj";
 import { syncWeighAnomalies } from "@/lib/server/weighAnomalies";
+import { ensureClaimNumbers } from "@/lib/server/claimNumbers";
 import { supplierProcesses } from "@/lib/server/followup";
-import { daysSince, stageOf } from "@/lib/anomaly";
+import { daysSince, stageOf, isClaimMode } from "@/lib/anomaly";
 import { DueBox, Kanban } from "./Kanban";
 import Link from "next/link";
 
@@ -24,6 +25,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   await ensureAnomaliesLinked();
   await syncWeighAnomalies();
+  await ensureClaimNumbers();
   const processes = await supplierProcesses();
   const view = one(sp.view) === "liste" ? "list" : "board";
   const a = schema.anomalies;
@@ -87,7 +89,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     days: daysSince(x.lastActionAt, x.createdAt, now),
     delay: processes.find(x.supplierId, x.supplierName)?.delay ?? 3,
     // À relancer : réclamée ou à vérifier, sans nouvelle action depuis le délai du fournisseur (3 jours par défaut)
-    due: (stageOf(x.stage) === "reclamee" || stageOf(x.stage) === "a_verifier") && x.mode !== "verification" && !x.consolidatedAt && daysSince(x.lastActionAt, x.createdAt, now) >= (processes.find(x.supplierId, x.supplierName)?.delay ?? 3),
+    due: (stageOf(x.stage) === "reclamee" || stageOf(x.stage) === "a_verifier") && isClaimMode(x.mode) && !x.consolidatedAt && daysSince(x.lastActionAt, x.createdAt, now) >= (processes.find(x.supplierId, x.supplierName)?.delay ?? 3),
     receptionId: x.receptionId,
     photoUrl: x.photoUrl,
   });

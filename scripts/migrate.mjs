@@ -337,6 +337,17 @@ if (!(await db.execute(sql`select 1 from dev_items limit 1`)).rows.length && !(a
   await db.execute(sql`insert into app_settings (key, value) values ('dev_seed_v1', '1') on conflict (key) do nothing`);
 }
 
+// Onglet Dev : contraintes de départ et priorités des points en attente (une fois)
+const devConstraints = [["constraint", "Format de date JJ/MM/AA", "Partout dans l'application et dans les textes repris des fichiers."], ["constraint", "Pas de défilement horizontal dans les tableaux", "Les colonnes s'adaptent à la largeur de la page ; le texte passe à la ligne."], ["constraint", "Confirmations dans l'application", "Jamais la fenêtre du navigateur : boîte de confirmation de l'appli pour toute suppression."], ["constraint", "Listes triées de A à Z", "Suggestions, fournisseurs, produits, unités."], ["constraint", "« Mail » plutôt que « E-mail »", ""], ["constraint", "Texte des tableaux : première lettre en majuscule", "Sauf les produits du mercurial, les références et les numéros."], ["constraint", "Un n° de BL / facture = une seule réception par fournisseur", "Plusieurs BL possibles dans une même réception."], ["constraint", "Numéros uniques", "N° de produit, de fournisseur (clé), N° de réclamation (1 = la plus ancienne), N° de fiche d'anomalie (définitif à la consolidation)."], ["constraint", "Chaque chiffre doit être justifiable", "Tout montant affiché dans Économies s'ouvre sur la liste des réclamations qui le composent."], ["constraint", "Sauvegarde conservée 10 ans", ""], ["constraint", "Secrets jamais dans les échanges", "Clés API (Anthropic, Resend…) saisies uniquement dans Vercel."]];
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_seed_v2'`)).rows.length) {
+  let pos = 1000;
+  for (const [kind, title, detail] of devConstraints) await db.execute(sql`insert into dev_items (kind, title, detail, position) values (${kind}, ${title}, ${detail || null}, ${pos++})`);
+  await db.execute(sql`update dev_items set priority = 'haute' where kind = 'pending' and priority is null and (title like 'Ajouter la clé%' or title like 'Compléter les montants%')`);
+  await db.execute(sql`update dev_items set priority = 'moyenne' where kind = 'pending' and priority is null and owner = 'moi'`);
+  await db.execute(sql`update dev_items set priority = 'basse' where kind = 'pending' and priority is null`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_seed_v2', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

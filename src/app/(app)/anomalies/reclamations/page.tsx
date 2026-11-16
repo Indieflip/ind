@@ -1,13 +1,14 @@
-import { desc, eq, isNull } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
 import { fmtDate, num } from "@/lib/format";
 import { lineDocLabel } from "@/lib/documents";
-import { daysSince, stageOf } from "@/lib/anomaly";
+import { daysSince, stageOf, isClaimMode } from "@/lib/anomaly";
 import { supplierProcesses } from "@/lib/server/followup";
 import { syncWeighAnomalies } from "@/lib/server/weighAnomalies";
+import { ensureClaimNumbers } from "@/lib/server/claimNumbers";
 import { PageHeader } from "@/components/ui";
 import { one, type SP } from "@/lib/server/queries";
 import { ClaimsView } from "./ClaimsView";
@@ -18,6 +19,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
   const f = one((await searchParams).f);
   const { t, locale } = await getDict();
   await syncWeighAnomalies();
+  await ensureClaimNumbers();
   const a = schema.anomalies;
   const db = getDb();
   const [rows, processes] = await Promise.all([
@@ -27,7 +29,6 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
       .leftJoin(schema.suppliers, eq(schema.suppliers.id, a.supplierId))
       .leftJoin(schema.receptions, eq(schema.receptions.id, a.receptionId))
       .leftJoin(schema.receptionLines, eq(schema.receptionLines.id, a.lineId))
-      .where(isNull(a.consolidatedAt))
       .orderBy(desc(a.createdAt)),
     supplierProcesses(),
   ]);
@@ -44,10 +45,10 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
           const days = daysSince(x.lastActionAt, x.createdAt, now);
           const stage = stageOf(x.stage);
           return {
-            id: x.id, date: fmtDate(x.createdAt, locale), dateIso: x.createdAt.toISOString(), supplier: supplier ?? x.supplierName, supplierId: x.supplierId,
+            id: x.id, claimNo: x.claimNo ?? 0, consolidated: !!x.consolidatedAt, date: fmtDate(x.createdAt, locale), dateIso: x.createdAt.toISOString(), supplier: supplier ?? x.supplierName, supplierId: x.supplierId,
             reference: (x.receptionId ? lineDocLabel(documents, lineDoc, blNumber) : null) ?? x.reference ?? "", product: x.productName ?? "",
             subject: x.description, mode: x.mode, stage, resolution: x.resolution, claimed: num(x.claimedAmount), credit: num(x.creditAmount),
-            days, due: (stage === "reclamee" || stage === "a_verifier") && x.mode !== "verification" && days >= delay, source: x.source,
+            days, due: (stage === "reclamee" || stage === "a_verifier") && isClaimMode(x.mode) && days >= delay, source: x.source,
           };
         })}
       />

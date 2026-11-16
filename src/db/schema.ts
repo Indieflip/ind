@@ -262,6 +262,8 @@ export const anomalies = pgTable(
     claimedAmount: numeric("claimed_amount", { precision: 12, scale: 2 }),
     /** reception | manual | file | weigh */
     source: text("source").notNull().default("reception"),
+    /** N° de réclamation (1 = la plus ancienne) ; plusieurs anomalies regroupées partagent le même N° */
+    claimNo: integer("claim_no"),
     /** Avoir reçu : n° et date de l'avoir (rapprochement avec la compta) */
     creditNumber: text("credit_number"),
     creditDate: date("credit_date"),
@@ -509,8 +511,10 @@ export const claims = pgTable(
 /** Clôtures hebdomadaires des anomalies (bilan de la semaine figé) */
 export const weeklyClosings = pgTable("weekly_closings", {
   id: serial("id").primaryKey(),
-  /** Lundi de la semaine clôturée (AAAA-MM-JJ) */
-  week: date("week").notNull().unique(),
+  /** week (semaine) | month (mois) */
+  period: text("period").notNull().default("week"),
+  /** Début de la période clôturée : lundi de la semaine ou 1er du mois (AAAA-MM-JJ) */
+  week: date("week").notNull(),
   closed: integer("closed").notNull().default(0),
   credits: numeric("credits", { precision: 12, scale: 2 }),
   deferred: numeric("deferred", { precision: 12, scale: 2 }),
@@ -518,7 +522,7 @@ export const weeklyClosings = pgTable("weekly_closings", {
   details: jsonb("details"),
   closedBy: integer("closed_by").references(() => users.id, { onDelete: "set null" }),
   closedAt: timestamp("closed_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => [uniqueIndex("closings_period_week_idx").on(t.period, t.week)]);
 
 /** Onglet Dev : objectifs du projet, points en attente, idées (modifiables) */
 export const devItems = pgTable("dev_items", {
@@ -529,6 +533,8 @@ export const devItems = pgTable("dev_items", {
   detail: text("detail"),
   /** Qui doit agir : moi (utilisateur) | dev */
   owner: text("owner"),
+  /** haute | moyenne | basse */
+  priority: text("priority"),
   position: integer("position").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

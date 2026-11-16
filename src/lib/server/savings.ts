@@ -5,7 +5,7 @@ import { num } from "@/lib/format";
 import { isOpenStage, stageOf } from "@/lib/anomaly";
 
 export type AnomalyLite = {
-  id: number; supplierId: number | null; supplierName: string; supplier: string | null; displayNumber: number; numberFinal: boolean; stage: string; resolution: string | null; mode: string;
+  id: number; supplierId: number | null; supplierName: string; supplier: string | null; displayNumber: number; numberFinal: boolean; claimNo: number | null; stage: string; resolution: string | null; mode: string;
   claimed: number | null; credit: number | null; createdAt: Date; closedAt: Date | null; consolidatedAt: Date | null; number: number | null; productName: string | null; description: string;
 };
 
@@ -18,7 +18,7 @@ export async function loadAnomalies(): Promise<AnomalyLite[]> {
   const max = rows.reduce((m, r) => Math.max(m, r.a.number ?? 0), 0);
   const prov = new Map(rows.filter((r) => r.a.number == null).sort((x, y) => x.a.createdAt.getTime() - y.a.createdAt.getTime() || x.a.id - y.a.id).map((r, i) => [r.a.id, max + i + 1]));
   return rows.map(({ a, supplier }) => ({
-    id: a.id, supplierId: a.supplierId, supplierName: a.supplierName, supplier, displayNumber: a.number ?? prov.get(a.id) ?? 0, numberFinal: a.number != null, stage: a.stage, resolution: a.resolution, mode: a.mode,
+    id: a.id, supplierId: a.supplierId, supplierName: a.supplierName, supplier, claimNo: a.claimNo, displayNumber: a.number ?? prov.get(a.id) ?? 0, numberFinal: a.number != null, stage: a.stage, resolution: a.resolution, mode: a.mode,
     claimed: num(a.claimedAmount), credit: num(a.creditAmount), createdAt: a.createdAt, closedAt: a.closedAt, consolidatedAt: a.consolidatedAt,
     number: a.number, productName: a.productName, description: a.description,
   }));
@@ -37,8 +37,9 @@ export function savingsOf(list: AnomalyLite[]) {
   const open = list.filter((a) => isOpenStage(stageOf(a.stage)));
   const waiting = open.filter((a) => stageOf(a.stage) !== "a_traiter");
   const noFollow = list.filter((a) => stageOf(a.stage) === "cloturee" && a.resolution === "sans_suite");
-  const byMode = (m: string) => {
-    const xs = waiting.filter((a) => a.mode === m);
+  // « Vérification de l'avoir - avec réclamation » compte comme une réclamation avec relances
+  const byMode = (m: "claim" | "verification") => {
+    const xs = waiting.filter((a) => (m === "claim" ? a.mode !== "verification" : a.mode === "verification"));
     return { count: xs.length, amount: sum(xs, "claimed"), withoutAmount: xs.filter((a) => a.claimed == null).length };
   };
   const obtained = sum(credits, "credit") + sum(deferred.filter((a) => !(a.credit ?? 0)), "claimed");
@@ -50,7 +51,7 @@ export function savingsOf(list: AnomalyLite[]) {
     pending: { count: waiting.length, amount: pending, withoutAmount: waiting.filter((a) => a.claimed == null).length },
     toProcess: { count: open.length - waiting.length, amount: sum(open.filter((a) => stageOf(a.stage) === "a_traiter"), "claimed") },
     noFollow: { count: noFollow.length, amount: sum(noFollow, "claimed") },
-    reclamation: byMode("reclamation"),
+    reclamation: byMode("claim"),
     verification: byMode("verification"),
     rate: obtained + pending > 0 ? obtained / (obtained + pending) : null,
   };

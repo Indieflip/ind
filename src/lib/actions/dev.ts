@@ -12,12 +12,13 @@ async function guard() {
   return user!;
 }
 
-const KINDS = ["objective", "pending", "idea", "done"];
+const KINDS = ["objective", "pending", "constraint", "idea", "done"];
+const PRIORITIES = ["haute", "moyenne", "basse"];
 
-export async function saveDevItemAction(id: number | null, data: { kind: string; title: string; detail: string; owner: string }) {
+export async function saveDevItemAction(id: number | null, data: { kind: string; title: string; detail: string; owner: string; priority?: string }) {
   await guard();
   if (!data.title.trim() || !KINDS.includes(data.kind)) return { error: "invalid" };
-  const values = { kind: data.kind, title: data.title.trim(), detail: data.detail.trim() || null, owner: data.owner || null, updatedAt: new Date() };
+  const values = { kind: data.kind, title: data.title.trim(), detail: data.detail.trim() || null, owner: data.owner || null, priority: PRIORITIES.includes(data.priority ?? "") ? data.priority! : null, updatedAt: new Date() };
   if (id) await getDb().update(schema.devItems).set(values).where(eq(schema.devItems.id, id));
   else await getDb().insert(schema.devItems).values({ ...values, position: Date.now() % 1_000_000 });
   revalidatePath("/dev");

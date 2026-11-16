@@ -43,8 +43,17 @@ export const isOpenStage = (s: Stage) => s === "a_traiter" || s === "reclamee" |
 /** Résolution d'une anomalie clôturée : par un avoir, ou par la marchandise livrée plus tard */
 export const RESOLUTIONS = ["avoir", "livraison", "sans_suite"] as const;
 export type Resolution = (typeof RESOLUTIONS)[number];
-export const MODES = ["reclamation", "verification"] as const;
+/**
+ * Types de suivi :
+ * - reclamation : réclamation avec relances ;
+ * - verification_reclamation : vérification de l'avoir AVEC réclamation (même effet que « réclamation » dans les économies) ;
+ * - verification : vérification de l'avoir SANS réclamation (on contrôle seulement l'avoir / la régularisation reçue).
+ */
+export const MODES = ["reclamation", "verification_reclamation", "verification"] as const;
 export type Mode = (typeof MODES)[number];
+/** Le suivi comporte une démarche auprès du fournisseur (relances, rappel à 3 jours, « avec réclamation » dans les économies) */
+export const isClaimMode = (m: string | null | undefined) => m !== "verification";
+export const modeIcon = (m: string | null | undefined) => (m === "verification" ? "🔍" : m === "verification_reclamation" ? "📞🔍" : "📞");
 
 /** Anciens champs (statut / résultat) tenus à jour d'après l'étape, pour l'historique et les exports */
 export function legacyOf(stage: Stage, resolution: string | null) {

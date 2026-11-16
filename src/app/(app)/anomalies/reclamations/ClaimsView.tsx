@@ -2,15 +2,15 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { updateAnomalyAction } from "@/lib/actions/anomalies";
+import { groupClaimsAction, ungroupClaimAction, updateAnomalyAction } from "@/lib/actions/anomalies";
 import { MoneyInput } from "@/components/MoneyInput";
-import { stageStyles, type Stage } from "@/lib/anomaly";
+import { stageStyles, type Stage, modeIcon } from "@/lib/anomaly";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtMoney, sentence } from "@/lib/format";
 import { DataTable, type Col } from "@/components/table/DataTable";
 
 export interface ClaimViewRow {
-  id: number; date: string; dateIso: string; supplier: string; supplierId: number | null; reference: string; product: string; subject: string;
+  id: number; claimNo: number; consolidated: boolean; date: string; dateIso: string; supplier: string; supplierId: number | null; reference: string; product: string; subject: string;
   mode: string; stage: Stage; resolution: string | null; claimed: number | null; credit: number | null; days: number; due: boolean; source: string;
 }
 
@@ -25,13 +25,32 @@ export function ClaimsView({ rows, canManage, initialFilter }: { rows: ClaimView
   const counts = Object.fromEntries(tiles.map((s) => [s, rows.filter((r) => r.stage === s).length])) as Record<Stage, number>;
   const shown = filter === "open" ? rows.filter((r) => r.stage === "reclamee" || r.stage === "a_verifier") : filter === "missing" ? missing : rows.filter((r) => r.stage === filter);
   const sum = (k: "claimed" | "credit") => shown.reduce((s, r) => s + (r[k] ?? 0), 0);
+  const [sel, setSel] = useState<Set<string | number>>(new Set());
+  const [busy, startBusy] = useTransition();
+  const router2 = useRouter();
+  const groupSize = new Map<number, number>();
+  for (const r of rows) groupSize.set(r.claimNo, (groupSize.get(r.claimNo) ?? 0) + 1);
   const cols: Col<ClaimViewRow>[] = [
+    // N° de réclamation : seul lien vers la fiche d'anomalie / l'écart de pesée
+    {
+      key: "claimNo", width: "4.5rem", label: "N°", text: (r) => String(r.claimNo), sort: (r) => r.claimNo,
+      render: (r) => (
+        <div>
+          <Link href={`/anomalies/${r.id}`} className="font-semibold text-brand-700 hover:underline" title={t.sheet.open}>{r.claimNo}</Link>
+          {(groupSize.get(r.claimNo) ?? 0) > 1 && (
+            <span className="block text-[10px] text-stone-500">
+              {c.grouped}{canManage && !r.consolidated && <button type="button" className="ml-1 underline" onClick={() => startBusy(async () => { await ungroupClaimAction(r.id); router2.refresh(); })}>{c.ungroup}</button>}
+            </span>
+          )}
+        </div>
+      ),
+    },
     { key: "date", width: "5rem", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateIso },
     { key: "supplier", width: "10%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => sentence(r.supplier) },
     { key: "reference", width: "9%", label: t.anomalies.blInvoice, text: (r) => r.reference },
-    { key: "product", width: "11%", label: t.common.product, text: (r) => r.product, href: (r) => `/anomalies/${r.id}` },
+    { key: "product", width: "11%", label: t.common.product, text: (r) => r.product },
     { key: "subject", label: c.subject, text: (r) => r.subject, keepCase: true, className: "text-stone-700" },
-    { key: "mode", width: "6.5rem", label: c.mode, text: (r) => t.modes[r.mode as "reclamation"], options: Object.values(t.modes), render: (r) => <span className="text-xs">{r.mode === "verification" ? "🔍" : "📞"} {t.modes[r.mode as "reclamation"]}</span> },
+    { key: "mode", width: "6.5rem", label: c.mode, text: (r) => t.modes[r.mode as "reclamation"], options: Object.values(t.modes), render: (r) => <span className="text-xs">{modeIcon(r.mode)} {t.modes[r.mode as "reclamation"]}</span> },
     {
       key: "claimed", width: "6rem", label: c.amount, align: "right", text: (r) => (r.claimed != null ? fmtMoney(r.claimed, locale) : ""), sort: (r) => r.claimed, filterable: false,
       // Montant manquant : saisie directe dans la ligne
@@ -68,11 +87,22 @@ export function ClaimsView({ rows, canManage, initialFilter }: { rows: ClaimView
         ))}
       </div>
       <p className="mb-2 text-right text-sm text-stone-600">{c.amount} : <strong>{fmtMoney(sum("claimed"), locale)}</strong> · {c.credit} : <strong>{fmtMoney(sum("credit"), locale)}</strong></p>
+      {canManage && (
+        <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+          <button type="button" className="btn-secondary py-1.5" disabled={sel.size < 2 || busy} onClick={() => startBusy(async () => { await groupClaimsAction([...sel].map(Number)); setSel(new Set()); router2.refresh(); })}>
+            {c.group} {sel.size > 1 && `(${sel.size})`}
+          </button>
+          <span className="text-xs text-stone-500">{c.groupHint}</span>
+        </div>
+      )}
       <DataTable
+        selectable={canManage}
+        selection={sel}
+        onSelectionChange={setSel}
         rows={shown}
         cols={cols}
         rowKey={(r) => r.id}
-        defaultSort={{ key: "date", dir: "desc" }}
+        defaultSort={{ key: "claimNo", dir: "desc" }}
         dense
         fixed
         empty={c.empty}

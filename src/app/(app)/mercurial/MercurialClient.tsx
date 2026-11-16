@@ -240,7 +240,7 @@ function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; supp
     return (
       <tr className={r.active ? "" : "opacity-50"}>
         <td className="text-right text-xs tabular-nums text-stone-400">{r.id}</td>
-        <td className="text-stone-600">{sentence(r.supplier)}</td>
+        <td className="text-stone-600"><Link href={`/mercurial/fournisseurs/${r.supplierId}`} className="hover:text-brand-700 hover:underline">{sentence(r.supplier)}</Link></td>
         <td className="text-stone-600">{r.fv ? <span className="badge bg-lime-100 text-lime-800">{r.nature ?? m.fvTag}</span> : r.nature ?? ""}</td>
         <td className="font-medium">
           {r.name}

@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { AmountTile, SupplierSavings, type Contribution } from "./SavingsClient";
+import { AmountTile, Justified, SupplierSavings, type Contribution } from "./SavingsClient";
 
 const PERIODS = ["all", "month", "lastMonth", "30d", "year"] as const;
 
@@ -40,7 +40,7 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
 
   // D'où viennent les montants : chaque anomalie qui compte, avec son N° de fiche
   const contrib = (a: AnomalyLite, kind: "credit" | "claimed"): Contribution => ({
-    id: a.id, number: a.displayNumber, final: a.numberFinal, date: fmtDate(a.createdAt, locale), supplier: a.supplier ?? a.supplierName,
+    id: a.id, number: a.claimNo ?? a.displayNumber, final: a.numberFinal, closed: !isOpenStage(stageOf(a.stage)), date: fmtDate(a.createdAt, locale), supplier: a.supplier ?? a.supplierName,
     product: a.productName ?? a.description.slice(0, 60), stage: a.stage, resolution: a.resolution, amount: kind === "credit" ? a.credit ?? 0 : a.claimed ?? 0, kind,
   });
   const obtainedItems = (xs: AnomalyLite[]) => [
@@ -73,6 +73,16 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
     const k = a.createdAt.toISOString().slice(0, 7);
     byMonth.set(k, [...(byMonth.get(k) ?? []), a]);
   }
+  // Récapitulatif fournisseur × mois
+  const recapMonths = [...byMonth.keys()].sort((a, b) => b.localeCompare(a)).slice(0, 6);
+  const recap = suppliers
+    .map((r) => {
+      const all = bySupplier.get(r.key) ?? [];
+      const bm = new Map<string, AnomalyLite[]>();
+      for (const a of all) { const k = a.createdAt.toISOString().slice(0, 7); bm.set(k, [...(bm.get(k) ?? []), a]); }
+      return { key: r.key, supplierId: r.supplierId, name: r.name, all, byMonth: bm };
+    })
+    .sort((a, b) => b.all.length - a.all.length);
   const months = [...byMonth.entries()].sort((a, b) => b[0].localeCompare(a[0])).map(([k, xs]) => ({ k, ...savingsOf(xs), count: xs.length }));
   const monthLabel = (k: string) => { const x = new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "fr-FR", { month: "long", year: "numeric" }).format(new Date(k + "-15")); return x.charAt(0).toUpperCase() + x.slice(1); };
 
@@ -102,8 +112,8 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
 
       <section className="mb-6 grid gap-3 md:grid-cols-2">
         <div className="card p-4">
-          <h2 className="font-semibold">📞 {t.modes.reclamation}</h2>
-          <p className="text-xs text-stone-500">{t.sheet.modeHints.reclamation}</p>
+          <h2 className="font-semibold">📞 {t.savings.withClaim}</h2>
+          <p className="text-xs text-stone-500">{t.modes.reclamation} + {t.modes.verification_reclamation}</p>
           <p className="mt-2 text-xl font-bold tabular-nums">{money(s.reclamation.amount)}</p>
           <p className="text-sm text-stone-600">{s.reclamation.count} {e.inWait}{s.reclamation.withoutAmount ? ` · ${s.reclamation.withoutAmount} ${e.withoutAmount}` : ""}</p>
         </div>
@@ -120,20 +130,62 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
         <SupplierSavings rows={suppliers} suppliers={supplierList} canManage={can.manageAnomalies(user.role)} />
       </section>
 
+      {/* Récapitulatif : fournisseur × mois, clôturées ou non — chaque chiffre ouvre la liste des fiches */}
+      <section className="card mb-6 overflow-x-auto">
+        <h2 className="px-4 pt-4 font-semibold">{e.recap}</h2>
+        <p className="px-4 text-xs text-stone-500">{e.recapHint}</p>
+        <table className="table mt-2 text-xs">
+          <thead>
+            <tr>
+              <th className="sticky left-0 z-10 bg-stone-50">{t.common.supplier}</th>
+              {recapMonths.map((m) => <th key={m} className="text-center">{monthLabel(m)}</th>)}
+              <th className="text-center">{e.totalCol}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recap.map((r) => (
+              <tr key={r.key}>
+                <td className="sticky left-0 bg-white font-medium">{r.supplierId ? <Link href={`/mercurial/fournisseurs/${r.supplierId}`} className="text-brand-700 hover:underline">{sentence(r.name)}</Link> : <span className="text-red-700">⚠ {r.name}</span>}</td>
+                {[...recapMonths, "total"].map((m) => {
+                  const xs = m === "total" ? r.all : r.byMonth.get(m) ?? [];
+                  if (!xs.length) return <td key={m} className="text-center text-stone-300">·</td>;
+                  const closed = xs.filter((a) => !isOpenStage(stageOf(a.stage)));
+                  const v = savingsOf(xs);
+                  return (
+                    <td key={m} className={`text-center ${m === "total" ? "bg-stone-50 font-semibold" : ""}`}>
+                      <Justified title={`${sentence(r.name)} · ${m === "total" ? e.totalCol : monthLabel(m)}`} items={xs.map((a) => contrib(a, (a.credit ?? 0) > 0 ? "credit" : "claimed"))}>
+                        {xs.length} <span className="text-stone-500">({closed.length} {e.closedShort})</span>
+                      </Justified>
+                      {v.obtained > 0 && <div className="text-emerald-800">{money(v.obtained)}</div>}
+                      {v.pending.amount > 0 && <div className="text-amber-800">{money(v.pending.amount)}</div>}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
       <section className="card overflow-x-auto">
         <h2 className="px-4 pt-4 font-semibold">{e.byMonth}</h2>
         <table className="table mt-2 text-sm">
-          <thead><tr><th>{e.month}</th><th className="text-right">{e.anomalies}</th><th className="text-right">{e.obtained}</th><th className="text-right">{e.pending}</th><th className="text-right">{e.noFollow}</th></tr></thead>
+          <thead><tr><th>{e.month}</th><th className="text-right">{e.anomalies}</th><th className="text-right">{e.closedCol}</th><th className="text-right">{e.obtained}</th><th className="text-right">{e.pending}</th><th className="text-right">{e.noFollow}</th></tr></thead>
           <tbody>
-            {months.map((m) => (
-              <tr key={m.k}>
-                <td className="font-medium">{monthLabel(m.k)}</td>
-                <td className="text-right tabular-nums">{m.count}</td>
-                <td className="text-right font-semibold tabular-nums text-emerald-800">{money(m.obtained)}</td>
-                <td className="text-right tabular-nums text-amber-800">{money(m.pending.amount)}</td>
-                <td className="text-right tabular-nums text-stone-600">{m.noFollow.count}</td>
-              </tr>
-            ))}
+            {months.map((m) => {
+              const xs = byMonth.get(m.k) ?? [];
+              const label = monthLabel(m.k);
+              return (
+                <tr key={m.k}>
+                  <td className="font-medium">{label}</td>
+                  <td className="text-right tabular-nums"><Justified title={`${label} · ${e.anomalies}`} items={xs.map((a) => contrib(a, (a.credit ?? 0) > 0 ? "credit" : "claimed"))}>{m.count}</Justified></td>
+                  <td className="text-right tabular-nums"><Justified title={`${label} · ${e.closedCol}`} items={xs.filter((a) => !isOpenStage(stageOf(a.stage))).map((a) => contrib(a, (a.credit ?? 0) > 0 ? "credit" : "claimed"))}>{xs.filter((a) => !isOpenStage(stageOf(a.stage))).length}</Justified></td>
+                  <td className="text-right font-semibold tabular-nums text-emerald-800"><Justified title={`${label} · ${e.obtained}`} items={obtainedItems(xs)}>{money(m.obtained)}</Justified></td>
+                  <td className="text-right tabular-nums text-amber-800"><Justified title={`${label} · ${e.pending}`} items={pendingItems(xs)}>{money(m.pending.amount)}</Justified></td>
+                  <td className="text-right tabular-nums text-stone-600">{m.noFollow.count}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </section>

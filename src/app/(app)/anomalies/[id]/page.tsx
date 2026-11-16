@@ -12,6 +12,7 @@ import { decisionStyles } from "@/components/DecisionBadge";
 import { Icon } from "@/components/Icon";
 import { claimStyles } from "@/lib/anomaly";
 import { AnomalySheetForm } from "./SheetClient";
+import { ensureClaimNumbers } from "@/lib/server/claimNumbers";
 import { supplierProcesses } from "@/lib/server/followup";
 
 /** Fiche d'anomalie : la réception d'origine et tout le suivi (problème, action, résultat, économie, statut) */
@@ -21,6 +22,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
   const db = getDb();
+  await ensureClaimNumbers();
   const a = await db.query.anomalies.findFirst({ where: eq(schema.anomalies.id, id) });
   if (!a) notFound();
   const [rec, line, supplier, claims, photos, numbers, maxNum, rank, author] = await Promise.all([
@@ -67,7 +69,8 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
             <p className="mt-1 text-sm text-white/85">{reference || s.noDocument}</p>
           </div>
           <div className="flex flex-col items-end gap-1.5">
-            <span className="badge bg-white text-red-800">{t.anomalies.types[a.type]}</span>
+            {a.claimNo && <span className="badge bg-white text-red-800">{t.claims.title} N° {a.claimNo}</span>}
+            <span className="badge bg-white/20 text-white">{t.anomalies.types[a.type]}</span>
             {a.nature && <span className="badge bg-white/20 text-white">{a.nature}</span>}
             {locked && <span className="badge bg-emerald-100 text-emerald-800">✓ {s.consolidated} {fmtDate(a.consolidatedAt, locale)}</span>}
           </div>

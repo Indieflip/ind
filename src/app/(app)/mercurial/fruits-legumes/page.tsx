@@ -6,6 +6,7 @@ import { can } from "@/lib/permissions";
 import { one, type SP } from "@/lib/server/queries";
 import { PageHeader } from "@/components/ui";
 import { AddFv, FvTable } from "./FvClient";
+import { supplierMatcher } from "@/lib/server/maj";
 
 export default async function FruitsLegumesPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser(can.viewFv);
@@ -15,6 +16,7 @@ export default async function FruitsLegumesPage({ searchParams }: { searchParams
   const years = (await db.selectDistinct({ year: schema.fvItems.year }).from(schema.fvItems).orderBy(desc(schema.fvItems.year))).map((y) => y.year);
   const thisYear = new Date().getFullYear();
   const year = Number(one(sp.year)) || years[0] || thisYear;
+  const matcher = await supplierMatcher();
   const units = (await db.select({ name: schema.units.name }).from(schema.units).orderBy(asc(schema.units.position), asc(schema.units.name))).map((u) => u.name);
   const all = await db.select().from(schema.fvItems).where(eq(schema.fvItems.year, year)).orderBy(asc(schema.fvItems.position), asc(schema.fvItems.id));
   const rows = all;
@@ -37,7 +39,7 @@ export default async function FruitsLegumesPage({ searchParams }: { searchParams
         <button className="btn-secondary py-2">{t.common.apply}</button>
       </form>
       <p className="mb-2 text-xs text-stone-500">🔒 {t.fv.lockedHint} {t.fv.monthHint}</p>
-      <FvTable rows={rows.map((r) => ({ id: r.id, supplier: r.supplier, product: r.product, unit: r.unit, prices: r.prices, blocked: r.blocked, locked: r.locked }))} months={months} currentMonth={currentMonth} editable={can.editFv(user.role)} units={units} />
+      <FvTable rows={rows.map((r) => ({ id: r.id, supplierId: matcher.find(r.supplier), supplier: r.supplier, product: r.product, unit: r.unit, prices: r.prices, blocked: r.blocked, locked: r.locked }))} months={months} currentMonth={currentMonth} editable={can.editFv(user.role)} units={units} />
     </>
   );
 }

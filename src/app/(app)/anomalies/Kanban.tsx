@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { moveAnomalyAction } from "@/lib/actions/anomalies";
-import { stageOf, stageStyles, type Stage } from "@/lib/anomaly";
+import { stageOf, stageStyles, type Stage, modeIcon } from "@/lib/anomaly";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtMoney, sentence } from "@/lib/format";
 import type { AnomalyRow } from "./AnomalyClient";
@@ -97,7 +97,7 @@ export function Kanban({ rows, canManage }: { rows: AnomalyRow[]; canManage: boo
                     <p className="text-xs text-stone-600">{r.product || r.type}</p>
                     <p className="mt-1 line-clamp-2 text-xs text-stone-500">{r.problem}</p>
                     <div className="mt-1 flex items-center justify-between text-xs">
-                      <span title={t.modes[r.mode as "reclamation"]}>{r.mode === "verification" ? "🔍" : "📞"} {t.modes[r.mode as "reclamation"]}</span>
+                      <span title={t.modes[r.mode as "reclamation"]}>{modeIcon(r.mode)} {t.modes[r.mode as "reclamation"]}</span>
                       <span className="font-semibold tabular-nums">{s === "cloturee" ? (r.saving != null ? fmtMoney(r.saving, locale) : "") : r.claimed != null ? fmtMoney(r.claimed, locale) : ""}</span>
                     </div>
                   </Link>

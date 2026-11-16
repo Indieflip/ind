@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
   if (!(await hasAnyUser())) redirect("/setup");
-  if (await getUser()) redirect("/receptions");
+  if (await getUser()) redirect("/accueil");
   const { t } = await getDict();
   return (
     <AuthCard title={t.app.name} subtitle={t.auth.login}>

@@ -15,7 +15,7 @@ export async function loginAction(_prev: { error?: string } | undefined, form: F
   }
   await createSession(user.id);
   (await cookies()).set(LOCALE_COOKIE, user.locale, { path: "/", maxAge: 60 * 60 * 24 * 365 });
-  redirect("/receptions");
+  redirect("/accueil");
 }
 
 export async function setupAction(_prev: { error?: string } | undefined, form: FormData) {
@@ -37,7 +37,7 @@ export async function setupAction(_prev: { error?: string } | undefined, form: F
       .onConflictDoUpdate({ target: schema.appSettings.key, set: { value: restaurant } });
   }
   await createSession(user.id);
-  redirect("/receptions");
+  redirect("/accueil");
 }
 
 export async function logoutAction() {
