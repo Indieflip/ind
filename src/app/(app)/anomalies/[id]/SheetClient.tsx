@@ -9,7 +9,7 @@ import { MoneyInput } from "@/components/MoneyInput";
 
 interface Values {
   nature: string; description: string; followUp: string; lastActionAt: string; nextActionAt: string;
-  creditAmount: string; claimedAmount: string; stage: string; resolution: string; mode: string;
+  creditAmount: string; claimedAmount: string; stage: string; resolution: string; mode: string; creditNumber: string; creditDate: string;
 }
 
 const NATURES = ["Viande", "Poisson", "Fruits & Légumes", "Crèmerie", "Épicerie", "Boisson", "Boulangerie", "Hygiène", "Autre"];
@@ -73,6 +73,14 @@ export function AnomalySheetForm({ id, initial, editable }: { id: number; initia
             ))}
           </div>
           {closedWithout && <p className="mt-1 text-xs text-amber-700">{s.resolutionNeeded}</p>}
+          {v.resolution === "avoir" && (
+            <div id="avoir" className="mt-3 grid gap-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 sm:grid-cols-3">
+              <label><span className="label">{s.creditAmount} *</span><MoneyInput value={v.creditAmount} onChange={set("creditAmount")} disabled={!editable} /></label>
+              <label><span className="label">{s.creditNumber}</span><input className="input" value={v.creditNumber} onChange={set("creditNumber")} disabled={!editable} placeholder="AV-12345" /></label>
+              <label><span className="label">{s.creditDate}</span><input type="date" className="input" value={v.creditDate} onChange={set("creditDate")} disabled={!editable} /></label>
+              {!v.creditAmount.trim() && <p className="text-xs text-amber-700 sm:col-span-3">{s.creditMissing}</p>}
+            </div>
+          )}
         </div>
       )}
 
@@ -134,7 +142,7 @@ export function AnomalySheetForm({ id, initial, editable }: { id: number; initia
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label><span className="label">{s.claimed}</span><MoneyInput value={v.claimedAmount} onChange={set("claimedAmount")} disabled={!editable} /></label>
-        <label><span className="label">{a.saving}</span><MoneyInput value={v.creditAmount} onChange={set("creditAmount")} disabled={!editable} /></label>
+        {v.resolution !== "avoir" && <label><span className="label">{a.saving}</span><MoneyInput value={v.creditAmount} onChange={set("creditAmount")} disabled={!editable} /></label>}
       </div>
 
       {editable && (

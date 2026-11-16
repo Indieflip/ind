@@ -12,6 +12,7 @@ import { SupplierCombo } from "@/components/SupplierCombo";
 import { StatusBadge } from "@/components/DecisionBadge";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { UnitSelect } from "@/components/UnitSelect";
+import { stageOf, stageStyles } from "@/lib/anomaly";
 
 export function AddSupplier() {
   const { t } = useI18n();
@@ -119,22 +120,24 @@ export function SupplierSearch({ suppliers }: { suppliers: { id: number; name: s
   return <SupplierCombo key={suppliers.length} suppliers={suppliers} name="goto" placeholder={t.suppliers.searchSupplier} searchButton={t.search.button} onChange={(id) => id && router.push(`/mercurial/fournisseurs/${id}`)} />;
 }
 
-interface AnomalyRow { id: number; date: string; dateSort: string; type: string; product: string; description: string; status: string; statusLabel: string; receptionId: number | null }
+interface AnomalyRow { id: number; number: number | null; numberFinal: boolean; stage: string; stageLabel: string; date: string; dateSort: string; type: string; product: string; description: string; status: string; statusLabel: string; receptionId: number | null }
 
 export function SupplierAnomalies({ rows, supplierId }: { rows: AnomalyRow[]; supplierId: number }) {
   const { t } = useI18n();
   const cols: Col<AnomalyRow>[] = [
+    // N° de la fiche d'anomalie (lien vers la fiche)
+    { key: "number", label: "N°", text: (r) => (r.number != null ? String(r.number) : ""), sort: (r) => r.number, href: (r) => `/anomalies/${r.id}`, render: (r) => <span className={r.numberFinal ? "font-semibold" : "italic"}>{r.number}</span> },
     { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, className: "whitespace-nowrap" },
     { key: "type", label: t.anomalies.type, text: (r) => r.type },
     { key: "product", label: t.common.product, text: (r) => r.product },
     { key: "description", label: t.anomalies.description, text: (r) => r.description },
-    { key: "status", label: t.common.status, text: (r) => r.statusLabel, render: (r) => <StatusBadge status={r.status} label={r.statusLabel} /> },
+    { key: "stage", label: t.common.status, text: (r) => r.stageLabel, render: (r) => <span className={`badge ${stageStyles[stageOf(r.stage)]}`}>{r.stageLabel}</span> },
     { key: "bl", label: t.receptions.bl, text: () => "", sortable: false, filterable: false, render: (r) => (r.receptionId ? <Link className="text-brand-700" href={`/receptions/${r.receptionId}`}>→</Link> : "") },
   ];
   return (
     <>
       <div className="flex justify-end"><Link href={`/anomalies?supplier=${supplierId}&status=`} className="text-sm text-brand-700 underline">{t.nav.anomalies} →</Link></div>
-      <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} empty={t.mercurial.noAnomalies} defaultSort={{ key: "date", dir: "desc" }} />
+      <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} empty={t.mercurial.noAnomalies} defaultSort={{ key: "date", dir: "desc" }} rowClassName={() => "cursor-pointer"} />
     </>
   );
 }

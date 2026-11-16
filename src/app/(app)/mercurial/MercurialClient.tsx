@@ -163,6 +163,7 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
   const money = (n: number | null) => (n != null ? fmtMoney(n, locale) : "");
   const cols: ColumnDef<Row>[] = useMemo(
     () => [
+      { key: "id", text: (r) => String(r.id), sort: (r) => r.id },
       { key: "supplier", text: (r) => r.supplier, options: suppliers.map((s) => s.name) },
       { key: "nature", text: (r) => r.nature ?? "", options: natures },
       { key: "name", text: (r) => r.name },
@@ -176,7 +177,7 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
   const base = useMemo(() => rows.filter((r) => (showInactive || r.active) && (!lockedOnly || r.priceLocked)), [rows, showInactive, lockedOnly]);
   const tb = useTable(base, cols, { pageSize: 1000 });
   const labels: Record<string, [string, "right" | undefined]> = {
-    supplier: [t.common.supplier, undefined], nature: [m.nature, undefined], name: [m.products, undefined], unit: [t.common.unit, undefined],
+    id: ["N°", "right"], supplier: [t.common.supplier, undefined], nature: [m.nature, undefined], name: [m.products, undefined], unit: [t.common.unit, undefined],
     priceMin: [m.priceMin, "right"], price: [m.priceMax, "right"],
   };
   return (
@@ -194,7 +195,7 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
         <div className="max-h-[75vh] overflow-y-auto">
           <table className="table">
             <colgroup>
-              <col className="w-[15%]" /><col className="w-[12%]" /><col /><col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[9%]" />
+              <col className="w-[4.5rem]" /><col className="w-[14%]" /><col className="w-[11%]" /><col /><col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[9%]" />
             </colgroup>
             <thead className="sticky top-0 z-10">
               <tr>
@@ -238,6 +239,7 @@ function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; supp
   if (!edit) {
     return (
       <tr className={r.active ? "" : "opacity-50"}>
+        <td className="text-right text-xs tabular-nums text-stone-400">{r.id}</td>
         <td className="text-stone-600">{sentence(r.supplier)}</td>
         <td className="text-stone-600">{r.fv ? <span className="badge bg-lime-100 text-lime-800">{r.nature ?? m.fvTag}</span> : r.nature ?? ""}</td>
         <td className="font-medium">
@@ -256,6 +258,7 @@ function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; supp
   }
   return (
     <tr className="bg-brand-50/40 align-top">
+      <td className="text-right text-xs tabular-nums text-stone-400">{r.id}</td>
       <td>
         <select className="input py-1.5" defaultValue={r.supplierId} onChange={(e) => save({ supplierId: Number(e.target.value) })}>
           {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}

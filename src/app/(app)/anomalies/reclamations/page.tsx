@@ -9,11 +9,13 @@ import { daysSince, stageOf } from "@/lib/anomaly";
 import { supplierProcesses } from "@/lib/server/followup";
 import { syncWeighAnomalies } from "@/lib/server/weighAnomalies";
 import { PageHeader } from "@/components/ui";
+import { one, type SP } from "@/lib/server/queries";
 import { ClaimsView } from "./ClaimsView";
 
 /** Anomalies > Réclamations : les anomalies réclamées au fournisseur ou à vérifier sur facture (même suivi que le tableau de bord) */
-export default async function ClaimsPage() {
-  await requireUser(can.viewAnomalies);
+export default async function ClaimsPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const user = await requireUser(can.viewAnomalies);
+  const f = one((await searchParams).f);
   const { t, locale } = await getDict();
   await syncWeighAnomalies();
   const a = schema.anomalies;
@@ -35,6 +37,8 @@ export default async function ClaimsPage() {
       <PageHeader title={t.claims.title} />
       <p className="mb-4 max-w-3xl text-sm text-stone-600">{t.claims.introView}</p>
       <ClaimsView
+        canManage={can.manageAnomalies(user.role)}
+        initialFilter={f === "sans-montant" ? "missing" : undefined}
         rows={rows.map(({ a: x, supplier, documents, blNumber, lineDoc }) => {
           const delay = processes.find(x.supplierId, x.supplierName)?.delay ?? 3;
           const days = daysSince(x.lastActionAt, x.createdAt, now);

@@ -49,6 +49,8 @@ export async function syncWeighAnomalies() {
     const cur = byKey.get(key);
     if (cur) {
       if (cur.consolidatedAt) continue;
+      // Sans prix sur les lignes, le montant saisi à la main est gardé
+      if (values.claimedAmount == null) values.claimedAmount = cur.claimedAmount;
       if (cur.description !== values.description || cur.claimedAmount !== values.claimedAmount || cur.supplierId !== values.supplierId || cur.reference !== values.reference) {
         await db.update(schema.anomalies).set(values).where(eq(schema.anomalies.id, cur.id));
       }

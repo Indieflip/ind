@@ -262,6 +262,9 @@ export const anomalies = pgTable(
     claimedAmount: numeric("claimed_amount", { precision: 12, scale: 2 }),
     /** reception | manual | file | weigh */
     source: text("source").notNull().default("reception"),
+    /** Avoir reçu : n° et date de l'avoir (rapprochement avec la compta) */
+    creditNumber: text("credit_number"),
+    creditDate: date("credit_date"),
     /** Écarts de pesée regroupés par bon : clé du bon (rec:12 ou ref:Fournisseur : Facture 123) */
     groupKey: text("group_key"),
     createdBy: integer("created_by").references(() => users.id),
@@ -515,4 +518,17 @@ export const weeklyClosings = pgTable("weekly_closings", {
   details: jsonb("details"),
   closedBy: integer("closed_by").references(() => users.id, { onDelete: "set null" }),
   closedAt: timestamp("closed_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Onglet Dev : objectifs du projet, points en attente, idées (modifiables) */
+export const devItems = pgTable("dev_items", {
+  id: serial("id").primaryKey(),
+  /** objective | pending | idea | done */
+  kind: text("kind").notNull().default("pending"),
+  title: text("title").notNull(),
+  detail: text("detail"),
+  /** Qui doit agir : moi (utilisateur) | dev */
+  owner: text("owner"),
+  position: integer("position").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

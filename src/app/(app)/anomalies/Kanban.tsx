@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { moveAnomalyAction } from "@/lib/actions/anomalies";
 import { stageOf, stageStyles, type Stage } from "@/lib/anomaly";
 import { useI18n } from "@/lib/i18n/client";
@@ -19,9 +19,15 @@ export function DueBox({ rows }: { rows: AnomalyRow[] }) {
   const k = t.kanban;
   const late = rows.filter((r) => r.due);
   const todo = rows.filter((r) => stageOf(r.stage) === "a_traiter");
+  // Refermable (✕) : caché jusqu'au lendemain ou jusqu'à ce que le nombre change
+  const stamp = `${new Date().toISOString().slice(0, 10)}|${late.length}|${todo.length}`;
+  const [hidden, setHidden] = useState(true);
+  useEffect(() => { try { setHidden(localStorage.getItem("rm_notice_duebox") === stamp); } catch { setHidden(false); } }, [stamp]);
+  if (hidden) return null;
   return (
-    <section className={`mb-4 rounded-xl border p-4 ${late.length ? "border-red-200 bg-red-50" : "border-emerald-200 bg-emerald-50"}`}>
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+    <section className={`relative mb-4 rounded-xl border p-4 ${late.length ? "border-red-200 bg-red-50" : "border-emerald-200 bg-emerald-50"}`}>
+      <button type="button" aria-label={t.common.close} title={t.common.close} className="absolute right-2 top-2 rounded px-2 py-0.5 text-base leading-none opacity-60 hover:bg-black/5 hover:opacity-100" onClick={() => { try { localStorage.setItem("rm_notice_duebox", stamp); } catch { /* */ } setHidden(true); }}>✕</button>
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 pr-8">
         <h2 className={`font-semibold ${late.length ? "text-red-800" : "text-emerald-800"}`}>{a.dueToday} ({late.length})</h2>
         <span className="text-sm text-stone-700">{todo.length} {k.toProcess}</span>
       </div>
@@ -50,8 +56,14 @@ export function Kanban({ rows, canManage }: { rows: AnomalyRow[]; canManage: boo
   const router = useRouter();
   const [pending, start] = useTransition();
   const [closing, setClosing] = useState<number | null>(null);
+  // Clôture « Avoir reçu » : on ouvre la fiche pour saisir le montant, le n° et la date de l'avoir
   const move = (id: number, stage: Stage, resolution?: string) =>
-    start(async () => { await moveAnomalyAction(id, stage, resolution); setClosing(null); router.refresh(); });
+    start(async () => {
+      await moveAnomalyAction(id, stage, resolution);
+      setClosing(null);
+      if (resolution === "avoir") router.push(`/anomalies/${id}#avoir`);
+      else router.refresh();
+    });
   // Clôturées : seulement les 7 derniers jours (le reste est dans la vue liste et la clôture hebdo)
   const weekAgo = Date.now() - 7 * 86_400_000;
   const inCol = (s: Stage) =>

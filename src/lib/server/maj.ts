@@ -212,19 +212,20 @@ export async function supplierMatcher() {
 
 /** Anomalies reprises du fichier : fournisseur rattaché à la liste et nom retiré de la colonne BL / Facture (une seule fois) */
 export async function ensureAnomaliesLinked() {
-  if (await getSetting("anomalies_linked_v2")) return;
+  if (await getSetting("anomalies_linked_v3")) return;
   const m = await supplierMatcher();
   const db = getDb();
   const rows = await db.select().from(schema.anomalies);
   for (const a of rows) {
-    if (a.receptionId) continue;
+    // Anomalies d'un bon : déjà rattachées, sauf fournisseur non reconnu
+    if (a.receptionId && a.supplierId) continue;
     const supplierId = a.supplierId ?? m.find(a.supplierName) ?? m.find(a.reference);
     const reference = cleanReference(a.reference, m.keys);
     if (supplierId !== a.supplierId || reference !== a.reference) {
       await db.update(schema.anomalies).set({ supplierId, reference }).where(eq(schema.anomalies.id, a.id));
     }
   }
-  await setSetting("anomalies_linked_v2", "1");
+  await setSetting("anomalies_linked_v3", "1");
 }
 
 type ProductLite = { id: number; name: string; supplierId: number };

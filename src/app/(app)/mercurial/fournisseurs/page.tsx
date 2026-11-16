@@ -42,7 +42,7 @@ export default async function SuppliersPage() {
             <li key={r.id}>
               <Link href={`/mercurial/fournisseurs/${r.id}`} className={`card flex items-center justify-between gap-2 p-4 hover:border-brand-500 ${r.active ? "" : "opacity-50"}`}>
                 <div className="min-w-0">
-                  <div className="truncate font-semibold">{r.name}</div>
+                  <div className="truncate font-semibold"><span className="mr-1.5 text-xs font-semibold text-stone-400">N° {r.id}</span>{r.name}</div>
                   <div className="text-xs text-stone-500">{r.products} {t.suppliers.productsCount}{!r.active && ` · ${t.suppliers.inactive}`}</div>
                 </div>
                 <span className="text-stone-300">›</span>

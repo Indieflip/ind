@@ -2,6 +2,8 @@ import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
 import { AppNav, type NavItem } from "@/components/AppNav";
+import { Notice } from "@/components/Notice";
+import { canSeeDev } from "@/lib/server/dev";
 import { getRestaurantName } from "@/lib/settings";
 import { backupSettings, lastBackup } from "@/lib/server/backup";
 import { and, count, eq, inArray, isNull } from "drizzle-orm";
@@ -23,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       pendingRequests = row?.n ?? 0;
     } catch { /* base indisponible */ }
   }
+  const devVisible = await canSeeDev(user);
   const items: NavItem[] = [
     { href: "/receptions", label: t.nav.receptions, icon: "truck", show: can.viewReceptions(r) },
     { href: "/mercurial", label: t.nav.mercurial, icon: "list", show: can.viewMercurial(r) },
@@ -33,6 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/protocoles", label: t.nav.protocols, icon: "book", show: can.viewProtocols(r) },
     { href: "/demandes", label: t.nav.requests, icon: "inbox", show: true, badge: r === "admin" ? pendingRequests : 0 },
     { href: "/settings", label: t.nav.settings, icon: "gear", show: r === "admin" },
+    { href: "/dev", label: t.nav.dev, icon: "sparkle", show: devVisible },
   ].filter((i) => i.show) as NavItem[];
 
   // Rappel de sauvegarde pour l'administrateur quand l'envoi automatique n'a pas pris le relais
@@ -75,25 +79,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       />
       <div className="min-w-0 flex-1 pb-24 lg:pb-0">
         {!can.receive(user.role) && (
-          <div className="no-print border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-900">{t.common.readOnly}</div>
+          <Notice id="readonly" version="1" closeLabel={t.common.close} className="border-amber-200 bg-amber-50 text-amber-900">{t.common.readOnly}</Notice>
         )}
         {backupReminder && (
-          <div className="no-print flex flex-wrap items-center justify-center gap-2 border-b border-sky-200 bg-sky-50 px-4 py-2 text-center text-sm text-sky-900">
+          <Notice id="backup" version={String(backupReminder)} closeLabel={t.common.close} className="border-sky-200 bg-sky-50 text-sky-900">
             {backupReminder}
             <a href="/settings/import-export#sauvegarde" className="font-semibold underline">{t.backup.reminderLink}</a>
-          </div>
+          </Notice>
         )}
         {pendingRequests > 0 && (
-          <div className="no-print flex flex-wrap items-center justify-center gap-2 border-b border-violet-200 bg-violet-50 px-4 py-2 text-center text-sm text-violet-900">
+          <Notice id="requests" version={pendingRequests} closeLabel={t.common.close} className="border-violet-200 bg-violet-50 text-violet-900">
             <strong>{pendingRequests}</strong> {t.requests.pending}
             <a href="/demandes" className="font-semibold underline">{t.anomalies.reminderLink}</a>
-          </div>
+          </Notice>
         )}
         {dueAnomalies > 0 && (
-          <div className="no-print flex flex-wrap items-center justify-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2 text-center text-sm text-red-900">
+          <Notice id="due" version={dueAnomalies} closeLabel={t.common.close} className="border-red-200 bg-red-50 text-red-900">
             <strong>{dueAnomalies}</strong> {t.kanban.lateBanner}
             <a href="/anomalies" className="font-semibold underline">{t.anomalies.reminderLink}</a>
-          </div>
+          </Notice>
         )}
         <main className="mx-auto max-w-7xl p-4 sm:p-6">{children}</main>
       </div>

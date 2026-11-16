@@ -47,7 +47,7 @@ export async function updateAnomalyAction(
   id: number,
   data: {
     status?: string; creditAmount?: string; followUp?: string; description?: string; nature?: string; result?: string; lastActionAt?: string; nextActionAt?: string;
-    stage?: string; resolution?: string; mode?: string; claimedAmount?: string;
+    stage?: string; resolution?: string; mode?: string; claimedAmount?: string; creditNumber?: string; creditDate?: string;
   },
 ) {
   await assertUser(can.manageAnomalies);
@@ -70,6 +70,8 @@ export async function updateAnomalyAction(
     const resolution = stage === "cloturee" && RESOLUTIONS.includes(data.resolution as (typeof RESOLUTIONS)[number]) ? data.resolution! : null;
     Object.assign(set, { stage, resolution, ...legacyOf(stage, resolution), closedAt: stage === "cloturee" || stage === "annulee" ? new Date() : null });
   }
+  if (data.creditNumber !== undefined) set.creditNumber = data.creditNumber.trim() || null;
+  if (data.creditDate !== undefined) set.creditDate = /^\d{4}-\d{2}-\d{2}$/.test(data.creditDate) ? data.creditDate : null;
   if (data.mode !== undefined && MODES.includes(data.mode as (typeof MODES)[number])) set.mode = data.mode;
   if (data.claimedAmount !== undefined) {
     const n = num(data.claimedAmount);
@@ -231,4 +233,23 @@ export async function closeWeekAction(week: string) {
     revalidatePath("/anomalies", "layout");
     return { ok: true, count: toClose.length };
   });
+}
+
+/** Économies : rattacher les anomalies d'un nom de fournisseur non reconnu à un fournisseur de la liste */
+export async function relinkSupplierGroupAction(supplierName: string, supplierId: number) {
+  await assertUser(can.manageAnomalies);
+  const db = getDb();
+  const sup = await db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, supplierId) });
+  if (!sup) return { error: "invalid" };
+  await db.update(schema.anomalies).set({ supplierId: sup.id, supplierName: sup.name }).where(and(isNull(schema.anomalies.supplierId), eq(schema.anomalies.supplierName, supplierName)));
+  revalidatePath("/anomalies", "layout");
+  return { ok: true };
+}
+
+/** Économies : supprimer les anomalies d'une ligne sans fournisseur (non consolidées) */
+export async function deleteSupplierGroupAction(supplierName: string) {
+  await assertUser(can.manageAnomalies);
+  await getDb().delete(schema.anomalies).where(and(isNull(schema.anomalies.supplierId), isNull(schema.anomalies.consolidatedAt), eq(schema.anomalies.supplierName, supplierName)));
+  revalidatePath("/anomalies", "layout");
+  return { ok: true };
 }

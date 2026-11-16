@@ -10,6 +10,8 @@ import { fvRange, parisMonth } from "@/lib/pricing";
 import { one, type SP } from "@/lib/server/queries";
 import { Icon } from "@/components/Icon";
 import { StatusBadge } from "@/components/DecisionBadge";
+import { anomalyNumbers } from "@/lib/server/savings";
+import { stageOf } from "@/lib/anomaly";
 import { SupplierAnomalies, SupplierInfo, SupplierReceptions, SupplierSearch, DeleteSupplier } from "../SupplierClient";
 import { AddRow, MercurialTable } from "../../MercurialClient";
 
@@ -55,7 +57,8 @@ export default async function SupplierPage({ params, searchParams }: { params: P
     };
   });
   const natures = [...new Set(rows.flatMap((r) => (r.nature ?? "").split(/,\s*/).filter(Boolean)))].sort((a, b) => a.localeCompare(b, "fr"));
-  const openAnomalies = supplierAnomalies.filter((a) => a.status !== "closed").length;
+  const numbers = await anomalyNumbers();
+  const openAnomalies = supplierAnomalies.filter((a) => a.stage === "a_traiter" || a.stage === "reclamee" || a.stage === "a_verifier").length;
   const tabCls = (on: boolean) => `-mb-px border-b-2 px-3 py-2 text-sm font-semibold ${on ? "border-brand-600 text-brand-700" : "border-transparent text-stone-500 hover:text-stone-800"}`;
 
   return (
@@ -65,7 +68,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
         <div className="w-full max-w-xs"><SupplierSearch suppliers={allSuppliers} /></div>
       </div>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h1 className="text-2xl font-bold">{sentence(supplier.name)}</h1>
+        <h1 className="text-2xl font-bold"><span className="mr-2 align-middle text-sm font-semibold text-stone-400">N° {supplier.id}</span>{sentence(supplier.name)}</h1>
         {can.deleteSupplier(user.role) ? (
           <DeleteSupplier id={supplier.id} name={supplier.name} others={allSuppliers} />
         ) : (
@@ -100,7 +103,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
         <SupplierAnomalies
           supplierId={supplier.id}
           rows={supplierAnomalies.map((a) => ({
-            id: a.id, date: fmtDateTime(a.createdAt, locale), dateSort: a.createdAt.toISOString(),
+            id: a.id, number: numbers.get(a.id)?.n ?? null, numberFinal: !!numbers.get(a.id)?.final, stageLabel: t.stages[stageOf(a.stage)], stage: a.stage, date: fmtDateTime(a.createdAt, locale), dateSort: a.createdAt.toISOString(),
             type: t.anomalies.types[a.type], product: a.productName ?? "", description: a.description,
             status: a.status, statusLabel: t.anomalies.statuses[a.status], receptionId: a.receptionId,
           }))}
