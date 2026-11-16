@@ -82,7 +82,7 @@ export const categories = pgTable("categories", {
   position: integer("position").notNull().default(0),
 });
 
-export interface SupplierContact { email?: string; phone?: string; notes?: string }
+export interface SupplierContact { email?: string; phone?: string; notes?: string; extra?: { label: string; value: string }[] }
 export type SupplierContacts = Partial<Record<"societe" | "reclamation" | "commande", SupplierContact>>;
 
 export const suppliers = pgTable(
@@ -273,6 +273,8 @@ export const anomalies = pgTable(
     claimNo: integer("claim_no"),
     /** Avoir reçu : n° et date de l'avoir (rapprochement avec la compta) */
     creditNumber: text("credit_number"),
+    /** Forme de la régularisation : avoir | facture (régularisation sur une facture) */
+    creditKind: text("credit_kind"),
     creditDate: date("credit_date"),
     /** Écarts de pesée regroupés par bon : clé du bon (rec:12 ou ref:Fournisseur : Facture 123) */
     groupKey: text("group_key"),

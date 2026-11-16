@@ -69,7 +69,7 @@ await db.execute(sql`delete from units u where exists (select 1 from units v whe
 await db.execute(sql`update units set name = upper(left(lower(name), 1)) || substr(lower(name), 2) where name not like '%/%' and name <> upper(left(lower(name), 1)) || substr(lower(name), 2)`);
 
 // Unités en double sous deux écritures : fusion (Pce → Pièce, Bte → Boite, Seaux / Sceaux → Seau, Btl → Bouteille)
-const aliases = { Pce: "Pièce", Piece: "Pièce", Bte: "Boite", "Boîte": "Boite", Seaux: "Seau", Sceaux: "Seau", Btl: "Bouteille", Bocal: "Bocal / Pot", Pot: "Bocal / Pot" };
+const aliases = { Pce: "Pièce", Piece: "Pièce", Bte: "Boite", "Boîte": "Boite", Seaux: "Seau", Sceaux: "Seau", Btl: "Bouteille", Bocal: "Bocal / Pot", Pot: "Bocal / Pot", Bqt: "Pièce" };
 for (const [from, to] of Object.entries(aliases)) {
   await db.execute(sql`insert into units (name) select ${to} where exists (select 1 from units where name = ${from}) on conflict (name) do nothing`);
   await db.execute(sql`update products set unit = ${to} where unit = ${from}`);
@@ -377,6 +377,13 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'merge_lerda_v
 // Company : le SIRET devient le SIREN (9 premiers chiffres)
 await db.execute(sql`insert into app_settings (key, value) select 'company_siren', left(regexp_replace(value, '\s', '', 'g'), 9) from app_settings where key = 'company_siret' on conflict (key) do nothing`);
 await db.execute(sql`delete from app_settings where key = 'company_siret'`);
+
+// Onglet Dev : points traités (une fois)
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_seed_v3'`)).rows.length) {
+  await db.execute(sql`update dev_items set kind = 'done', detail = coalesce(detail, '') || ' → Fait : Bqt fusionnée dans Pièce.', updated_at = now() where kind = 'pending' and title like 'Décider des fusions d''unités%'`);
+  await db.execute(sql`update dev_items set kind = 'done', detail = coalesce(detail, '') || ' → Fait : tableau « Par type d''économie » (quantités, prix, qualité, autres).', updated_at = now() where kind = 'pending' and title like 'Économies : séparer%'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_seed_v3', '1') on conflict (key) do nothing`);
+}
 
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide

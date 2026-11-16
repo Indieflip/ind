@@ -47,7 +47,7 @@ export async function updateAnomalyAction(
   id: number,
   data: {
     status?: string; creditAmount?: string; followUp?: string; description?: string; nature?: string; result?: string; lastActionAt?: string; nextActionAt?: string;
-    stage?: string; resolution?: string; mode?: string; claimedAmount?: string; creditNumber?: string; creditDate?: string;
+    stage?: string; resolution?: string; mode?: string; claimedAmount?: string; creditNumber?: string; creditDate?: string; creditKind?: string;
   },
 ) {
   await assertUser(can.manageAnomalies);
@@ -71,6 +71,7 @@ export async function updateAnomalyAction(
     Object.assign(set, { stage, resolution, ...legacyOf(stage, resolution), closedAt: stage === "cloturee" || stage === "annulee" ? new Date() : null });
   }
   if (data.creditNumber !== undefined) set.creditNumber = data.creditNumber.trim() || null;
+  if (data.creditKind !== undefined) set.creditKind = data.creditKind === "facture" ? "facture" : data.creditKind === "avoir" ? "avoir" : null;
   if (data.creditDate !== undefined) set.creditDate = /^\d{4}-\d{2}-\d{2}$/.test(data.creditDate) ? data.creditDate : null;
   if (data.mode !== undefined && MODES.includes(data.mode as (typeof MODES)[number])) set.mode = data.mode;
   if (data.claimedAmount !== undefined) {

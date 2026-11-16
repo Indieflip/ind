@@ -39,7 +39,7 @@ export function ClaimsView({ rows, canManage, initialFilter }: { rows: ClaimView
           <Link href={`/anomalies/${r.id}`} className="font-semibold text-brand-700 hover:underline" title={t.sheet.open}>{r.claimNo}</Link>
           {(groupSize.get(r.claimNo) ?? 0) > 1 && (
             <span className="block text-[10px] text-stone-500">
-              {c.grouped}{canManage && !r.consolidated && <button type="button" className="ml-1 underline" onClick={() => startBusy(async () => { await ungroupClaimAction(r.id); router2.refresh(); })}>{c.ungroup}</button>}
+              {c.grouped}
             </span>
           )}
         </div>
@@ -70,13 +70,13 @@ export function ClaimsView({ rows, canManage, initialFilter }: { rows: ClaimView
   return (
     <>
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+        <button type="button" onClick={() => setFilter("all")} className={`rounded-xl border-2 bg-brand-700 p-3 text-left text-white ${filter === "all" ? "border-brand-900 ring-2 ring-brand-300" : "border-transparent opacity-90 hover:opacity-100"}`}>
+          <p className="text-2xl font-bold leading-none">{rows.length}</p>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-white/80">{c.all}</p>
+        </button>
         <button type="button" onClick={() => setFilter("open")} className={`rounded-xl border-2 bg-white p-3 text-left ${filter === "open" ? "border-brand-600" : "border-stone-200"}`}>
           <p className="text-2xl font-bold leading-none">{counts.reclamee + counts.a_verifier}</p>
           <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{c.inProgress}</p>
-        </button>
-        <button type="button" onClick={() => setFilter("all")} className={`rounded-xl border-2 bg-white p-3 text-left ${filter === "all" ? "border-brand-600" : "border-stone-200"}`}>
-          <p className="text-2xl font-bold leading-none">{rows.length}</p>
-          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{c.all}</p>
         </button>
         <button type="button" onClick={() => setFilter(filter === "missing" ? "open" : "missing")} className={`rounded-xl border-2 bg-white p-3 text-left ${filter === "missing" ? "border-red-500" : "border-stone-200"}`}>
           <p className="text-2xl font-bold leading-none text-red-700">{missing.length}</p>
@@ -90,17 +90,7 @@ export function ClaimsView({ rows, canManage, initialFilter }: { rows: ClaimView
         ))}
       </div>
       <p className="mb-2 text-right text-sm text-stone-600">{c.amount} : <strong>{fmtMoney(sum("claimed"), locale)}</strong></p>
-      {canManage && (
-        <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
-          <button type="button" className="btn-secondary py-1.5" disabled={sel.size < 2 || busy} onClick={() => startBusy(async () => { await groupClaimsAction([...sel].map(Number)); setSel(new Set()); router2.refresh(); })}>
-            {c.group} {sel.size > 1 && `(${sel.size})`}
-          </button>
-        </div>
-      )}
       <DataTable
-        selectable={canManage}
-        selection={sel}
-        onSelectionChange={setSel}
         rows={shown}
         cols={cols}
         rowKey={(r) => r.id}

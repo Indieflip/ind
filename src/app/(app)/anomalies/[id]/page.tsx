@@ -179,6 +179,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
           mode: a.mode,
           creditNumber: a.creditNumber ?? "",
           creditDate: a.creditDate ?? "",
+          creditKind: a.creditKind ?? "avoir",
         }}
       />
 

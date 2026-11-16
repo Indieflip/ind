@@ -9,7 +9,7 @@ import { MoneyInput } from "@/components/MoneyInput";
 
 interface Values {
   nature: string; description: string; followUp: string; lastActionAt: string; nextActionAt: string;
-  creditAmount: string; claimedAmount: string; stage: string; resolution: string; mode: string; creditNumber: string; creditDate: string;
+  creditAmount: string; claimedAmount: string; stage: string; resolution: string; mode: string; creditNumber: string; creditDate: string; creditKind: string;
 }
 
 const NATURES = ["Viande", "Poisson", "Fruits & Légumes", "Crèmerie", "Épicerie", "Boisson", "Boulangerie", "Hygiène", "Autre"];
@@ -75,9 +75,17 @@ export function AnomalySheetForm({ id, initial, editable, informative }: { id: n
           {closedWithout && <p className="mt-1 text-xs text-amber-700">{s.resolutionNeeded}</p>}
           {v.resolution === "avoir" && (
             <div id="avoir" className="mt-3 grid gap-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 sm:grid-cols-3">
+              {/* L'argent revient soit par un avoir, soit par une régularisation sur une facture */}
+              <div className="flex flex-wrap gap-2 sm:col-span-3">
+                {(["avoir", "facture"] as const).map((k) => (
+                  <button key={k} type="button" disabled={!editable} onClick={() => { setV({ ...v, creditKind: k }); setSaved(false); }} className={`rounded-lg border-2 px-3 py-1.5 text-sm font-semibold ${(v.creditKind || "avoir") === k ? "border-emerald-600 bg-white text-emerald-800" : "border-stone-200 bg-white text-stone-500"}`}>
+                    {s.creditKinds[k]}
+                  </button>
+                ))}
+              </div>
               <label><span className="label">{s.creditAmount} *</span><MoneyInput value={v.creditAmount} onChange={set("creditAmount")} disabled={!editable} /></label>
-              <label><span className="label">{s.creditNumber}</span><input className="input" value={v.creditNumber} onChange={set("creditNumber")} disabled={!editable} placeholder="AV-12345" /></label>
-              <label><span className="label">{s.creditDate}</span><input type="date" className="input" value={v.creditDate} onChange={set("creditDate")} disabled={!editable} /></label>
+              <label><span className="label">{(v.creditKind || "avoir") === "facture" ? s.invoiceNumber : s.creditNumber}</span><input className="input" value={v.creditNumber} onChange={set("creditNumber")} disabled={!editable} placeholder="AV-12345" /></label>
+              <label><span className="label">{(v.creditKind || "avoir") === "facture" ? s.invoiceDate : s.creditDate}</span><input type="date" className="input" value={v.creditDate} onChange={set("creditDate")} disabled={!editable} /></label>
               {!v.creditAmount.trim() && <p className="text-xs text-amber-700 sm:col-span-3">{s.creditMissing}</p>}
             </div>
           )}

@@ -57,7 +57,7 @@ export async function deleteSupplierAction(id: number, transferTo: number | null
 
 export async function updateSupplierAction(
   id: number,
-  data: { name?: string; email?: string; phone?: string; notes?: string; active?: boolean; contacts?: Record<string, { email?: string; phone?: string; notes?: string }>; claimProcess?: string },
+  data: { name?: string; email?: string; phone?: string; notes?: string; active?: boolean; contacts?: Record<string, { email?: string; phone?: string; notes?: string; extra?: { label: string; value: string }[] }>; claimProcess?: string },
 ) {
   await assertUser(can.editSuppliers);
   const set: Partial<typeof schema.suppliers.$inferInsert> = {};
@@ -71,7 +71,8 @@ export async function updateSupplierAction(
     const clean = Object.fromEntries(
       (["societe", "reclamation", "commande"] as const).map((k) => {
         const c = data.contacts?.[k] ?? {};
-        return [k, { email: c.email?.trim() || undefined, phone: c.phone?.trim() || undefined, notes: c.notes?.trim() || undefined }];
+        const extra = (c.extra ?? []).map((x) => ({ label: x.label.trim(), value: x.value.trim() })).filter((x) => x.label || x.value);
+        return [k, { email: c.email?.trim() || undefined, phone: c.phone?.trim() || undefined, notes: c.notes?.trim() || undefined, extra: extra.length ? extra : undefined }];
       }),
     );
     set.contacts = clean;
@@ -82,6 +83,7 @@ export async function updateSupplierAction(
   if (data.claimProcess !== undefined) set.claimProcess = data.claimProcess.trim() || null;
   await getDb().update(schema.suppliers).set(set).where(eq(schema.suppliers.id, id));
   revalidatePath("/anomalies", "layout");
+  return { ok: true };
   revalidatePath("/mercurial", "layout");
 }
 

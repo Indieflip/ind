@@ -7,6 +7,7 @@ export const UNIT_ALIASES: Record<string, string> = {
   Seaux: "Seau",
   Sceaux: "Seau",
   Btl: "Bouteille",
+  Bqt: "Pièce",
   Bocal: "Bocal / Pot",
   Pot: "Bocal / Pot",
   "Bocal / pot": "Bocal / Pot",

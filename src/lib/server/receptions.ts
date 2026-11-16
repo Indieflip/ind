@@ -259,8 +259,8 @@ async function writeContent(
           receptionId: recId, createdBy: user.id, date, claim: claims.get(productId) ?? null,
         });
         await setBound(check.kind === "increase" ? "max" : "min", l.unitPrice);
-        // Prix facturé au-dessus du mercurial : anomalie de prix (à vérifier / réclamer)
-        if (check.kind === "increase" && !keep.products.has(l.productName.toLowerCase())) {
+        // Prix facturé au moins 10 % au-dessus du mercurial : anomalie de prix (à vérifier / réclamer)
+        if (check.kind === "increase" && check.pct >= 10 && !keep.products.has(l.productName.toLowerCase())) {
           await tx.insert(schema.anomalies).values({
             receptionId: recId, supplierId, supplierName, productName: l.productName, type: "price", nature: natureOf(l.categoryId), reference: lineRef(l),
             description: `${t.anomalies.types.price} : ${fmtEuro(l.unitPrice)} ${t.anomalies.texts.insteadOf} ${fmtEuro(check.bound)} (+${String(check.pct).replace(".", ",")} %)`,

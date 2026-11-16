@@ -5,7 +5,7 @@ import { can } from "@/lib/permissions";
 import { fmtMoney, sentence } from "@/lib/format";
 import { isClaimMode, isOpenStage, stageOf } from "@/lib/anomaly";
 import { one, type SP } from "@/lib/server/queries";
-import { loadAnomalies, savingsOf, type AnomalyLite } from "@/lib/server/savings";
+import { loadAnomalies, savingKindOf, savingsOf, type AnomalyLite, type SavingKind } from "@/lib/server/savings";
 import { syncWeighAnomalies } from "@/lib/server/weighAnomalies";
 import { ensureAnomaliesLinked } from "@/lib/server/maj";
 import { PageHeader } from "@/components/ui";
@@ -137,6 +137,34 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
           <p className="mt-2 text-xl font-bold tabular-nums">{money(s.verification.amount)}</p>
           <p className="text-sm text-stone-600">{s.verification.count} {e.inWait}{s.verification.withoutAmount ? ` · ${s.verification.withoutAmount} ${e.withoutAmount}` : ""}</p>
         </div>
+      </section>
+
+      {/* Types d'économies : quantités, prix, qualité, autres — chaque chiffre justifié */}
+      <section className="card mb-6 overflow-x-auto">
+        <h2 className="px-4 pt-4 font-semibold">{e.byKind}</h2>
+        <p className="px-4 text-xs text-stone-500">{e.byKindHint}</p>
+        <table className="table mt-2 text-sm">
+          <thead><tr><th>{e.kind}</th><th className="text-right">{e.anomalies}</th><th className="text-right">{e.creditsCol}</th><th className="text-right">{e.deferredCol}</th><th className="text-right">{e.obtained}</th><th className="text-right">{e.pending}</th></tr></thead>
+          <tbody>
+            {(["quantite", "prix", "qualite", "autre"] as SavingKind[]).map((k) => {
+              const xs = list.filter((a) => savingKindOf(a.type) === k);
+              const v = savingsOf(xs);
+              const credits = xs.filter((a) => !a.informative && isClaimMode(a.mode) && (a.credit ?? 0) > 0).map((a) => contrib(a, "credit"));
+              const deferred = xs.filter((a) => !a.informative && isClaimMode(a.mode) && stageOf(a.stage) === "cloturee" && a.resolution === "livraison" && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
+              const label = e.kinds[k];
+              return (
+                <tr key={k}>
+                  <td><p className="font-medium">{label}</p><p className="text-xs text-stone-500">{e.kindTypes[k]}</p></td>
+                  <td className="text-right tabular-nums"><Justified title={`${label} · ${e.anomalies}`} items={xs.map((a) => contrib(a, (a.credit ?? 0) > 0 ? "credit" : "claimed"))}>{xs.length}</Justified></td>
+                  <td className="text-right tabular-nums"><Justified title={`${label} · ${e.creditsCol}`} items={credits}>{money(v.credits.amount)}</Justified></td>
+                  <td className="text-right tabular-nums"><Justified title={`${label} · ${e.deferredCol}`} items={deferred}>{money(v.deferred.amount)}</Justified></td>
+                  <td className="text-right font-semibold tabular-nums text-emerald-800"><Justified title={`${label} · ${e.obtained}`} items={obtainedItems(xs)}>{money(v.obtained)}</Justified></td>
+                  <td className="text-right tabular-nums text-amber-800"><Justified title={`${label} · ${e.pending}`} items={pendingItems(xs)}>{money(v.pending.amount)}</Justified></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </section>
 
       <section className="mb-6 grid gap-3 md:grid-cols-2">

@@ -104,8 +104,8 @@ export default async function SupplierPage({ params, searchParams }: { params: P
               claimProcess={supplier.claimProcess ?? ""}
               contacts={Object.fromEntries((["societe", "reclamation", "commande"] as const).map((k) => {
                 const c = supplier.contacts?.[k] ?? (k === "societe" ? { email: supplier.email ?? "", phone: supplier.phone ?? "", notes: supplier.notes ?? "" } : {});
-                return [k, { email: c.email ?? "", phone: c.phone ?? "", notes: c.notes ?? "" }];
-              })) as Record<"societe" | "reclamation" | "commande", { email: string; phone: string; notes: string }>}
+                return [k, { email: c.email ?? "", phone: c.phone ?? "", notes: c.notes ?? "", extra: ("extra" in c && c.extra) || [] }];
+              })) as Record<"societe" | "reclamation" | "commande", { email: string; phone: string; notes: string; extra: { label: string; value: string }[] }>}
             />
           )}
           {editable && <AddRow suppliers={allSuppliers} units={units} natures={natures} fixedSupplier={{ id: supplier.id, name: supplier.name }} existing={rows.filter((r) => r.active).map((r) => ({ supplierId: r.supplierId, name: r.name }))} />}

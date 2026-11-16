@@ -5,7 +5,7 @@ import { num } from "@/lib/format";
 import { isClaimMode, isInformative, isOpenStage, stageOf } from "@/lib/anomaly";
 
 export type AnomalyLite = {
-  id: number; supplierId: number | null; supplierName: string; supplier: string | null; displayNumber: number; numberFinal: boolean; claimNo: number | null; informative: boolean; stage: string; resolution: string | null; mode: string;
+  id: number; supplierId: number | null; supplierName: string; supplier: string | null; displayNumber: number; numberFinal: boolean; claimNo: number | null; informative: boolean; type: string; stage: string; resolution: string | null; mode: string;
   claimed: number | null; credit: number | null; createdAt: Date; closedAt: Date | null; consolidatedAt: Date | null; number: number | null; productName: string | null; description: string;
 };
 
@@ -18,7 +18,7 @@ export async function loadAnomalies(): Promise<AnomalyLite[]> {
   const max = rows.reduce((m, r) => Math.max(m, r.a.number ?? 0), 0);
   const prov = new Map(rows.filter((r) => r.a.number == null).sort((x, y) => x.a.createdAt.getTime() - y.a.createdAt.getTime() || x.a.id - y.a.id).map((r, i) => [r.a.id, max + i + 1]));
   return rows.map(({ a, supplier }) => ({
-    id: a.id, supplierId: a.supplierId, supplierName: a.supplierName, supplier, claimNo: a.claimNo, informative: isInformative(a), displayNumber: a.number ?? prov.get(a.id) ?? 0, numberFinal: a.number != null, stage: a.stage, resolution: a.resolution, mode: a.mode,
+    id: a.id, supplierId: a.supplierId, supplierName: a.supplierName, supplier, claimNo: a.claimNo, informative: isInformative(a), type: a.type, displayNumber: a.number ?? prov.get(a.id) ?? 0, numberFinal: a.number != null, stage: a.stage, resolution: a.resolution, mode: a.mode,
     claimed: num(a.claimedAmount), credit: num(a.creditAmount), createdAt: a.createdAt, closedAt: a.closedAt, consolidatedAt: a.consolidatedAt,
     number: a.number, productName: a.productName, description: a.description,
   }));
@@ -82,3 +82,14 @@ export async function anomalyNumbers() {
   rows.filter((r) => r.number == null).sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime() || x.id - y.id).forEach((r, i) => out.set(r.id, { n: max + i + 1, final: false }));
   return out;
 }
+
+/** Types d'économies : regroupement des types d'anomalie */
+export const SAVING_KINDS = {
+  quantite: ["missing", "quantity"],
+  prix: ["price", "locked_price"],
+  qualite: ["damaged", "temperature", "dlc", "wrong_product"],
+  autre: ["hygiene", "missing_bl", "other"],
+} as const;
+export type SavingKind = keyof typeof SAVING_KINDS;
+export const savingKindOf = (type: string): SavingKind =>
+  ((Object.keys(SAVING_KINDS) as SavingKind[]).find((k) => (SAVING_KINDS[k] as readonly string[]).includes(type)) ?? "autre");

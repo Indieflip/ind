@@ -48,7 +48,7 @@ export function ImportCatalog() {
 }
 
 type ContactKey = "societe" | "reclamation" | "commande";
-type Contacts = Record<ContactKey, { email: string; phone: string; notes: string }>;
+type Contacts = Record<ContactKey, { email: string; phone: string; notes: string; extra: { label: string; value: string }[] }>;
 
 /** Compte fournisseur : nom, coordonnées (société / réclamation / commande), process de réclamation */
 export function SupplierInfo({ id, name, contacts, claimProcess, active }: { id: number; name: string; contacts: Contacts; claimProcess: string; active: boolean }) {
@@ -57,9 +57,17 @@ export function SupplierInfo({ id, name, contacts, claimProcess, active }: { id:
   const router = useRouter();
   const [pending, start] = useTransition();
   const initial = { name, contacts, claimProcess };
+  const initialKey = JSON.stringify(initial);
   const [v, setV] = useState(initial);
   const [saved, setSaved] = useState(false);
-  const dirty = JSON.stringify(v) !== JSON.stringify(initial);
+  // Après enregistrement, le formulaire reprend les valeurs enregistrées (espaces retirés…) : le message reste affiché
+  useEffect(() => { setV(JSON.parse(initialKey)); }, [initialKey]);
+  const dirty = JSON.stringify(v) !== initialKey;
+  const setX = (k: ContactKey, i: number, f: "label" | "value", value: string) => {
+    const extra = v.contacts[k].extra.map((x, j) => (j === i ? { ...x, [f]: value } : x));
+    setV({ ...v, contacts: { ...v.contacts, [k]: { ...v.contacts[k], extra } } });
+    setSaved(false);
+  };
   const setC = (k: ContactKey, f: "email" | "phone" | "notes", value: string) => { setV({ ...v, contacts: { ...v.contacts, [k]: { ...v.contacts[k], [f]: value } } }); setSaved(false); };
   return (
     <form
@@ -67,7 +75,10 @@ export function SupplierInfo({ id, name, contacts, claimProcess, active }: { id:
       onSubmit={(e) => {
         e.preventDefault();
         if (!v.name.trim()) return;
-        start(async () => { await updateSupplierAction(id, { name: v.name, contacts: v.contacts, claimProcess: v.claimProcess }); setSaved(true); router.refresh(); });
+        start(async () => {
+          const res = await updateSupplierAction(id, { name: v.name, contacts: v.contacts, claimProcess: v.claimProcess });
+          if (res?.ok) { setSaved(true); router.refresh(); }
+        });
       }}
     >
       <label className="block max-w-md"><span className="label">{s.supplierName} *</span><input className="input" required value={v.name} onChange={(e) => { setV({ ...v, name: e.target.value }); setSaved(false); }} /></label>
@@ -80,6 +91,16 @@ export function SupplierInfo({ id, name, contacts, claimProcess, active }: { id:
               <label className="block"><span className="label">{s.email}</span><input className="input" type="email" value={v.contacts[k].email} onChange={(e) => setC(k, "email", e.target.value)} /></label>
               <label className="block"><span className="label">{s.phone}</span><input className="input" type="tel" value={v.contacts[k].phone} onChange={(e) => setC(k, "phone", e.target.value)} /></label>
               <label className="block"><span className="label">{s.contactNotes}</span><input className="input" value={v.contacts[k].notes} onChange={(e) => setC(k, "notes", e.target.value)} /></label>
+              {v.contacts[k].extra.map((x, i) => (
+                <div key={i} className="flex items-end gap-1">
+                  <label className="w-2/5"><span className="label">{s.fieldName}</span><input className="input" value={x.label} placeholder={s.fieldNamePh} onChange={(e) => setX(k, i, "label", e.target.value)} /></label>
+                  <label className="flex-1"><span className="label">{s.fieldValue}</span><input className="input" value={x.value} onChange={(e) => setX(k, i, "value", e.target.value)} /></label>
+                  <button type="button" className="btn-ghost mb-0.5 p-2 text-stone-400 hover:text-red-600" aria-label={t.common.delete} onClick={() => { setV({ ...v, contacts: { ...v.contacts, [k]: { ...v.contacts[k], extra: v.contacts[k].extra.filter((_, j) => j !== i) } } }); setSaved(false); }}><Icon name="trash" className="h-4 w-4" /></button>
+                </div>
+              ))}
+              <button type="button" className="btn-ghost px-1 py-1 text-xs text-brand-700" onClick={() => { setV({ ...v, contacts: { ...v.contacts, [k]: { ...v.contacts[k], extra: [...v.contacts[k].extra, { label: "", value: "" }] } } }); setSaved(false); }}>
+                <Icon name="plus" className="h-3.5 w-3.5" /> {s.addField}
+              </button>
             </fieldset>
           ))}
         </div>

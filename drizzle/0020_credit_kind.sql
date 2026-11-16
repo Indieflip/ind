@@ -1,0 +1,1 @@
+ALTER TABLE "anomalies" ADD COLUMN "credit_kind" text;
