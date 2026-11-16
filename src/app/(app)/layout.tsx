@@ -4,7 +4,9 @@ import { can } from "@/lib/permissions";
 import { AppNav, type NavItem } from "@/components/AppNav";
 import { getRestaurantName } from "@/lib/settings";
 import { backupSettings, lastBackup } from "@/lib/server/backup";
-import { and, count, eq, isNotNull, isNull, lte, ne } from "drizzle-orm";
+import { and, count, eq, inArray, isNull } from "drizzle-orm";
+import { supplierProcesses } from "@/lib/server/followup";
+import { daysSince, DEFAULT_FOLLOW_UP_DAYS } from "@/lib/anomaly";
 import { getDb, schema } from "@/db";
 
 export const dynamic = "force-dynamic";
@@ -42,14 +44,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     else if (days >= bs.frequencyDays) backupReminder = `${t.backup.reminder} ${days} ${t.backup.daysAgo}.`;
   }
 
-  // Rappel quotidien des anomalies à relancer
+  // Rappel quotidien : réclamations sans nouvelle action depuis le délai du fournisseur (3 jours par défaut)
   let dueAnomalies = 0;
   if (can.manageAnomalies(r)) {
     const a = schema.anomalies;
-    const day = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date());
     try {
-      const [row] = await getDb().select({ n: count() }).from(a).where(and(isNull(a.consolidatedAt), isNotNull(a.nextActionAt), lte(a.nextActionAt, day), ne(a.status, "closed")));
-      dueAnomalies = row?.n ?? 0;
+      const open = await getDb()
+        .select({ id: a.id, supplierId: a.supplierId, supplierName: a.supplierName, lastActionAt: a.lastActionAt, createdAt: a.createdAt })
+        .from(a)
+        .where(and(isNull(a.consolidatedAt), inArray(a.stage, ["reclamee", "a_verifier"]), eq(a.mode, "reclamation")));
+      if (open.length) {
+        const processes = await supplierProcesses();
+        const now = new Date();
+        dueAnomalies = open.filter((x) => daysSince(x.lastActionAt, x.createdAt, now) >= (processes.find(x.supplierId, x.supplierName)?.delay ?? DEFAULT_FOLLOW_UP_DAYS)).length;
+      }
     } catch { /* base indisponible : pas de rappel */ }
   }
 
@@ -83,7 +91,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         )}
         {dueAnomalies > 0 && (
           <div className="no-print flex flex-wrap items-center justify-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2 text-center text-sm text-red-900">
-            <strong>{dueAnomalies}</strong> {t.anomalies.reminder}
+            <strong>{dueAnomalies}</strong> {t.kanban.lateBanner}
             <a href="/anomalies" className="font-semibold underline">{t.anomalies.reminderLink}</a>
           </div>
         )}

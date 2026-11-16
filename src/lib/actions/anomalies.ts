@@ -7,7 +7,7 @@ import { can } from "@/lib/permissions";
 import { num } from "@/lib/format";
 import { storeFile, parseDataUrl } from "@/lib/storage";
 import { matchProduct } from "@/lib/server/maj";
-import { outcomeOf } from "@/lib/anomaly";
+import { legacyOf, MODES, outcomeOf, RESOLUTIONS, stageOf, STAGES, type Stage } from "@/lib/anomaly";
 
 const TYPES = schema.anomalyTypeEnum.enumValues;
 const STATUSES = schema.anomalyStatusEnum.enumValues;
@@ -35,6 +35,8 @@ export async function createAnomalyAction(_p: { ok?: boolean; error?: string } |
     nature, reference: docs.map((d) => `${d.type === "facture" ? "Facture" : d.type === "autre" ? "Doc" : "BL"} ${d.number}`).join(", ") || null,
     nextActionAt: nextActionAt && /^\d{4}-\d{2}-\d{2}$/.test(nextActionAt) ? nextActionAt : null,
     createdAt: rec.deliveredAt,
+    source: "manual",
+    claimedAmount: (() => { const n = num(String(form.get("claimedAmount") ?? "")); return n != null ? String(Math.abs(n)) : null; })(),
   });
   revalidatePath(`/receptions/${receptionId}`);
   revalidatePath("/anomalies");
@@ -43,7 +45,10 @@ export async function createAnomalyAction(_p: { ok?: boolean; error?: string } |
 
 export async function updateAnomalyAction(
   id: number,
-  data: { status?: string; creditAmount?: string; followUp?: string; description?: string; nature?: string; result?: string; lastActionAt?: string; nextActionAt?: string },
+  data: {
+    status?: string; creditAmount?: string; followUp?: string; description?: string; nature?: string; result?: string; lastActionAt?: string; nextActionAt?: string;
+    stage?: string; resolution?: string; mode?: string; claimedAmount?: string;
+  },
 ) {
   await assertUser(can.manageAnomalies);
   const set: Partial<typeof schema.anomalies.$inferInsert> = {};
@@ -59,6 +64,17 @@ export async function updateAnomalyAction(
   if (data.description !== undefined && data.description.trim()) set.description = data.description.trim();
   if (data.nature !== undefined) set.nature = data.nature.trim() || null;
   if (data.result !== undefined) set.result = outcomeOf(data.result);
+  // Suivi unique : l'étape pilote aussi les anciens champs statut / résultat
+  if (data.stage !== undefined && STAGES.includes(data.stage as Stage)) {
+    const stage = stageOf(data.stage);
+    const resolution = stage === "cloturee" && RESOLUTIONS.includes(data.resolution as (typeof RESOLUTIONS)[number]) ? data.resolution! : null;
+    Object.assign(set, { stage, resolution, ...legacyOf(stage, resolution), closedAt: stage === "cloturee" || stage === "annulee" ? new Date() : null });
+  }
+  if (data.mode !== undefined && MODES.includes(data.mode as (typeof MODES)[number])) set.mode = data.mode;
+  if (data.claimedAmount !== undefined) {
+    const n = num(data.claimedAmount);
+    set.claimedAmount = n != null ? String(Math.abs(n)) : null;
+  }
   const day = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
   if (data.lastActionAt !== undefined) set.lastActionAt = day(data.lastActionAt);
   if (data.nextActionAt !== undefined) set.nextActionAt = day(data.nextActionAt);
@@ -146,4 +162,73 @@ export async function addWeighGapAction(data: WeighGapInput) {
   const date = data.date && /^\d{4}-\d{2}-\d{2}$/.test(data.date) ? data.date : new Date().toISOString().slice(0, 10);
   const [row] = await getDb().insert(schema.weighGaps).values({ date, product: data.product.trim(), position: -1 }).returning({ id: schema.weighGaps.id });
   return updateWeighGapAction(row.id, { ...data, date });
+}
+
+/** Tableau de bord : passer une anomalie à l'étape suivante (ou précédente) */
+export async function moveAnomalyAction(id: number, stage: string, resolution?: string) {
+  await assertUser(can.manageAnomalies);
+  const db = getDb();
+  const cur = await db.query.anomalies.findFirst({ where: eq(schema.anomalies.id, id), columns: { consolidatedAt: true, stage: true } });
+  if (!cur || cur.consolidatedAt) return { error: "consolidated" };
+  const st = stageOf(stage);
+  const res = st === "cloturee" && RESOLUTIONS.includes(resolution as (typeof RESOLUTIONS)[number]) ? resolution! : null;
+  const today = new Date().toISOString().slice(0, 10);
+  await db.update(schema.anomalies).set({ stage: st, resolution: res, ...legacyOf(st, res), lastActionAt: today, closedAt: st === "cloturee" || st === "annulee" ? new Date() : null }).where(eq(schema.anomalies.id, id));
+  revalidatePath("/anomalies", "layout");
+  return { ok: true };
+}
+
+/** « Relancé aujourd'hui » : date de dernière action = aujourd'hui, une ligne ajoutée à l'action */
+export async function followUpTodayAction(id: number, note: string) {
+  await assertUser(can.manageAnomalies);
+  const db = getDb();
+  const cur = await db.query.anomalies.findFirst({ where: eq(schema.anomalies.id, id) });
+  if (!cur || cur.consolidatedAt) return { error: "consolidated" };
+  const d = new Date();
+  const label = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`;
+  const line = `${label} : ${note.trim() || "relance"}`;
+  const stage = stageOf(cur.stage) === "a_traiter" ? "reclamee" : stageOf(cur.stage);
+  await db.update(schema.anomalies).set({
+    followUp: [cur.followUp, line].filter(Boolean).join("\n"), lastActionAt: d.toISOString().slice(0, 10), stage, ...legacyOf(stage, cur.resolution),
+  }).where(eq(schema.anomalies.id, id));
+  revalidatePath("/anomalies", "layout");
+  return { ok: true };
+}
+
+/**
+ * Clôture de la semaine : les anomalies clôturées ou annulées jusqu'à la fin de la semaine sont consolidées
+ * (N° définitif) et le bilan de la semaine est figé (avoirs, livraisons différées, montant encore en attente).
+ */
+export async function closeWeekAction(week: string) {
+  const user = await assertUser(can.consolidate);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(week)) return { error: "invalid" };
+  const end = new Date(`${week}T00:00:00`);
+  end.setDate(end.getDate() + 7);
+  const db = getDb();
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`lock table anomalies in share row exclusive mode`);
+    const a = schema.anomalies;
+    const toClose = await tx
+      .select()
+      .from(a)
+      .where(and(isNull(a.consolidatedAt), inArray(a.stage, ["cloturee", "annulee"]), sql`${a.closedAt} < ${end}`))
+      .orderBy(asc(a.createdAt), asc(a.id));
+    const [{ max }] = await tx.select({ max: sql<number>`coalesce(max(${a.number}), 0)::int` }).from(a);
+    let n = max;
+    for (const r of toClose) await tx.update(a).set({ consolidatedAt: new Date(), consolidatedBy: user.id, number: ++n }).where(eq(a.id, r.id));
+    const waiting = await tx.select({ s: sql<string>`coalesce(sum(${a.claimedAmount}), 0)` }).from(a).where(inArray(a.stage, ["reclamee", "a_verifier"]));
+    const credits = toClose.reduce((s, r) => s + (num(r.creditAmount) ?? 0), 0);
+    const deferred = toClose.filter((r) => r.resolution === "livraison").reduce((s, r) => s + (num(r.claimedAmount) ?? 0), 0);
+    const details = {
+      ids: toClose.map((r) => r.id),
+      avoir: toClose.filter((r) => r.resolution === "avoir").length,
+      livraison: toClose.filter((r) => r.resolution === "livraison").length,
+      sans_suite: toClose.filter((r) => r.resolution === "sans_suite" || (r.stage === "cloturee" && !r.resolution)).length,
+      annulee: toClose.filter((r) => r.stage === "annulee").length,
+    };
+    const values = { closed: toClose.length, credits: String(credits), deferred: String(deferred), pending: String(num(waiting[0]?.s) ?? 0), details, closedBy: user.id, closedAt: new Date() };
+    await tx.insert(schema.weeklyClosings).values({ week, ...values }).onConflictDoUpdate({ target: schema.weeklyClosings.week, set: values });
+    revalidatePath("/anomalies", "layout");
+    return { ok: true, count: toClose.length };
+  });
 }

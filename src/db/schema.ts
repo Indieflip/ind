@@ -250,6 +250,20 @@ export const anomalies = pgTable(
     imported: boolean("imported").notNull().default(false),
     /** N° définitif, attribué par ordre à la consolidation (unique) */
     number: integer("number").unique(),
+    /**
+     * Suivi unique : a_traiter → reclamee (en attente du fournisseur) → a_verifier (sur facture) → cloturee | annulee
+     */
+    stage: text("stage").notNull().default("a_traiter"),
+    /** Résolution d'une anomalie clôturée : avoir | livraison (livraison différée) | sans_suite */
+    resolution: text("resolution"),
+    /** reclamation (démarche active, relances) | verification (on vérifie seulement l'avoir / la facture) */
+    mode: text("mode").notNull().default("reclamation"),
+    /** Montant en jeu (réclamé) ; l'avoir obtenu est creditAmount (Économie HT) */
+    claimedAmount: numeric("claimed_amount", { precision: 12, scale: 2 }),
+    /** reception | manual | file | weigh */
+    source: text("source").notNull().default("reception"),
+    /** Écarts de pesée regroupés par bon : clé du bon (rec:12 ou ref:Fournisseur : Facture 123) */
+    groupKey: text("group_key"),
     createdBy: integer("created_by").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     closedAt: timestamp("closed_at", { withTimezone: true }),
@@ -488,3 +502,17 @@ export const claims = pgTable(
   },
   (t) => [index("claims_status_idx").on(t.status)],
 );
+
+/** Clôtures hebdomadaires des anomalies (bilan de la semaine figé) */
+export const weeklyClosings = pgTable("weekly_closings", {
+  id: serial("id").primaryKey(),
+  /** Lundi de la semaine clôturée (AAAA-MM-JJ) */
+  week: date("week").notNull().unique(),
+  closed: integer("closed").notNull().default(0),
+  credits: numeric("credits", { precision: 12, scale: 2 }),
+  deferred: numeric("deferred", { precision: 12, scale: 2 }),
+  pending: numeric("pending", { precision: 12, scale: 2 }),
+  details: jsonb("details"),
+  closedBy: integer("closed_by").references(() => users.id, { onDelete: "set null" }),
+  closedAt: timestamp("closed_at", { withTimezone: true }).notNull().defaultNow(),
+});

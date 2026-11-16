@@ -10,6 +10,11 @@ import { PageHeader } from "@/components/ui";
 import { AnomaliesBoard, AnomalyForm } from "./AnomalyClient";
 import { lineDocLabel } from "@/lib/documents";
 import { ensureAnomaliesLinked } from "@/lib/server/maj";
+import { syncWeighAnomalies } from "@/lib/server/weighAnomalies";
+import { supplierProcesses } from "@/lib/server/followup";
+import { daysSince, stageOf } from "@/lib/anomaly";
+import { DueBox, Kanban } from "./Kanban";
+import Link from "next/link";
 
 const today = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date());
 
@@ -18,6 +23,9 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
   const { t, locale } = await getDict();
   const sp = await searchParams;
   await ensureAnomaliesLinked();
+  await syncWeighAnomalies();
+  const processes = await supplierProcesses();
+  const view = one(sp.view) === "liste" ? "list" : "board";
   const a = schema.anomalies;
   const by = alias(schema.users, "by");
   const db = getDb();
@@ -49,6 +57,8 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
   const maxNum = consolidated.reduce((m, c) => Math.max(m, c.a.number ?? 0), 0);
   const provisional = new Map([...active].sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime() || x.id - y.id).map((x, i) => [x.id, maxNum + i + 1]));
   const day = today();
+  void day;
+  const now = new Date();
   const toRow = (x: typeof active[number]) => ({
     id: x.id,
     number: x.number ?? provisional.get(x.id) ?? null,
@@ -69,20 +79,37 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     statusLabel: t.anomalies.statuses[x.status],
     type: t.anomalies.types[x.type],
     nextActionAt: x.nextActionAt ?? "",
-    due: !!x.nextActionAt && x.nextActionAt <= day,
+    stage: x.stage,
+    resolution: x.resolution,
+    mode: x.mode,
+    claimed: num(x.claimedAmount),
+    closedAt: x.closedAt ? x.closedAt.toISOString() : null,
+    days: daysSince(x.lastActionAt, x.createdAt, now),
+    delay: processes.find(x.supplierId, x.supplierName)?.delay ?? 3,
+    // À relancer : réclamée ou à vérifier, sans nouvelle action depuis le délai du fournisseur (3 jours par défaut)
+    due: (stageOf(x.stage) === "reclamee" || stageOf(x.stage) === "a_verifier") && x.mode !== "verification" && !x.consolidatedAt && daysSince(x.lastActionAt, x.createdAt, now) >= (processes.find(x.supplierId, x.supplierName)?.delay ?? 3),
     receptionId: x.receptionId,
     photoUrl: x.photoUrl,
   });
   const preselect = Number(one(sp.reception)) || null;
   return (
     <>
-      <PageHeader title={t.anomalies.title} />
+      <PageHeader title={t.anomalies.title}>
+        <div className="flex rounded-lg border border-stone-200 bg-white p-0.5 text-sm">
+          <Link href="/anomalies" className={`rounded-md px-3 py-1.5 font-medium ${view === "board" ? "bg-brand-600 text-white" : "text-stone-600"}`}>{t.kanban.board}</Link>
+          <Link href="/anomalies?view=liste" className={`rounded-md px-3 py-1.5 font-medium ${view === "list" ? "bg-brand-600 text-white" : "text-stone-600"}`}>{t.kanban.list}</Link>
+        </div>
+      </PageHeader>
       {can.createAnomaly(user.role) && (
         <AnomalyForm
           preselect={preselect}
           receptions={recent.map((r) => ({ id: r.id, label: `${numbers.get(r.id) ?? ""}. ${r.blNumber ? r.blNumber : "—"} · ${r.supplierName} · ${fmtDate(r.deliveredAt, locale)}` }))}
         />
       )}
+      <DueBox rows={active.map(toRow)} />
+      {view === "board" ? (
+        <Kanban rows={active.map(toRow)} canManage={can.manageAnomalies(user.role)} />
+      ) : (
       <AnomaliesBoard
         rows={active.map(toRow)}
         consolidated={consolidated.map(({ a: x, byName }) => ({ ...toRow(x), consolidated: `${fmtDateTime(x.consolidatedAt, locale)}${byName ? ` ${t.consolidation.by} ${byName}` : ""}` }))}
@@ -90,6 +117,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
         canConsolidate={can.consolidate(user.role)}
         today={day}
       />
+      )}
     </>
   );
 }

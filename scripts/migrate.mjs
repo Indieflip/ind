@@ -273,6 +273,62 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'anomaly_outco
   await db.execute(sql`insert into app_settings (key, value) values ('anomaly_outcome_v1', '1') on conflict (key) do nothing`);
 }
 
+// Suivi unique des anomalies (une fois) : étape (À traiter / Réclamée / À vérifier sur facture / Clôturée / Annulée),
+// résolution (avoir / livraison différée / sans suite), mode (réclamation avec relances / simple vérification),
+// montant réclamé, source. Règles : une ligne qui indique la bonne réception d'un avoir (ou de la marchandise) est clôturée.
+if (!(await db.execute(sql`select 1 from app_settings where key = 'anomaly_stage_v1'`)).rows.length) {
+  const plain = (x) => (x ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const { rows } = await db.execute(sql`select a.*, l.qty_ordered, l.qty_received, l.unit_price, l.mercurial_min, l.mercurial_price, l.decision as line_decision
+    from anomalies a left join reception_lines l on l.id = a.line_id`);
+  for (const a of rows) {
+    const follow = a.follow_up ?? "";
+    const resultLine = (/Résultat : (.*)$/m.exec(follow)?.[1] ?? "");
+    const actions = plain(follow.replace(/Résultat : .*$/m, ""));
+    const all = plain(`${follow} ${a.description}`);
+    const active = /mail|appel|whatsapp|relanc|demand|contact|telephon|sms|message|bon de retour|retour gere|recup/.test(actions);
+    const deferred = /differe|livre ulterieurement|a ete livre|livre apres|livraison du complement|complement|renvoi|livr[ee]+ le lendemain/.test(all);
+    const creditOk = /ok le|reception avoir le|avoir recu|nous envoie l.avoir|receptionne le|: ok\b|\bok ras\b|^ok$/.test(plain(resultLine)) || /reception avoir le|avoir recu/.test(all);
+    let stage, resolution = null;
+    if (a.result === "annule") stage = "annulee";
+    else if (a.result === "cloture" || creditOk) {
+      stage = "cloturee";
+      resolution = Number(a.credit_amount) > 0 ? "avoir" : deferred && !/avoir/.test(plain(resultLine)) ? "livraison" : /avoir/.test(plain(resultLine)) ? "avoir" : "sans_suite";
+    } else if (active) stage = "reclamee";
+    else if (/verifi/.test(plain(resultLine))) stage = "a_verifier";
+    else stage = "a_traiter";
+    const mode = active ? "reclamation" : "verification";
+    // Montant en jeu, d'après la ligne du bon
+    let claimed = null;
+    const price = a.unit_price != null ? Number(a.unit_price) : null;
+    if (price != null) {
+      const qo = a.qty_ordered != null ? Number(a.qty_ordered) : null;
+      const qr = a.qty_received != null ? Number(a.qty_received) : null;
+      if (a.type === "locked_price") {
+        const ref = a.mercurial_min ?? a.mercurial_price;
+        if (ref != null) claimed = (price - Number(ref)) * (qr ?? qo ?? 0);
+      } else if (a.line_decision === "refuse") claimed = price * (qo ?? qr ?? 0);
+      else if (qo != null && qr != null && qo !== qr) claimed = Math.abs(qo - qr) * price;
+    }
+    const source = a.imported ? "file" : a.reception_id ? "reception" : "manual";
+    const status = stage === "a_traiter" ? "open" : stage === "reclamee" || stage === "a_verifier" ? "claimed" : stage === "cloturee" ? (resolution === "avoir" ? "credit_received" : "closed") : "closed";
+    const result = stage === "cloturee" ? "cloture" : stage === "annulee" ? "annule" : "en_cours";
+    await db.execute(sql`update anomalies set stage = ${stage}, resolution = ${resolution}, mode = ${mode}, source = ${source},
+      claimed_amount = ${claimed != null && claimed > 0 ? Math.round(claimed * 100) / 100 : null}, status = ${status}, result = ${result},
+      closed_at = ${stage === "cloturee" || stage === "annulee" ? sql`coalesce(closed_at, consolidated_at, created_at)` : null} where id = ${a.id}`);
+  }
+  // Réclamations saisies à la main → anomalies (une seule liste de suivi)
+  const { rows: manual } = await db.execute(sql`select * from claims where source = 'manual' and anomaly_id is null and weigh_gap_id is null`);
+  for (const c of manual) {
+    const stage = c.status === "cloturee" ? "cloturee" : c.status === "annulee" ? "annulee" : "reclamee";
+    await db.execute(sql`insert into anomalies (supplier_id, supplier_name, product_name, type, description, reference, follow_up, credit_amount, claimed_amount,
+      stage, resolution, mode, source, status, result, reception_id, created_by, created_at)
+      values (${c.supplier_id}, ${c.supplier_name ?? "—"}, ${c.product}, 'other', ${c.subject}, ${c.reference}, ${c.notes}, ${c.credit}, ${c.amount},
+      ${stage}, ${stage === "cloturee" ? (Number(c.credit) > 0 ? "avoir" : "sans_suite") : null}, 'reclamation', 'manual',
+      ${stage === "reclamee" ? "claimed" : "closed"}, ${stage === "cloturee" ? "cloture" : stage === "annulee" ? "annule" : "en_cours"}, ${c.reception_id}, ${c.created_by}, ${c.created_at})`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('anomaly_stage_v1', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

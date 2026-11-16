@@ -12,7 +12,7 @@ import { appConfirm } from "@/components/Confirm";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { PhotoButton, Thumbs } from "@/components/reception/PhotoButton";
 import { PasteRowButton } from "@/components/table/RowMenu";
-import { outcomeOf, outcomeStyles } from "@/lib/anomaly";
+import { isOpenStage, outcomeOf, outcomeStyles, stageOf, stageStyles } from "@/lib/anomaly";
 import { copyRow, type RowFields } from "@/lib/client/rowClipboard";
 
 const NATURES = ["Viande", "Poisson", "Fruits & Légumes", "Crèmerie", "Épicerie", "Boisson", "Boulangerie", "Autre"];
@@ -86,6 +86,7 @@ export interface AnomalyRow {
   id: number; number: number | null; numberFinal: boolean; date: string; dateSort: string; nature: string; supplier: string; supplierId: number | null; reference: string; product: string; problem: string;
   action: string; lastActionAt: string; result: string; saving: number | null; status: string; statusLabel: string;
   type: string; nextActionAt: string; due: boolean; receptionId: number | null; photoUrl: string | null; consolidated?: string;
+  stage: string; resolution: string | null; mode: string; claimed: number | null; days: number; delay: number; closedAt: string | null;
 }
 
 /** Anomalies : à suivre aujourd'hui, suivi (colonnes du fichier), consolidation */
@@ -96,7 +97,6 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
   const [sel, setSel] = useState<Set<string | number>>(new Set());
   const [showDone, setShowDone] = useState(false);
   const [pending, start] = useTransition();
-  const due = rows.filter((r) => r.due);
   // Menu ⋮ : copier la ligne (à coller dans un autre tableau) ou en faire une réclamation
   const fieldsOf = (r: AnomalyRow): RowFields => ({
     date: r.dateSort.slice(0, 10), nature: r.nature, supplier: r.supplier, supplierId: r.supplierId ? String(r.supplierId) : "", reference: r.reference,
@@ -129,7 +129,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
       render: (r) => (
         <div className="space-y-1">
           <StatusBadge status={r.status} label={r.statusLabel} />
-          {r.nextActionAt && <div className={`text-[11px] ${r.due ? "font-semibold text-red-700" : "text-stone-500"}`}>{a.nextActionShort} {fmtDate(r.nextActionAt, locale)}</div>}
+          
         </div>
       ),
     },
@@ -142,27 +142,19 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
   const shownCols = cols
     .filter((c) => !["problem", "action", "lastActionAt", "result", "saving", "status"].includes(c.key))
     .map((c) => (c.key === "product" ? { ...c, width: undefined, render: (r: AnomalyRow) => <Link href={`/anomalies/${r.id}`} className="font-medium text-brand-700 hover:underline" title={t.sheet.open}>{r.product || r.problem}</Link> } : c));
+  // Suivi unique : l'étape (et les jours depuis la dernière action)
+  const edit = shownCols.findIndex((c) => c.key === "edit");
+  shownCols.splice(edit < 0 ? shownCols.length : edit, 0, {
+    key: "stage", width: "8.5rem", label: t.common.status, text: (r) => t.stages[stageOf(r.stage)], options: Object.values(t.stages),
+    render: (r) => (
+      <div className="space-y-0.5">
+        <span className={`badge ${stageStyles[stageOf(r.stage)]}`}>{t.stages[stageOf(r.stage)]}</span>
+        {isOpenStage(stageOf(r.stage)) && <div className={`text-[11px] ${r.due ? "font-semibold text-red-700" : "text-stone-500"}`}>{r.days} {t.kanban.days}</div>}
+      </div>
+    ),
+  });
   return (
     <>
-      {/* Rappel du jour */}
-      <section className={`mb-4 rounded-xl border p-4 ${due.length ? "border-red-200 bg-red-50" : "border-emerald-200 bg-emerald-50"}`}>
-        <h2 className={`font-semibold ${due.length ? "text-red-800" : "text-emerald-800"}`}>
-          {a.dueToday} ({due.length})
-        </h2>
-        {due.length === 0 ? (
-          <p className="text-sm text-emerald-800">{a.nothingDue}</p>
-        ) : (
-          <ul className="mt-2 space-y-1 text-sm">
-            {due.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-red-700">{fmtDate(r.nextActionAt, locale)}</span>
-                <strong>{sentence(r.supplier)}</strong> · {r.product || r.problem}
-                <Link className="ml-auto text-xs font-semibold text-red-800 underline" href={`/anomalies/${r.id}`}>{a.followUpNow}</Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
 
       <div className="mb-2 flex flex-wrap items-center gap-3 text-sm">
         {canConsolidate && (

@@ -26,3 +26,38 @@ export const claimStyles: Record<"en_cours" | "cloturee" | "annulee", string> = 
   cloturee: "bg-emerald-100 text-emerald-800",
   annulee: "bg-stone-200 text-stone-600",
 };
+
+/** Suivi unique d'une anomalie */
+export const STAGES = ["a_traiter", "reclamee", "a_verifier", "cloturee", "annulee"] as const;
+export type Stage = (typeof STAGES)[number];
+export const stageStyles: Record<Stage, string> = {
+  a_traiter: "bg-red-100 text-red-800",
+  reclamee: "bg-amber-100 text-amber-900",
+  a_verifier: "bg-sky-100 text-sky-800",
+  cloturee: "bg-emerald-100 text-emerald-800",
+  annulee: "bg-stone-200 text-stone-600",
+};
+export const stageOf = (v: string | null | undefined): Stage => (STAGES.includes(v as Stage) ? (v as Stage) : "a_traiter");
+export const isOpenStage = (s: Stage) => s === "a_traiter" || s === "reclamee" || s === "a_verifier";
+
+/** Résolution d'une anomalie clôturée : par un avoir, ou par la marchandise livrée plus tard */
+export const RESOLUTIONS = ["avoir", "livraison", "sans_suite"] as const;
+export type Resolution = (typeof RESOLUTIONS)[number];
+export const MODES = ["reclamation", "verification"] as const;
+export type Mode = (typeof MODES)[number];
+
+/** Anciens champs (statut / résultat) tenus à jour d'après l'étape, pour l'historique et les exports */
+export function legacyOf(stage: Stage, resolution: string | null) {
+  const status = stage === "a_traiter" ? "open" : stage === "reclamee" || stage === "a_verifier" ? "claimed" : stage === "cloturee" && resolution === "avoir" ? "credit_received" : "closed";
+  const result: Outcome = stage === "cloturee" ? "cloture" : stage === "annulee" ? "annule" : "en_cours";
+  return { status: status as "open" | "claimed" | "credit_received" | "closed", result };
+}
+
+/** Délai de relance par défaut (jours) */
+export const DEFAULT_FOLLOW_UP_DAYS = 3;
+
+/** Jours écoulés depuis la dernière action (ou la création) */
+export function daysSince(lastActionAt: string | null, createdAt: Date | string, today = new Date()) {
+  const ref = lastActionAt ? new Date(lastActionAt + "T12:00:00") : new Date(createdAt);
+  return Math.floor((today.getTime() - ref.getTime()) / 86_400_000);
+}

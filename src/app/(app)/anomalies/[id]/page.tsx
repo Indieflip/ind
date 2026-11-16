@@ -12,6 +12,7 @@ import { decisionStyles } from "@/components/DecisionBadge";
 import { Icon } from "@/components/Icon";
 import { claimStyles } from "@/lib/anomaly";
 import { AnomalySheetForm } from "./SheetClient";
+import { supplierProcesses } from "@/lib/server/followup";
 
 /** Fiche d'anomalie : la réception d'origine et tout le suivi (problème, action, résultat, économie, statut) */
 export default async function AnomalySheet({ params }: { params: Promise<{ id: string }> }) {
@@ -25,7 +26,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   const [rec, line, supplier, claims, photos, numbers, maxNum, rank, author] = await Promise.all([
     a.receptionId ? db.query.receptions.findFirst({ where: eq(schema.receptions.id, a.receptionId) }) : undefined,
     a.lineId ? db.query.receptionLines.findFirst({ where: eq(schema.receptionLines.id, a.lineId) }) : undefined,
-    a.supplierId ? db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, a.supplierId), columns: { id: true, name: true } }) : undefined,
+    a.supplierId ? db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, a.supplierId), columns: { id: true, name: true, email: true, phone: true } }) : undefined,
     db.select().from(schema.claims).where(eq(schema.claims.anomalyId, id)).orderBy(asc(schema.claims.date)),
     a.lineId ? db.select().from(schema.receptionPhotos).where(eq(schema.receptionPhotos.lineId, a.lineId)) : Promise.resolve([]),
     receptionNumbers(),
@@ -35,6 +36,9 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
     a.createdBy ? db.query.users.findFirst({ where: eq(schema.users.id, a.createdBy), columns: { name: true } }) : undefined,
   ]);
   const number = a.number ?? (maxNum[0]?.m ?? 0) + (rank[0]?.n ?? 0) + 1;
+  void claims;
+  // Procédure de réclamation du fournisseur (protocole) et délai de relance
+  const process = (await supplierProcesses()).find(a.supplierId, a.supplierName);
   const docs = (rec?.documents as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[] | null) ?? (rec?.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : []);
   const reference = rec ? lineDocLabel(docs, line?.document, rec.blNumber) : a.reference;
   const locked = !!a.consolidatedAt;
@@ -125,6 +129,33 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
       </section>
 
       {/* Suivi : Problème, Action, Dernière action, Résultat, Économie HT, Statut */}
+      {/* Procédure du fournisseur + mail pré-rempli */}
+      <section className="card border-l-4 border-l-sky-400 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h2 className="font-semibold">{s.procedure} · {sentence(supplier?.name ?? a.supplierName)}</h2>
+          <span className="badge bg-sky-100 text-sky-800">{s.delay} : {process?.delay ?? 3} {t.kanban.days}</span>
+        </div>
+        {process ? (
+          <ul className="mt-2 list-inside list-disc space-y-0.5 text-sm text-stone-700">
+            {process.text.split("\n").map((l) => l.replace(/^[•\-*]\s*/, "").trim()).filter((l) => l && !l.endsWith(":")).map((l, i) => <li key={i}>{l}</li>)}
+          </ul>
+        ) : (
+          <p className="mt-1 text-sm text-stone-500">{s.noProcess} <Link href="/protocoles" className="text-brand-700 underline">{t.nav.protocols}</Link></p>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a
+            className="btn-secondary py-1.5 text-sm"
+            href={`mailto:${supplier?.email ?? ""}?subject=${encodeURIComponent(`${s.mailSubject} — ${reference ?? ""} ${a.productName ?? ""}`.trim())}&body=${encodeURIComponent(
+              `${s.mailHello}\n\n${s.mailIntro} ${rec ? fmtDate(rec.deliveredAt, locale) : fmtDate(a.createdAt, locale)}${reference ? ` (${reference})` : ""} :\n- ${a.productName ?? ""} : ${a.description}${a.claimedAmount ? `\n- ${s.mailAmount} : ${fmtMoney(num(a.claimedAmount), locale)}` : ""}\n\n${s.mailAsk}\n\n${s.mailBye}`,
+            )}`}
+          >
+            ✉ {s.mail}{supplier?.email ? ` (${supplier.email})` : ""}
+          </a>
+          {supplier?.phone && <a className="btn-secondary py-1.5 text-sm" href={`tel:${supplier.phone}`}>☎ {supplier.phone}</a>}
+        </div>
+        {!supplier?.email && <p className="mt-1 text-xs text-stone-500">{s.noEmail}</p>}
+      </section>
+
       <AnomalySheetForm
         id={a.id}
         editable={editable}
@@ -134,25 +165,14 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
           followUp: a.followUp ?? "",
           lastActionAt: a.lastActionAt ?? "",
           nextActionAt: a.nextActionAt ?? "",
-          result: a.result ?? "en_cours",
           creditAmount: a.creditAmount != null ? String(num(a.creditAmount)).replace(".", ",") : "",
-          status: a.status,
+          claimedAmount: a.claimedAmount != null ? String(num(a.claimedAmount)).replace(".", ",") : "",
+          stage: a.stage,
+          resolution: a.resolution ?? "",
+          mode: a.mode,
         }}
       />
 
-      {claims.length > 0 && (
-        <section className="card p-4">
-          <h2 className="mb-2 font-semibold">{t.claims.title}</h2>
-          <ul className="divide-y divide-stone-100 text-sm">
-            {claims.map((c) => (
-              <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                <span>{t.claims.number} {c.id} · {fmtDate(c.date, locale)} — {c.subject}</span>
-                <span className={`badge ${claimStyles[c.status as "en_cours"] ?? ""}`}>{t.claims.statuses[c.status as "en_cours"] ?? c.status}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       <p className="text-xs text-stone-500">{s.created} {fmtDateTime(a.createdAt, locale)}{author ? ` · ${author.name}` : ""}{a.imported ? ` · ${s.fromFile}` : ""}</p>
     </div>

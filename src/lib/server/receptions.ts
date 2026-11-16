@@ -263,6 +263,7 @@ async function writeContent(
         // Prix bloqué : pas de variation, une anomalie à réclamer au fournisseur
         await tx.insert(schema.anomalies).values({
           receptionId: recId, supplierId, supplierName, productName: l.productName, type: "locked_price", nature: natureOf(l.categoryId), reference: lineRef(l),
+          claimedAmount: money(l.unitPrice != null && (ref.min ?? ref.max) != null ? (l.unitPrice - (ref.min ?? ref.max)!) * (l.qtyReceived ?? l.qtyOrdered ?? 0) : null),
           description: `${t.anomalies.types.locked_price} : ${fmtEuro(l.unitPrice)} ${t.anomalies.texts.insteadOf} ${fmtEuro(ref.min ?? ref.max)}${ref.min != null && ref.max != null && ref.min !== ref.max ? ` – ${fmtEuro(ref.max)}` : ""} (${check.pct > 0 ? "+" : ""}${String(check.pct).replace(".", ",")} %)`,
           createdBy: user.id, createdAt: date,
         });
@@ -315,6 +316,7 @@ async function writeContent(
         nature: natureOf(l.categoryId), reference: lineRef(l),
         type: first.startsWith("temp") ? "temperature" : first.startsWith("dlc") ? "dlc" : first === "qty_less" ? "missing" : "quantity",
         description: `${t.anomalies.detected} : ${facts.join(" ; ")}`,
+        claimedAmount: money(gapValue(l)),
         photoUrl: l.photos[0] ?? null, createdBy: user.id, createdAt: date,
       });
     }
@@ -332,6 +334,7 @@ async function writeContent(
         reference: lineRef(l),
         type: (l.reason && reasonToAnomaly[l.reason]) || (l.qtyReceived != null && l.qtyOrdered != null && l.qtyReceived < l.qtyOrdered ? "missing" : "other"),
         description: `${t.decision[l.decision]}${why.length ? ` : ${[...new Set(why)].join(" ; ")}` : ""}`,
+        claimedAmount: money(l.decision === "refuse" && l.unitPrice != null ? l.unitPrice * (l.qtyOrdered ?? l.qtyReceived ?? 0) : gapValue(l)),
         photoUrl: l.photos[0] ?? null,
         createdBy: user.id,
         createdAt: date,
@@ -476,7 +479,7 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
     const anomalies = await tx.select().from(schema.anomalies).where(eq(schema.anomalies.receptionId, id));
     const keep = { products: new Set<string>(), hygiene: false, missingBl: false, locked: new Set<number>(), truck: false };
     // Une anomalie déjà suivie (action, relance, résultat, consolidation) n'est jamais recréée ni supprimée
-    const touched = (a: (typeof anomalies)[number]) => a.status !== "open" || !!a.followUp || !!a.nextActionAt || !!a.result || !!a.consolidatedAt || !!a.lastActionAt;
+    const touched = (a: (typeof anomalies)[number]) => a.stage !== "a_traiter" || a.status !== "open" || !!a.followUp || !!a.nextActionAt || !!a.result || !!a.consolidatedAt || !!a.lastActionAt;
     for (const a of anomalies) {
       if (!touched(a)) continue;
       if (a.type === "missing_bl") keep.missingBl = true;
@@ -536,3 +539,10 @@ function describeLine(
   }
   return [...new Set(out)];
 }
+
+/** Montant en jeu d'un écart de quantité : quantité manquante (ou en trop) × prix unitaire */
+function gapValue(l: { qtyOrdered: number | null; qtyReceived: number | null; unitPrice: number | null }) {
+  if (l.unitPrice == null || l.qtyOrdered == null || l.qtyReceived == null || l.qtyOrdered === l.qtyReceived) return null;
+  return Math.abs(l.qtyOrdered - l.qtyReceived) * l.unitPrice;
+}
+const money = (n: number | null) => (n != null && n > 0 ? String(Math.round(n * 100) / 100) : null);
