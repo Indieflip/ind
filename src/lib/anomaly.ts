@@ -66,6 +66,17 @@ export function legacyOf(stage: Stage, resolution: string | null) {
 export const DEFAULT_FOLLOW_UP_DAYS = 3;
 
 /** Jours écoulés depuis la dernière action (ou la création) */
+/** Vérification de l'avoir - sans réclamation : rappel si « À traiter » depuis 7 j, ou « À vérifier sur facture » depuis 15 j */
+export const VERIFY_TODO_DAYS = 7;
+export const VERIFY_CHECK_DAYS = 15;
+export function verificationDue(stage: string, mode: string | null | undefined, days: number): "a_traiter" | "a_verifier" | null {
+  if (mode !== "verification") return null;
+  const s = stageOf(stage);
+  if (s === "a_traiter" && days >= VERIFY_TODO_DAYS) return "a_traiter";
+  if (s === "a_verifier" && days >= VERIFY_CHECK_DAYS) return "a_verifier";
+  return null;
+}
+
 export function daysSince(lastActionAt: string | null, createdAt: Date | string, today = new Date()) {
   const ref = lastActionAt ? new Date(lastActionAt + "T12:00:00") : new Date(createdAt);
   return Math.floor((today.getTime() - ref.getTime()) / 86_400_000);

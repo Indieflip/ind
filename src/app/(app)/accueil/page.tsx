@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
 import { fmtMoney } from "@/lib/format";
-import { daysSince, DEFAULT_FOLLOW_UP_DAYS, isClaimMode, stageOf } from "@/lib/anomaly";
+import { daysSince, DEFAULT_FOLLOW_UP_DAYS, isClaimMode, stageOf, verificationDue } from "@/lib/anomaly";
 import { backupSettings, lastBackup } from "@/lib/server/backup";
 import { supplierProcesses } from "@/lib/server/followup";
 import { canSeeDev } from "@/lib/server/dev";
@@ -43,10 +43,12 @@ export default async function HomePage() {
     const late = open.filter((x) => stageOf(x.stage) !== "a_traiter" && isClaimMode(x.mode) && daysSince(x.lastActionAt, x.createdAt, now) >= (processes.find(x.supplierId, x.supplierName)?.delay ?? DEFAULT_FOLLOW_UP_DAYS));
     const toCheck = open.filter((x) => stageOf(x.stage) === "a_verifier");
     const noAmount = open.filter((x) => x.claimedAmount == null);
+    const verify = open.filter((x) => verificationDue(x.stage, x.mode, daysSince(x.lastActionAt, x.createdAt, now)));
     const sum = (xs: typeof open) => xs.reduce((s, x) => s + Number(x.claimedAmount ?? 0), 0);
     if (late.length) tasks.push({ key: "late", label: h.late, detail: money(sum(late)), count: late.length, href: "/anomalies", tone: "red", icon: "alert" });
     if (todo.length) tasks.push({ key: "todo", label: h.anomaliesTodo, detail: money(sum(todo)), count: todo.length, href: "/anomalies", tone: "red", icon: "alert" });
     if (toCheck.length) tasks.push({ key: "check", label: h.toCheck, detail: money(sum(toCheck)), count: toCheck.length, href: "/anomalies/reclamations", tone: "sky", icon: "search" });
+    if (verify.length) tasks.push({ key: "verify", label: h.verifyDue, detail: money(sum(verify)), count: verify.length, href: "/anomalies", tone: "sky", icon: "search" });
     if (noAmount.length) tasks.push({ key: "noAmount", label: h.noAmount, count: noAmount.length, href: "/anomalies/reclamations?f=sans-montant", tone: "amber", icon: "euro" });
     const [credits] = await db.select({ n: count() }).from(a).where(and(eq(a.stage, "cloturee"), eq(a.resolution, "avoir"), isNull(a.creditAmount)));
     if (credits.n) tasks.push({ key: "creditMissing", label: h.creditMissing, count: credits.n, href: "/anomalies/reclamations", tone: "amber", icon: "euro" });
@@ -110,7 +112,7 @@ export default async function HomePage() {
       <div className="mt-6 flex flex-wrap gap-2">
         {can.receive(r) && <Link href="/receptions/new?new=1" className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t.receptions.new}</Link>}
         <Link href="/anomalies" className="btn-secondary">{t.nav.anomalies}</Link>
-        <Link href="/anomalies/economies" className="btn-secondary">{t.savings.title}</Link>
+        <Link href="/reporting/economies" className="btn-secondary">{t.savings.title}</Link>
       </div>
     </>
   );

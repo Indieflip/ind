@@ -19,8 +19,9 @@ export function DueBox({ rows }: { rows: AnomalyRow[] }) {
   const k = t.kanban;
   const late = rows.filter((r) => r.due);
   const todo = rows.filter((r) => stageOf(r.stage) === "a_traiter");
+  const verify = rows.filter((r) => r.verify).sort((x, y) => y.days - x.days);
   // Refermable (✕) : caché jusqu'au lendemain ou jusqu'à ce que le nombre change
-  const stamp = `${new Date().toISOString().slice(0, 10)}|${late.length}|${todo.length}`;
+  const stamp = `${new Date().toISOString().slice(0, 10)}|${late.length}|${todo.length}|${verify.length}`;
   const [hidden, setHidden] = useState(true);
   useEffect(() => { try { setHidden(localStorage.getItem("rm_notice_duebox") === stamp); } catch { setHidden(false); } }, [stamp]);
   if (hidden) return null;
@@ -44,6 +45,22 @@ export function DueBox({ rows }: { rows: AnomalyRow[] }) {
             </li>
           ))}
         </ul>
+      )}
+      {verify.length > 0 && (
+        <div className="mt-3 border-t border-black/10 pt-3">
+          <h3 className="text-sm font-semibold text-sky-900">{k.verifyTitle} ({verify.length})</h3>
+          <p className="text-xs text-stone-600">{k.verifyHint}</p>
+          <ul className="mt-1.5 max-h-48 space-y-1 overflow-y-auto text-sm">
+            {verify.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center gap-2">
+                <span className="badge bg-sky-100 text-sky-800">{r.days} {k.days}</span>
+                <span className="badge bg-stone-100 text-stone-700">{r.verify === "a_verifier" ? k.verifyCheck : k.verifyTodo}</span>
+                <strong>{sentence(r.supplier)}</strong> · {r.product || r.problem}
+                <Link className="ml-auto text-xs font-semibold text-sky-800 underline" href={`/anomalies/${r.id}`}>{k.verifyOpen}</Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </section>
   );

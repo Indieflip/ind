@@ -48,6 +48,13 @@ export function ImportCatalog() {
 }
 
 type ContactKey = "societe" | "reclamation" | "commande";
+/** Champs de coordonnées : le « + » ajoute une valeur de plus du même type (stockée dans extra avec label = clé) */
+const FIELDS = [
+  { key: "email", type: "email", label: (s: { email: string }) => s.email },
+  { key: "phone", type: "tel", label: (s: { phone: string }) => s.phone },
+  { key: "notes", type: "text", label: (s: { contactNotes: string }) => s.contactNotes },
+] as const;
+const FIELD_KEYS: string[] = FIELDS.map((f) => f.key);
 type Contacts = Record<ContactKey, { email: string; phone: string; notes: string; extra: { label: string; value: string }[] }>;
 
 /** Compte fournisseur : nom, coordonnées (société / réclamation / commande), process de réclamation */
@@ -68,6 +75,7 @@ export function SupplierInfo({ id, name, contacts, claimProcess, active }: { id:
     setV({ ...v, contacts: { ...v.contacts, [k]: { ...v.contacts[k], extra } } });
     setSaved(false);
   };
+  const removeX = (k: ContactKey, i: number) => { setV({ ...v, contacts: { ...v.contacts, [k]: { ...v.contacts[k], extra: v.contacts[k].extra.filter((_, j) => j !== i) } } }); setSaved(false); };
   const setC = (k: ContactKey, f: "email" | "phone" | "notes", value: string) => { setV({ ...v, contacts: { ...v.contacts, [k]: { ...v.contacts[k], [f]: value } } }); setSaved(false); };
   return (
     <form
@@ -88,19 +96,33 @@ export function SupplierInfo({ id, name, contacts, claimProcess, active }: { id:
           {(["societe", "reclamation", "commande"] as ContactKey[]).map((k) => (
             <fieldset key={k} className="space-y-2 rounded-lg border border-stone-200 p-3">
               <legend className="px-1 text-xs font-bold uppercase tracking-wide text-stone-500">{s.contactKinds[k]}</legend>
-              <label className="block"><span className="label">{s.email}</span><input className="input" type="email" value={v.contacts[k].email} onChange={(e) => setC(k, "email", e.target.value)} /></label>
-              <label className="block"><span className="label">{s.phone}</span><input className="input" type="tel" value={v.contacts[k].phone} onChange={(e) => setC(k, "phone", e.target.value)} /></label>
-              <label className="block"><span className="label">{s.contactNotes}</span><input className="input" value={v.contacts[k].notes} onChange={(e) => setC(k, "notes", e.target.value)} /></label>
-              {v.contacts[k].extra.map((x, i) => (
+              {FIELDS.map((f) => {
+                const extras = v.contacts[k].extra.map((x, i) => ({ ...x, i })).filter((x) => x.label === f.key);
+                return (
+                  <div key={f.key}>
+                    <div className="flex items-center gap-1">
+                      <span className="label mb-0">{f.label(s)}</span>
+                      <button type="button" className="rounded px-1.5 text-base font-bold leading-none text-brand-700 hover:bg-brand-50" title={`${s.addAnother} : ${f.label(s)}`} aria-label={`${s.addAnother} : ${f.label(s)}`}
+                        onClick={() => { setV({ ...v, contacts: { ...v.contacts, [k]: { ...v.contacts[k], extra: [...v.contacts[k].extra, { label: f.key, value: "" }] } } }); setSaved(false); }}>+</button>
+                    </div>
+                    <input className="input mt-1" type={f.type} value={v.contacts[k][f.key]} onChange={(e) => setC(k, f.key, e.target.value)} />
+                    {extras.map((x) => (
+                      <div key={x.i} className="mt-1 flex items-center gap-1">
+                        <input className="input" type={f.type} value={x.value} autoFocus={!x.value} onChange={(e) => setX(k, x.i, "value", e.target.value)} />
+                        <button type="button" className="btn-ghost p-2 text-stone-400 hover:text-red-600" aria-label={t.common.delete} onClick={() => removeX(k, x.i)}><Icon name="trash" className="h-4 w-4" /></button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+              {/* Anciens champs libres (avant les « + ») : conservés et modifiables */}
+              {v.contacts[k].extra.map((x, i) => (FIELD_KEYS.includes(x.label) ? null : (
                 <div key={i} className="flex items-end gap-1">
-                  <label className="w-2/5"><span className="label">{s.fieldName}</span><input className="input" value={x.label} placeholder={s.fieldNamePh} onChange={(e) => setX(k, i, "label", e.target.value)} /></label>
+                  <label className="w-2/5"><span className="label">{s.fieldName}</span><input className="input" value={x.label} onChange={(e) => setX(k, i, "label", e.target.value)} /></label>
                   <label className="flex-1"><span className="label">{s.fieldValue}</span><input className="input" value={x.value} onChange={(e) => setX(k, i, "value", e.target.value)} /></label>
-                  <button type="button" className="btn-ghost mb-0.5 p-2 text-stone-400 hover:text-red-600" aria-label={t.common.delete} onClick={() => { setV({ ...v, contacts: { ...v.contacts, [k]: { ...v.contacts[k], extra: v.contacts[k].extra.filter((_, j) => j !== i) } } }); setSaved(false); }}><Icon name="trash" className="h-4 w-4" /></button>
+                  <button type="button" className="btn-ghost mb-0.5 p-2 text-stone-400 hover:text-red-600" aria-label={t.common.delete} onClick={() => removeX(k, i)}><Icon name="trash" className="h-4 w-4" /></button>
                 </div>
-              ))}
-              <button type="button" className="btn-ghost px-1 py-1 text-xs text-brand-700" onClick={() => { setV({ ...v, contacts: { ...v.contacts, [k]: { ...v.contacts[k], extra: [...v.contacts[k].extra, { label: "", value: "" }] } } }); setSaved(false); }}>
-                <Icon name="plus" className="h-3.5 w-3.5" /> {s.addField}
-              </button>
+              )))}
             </fieldset>
           ))}
         </div>

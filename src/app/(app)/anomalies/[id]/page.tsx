@@ -42,7 +42,10 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   // Procédure de réclamation du fournisseur (protocole) et délai de relance
   const process = (await supplierProcesses()).find(a.supplierId, a.supplierName);
   // Coordonnées « Réclamation » du fournisseur en priorité, sinon celles de la société
-  const claimEmail = supplier?.contacts?.reclamation?.email || supplier?.contacts?.societe?.email || supplier?.email || "";
+  // Adresse de réclamation (sinon société) + les mails ajoutés avec le « + » du même bloc
+  const mailsOf = (c?: { email?: string; extra?: { label: string; value: string }[] }) => [c?.email, ...(c?.extra ?? []).filter((x) => x.label === "email").map((x) => x.value)].filter(Boolean) as string[];
+  const claimMails = mailsOf(supplier?.contacts?.reclamation);
+  const claimEmail = (claimMails.length ? claimMails : mailsOf(supplier?.contacts?.societe)).join(",") || supplier?.email || "";
   const claimPhone = supplier?.contacts?.reclamation?.phone || supplier?.contacts?.societe?.phone || supplier?.phone || "";
   const docs = (rec?.documents as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[] | null) ?? (rec?.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : []);
   const reference = rec ? lineDocLabel(docs, line?.document, rec.blNumber) : a.reference;

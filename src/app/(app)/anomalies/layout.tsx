@@ -8,7 +8,7 @@ export default async function AnomaliesLayout({ children }: { children: React.Re
   const { t } = await getDict();
   return (
     <>
-      <SubTabs tabs={[{ href: "/anomalies", label: t.anomalies.title, exact: true }, { href: "/anomalies/ecarts-pesee", label: t.weigh.title }, { href: "/anomalies/reclamations", label: t.claims.title }, { href: "/anomalies/economies", label: t.savings.title }]} />
+      <SubTabs tabs={[{ href: "/anomalies", label: t.anomalies.title, exact: true }, { href: "/anomalies/ecarts-pesee", label: t.weigh.title }, { href: "/anomalies/reclamations", label: t.claims.title }]} />
       {children}
     </>
   );

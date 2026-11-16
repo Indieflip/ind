@@ -4,7 +4,7 @@ import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
 import { fmtDateTime } from "@/lib/format";
 import { listReceptions, one, receptionFilters, type SP } from "@/lib/server/queries";
-import { Field, PageHeader, qs } from "@/components/ui";
+import { Field, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { DraftBanner, DeleteDraftButton } from "@/components/reception/DraftBanner";
 import { ReceptionsTable } from "./ReceptionsTable";
@@ -26,11 +26,7 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
   ]);
   return (
     <>
-      <PageHeader title={t.receptions.title}>
-        <a className="btn-secondary" href={`/api/export/receptions${qs({ ...f })}`}>
-          <Icon name="download" className="h-4 w-4" /> {t.common.exportCsv}
-        </a>
-      </PageHeader>
+      <PageHeader title={t.receptions.title} />
 
       {can.receive(user.role) && <DraftBanner />}
       {one(sp.draft) === "saved" && <p className="no-print mb-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{t.receptions.draftSaved}</p>}
@@ -78,6 +74,16 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
           author: r.createdByName,
         }))}
       />
+
+      <section className="no-print card mt-6 p-4">
+        <h2 className="font-semibold">{t.reporting.haccp}</h2>
+        <p className="mt-1 text-sm text-stone-600">{t.reporting.haccpHint}</p>
+        <form method="get" action="/api/export/receptions" className="mt-3 flex flex-wrap items-end gap-3">
+          <Field label={t.common.from}><input type="date" name="from" defaultValue={f.from} className="input py-2" /></Field>
+          <Field label={t.common.to}><input type="date" name="to" defaultValue={f.to} className="input py-2" /></Field>
+          <button className="btn-primary py-2"><Icon name="download" className="h-4 w-4" /> {t.reporting.exportHaccp}</button>
+        </form>
+      </section>
     </>
   );
 }

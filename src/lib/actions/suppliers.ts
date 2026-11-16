@@ -71,7 +71,7 @@ export async function updateSupplierAction(
     const clean = Object.fromEntries(
       (["societe", "reclamation", "commande"] as const).map((k) => {
         const c = data.contacts?.[k] ?? {};
-        const extra = (c.extra ?? []).map((x) => ({ label: x.label.trim(), value: x.value.trim() })).filter((x) => x.label || x.value);
+        const extra = (c.extra ?? []).map((x) => ({ label: x.label.trim(), value: x.value.trim() })).filter((x) => (["email", "phone", "notes"].includes(x.label) ? x.value : x.label || x.value));
         return [k, { email: c.email?.trim() || undefined, phone: c.phone?.trim() || undefined, notes: c.notes?.trim() || undefined, extra: extra.length ? extra : undefined }];
       }),
     );

@@ -85,7 +85,7 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
 export interface AnomalyRow {
   id: number; number: number | null; numberFinal: boolean; date: string; dateSort: string; nature: string; supplier: string; supplierId: number | null; reference: string; product: string; problem: string;
   action: string; lastActionAt: string; result: string; saving: number | null; status: string; statusLabel: string;
-  type: string; nextActionAt: string; due: boolean; receptionId: number | null; photoUrl: string | null; consolidated?: string;
+  type: string; nextActionAt: string; due: boolean; verify?: "a_traiter" | "a_verifier" | null; receptionId: number | null; photoUrl: string | null; consolidated?: string;
   stage: string; resolution: string | null; mode: string; claimed: number | null; days: number; delay: number; closedAt: string | null;
 }
 

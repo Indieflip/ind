@@ -13,7 +13,7 @@ import { ensureAnomaliesLinked } from "@/lib/server/maj";
 import { syncWeighAnomalies } from "@/lib/server/weighAnomalies";
 import { ensureClaimNumbers } from "@/lib/server/claimNumbers";
 import { supplierProcesses } from "@/lib/server/followup";
-import { daysSince, stageOf, isClaimMode } from "@/lib/anomaly";
+import { daysSince, stageOf, isClaimMode, verificationDue } from "@/lib/anomaly";
 import { DueBox, Kanban } from "./Kanban";
 import Link from "next/link";
 
@@ -89,6 +89,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     days: daysSince(x.lastActionAt, x.createdAt, now),
     delay: processes.find(x.supplierId, x.supplierName)?.delay ?? 3,
     // À relancer : réclamée ou à vérifier, sans nouvelle action depuis le délai du fournisseur (3 jours par défaut)
+    verify: x.consolidatedAt ? null : verificationDue(x.stage, x.mode, daysSince(x.lastActionAt, x.createdAt, now)),
     due: (stageOf(x.stage) === "reclamee" || stageOf(x.stage) === "a_verifier") && isClaimMode(x.mode) && !x.consolidatedAt && daysSince(x.lastActionAt, x.createdAt, now) >= (processes.find(x.supplierId, x.supplierName)?.delay ?? 3),
     receptionId: x.receptionId,
     photoUrl: x.photoUrl,

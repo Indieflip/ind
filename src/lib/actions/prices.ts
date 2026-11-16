@@ -10,7 +10,7 @@ import { priceDiffPct } from "@/lib/rules";
 export async function saveClaimAction(id: number, claim: string) {
   await assertUser(can.editPrices);
   await getDb().update(schema.priceChanges).set({ claim: claim.trim() || null }).where(eq(schema.priceChanges.id, id));
-  revalidatePath("/prices");
+  revalidatePath("/reporting/prix");
 }
 
 /** « Ajouter une ligne » : écart repéré sur facture ou correction du mercurial */
@@ -45,6 +45,6 @@ export async function addPriceLineAction(_prev: { ok?: boolean; error?: string }
     });
     await tx.update(schema.products).set({ price: String(newPrice) }).where(eq(schema.products.id, productId));
   });
-  revalidatePath("/prices");
+  revalidatePath("/reporting/prix");
   return { ok: true };
 }

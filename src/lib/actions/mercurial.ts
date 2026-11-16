@@ -114,7 +114,7 @@ export async function updateMercurialRowAction(
   }
   if (Object.keys(set).length) await db.update(schema.products).set(set).where(eq(schema.products.id, id));
   refresh();
-  revalidatePath("/prices");
+  revalidatePath("/reporting/prix");
   return { ok: true };
 }
 

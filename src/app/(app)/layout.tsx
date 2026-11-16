@@ -8,7 +8,7 @@ import { getRestaurantName } from "@/lib/settings";
 import { backupSettings, lastBackup } from "@/lib/server/backup";
 import { and, count, eq, inArray, isNull, ne } from "drizzle-orm";
 import { supplierProcesses } from "@/lib/server/followup";
-import { daysSince, DEFAULT_FOLLOW_UP_DAYS } from "@/lib/anomaly";
+import { daysSince, DEFAULT_FOLLOW_UP_DAYS, verificationDue } from "@/lib/anomaly";
 import { getDb, schema } from "@/db";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/accueil", label: t.nav.home, icon: "home", show: true },
     { href: "/receptions", label: t.nav.receptions, icon: "truck", show: can.viewReceptions(r) },
     { href: "/mercurial", label: t.nav.mercurial, icon: "list", show: can.viewMercurial(r) },
-    { href: "/prices", label: t.nav.prices, icon: "euro", show: can.viewPrices(r) },
     { href: "/anomalies", label: t.nav.anomalies, icon: "alert", show: can.viewAnomalies(r) },
     { href: "/reporting", label: t.nav.reporting, icon: "chart", show: true },
     { href: "/consolidation", label: t.nav.consolidation, icon: "layers", show: can.viewConsolidation(r) },
@@ -51,17 +50,20 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // Rappel quotidien : réclamations sans nouvelle action depuis le délai du fournisseur (3 jours par défaut)
   let dueAnomalies = 0;
+  let dueVerifications = 0;
   if (can.manageAnomalies(r)) {
     const a = schema.anomalies;
     try {
       const open = await getDb()
-        .select({ id: a.id, supplierId: a.supplierId, supplierName: a.supplierName, lastActionAt: a.lastActionAt, createdAt: a.createdAt })
+        .select({ id: a.id, stage: a.stage, mode: a.mode, supplierId: a.supplierId, supplierName: a.supplierName, lastActionAt: a.lastActionAt, createdAt: a.createdAt })
         .from(a)
-        .where(and(isNull(a.consolidatedAt), inArray(a.stage, ["reclamee", "a_verifier"]), ne(a.mode, "verification")));
+        .where(and(isNull(a.consolidatedAt), inArray(a.stage, ["a_traiter", "reclamee", "a_verifier"])));
       if (open.length) {
         const processes = await supplierProcesses();
         const now = new Date();
-        dueAnomalies = open.filter((x) => daysSince(x.lastActionAt, x.createdAt, now) >= (processes.find(x.supplierId, x.supplierName)?.delay ?? DEFAULT_FOLLOW_UP_DAYS)).length;
+        const days = (x: (typeof open)[number]) => daysSince(x.lastActionAt, x.createdAt, now);
+        dueAnomalies = open.filter((x) => x.mode !== "verification" && x.stage !== "a_traiter" && days(x) >= (processes.find(x.supplierId, x.supplierName)?.delay ?? DEFAULT_FOLLOW_UP_DAYS)).length;
+        dueVerifications = open.filter((x) => verificationDue(x.stage, x.mode, days(x))).length;
       }
     } catch { /* base indisponible : pas de rappel */ }
   }
@@ -97,6 +99,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {dueAnomalies > 0 && (
           <Notice id="due" version={dueAnomalies} closeLabel={t.common.close} className="border-red-200 bg-red-50 text-red-900">
             <strong>{dueAnomalies}</strong> {t.kanban.lateBanner}
+            <a href="/anomalies" className="font-semibold underline">{t.anomalies.reminderLink}</a>
+          </Notice>
+        )}
+        {dueVerifications > 0 && (
+          <Notice id="verify" version={dueVerifications} closeLabel={t.common.close} className="border-sky-200 bg-sky-50 text-sky-900">
+            <strong>{dueVerifications}</strong> {t.kanban.verifyBanner}
             <a href="/anomalies" className="font-semibold underline">{t.anomalies.reminderLink}</a>
           </Notice>
         )}
