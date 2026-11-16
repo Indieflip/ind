@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
 import { fmtMoney, sentence } from "@/lib/format";
-import { isOpenStage, stageOf } from "@/lib/anomaly";
+import { isClaimMode, isOpenStage, stageOf } from "@/lib/anomaly";
 import { one, type SP } from "@/lib/server/queries";
 import { loadAnomalies, savingsOf, type AnomalyLite } from "@/lib/server/savings";
 import { syncWeighAnomalies } from "@/lib/server/weighAnomalies";
@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { AmountTile, Justified, SupplierSavings, type Contribution } from "./SavingsClient";
+import { AmountTile, Justified, RecapTable, SupplierSavings, type Contribution, type RecapLine } from "./SavingsClient";
 
 const PERIODS = ["all", "month", "lastMonth", "30d", "year"] as const;
 
@@ -43,12 +43,16 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
     id: a.id, number: a.claimNo ?? a.displayNumber, final: a.numberFinal, closed: !isOpenStage(stageOf(a.stage)), date: fmtDate(a.createdAt, locale), supplier: a.supplier ?? a.supplierName,
     product: a.productName ?? a.description.slice(0, 60), stage: a.stage, resolution: a.resolution, amount: kind === "credit" ? a.credit ?? 0 : a.claimed ?? 0, kind,
   });
+  // Mêmes règles que le calcul : avoirs obtenus AVEC réclamation ; quantités en trop hors statistiques
+  const counted = (a: AnomalyLite) => !a.informative;
   const obtainedItems = (xs: AnomalyLite[]) => [
-    ...xs.filter((a) => (a.credit ?? 0) > 0).map((a) => contrib(a, "credit")),
-    ...xs.filter((a) => stageOf(a.stage) === "cloturee" && a.resolution === "livraison" && !(a.credit ?? 0) && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed")),
+    ...xs.filter((a) => counted(a) && isClaimMode(a.mode) && (a.credit ?? 0) > 0).map((a) => contrib(a, "credit")),
+    ...xs.filter((a) => counted(a) && isClaimMode(a.mode) && stageOf(a.stage) === "cloturee" && a.resolution === "livraison" && !(a.credit ?? 0) && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed")),
   ];
-  const pendingItems = (xs: AnomalyLite[]) => xs.filter((a) => (stageOf(a.stage) === "reclamee" || stageOf(a.stage) === "a_verifier") && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
-  const todoItems = list.filter((a) => stageOf(a.stage) === "a_traiter" && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
+  const pendingItems = (xs: AnomalyLite[]) => xs.filter((a) => counted(a) && isClaimMode(a.mode) && (stageOf(a.stage) === "reclamee" || stageOf(a.stage) === "a_verifier") && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
+  const todoItems = list.filter((a) => counted(a) && stageOf(a.stage) === "a_traiter" && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
+  const verifiedItems = list.filter((a) => counted(a) && !isClaimMode(a.mode) && (a.credit ?? 0) > 0).map((a) => contrib(a, "credit"));
+  const extraItems = list.filter((a) => a.informative).map((a) => contrib(a, "claimed"));
 
   // Par fournisseur : regroupé par compte fournisseur (les fautes d'orthographe rattachées au même compte), sinon par nom écrit
   const bySupplier = new Map<string, AnomalyLite[]>();
@@ -87,6 +91,16 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
   const monthLabel = (k: string) => { const x = new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "fr-FR", { month: "long", year: "numeric" }).format(new Date(k + "-15")); return x.charAt(0).toUpperCase() + x.slice(1); };
 
 
+  const recapLines: RecapLine[] = recap.flatMap((r) =>
+    [...r.byMonth.entries()].map(([m, xs]) => {
+      const v = savingsOf(xs);
+      return {
+        key: `${r.key}|${m}`, supplierId: r.supplierId, name: r.name, month: monthLabel(m), monthSort: m, count: xs.length,
+        closed: xs.filter((a) => !isOpenStage(stageOf(a.stage))).length, obtained: v.obtained, pending: v.pending.amount,
+        items: xs.map((a) => contrib(a, (a.credit ?? 0) > 0 ? "credit" : "claimed")),
+      };
+    }),
+  );
   return (
     <>
       <PageHeader title={e.title}>
@@ -125,46 +139,29 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
         </div>
       </section>
 
+      <section className="mb-6 grid gap-3 md:grid-cols-2">
+        <div className="card p-4 text-sm">
+          <h2 className="font-semibold">ℹ {e.verifiedTitle}</h2>
+          <p className="text-xs text-stone-500">{e.verifiedHint}</p>
+          <p className="mt-1"><Justified title={e.verifiedTitle} items={verifiedItems}>{s.verifiedCredits.count} · {money(s.verifiedCredits.amount)}</Justified></p>
+        </div>
+        <div className="card p-4 text-sm">
+          <h2 className="font-semibold">ℹ {e.extraTitle}</h2>
+          <p className="text-xs text-stone-500">{e.extraHint}</p>
+          <p className="mt-1"><Justified title={e.extraTitle} items={extraItems}>{s.extra.count} · {money(s.extra.amount)}</Justified></p>
+        </div>
+      </section>
+
       <section className="mb-6">
         <h2 className="mb-2 font-semibold">{e.bySupplier}</h2>
         <SupplierSavings rows={suppliers} suppliers={supplierList} canManage={can.manageAnomalies(user.role)} />
       </section>
 
-      {/* Récapitulatif : fournisseur × mois, clôturées ou non — chaque chiffre ouvre la liste des fiches */}
-      <section className="card mb-6 overflow-x-auto">
-        <h2 className="px-4 pt-4 font-semibold">{e.recap}</h2>
-        <p className="px-4 text-xs text-stone-500">{e.recapHint}</p>
-        <table className="table mt-2 text-xs">
-          <thead>
-            <tr>
-              <th className="sticky left-0 z-10 bg-stone-50">{t.common.supplier}</th>
-              {recapMonths.map((m) => <th key={m} className="text-center">{monthLabel(m)}</th>)}
-              <th className="text-center">{e.totalCol}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {recap.map((r) => (
-              <tr key={r.key}>
-                <td className="sticky left-0 bg-white font-medium">{r.supplierId ? <Link href={`/mercurial/fournisseurs/${r.supplierId}`} className="text-brand-700 hover:underline">{sentence(r.name)}</Link> : <span className="text-red-700">⚠ {r.name}</span>}</td>
-                {[...recapMonths, "total"].map((m) => {
-                  const xs = m === "total" ? r.all : r.byMonth.get(m) ?? [];
-                  if (!xs.length) return <td key={m} className="text-center text-stone-300">·</td>;
-                  const closed = xs.filter((a) => !isOpenStage(stageOf(a.stage)));
-                  const v = savingsOf(xs);
-                  return (
-                    <td key={m} className={`text-center ${m === "total" ? "bg-stone-50 font-semibold" : ""}`}>
-                      <Justified title={`${sentence(r.name)} · ${m === "total" ? e.totalCol : monthLabel(m)}`} items={xs.map((a) => contrib(a, (a.credit ?? 0) > 0 ? "credit" : "claimed"))}>
-                        {xs.length} <span className="text-stone-500">({closed.length} {e.closedShort})</span>
-                      </Justified>
-                      {v.obtained > 0 && <div className="text-emerald-800">{money(v.obtained)}</div>}
-                      {v.pending.amount > 0 && <div className="text-amber-800">{money(v.pending.amount)}</div>}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Récapitulatif : une ligne par fournisseur et par mois (clôturées ou non), filtres et bouton Détail */}
+      <section className="mb-6">
+        <h2 className="font-semibold">{e.recap}</h2>
+        <p className="mb-2 text-xs text-stone-500">{e.recapHint}</p>
+        <RecapTable rows={recapLines} />
       </section>
 
       <section className="card overflow-x-auto">

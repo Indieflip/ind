@@ -14,7 +14,7 @@ interface Values {
 
 const NATURES = ["Viande", "Poisson", "Fruits & Légumes", "Crèmerie", "Épicerie", "Boisson", "Boulangerie", "Hygiène", "Autre"];
 
-export function AnomalySheetForm({ id, initial, editable }: { id: number; initial: Values; editable: boolean }) {
+export function AnomalySheetForm({ id, initial, editable, informative }: { id: number; initial: Values; editable: boolean; informative?: boolean }) {
   const { t } = useI18n();
   const a = t.anomalies;
   const s = t.sheet;
@@ -141,7 +141,11 @@ export function AnomalySheetForm({ id, initial, editable }: { id: number; initia
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <label><span className="label">{s.claimed}</span><MoneyInput value={v.claimedAmount} onChange={set("claimedAmount")} disabled={!editable} /></label>
+        <label>
+          <span className="label">{s.claimed}</span>
+          <MoneyInput value={v.claimedAmount} onChange={set("claimedAmount")} disabled={!editable} />
+          {informative && <span className="mt-1 block text-xs text-sky-700">ℹ {s.informative}</span>}
+        </label>
         {v.resolution !== "avoir" && <label><span className="label">{a.saving}</span><MoneyInput value={v.creditAmount} onChange={set("creditAmount")} disabled={!editable} /></label>}
       </div>
 

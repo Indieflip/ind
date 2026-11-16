@@ -142,3 +142,30 @@ export function Justified({ title, items, children, className = "" }: { title: s
     </>
   );
 }
+
+export interface RecapLine { key: string; supplierId: number | null; name: string; month: string; monthSort: string; count: number; closed: number; obtained: number; pending: number; items: Contribution[] }
+
+/** Récapitulatif fournisseur × mois : une ligne par fournisseur et par mois, filtres d'en-tête, bouton Détail */
+export function RecapTable({ rows }: { rows: RecapLine[] }) {
+  const { t, locale } = useI18n();
+  const e = t.savings;
+  const [detail, setDetail] = useState<RecapLine | null>(null);
+  const money = (n: number) => (n ? fmtMoney(n, locale) : "—");
+  const cols: Col<RecapLine>[] = [
+    { key: "id", width: "4rem", label: "N°", text: (r) => (r.supplierId ? String(r.supplierId) : ""), sort: (r) => r.supplierId ?? 0 },
+    { key: "supplier", label: t.common.supplier, text: (r) => r.name, render: (r) => (r.supplierId ? <Link href={`/mercurial/fournisseurs/${r.supplierId}`} className="font-medium text-brand-700 hover:underline">{sentence(r.name)}</Link> : <span className="text-red-700">⚠ {r.name}</span>) },
+    { key: "month", width: "9rem", label: e.month, text: (r) => r.month, sort: (r) => r.monthSort, keepCase: true },
+    { key: "count", width: "6rem", label: e.anomalies, align: "right", text: (r) => String(r.count), sort: (r) => r.count },
+    { key: "closed", width: "6rem", label: e.closedCol, align: "right", text: (r) => String(r.closed), sort: (r) => r.closed },
+    { key: "open", width: "6rem", label: e.stillOpen, align: "right", text: (r) => String(r.count - r.closed), sort: (r) => r.count - r.closed },
+    { key: "obtained", width: "8rem", label: e.obtained, align: "right", text: (r) => money(r.obtained), sort: (r) => r.obtained, className: "font-semibold text-emerald-800" },
+    { key: "pending", width: "8rem", label: e.pending, align: "right", text: (r) => money(r.pending), sort: (r) => r.pending, className: "text-amber-800" },
+    { key: "detail", width: "5.5rem", label: "", text: () => "", sortable: false, filterable: false, render: (r) => <button type="button" className="btn-ghost px-2 py-1 text-xs text-brand-700" onClick={() => setDetail(r)}>{e.detail}</button> },
+  ];
+  return (
+    <>
+      <DataTable rows={rows} cols={cols} rowKey={(r) => r.key} defaultSort={{ key: "month", dir: "desc" }} dense fixed />
+      {detail && <DetailModal title={`${sentence(detail.name)} · ${detail.month}`} items={detail.items} onClose={() => setDetail(null)} />}
+    </>
+  );
+}

@@ -70,3 +70,11 @@ export function daysSince(lastActionAt: string | null, createdAt: Date | string,
   const ref = lastActionAt ? new Date(lastActionAt + "T12:00:00") : new Date(createdAt);
   return Math.floor((today.getTime() - ref.getTime()) / 86_400_000);
 }
+
+/**
+ * Quantité en trop : moyen de contrôle, pas une économie. Son montant est donné à titre informatif
+ * et n'entre pas dans les statistiques d'économies.
+ */
+export function isInformative(a: { type: string; source?: string | null; description: string }) {
+  return a.type === "quantity" && a.source !== "weigh" && /en trop/i.test(a.description);
+}

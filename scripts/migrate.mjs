@@ -348,6 +348,36 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_seed_v2'`
   await db.execute(sql`insert into app_settings (key, value) values ('dev_seed_v2', '1') on conflict (key) do nothing`);
 }
 
+// Coordonnées des fournisseurs : les champs existants deviennent les coordonnées « Société » (une fois)
+await db.execute(sql`update suppliers set contacts = jsonb_build_object('societe', jsonb_strip_nulls(jsonb_build_object('email', email, 'phone', phone, 'notes', notes)))
+  where contacts is null and (email is not null or phone is not null or notes is not null)`);
+
+// Fusion « Lerda » → « Les maîtres affineurs (Lerda) » : anomalies, produits, réceptions, écarts… (une fois)
+if (!(await db.execute(sql`select 1 from app_settings where key = 'merge_lerda_v1'`)).rows.length) {
+  const target = (await db.execute(sql`select id, name from suppliers where upper(name) like '%AFFINEUR%' and upper(name) like '%LERDA%' order by id limit 1`)).rows[0];
+  if (target) {
+    const sources = (await db.execute(sql`select id from suppliers where upper(name) like '%LERDA%' and id <> ${target.id}`)).rows;
+    for (const { id } of sources) {
+      await db.execute(sql`update products set supplier_id = ${target.id} where supplier_id = ${id}`);
+      await db.execute(sql`update receptions set supplier_id = ${target.id}, supplier_name = ${target.name} where supplier_id = ${id}`);
+      await db.execute(sql`update anomalies set supplier_id = ${target.id}, supplier_name = ${target.name} where supplier_id = ${id}`);
+      await db.execute(sql`update price_changes set supplier_id = ${target.id}, supplier_name = ${target.name} where supplier_id = ${id}`);
+      await db.execute(sql`update weigh_gaps set supplier_id = ${target.id} where supplier_id = ${id}`);
+      await db.execute(sql`update maj_log set supplier_id = ${target.id} where supplier_id = ${id}`);
+      await db.execute(sql`update claims set supplier_id = ${target.id} where supplier_id = ${id}`);
+      await db.execute(sql`delete from suppliers where id = ${id}`);
+    }
+    await db.execute(sql`update anomalies set supplier_id = ${target.id}, supplier_name = ${target.name} where supplier_id is null and supplier_name ilike '%lerda%'`);
+    await db.execute(sql`update weigh_gaps set supplier_id = ${target.id} where supplier_id is null and supplier_ref ilike '%lerda%'`);
+    console.log(`[migrate] fournisseurs Lerda rattachés à ${target.name} : ${sources.length}`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('merge_lerda_v1', '1') on conflict (key) do nothing`);
+}
+
+// Company : le SIRET devient le SIREN (9 premiers chiffres)
+await db.execute(sql`insert into app_settings (key, value) select 'company_siren', left(regexp_replace(value, '\s', '', 'g'), 9) from app_settings where key = 'company_siret' on conflict (key) do nothing`);
+await db.execute(sql`delete from app_settings where key = 'company_siret'`);
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

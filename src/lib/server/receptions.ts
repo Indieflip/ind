@@ -259,6 +259,15 @@ async function writeContent(
           receptionId: recId, createdBy: user.id, date, claim: claims.get(productId) ?? null,
         });
         await setBound(check.kind === "increase" ? "max" : "min", l.unitPrice);
+        // Prix facturé au-dessus du mercurial : anomalie de prix (à vérifier / réclamer)
+        if (check.kind === "increase" && !keep.products.has(l.productName.toLowerCase())) {
+          await tx.insert(schema.anomalies).values({
+            receptionId: recId, supplierId, supplierName, productName: l.productName, type: "price", nature: natureOf(l.categoryId), reference: lineRef(l),
+            description: `${t.anomalies.types.price} : ${fmtEuro(l.unitPrice)} ${t.anomalies.texts.insteadOf} ${fmtEuro(check.bound)} (+${String(check.pct).replace(".", ",")} %)`,
+            claimedAmount: money((l.unitPrice - check.bound) * (l.qtyReceived ?? l.qtyOrdered ?? 0)),
+            createdBy: user.id, createdAt: date,
+          });
+        }
       } else if (check.kind === "locked" && !keep.locked?.has(productId)) {
         // Prix bloqué : pas de variation, une anomalie à réclamer au fournisseur
         await tx.insert(schema.anomalies).values({

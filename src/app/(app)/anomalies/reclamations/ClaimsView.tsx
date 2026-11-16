@@ -19,11 +19,11 @@ export function ClaimsView({ rows, canManage, initialFilter }: { rows: ClaimView
   const { t, locale } = useI18n();
   const c = t.claims;
   const tiles: Stage[] = ["reclamee", "a_verifier", "cloturee", "annulee"];
-  const [filter, setFilter] = useState<Stage | "open" | "missing">(initialFilter ?? "open");
+  const [filter, setFilter] = useState<Stage | "open" | "missing" | "all">(initialFilter ?? "open");
   const isOpen = (r: ClaimViewRow) => r.stage === "reclamee" || r.stage === "a_verifier" || r.stage === "a_traiter";
   const missing = rows.filter((r) => isOpen(r) && r.claimed == null);
   const counts = Object.fromEntries(tiles.map((s) => [s, rows.filter((r) => r.stage === s).length])) as Record<Stage, number>;
-  const shown = filter === "open" ? rows.filter((r) => r.stage === "reclamee" || r.stage === "a_verifier") : filter === "missing" ? missing : rows.filter((r) => r.stage === filter);
+  const shown = filter === "all" ? rows : filter === "open" ? rows.filter((r) => r.stage === "reclamee" || r.stage === "a_verifier") : filter === "missing" ? missing : rows.filter((r) => r.stage === filter);
   const sum = (k: "claimed" | "credit") => shown.reduce((s, r) => s + (r[k] ?? 0), 0);
   const [sel, setSel] = useState<Set<string | number>>(new Set());
   const [busy, startBusy] = useTransition();
@@ -52,11 +52,10 @@ export function ClaimsView({ rows, canManage, initialFilter }: { rows: ClaimView
     { key: "subject", label: c.subject, text: (r) => r.subject, keepCase: true, className: "text-stone-700" },
     { key: "mode", width: "6.5rem", label: c.mode, text: (r) => t.modes[r.mode as "reclamation"], options: Object.values(t.modes), render: (r) => <span className="text-xs">{modeIcon(r.mode)} {t.modes[r.mode as "reclamation"]}</span> },
     {
-      key: "claimed", width: "6rem", label: c.amount, align: "right", text: (r) => (r.claimed != null ? fmtMoney(r.claimed, locale) : ""), sort: (r) => r.claimed, filterable: false,
+      key: "claimed", width: "6rem", label: c.amount, align: "right", text: (r) => (r.claimed != null ? fmtMoney(r.claimed, locale) : ""), sort: (r) => r.claimed,
       // Montant manquant : saisie directe dans la ligne
       render: (r) => (canManage && r.claimed == null && isOpen(r) ? <AmountCell id={r.id} /> : r.claimed != null ? fmtMoney(r.claimed, locale) : "—"),
     },
-    { key: "credit", width: "5rem", label: c.credit, align: "right", text: (r) => (r.credit != null ? fmtMoney(r.credit, locale) : ""), sort: (r) => r.credit, filterable: false },
     {
       key: "stage", width: "8rem", label: t.common.status, text: (r) => t.stages[r.stage], options: Object.values(t.stages),
       render: (r) => (
@@ -70,10 +69,14 @@ export function ClaimsView({ rows, canManage, initialFilter }: { rows: ClaimView
   ];
   return (
     <>
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-6">
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
         <button type="button" onClick={() => setFilter("open")} className={`rounded-xl border-2 bg-white p-3 text-left ${filter === "open" ? "border-brand-600" : "border-stone-200"}`}>
           <p className="text-2xl font-bold leading-none">{counts.reclamee + counts.a_verifier}</p>
           <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{c.inProgress}</p>
+        </button>
+        <button type="button" onClick={() => setFilter("all")} className={`rounded-xl border-2 bg-white p-3 text-left ${filter === "all" ? "border-brand-600" : "border-stone-200"}`}>
+          <p className="text-2xl font-bold leading-none">{rows.length}</p>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{c.all}</p>
         </button>
         <button type="button" onClick={() => setFilter(filter === "missing" ? "open" : "missing")} className={`rounded-xl border-2 bg-white p-3 text-left ${filter === "missing" ? "border-red-500" : "border-stone-200"}`}>
           <p className="text-2xl font-bold leading-none text-red-700">{missing.length}</p>
@@ -86,13 +89,12 @@ export function ClaimsView({ rows, canManage, initialFilter }: { rows: ClaimView
           </button>
         ))}
       </div>
-      <p className="mb-2 text-right text-sm text-stone-600">{c.amount} : <strong>{fmtMoney(sum("claimed"), locale)}</strong> · {c.credit} : <strong>{fmtMoney(sum("credit"), locale)}</strong></p>
+      <p className="mb-2 text-right text-sm text-stone-600">{c.amount} : <strong>{fmtMoney(sum("claimed"), locale)}</strong></p>
       {canManage && (
         <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
           <button type="button" className="btn-secondary py-1.5" disabled={sel.size < 2 || busy} onClick={() => startBusy(async () => { await groupClaimsAction([...sel].map(Number)); setSel(new Set()); router2.refresh(); })}>
             {c.group} {sel.size > 1 && `(${sel.size})`}
           </button>
-          <span className="text-xs text-stone-500">{c.groupHint}</span>
         </div>
       )}
       <DataTable

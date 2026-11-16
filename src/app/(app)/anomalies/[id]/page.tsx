@@ -10,7 +10,7 @@ import { lineDocLabel } from "@/lib/documents";
 import { receptionNumbers } from "@/lib/server/queries";
 import { decisionStyles } from "@/components/DecisionBadge";
 import { Icon } from "@/components/Icon";
-import { claimStyles } from "@/lib/anomaly";
+import { claimStyles, isInformative } from "@/lib/anomaly";
 import { AnomalySheetForm } from "./SheetClient";
 import { ensureClaimNumbers } from "@/lib/server/claimNumbers";
 import { supplierProcesses } from "@/lib/server/followup";
@@ -28,7 +28,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   const [rec, line, supplier, claims, photos, numbers, maxNum, rank, author] = await Promise.all([
     a.receptionId ? db.query.receptions.findFirst({ where: eq(schema.receptions.id, a.receptionId) }) : undefined,
     a.lineId ? db.query.receptionLines.findFirst({ where: eq(schema.receptionLines.id, a.lineId) }) : undefined,
-    a.supplierId ? db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, a.supplierId), columns: { id: true, name: true, email: true, phone: true } }) : undefined,
+    a.supplierId ? db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, a.supplierId), columns: { id: true, name: true, email: true, phone: true, contacts: true } }) : undefined,
     db.select().from(schema.claims).where(eq(schema.claims.anomalyId, id)).orderBy(asc(schema.claims.date)),
     a.lineId ? db.select().from(schema.receptionPhotos).where(eq(schema.receptionPhotos.lineId, a.lineId)) : Promise.resolve([]),
     receptionNumbers(),
@@ -41,6 +41,9 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   void claims;
   // Procédure de réclamation du fournisseur (protocole) et délai de relance
   const process = (await supplierProcesses()).find(a.supplierId, a.supplierName);
+  // Coordonnées « Réclamation » du fournisseur en priorité, sinon celles de la société
+  const claimEmail = supplier?.contacts?.reclamation?.email || supplier?.contacts?.societe?.email || supplier?.email || "";
+  const claimPhone = supplier?.contacts?.reclamation?.phone || supplier?.contacts?.societe?.phone || supplier?.phone || "";
   const docs = (rec?.documents as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[] | null) ?? (rec?.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : []);
   const reference = rec ? lineDocLabel(docs, line?.document, rec.blNumber) : a.reference;
   const locked = !!a.consolidatedAt;
@@ -148,18 +151,19 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
         <div className="mt-3 flex flex-wrap gap-2">
           <a
             className="btn-secondary py-1.5 text-sm"
-            href={`mailto:${supplier?.email ?? ""}?subject=${encodeURIComponent(`${s.mailSubject} — ${reference ?? ""} ${a.productName ?? ""}`.trim())}&body=${encodeURIComponent(
+            href={`mailto:${claimEmail}?subject=${encodeURIComponent(`${s.mailSubject} — ${reference ?? ""} ${a.productName ?? ""}`.trim())}&body=${encodeURIComponent(
               `${s.mailHello}\n\n${s.mailIntro} ${rec ? fmtDate(rec.deliveredAt, locale) : fmtDate(a.createdAt, locale)}${reference ? ` (${reference})` : ""} :\n- ${a.productName ?? ""} : ${a.description}${a.claimedAmount ? `\n- ${s.mailAmount} : ${fmtMoney(num(a.claimedAmount), locale)}` : ""}\n\n${s.mailAsk}\n\n${s.mailBye}`,
             )}`}
           >
-            ✉ {s.mail}{supplier?.email ? ` (${supplier.email})` : ""}
+            ✉ {s.mail}{claimEmail ? ` (${claimEmail})` : ""}
           </a>
-          {supplier?.phone && <a className="btn-secondary py-1.5 text-sm" href={`tel:${supplier.phone}`}>☎ {supplier.phone}</a>}
+          {claimPhone && <a className="btn-secondary py-1.5 text-sm" href={`tel:${claimPhone}`}>☎ {claimPhone}</a>}
         </div>
-        {!supplier?.email && <p className="mt-1 text-xs text-stone-500">{s.noEmail}</p>}
+        {!claimEmail && <p className="mt-1 text-xs text-stone-500">{s.noEmail}</p>}
       </section>
 
       <AnomalySheetForm
+        informative={isInformative(a)}
         id={a.id}
         editable={editable}
         initial={{

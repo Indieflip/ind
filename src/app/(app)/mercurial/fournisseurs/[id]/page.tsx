@@ -11,11 +11,13 @@ import { one, type SP } from "@/lib/server/queries";
 import { Icon } from "@/components/Icon";
 import { StatusBadge } from "@/components/DecisionBadge";
 import { anomalyNumbers } from "@/lib/server/savings";
+import { ensureSupplierProcesses } from "@/lib/server/followup";
 import { stageOf } from "@/lib/anomaly";
 import { SupplierAnomalies, SupplierInfo, SupplierReceptions, SupplierSearch, DeleteSupplier } from "../SupplierClient";
 import { AddRow, MercurialTable } from "../../MercurialClient";
 
 export default async function SupplierPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SP> }) {
+  await ensureSupplierProcesses();
   const user = await requireUser(can.viewSuppliers);
   const { t, locale } = await getDict();
   const id = Number((await params).id);
@@ -77,6 +79,15 @@ export default async function SupplierPage({ params, searchParams }: { params: P
           </Link>
         )}
       </div>
+      {/* Process de réclamation du fournisseur : toujours visible dans son compte */}
+      {supplier.claimProcess && (
+        <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          <h2 className="mb-1 font-semibold">⚠ {t.suppliers.claimProcess}</h2>
+          <ul className="list-inside list-disc space-y-0.5">
+            {supplier.claimProcess.split("\n").map((l) => l.replace(/^[•\-*]\s*/, "").trim()).filter((l) => l && !l.endsWith(":")).map((l, i) => <li key={i}>{l}</li>)}
+          </ul>
+        </section>
+      )}
       <nav className="flex gap-1 border-b border-stone-200">
         <Link href={`/mercurial/fournisseurs/${id}`} className={tabCls(tab === "products")}>{t.mercurial.tabProducts} ({rows.filter((r) => r.active).length})</Link>
         <Link href={`/mercurial/fournisseurs/${id}?tab=receptions`} className={tabCls(tab === "receptions")}>{t.nav.receptions} ({recents.length})</Link>
@@ -86,7 +97,16 @@ export default async function SupplierPage({ params, searchParams }: { params: P
       {tab === "products" ? (
         <>
           {editable && (
-            <SupplierInfo id={supplier.id} name={supplier.name} email={supplier.email ?? ""} phone={supplier.phone ?? ""} notes={supplier.notes ?? ""} active={supplier.active} />
+            <SupplierInfo
+              id={supplier.id}
+              name={supplier.name}
+              active={supplier.active}
+              claimProcess={supplier.claimProcess ?? ""}
+              contacts={Object.fromEntries((["societe", "reclamation", "commande"] as const).map((k) => {
+                const c = supplier.contacts?.[k] ?? (k === "societe" ? { email: supplier.email ?? "", phone: supplier.phone ?? "", notes: supplier.notes ?? "" } : {});
+                return [k, { email: c.email ?? "", phone: c.phone ?? "", notes: c.notes ?? "" }];
+              })) as Record<"societe" | "reclamation" | "commande", { email: string; phone: string; notes: string }>}
+            />
           )}
           {editable && <AddRow suppliers={allSuppliers} units={units} natures={natures} fixedSupplier={{ id: supplier.id, name: supplier.name }} existing={rows.filter((r) => r.active).map((r) => ({ supplierId: r.supplierId, name: r.name }))} />}
           <h2 className="pt-2 text-lg font-semibold">{t.suppliers.productList}</h2>

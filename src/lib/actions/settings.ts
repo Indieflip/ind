@@ -125,7 +125,7 @@ export async function updateConformityAction(id: number, data: { conformRules?: 
   revalidatePath("/protocoles");
 }
 
-const COMPANY_KEYS = ["company_legal_name", "restaurant_name", "company_address", "company_phone", "company_email", "company_siret", "company_vat"] as const;
+const COMPANY_KEYS = ["company_legal_name", "restaurant_name", "company_address", "company_phone", "company_email", "company_siren", "company_vat"] as const;
 
 /** Champs de l'onglet Company (raison sociale, établissement, adresse, téléphone, mail) */
 export async function setCompanyFieldAction(key: string, value: string) {
@@ -133,8 +133,8 @@ export async function setCompanyFieldAction(key: string, value: string) {
   if (!(COMPANY_KEYS as readonly string[]).includes(key)) return { error: "invalid" };
   const v = value.trim();
   if (key === "company_email" && v && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return { error: "email" };
-  // SIRET : 14 chiffres ; TVA intracommunautaire : FR + 11 caractères
-  if (key === "company_siret" && v && v.replace(/\s/g, "").length !== 14) return { error: "siret" };
+  // SIREN : 9 chiffres ; TVA intracommunautaire : FR + 11 caractères
+  if (key === "company_siren" && v && v.replace(/\s/g, "").length !== 9) return { error: "siren" };
   if (key === "company_vat" && v && !/^[A-Z]{2}[0-9A-Z]{2,13}$/i.test(v.replace(/\s/g, ""))) return { error: "vat" };
   await setSetting(key, v);
   revalidatePath("/", "layout");

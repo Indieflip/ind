@@ -82,6 +82,9 @@ export const categories = pgTable("categories", {
   position: integer("position").notNull().default(0),
 });
 
+export interface SupplierContact { email?: string; phone?: string; notes?: string }
+export type SupplierContacts = Partial<Record<"societe" | "reclamation" | "commande", SupplierContact>>;
+
 export const suppliers = pgTable(
   "suppliers",
   {
@@ -90,6 +93,10 @@ export const suppliers = pgTable(
     email: text("email"),
     phone: text("phone"),
     notes: text("notes"),
+    /** Coordonnées par usage : société, réclamation, commande (mail, téléphone, contact / notes) */
+    contacts: jsonb("contacts").$type<SupplierContacts>(),
+    /** Process de réclamation propre au fournisseur (repris du protocole, modifiable dans son compte) */
+    claimProcess: text("claim_process"),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

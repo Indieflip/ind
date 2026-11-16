@@ -197,45 +197,6 @@ export async function followUpTodayAction(id: number, note: string) {
   return { ok: true };
 }
 
-/**
- * Clôture de la semaine : les anomalies clôturées ou annulées jusqu'à la fin de la semaine sont consolidées
- * (N° définitif) et le bilan de la semaine est figé (avoirs, livraisons différées, montant encore en attente).
- */
-export async function closeWeekAction(week: string, period: "week" | "month" = "week") {
-  const user = await assertUser(can.consolidate);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(week)) return { error: "invalid" };
-  // Fin de la période : semaine (+7 jours) ou mois (1er du mois suivant)
-  const end = new Date(`${week}T00:00:00`);
-  if (period === "month") end.setMonth(end.getMonth() + 1);
-  else end.setDate(end.getDate() + 7);
-  const db = getDb();
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`lock table anomalies in share row exclusive mode`);
-    const a = schema.anomalies;
-    const toClose = await tx
-      .select()
-      .from(a)
-      .where(and(isNull(a.consolidatedAt), inArray(a.stage, ["cloturee", "annulee"]), sql`${a.closedAt} < ${end}`))
-      .orderBy(asc(a.createdAt), asc(a.id));
-    const [{ max }] = await tx.select({ max: sql<number>`coalesce(max(${a.number}), 0)::int` }).from(a);
-    let n = max;
-    for (const r of toClose) await tx.update(a).set({ consolidatedAt: new Date(), consolidatedBy: user.id, number: ++n }).where(eq(a.id, r.id));
-    const waiting = await tx.select({ s: sql<string>`coalesce(sum(${a.claimedAmount}), 0)` }).from(a).where(inArray(a.stage, ["reclamee", "a_verifier"]));
-    const credits = toClose.reduce((s, r) => s + (num(r.creditAmount) ?? 0), 0);
-    const deferred = toClose.filter((r) => r.resolution === "livraison").reduce((s, r) => s + (num(r.claimedAmount) ?? 0), 0);
-    const details = {
-      ids: toClose.map((r) => r.id),
-      avoir: toClose.filter((r) => r.resolution === "avoir").length,
-      livraison: toClose.filter((r) => r.resolution === "livraison").length,
-      sans_suite: toClose.filter((r) => r.resolution === "sans_suite" || (r.stage === "cloturee" && !r.resolution)).length,
-      annulee: toClose.filter((r) => r.stage === "annulee").length,
-    };
-    const values = { closed: toClose.length, credits: String(credits), deferred: String(deferred), pending: String(num(waiting[0]?.s) ?? 0), details, closedBy: user.id, closedAt: new Date() };
-    await tx.insert(schema.weeklyClosings).values({ week, period, ...values }).onConflictDoUpdate({ target: [schema.weeklyClosings.period, schema.weeklyClosings.week], set: values });
-    revalidatePath("/anomalies", "layout");
-    return { ok: true, count: toClose.length };
-  });
-}
 
 /** Économies : rattacher les anomalies d'un nom de fournisseur non reconnu à un fournisseur de la liste */
 export async function relinkSupplierGroupAction(supplierName: string, supplierId: number) {
@@ -280,10 +241,3 @@ export async function ungroupClaimAction(id: number) {
   return { ok: true };
 }
 
-/** Clôture : activer / désactiver les rappels hebdomadaire et mensuel */
-export async function setClosingReminderAction(period: "week" | "month", on: boolean) {
-  await assertUser(can.consolidate);
-  const { setSetting } = await import("@/lib/settings");
-  await setSetting(period === "week" ? "closing_weekly" : "closing_monthly", on ? "1" : "0");
-  revalidatePath("/", "layout");
-}

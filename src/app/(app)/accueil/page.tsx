@@ -7,7 +7,6 @@ import { can } from "@/lib/permissions";
 import { fmtMoney } from "@/lib/format";
 import { daysSince, DEFAULT_FOLLOW_UP_DAYS, isClaimMode, stageOf } from "@/lib/anomaly";
 import { backupSettings, lastBackup } from "@/lib/server/backup";
-import { closingReminders } from "@/lib/server/closingReminders";
 import { supplierProcesses } from "@/lib/server/followup";
 import { canSeeDev } from "@/lib/server/dev";
 import { Icon } from "@/components/Icon";
@@ -51,13 +50,6 @@ export default async function HomePage() {
     if (noAmount.length) tasks.push({ key: "noAmount", label: h.noAmount, count: noAmount.length, href: "/anomalies/reclamations?f=sans-montant", tone: "amber", icon: "euro" });
     const [credits] = await db.select({ n: count() }).from(a).where(and(eq(a.stage, "cloturee"), eq(a.resolution, "avoir"), isNull(a.creditAmount)));
     if (credits.n) tasks.push({ key: "creditMissing", label: h.creditMissing, count: credits.n, href: "/anomalies/reclamations", tone: "amber", icon: "euro" });
-  }
-
-  // Clôtures
-  if (can.consolidate(r)) {
-    const c = await closingReminders();
-    if (c.weekDue) tasks.push({ key: "week", label: h.closeWeek, detail: c.lastWeekDays != null ? `${h.lastOne} ${c.lastWeekDays} ${t.kanban.days}` : h.never, href: "/anomalies/cloture", tone: "amber", icon: "layers" });
-    if (c.monthDue) tasks.push({ key: "month", label: h.closeMonth, detail: c.lastMonthDays != null ? `${h.lastOne} ${c.lastMonthDays} ${t.kanban.days}` : h.never, href: "/anomalies/cloture?p=mois", tone: "amber", icon: "layers" });
   }
 
   // Sauvegarde

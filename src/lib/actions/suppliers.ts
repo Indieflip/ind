@@ -55,7 +55,10 @@ export async function deleteSupplierAction(id: number, transferTo: number | null
   return { ok: true };
 }
 
-export async function updateSupplierAction(id: number, data: { name?: string; email?: string; phone?: string; notes?: string; active?: boolean }) {
+export async function updateSupplierAction(
+  id: number,
+  data: { name?: string; email?: string; phone?: string; notes?: string; active?: boolean; contacts?: Record<string, { email?: string; phone?: string; notes?: string }>; claimProcess?: string },
+) {
   await assertUser(can.editSuppliers);
   const set: Partial<typeof schema.suppliers.$inferInsert> = {};
   if (data.name !== undefined && data.name.trim()) set.name = data.name.trim();
@@ -63,7 +66,22 @@ export async function updateSupplierAction(id: number, data: { name?: string; em
   if (data.phone !== undefined) set.phone = data.phone.trim() || null;
   if (data.notes !== undefined) set.notes = data.notes.trim() || null;
   if (data.active !== undefined) set.active = data.active;
+  if (data.contacts !== undefined) {
+    // Coordonnées par usage ; celles de la société restent aussi dans les champs mail / téléphone / notes
+    const clean = Object.fromEntries(
+      (["societe", "reclamation", "commande"] as const).map((k) => {
+        const c = data.contacts?.[k] ?? {};
+        return [k, { email: c.email?.trim() || undefined, phone: c.phone?.trim() || undefined, notes: c.notes?.trim() || undefined }];
+      }),
+    );
+    set.contacts = clean;
+    set.email = clean.societe.email ?? null;
+    set.phone = clean.societe.phone ?? null;
+    set.notes = clean.societe.notes ?? null;
+  }
+  if (data.claimProcess !== undefined) set.claimProcess = data.claimProcess.trim() || null;
   await getDb().update(schema.suppliers).set(set).where(eq(schema.suppliers.id, id));
+  revalidatePath("/anomalies", "layout");
   revalidatePath("/mercurial", "layout");
 }
 

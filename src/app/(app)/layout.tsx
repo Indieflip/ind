@@ -4,7 +4,6 @@ import { can } from "@/lib/permissions";
 import { AppNav, type NavItem } from "@/components/AppNav";
 import { Notice } from "@/components/Notice";
 import { canSeeDev } from "@/lib/server/dev";
-import { closingReminders } from "@/lib/server/closingReminders";
 import { getRestaurantName } from "@/lib/settings";
 import { backupSettings, lastBackup } from "@/lib/server/backup";
 import { and, count, eq, inArray, isNull, ne } from "drizzle-orm";
@@ -27,8 +26,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     } catch { /* base indisponible */ }
   }
   const devVisible = await canSeeDev(user);
-  // Rappels de clôture (semaine / mois)
-  const closing = can.consolidate(r) ? await closingReminders().catch(() => null) : null;
   const items: NavItem[] = [
     { href: "/accueil", label: t.nav.home, icon: "home", show: true },
     { href: "/receptions", label: t.nav.receptions, icon: "truck", show: can.viewReceptions(r) },
@@ -95,12 +92,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Notice id="requests" version={pendingRequests} closeLabel={t.common.close} className="border-violet-200 bg-violet-50 text-violet-900">
             <strong>{pendingRequests}</strong> {t.requests.pending}
             <a href="/demandes" className="font-semibold underline">{t.anomalies.reminderLink}</a>
-          </Notice>
-        )}
-        {closing && (closing.weekDue || closing.monthDue) && (
-          <Notice id="closing" version={`${closing.weekDue}${closing.monthDue}`} closeLabel={t.common.close} className="border-amber-200 bg-amber-50 text-amber-900">
-            <strong>{t.weekly.banner}</strong> {[closing.weekDue && t.weekly.weekDue, closing.monthDue && t.weekly.monthDue].filter(Boolean).join(" ")}
-            <a href="/anomalies/cloture" className="font-semibold underline">{t.anomalies.reminderLink}</a>
           </Notice>
         )}
         {dueAnomalies > 0 && (

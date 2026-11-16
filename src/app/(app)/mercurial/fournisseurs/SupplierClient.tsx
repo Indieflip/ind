@@ -47,40 +47,59 @@ export function ImportCatalog() {
   );
 }
 
-export function SupplierInfo({ id, name, email, phone, notes, active }: { id: number; name: string; email: string; phone: string; notes: string; active: boolean }) {
+type ContactKey = "societe" | "reclamation" | "commande";
+type Contacts = Record<ContactKey, { email: string; phone: string; notes: string }>;
+
+/** Compte fournisseur : nom, coordonnées (société / réclamation / commande), process de réclamation */
+export function SupplierInfo({ id, name, contacts, claimProcess, active }: { id: number; name: string; contacts: Contacts; claimProcess: string; active: boolean }) {
   const { t } = useI18n();
+  const s = t.suppliers;
   const router = useRouter();
   const [pending, start] = useTransition();
-  const initial = { name, email, phone, notes };
+  const initial = { name, contacts, claimProcess };
   const [v, setV] = useState(initial);
   const [saved, setSaved] = useState(false);
-  const dirty = v.name !== name || v.email !== email || v.phone !== phone || v.notes !== notes;
-  const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => { setV({ ...v, [k]: e.target.value }); setSaved(false); };
+  const dirty = JSON.stringify(v) !== JSON.stringify(initial);
+  const setC = (k: ContactKey, f: "email" | "phone" | "notes", value: string) => { setV({ ...v, contacts: { ...v.contacts, [k]: { ...v.contacts[k], [f]: value } } }); setSaved(false); };
   return (
     <form
-      className="card grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4"
+      className="card space-y-4 p-4"
       onSubmit={(e) => {
         e.preventDefault();
         if (!v.name.trim()) return;
-        start(async () => { await updateSupplierAction(id, v); setSaved(true); router.refresh(); });
+        start(async () => { await updateSupplierAction(id, { name: v.name, contacts: v.contacts, claimProcess: v.claimProcess }); setSaved(true); router.refresh(); });
       }}
     >
-      <h2 className="text-sm font-semibold sm:col-span-2 lg:col-span-4">{t.suppliers.contact}</h2>
-      <label><span className="label">{t.suppliers.supplierName} *</span><input className="input" required value={v.name} onChange={set("name")} /></label>
-      <label><span className="label">{t.suppliers.email}</span><input className="input" type="email" value={v.email} onChange={set("email")} /></label>
-      <label><span className="label">{t.suppliers.phone}</span><input className="input" value={v.phone} onChange={set("phone")} /></label>
-      <label><span className="label">{t.common.notes}</span><input className="input" value={v.notes} onChange={set("notes")} /></label>
-      <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
+      <label className="block max-w-md"><span className="label">{s.supplierName} *</span><input className="input" required value={v.name} onChange={(e) => { setV({ ...v, name: e.target.value }); setSaved(false); }} /></label>
+      <div>
+        <h2 className="mb-2 text-sm font-semibold">{s.contact}</h2>
+        <div className="grid gap-3 lg:grid-cols-3">
+          {(["societe", "reclamation", "commande"] as ContactKey[]).map((k) => (
+            <fieldset key={k} className="space-y-2 rounded-lg border border-stone-200 p-3">
+              <legend className="px-1 text-xs font-bold uppercase tracking-wide text-stone-500">{s.contactKinds[k]}</legend>
+              <label className="block"><span className="label">{s.email}</span><input className="input" type="email" value={v.contacts[k].email} onChange={(e) => setC(k, "email", e.target.value)} /></label>
+              <label className="block"><span className="label">{s.phone}</span><input className="input" type="tel" value={v.contacts[k].phone} onChange={(e) => setC(k, "phone", e.target.value)} /></label>
+              <label className="block"><span className="label">{s.contactNotes}</span><input className="input" value={v.contacts[k].notes} onChange={(e) => setC(k, "notes", e.target.value)} /></label>
+            </fieldset>
+          ))}
+        </div>
+      </div>
+      <label className="block">
+        <span className="label">⚠ {s.claimProcess}</span>
+        <textarea className="input border-amber-300 bg-amber-50/50" rows={4} value={v.claimProcess} onChange={(e) => { setV({ ...v, claimProcess: e.target.value }); setSaved(false); }} placeholder={s.claimProcessPh} />
+        <span className="mt-1 block text-xs text-stone-500">{s.claimProcessHint}</span>
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
         <button className="btn-primary" disabled={pending || !dirty}><Icon name="check" className="h-4 w-4" /> {t.common.save}</button>
         {dirty && <button type="button" className="btn-ghost" onClick={() => setV(initial)}>{t.common.cancel}</button>}
-        {saved && !dirty && <span className="text-sm text-emerald-700">{t.suppliers.saved}</span>}
+        {saved && !dirty && <span className="text-sm text-emerald-700">{s.saved}</span>}
         <button
           type="button"
           className={`ml-auto ${active ? "btn-ghost text-red-600" : "btn-secondary"}`}
           disabled={pending}
-          onClick={async () => { if (await appConfirm(active ? t.suppliers.deleteWarning : `${t.suppliers.reactivate} ?`)) start(async () => { await updateSupplierAction(id, { active: !active }); router.refresh(); }); }}
+          onClick={async () => { if (await appConfirm(active ? s.deleteWarning : `${s.reactivate} ?`)) start(async () => { await updateSupplierAction(id, { active: !active }); router.refresh(); }); }}
         >
-          {active ? t.suppliers.deactivate : t.suppliers.reactivate}
+          {active ? s.deactivate : s.reactivate}
         </button>
       </div>
     </form>
