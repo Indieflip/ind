@@ -12,15 +12,15 @@ export async function importExcelAction(_p: { report?: ImportReport; error?: str
   if (!/\.xls[xm]$/i.test(file.name)) return { error: "format" };
   try {
     const report = await importWorkbook(await file.arrayBuffer(), {
-      mercurial: form.get("mercurial") === "on",
-      maj: form.get("maj") === "on",
-      fv: form.get("fv") === "on",
-      bakery: form.get("bakery") === "on",
-      locked: form.get("locked") === "on",
-      gaps: form.get("gaps") === "on",
-      anomalies: form.get("anomalies") === "on",
-      process: form.get("process") === "on",
-      info: form.get("info") === "on",
+      mercurial: form.get("mercurial") !== "off",
+      maj: form.get("maj") !== "off",
+      fv: form.get("fv") !== "off",
+      bakery: form.get("bakery") !== "off",
+      locked: form.get("locked") !== "off",
+      gaps: form.get("gaps") !== "off",
+      anomalies: form.get("anomalies") !== "off",
+      process: form.get("process") !== "off",
+      info: form.get("info") !== "off",
     });
     await getDb().insert(schema.imports).values({
       fileName: file.name,

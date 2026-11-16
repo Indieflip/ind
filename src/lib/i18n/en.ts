@@ -446,6 +446,10 @@ export const en: Dict = {
     priceTraced: "A price change is recorded in Price tracking.",
   },
   excelImport: {
+    drop: "Drop your Excel file here, or click to choose it",
+    dropHint: "Price list, meat / fish log, quality control… the file is recognised automatically.",
+    nothing: "No known sheet in this file: nothing was imported.",
+    r: { mercurial: "Price list", maj: "Price list updates", fv: "Fruit & veg", bakery: "Bakery", locked: "Locked prices", control: "Quality control" },
     control: "Quality & quantity control",
     weighGaps: "weighing gaps",
     anomaliesCount: "issues",

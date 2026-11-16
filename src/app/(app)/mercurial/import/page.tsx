@@ -24,8 +24,8 @@ export default async function ImportPage() {
     <>
       <PageHeader title={m.importTitle} />
       <ImportForm />
-      <section className="card mt-6 max-w-4xl overflow-x-auto">
-        <h2 className="px-4 pt-4 font-semibold">{m.importHistory}</h2>
+      <details className="card mt-6 max-w-4xl overflow-x-auto">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-stone-600">{m.importHistory} ({history.length})</summary>
         {history.length === 0 ? (
           <p className="p-4 text-sm text-stone-500">—</p>
         ) : (
@@ -46,7 +46,7 @@ export default async function ImportPage() {
             </tbody>
           </table>
         )}
-      </section>
+      </details>
     </>
   );
 }

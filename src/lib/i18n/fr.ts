@@ -448,6 +448,10 @@ export const fr = {
     priceTraced: "Un changement de prix est enregistré dans le Suivi des prix.",
   },
   excelImport: {
+    drop: "Déposez votre fichier Excel ici, ou cliquez pour le choisir",
+    dropHint: "Mercurial, suivi viande / poisson, suivi contrôle… le fichier est reconnu automatiquement.",
+    nothing: "Aucun onglet reconnu dans ce fichier : rien n'a été importé.",
+    r: { mercurial: "Mercurial", maj: "Mise à jour Mercurial", fv: "Fruits et légumes", bakery: "Boulangerie", locked: "Prix bloqués", control: "Suivi contrôle" },
     control: "Suivi contrôle Qualité & Quantité",
     weighGaps: "écarts de pesée",
     anomaliesCount: "anomalies",
