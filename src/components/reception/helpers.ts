@@ -79,7 +79,7 @@ export function lineDoc(d: Draft, l: DraftLine) {
   return l.doc && nums.includes(l.doc.trim()) ? l.doc.trim() : nums[0] ?? "";
 }
 
-export function evaluate(line: DraftLine, catalog: Catalog | undefined): Evaluation {
+export function evaluate(line: DraftLine, catalog: Catalog | undefined, truckTemp?: string): Evaluation {
   const cat = catalog?.categories.find((c) => c.id === line.categoryId);
   return evaluateLine(
     {
@@ -88,6 +88,7 @@ export function evaluate(line: DraftLine, catalog: Catalog | undefined): Evaluat
       temperature: num(line.temperature),
       dlc: line.dlc || null,
       categoryId: line.categoryId,
+      truckTemp: truckTemp != null ? num(truckTemp) : null,
     },
     cat,
   );
@@ -99,18 +100,27 @@ export function suggestedDecision(line: DraftLine, catalog: Catalog | undefined)
 }
 
 /** Motif proposé pour une réserve ou un refus, d'après les contrôles */
-export function suggestedReason(line: DraftLine, catalog: Catalog | undefined): DraftLine["reason"] {
-  const ev = evaluate(line, catalog);
-  if (ev.issues.includes("temp_over") || ev.issues.includes("temp_limit")) return "temperature";
-  if (ev.issues.includes("dlc_expired") || ev.issues.includes("dlc_short")) return "dlc";
+export function suggestedReason(line: DraftLine, catalog: Catalog | undefined, truckTemp?: string): DraftLine["reason"] {
+  const ev = evaluate(line, catalog, truckTemp);
+  if (ev.issues.includes("temp_over") || ev.issues.includes("truck_over")) return "temperature";
+  if (ev.issues.includes("dlc_expired")) return "dlc";
   if (ev.issues.includes("qty_less") && num(line.qtyReceived) === 0) return "missing";
   if (ev.issues.includes("qty_less") || ev.issues.includes("qty_more")) return "quantity";
   return "";
 }
 
-/** Conservé pour compatibilité : ne modifie plus la décision */
-export function withAutoDecision(line: DraftLine, _catalog: Catalog | undefined): DraftLine {
-  return line;
+/**
+ * Conformité produit automatique : Conforme si T° camion, T° produit et DLC sont conformes, Refus sinon.
+ * Tant qu'une donnée obligatoire manque (T° produit, DLC), rien n'est coché.
+ * Un choix fait à la main (decisionManual) n'est jamais remplacé : l'utilisateur peut refuser un produit conforme.
+ */
+export function withAutoDecision(line: DraftLine, catalog: Catalog | undefined, truckTemp?: string): DraftLine {
+  if (line.decisionManual || !line.productName.trim()) return line;
+  const ev = evaluate(line, catalog, truckTemp);
+  const missing = ev.issues.includes("temp_missing") || (dlcRequired(line, catalog) && !line.dlc);
+  const decision = ev.decision === "refuse" ? "refuse" : missing ? null : "conform";
+  const reason = decision === "refuse" ? line.reason || suggestedReason(line, catalog, truckTemp) : "";
+  return decision === line.decision && reason === line.reason ? line : { ...line, decision, reason };
 }
 
 
@@ -144,8 +154,15 @@ export function needsTemp(line: DraftLine, catalog: Catalog | undefined) {
 export function buildReservesText(d: Draft, t: Dict, catalog: Catalog | undefined): string {
   const parts: string[] = [];
   for (const l of d.lines) {
-    if (!l.decision || l.decision === "conform") continue;
+    if (!l.decision) continue;
     const ev = evaluate(l, catalog);
+    if (l.decision === "conform") {
+      // Produit accepté avec un écart de quantité : à noter sur le BL
+      const qo = num(l.qtyOrdered);
+      const qr = num(l.qtyReceived);
+      if (qo != null && qr != null && qo !== qr) parts.push(`${(qr < qo ? t.wizard.gapMissing : t.wizard.gapExtra).toUpperCase()} – ${l.productName} : ${t.wizard.received.toLowerCase()} ${qr} / ${qo} ${l.unit}`);
+      continue;
+    }
     const bits: string[] = [];
     if (l.reason) bits.push((t.reasons as Record<string, string>)[l.reason] ?? l.reason);
     const qo = num(l.qtyOrdered);
@@ -177,6 +194,8 @@ export function toPayload(d: Draft): ReceptionPayload {
     signerName: (d.signerName || d.driverName).trim() || null,
     signature: d.signature || null,
     driverLeftUnsigned: !d.signature && !!d.driverLeft,
+    receiverName: d.receiverName?.trim() || null,
+    receiverSignature: d.receiverSignature || null,
     blPhotos: d.blPhotos,
     labelPhotos: d.labelPhotos ?? [],
     bakery: d.bakery

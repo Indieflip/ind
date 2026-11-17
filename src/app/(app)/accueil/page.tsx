@@ -9,7 +9,7 @@ import { daysSince, DEFAULT_FOLLOW_UP_DAYS, isClaimMode, stageOf, verificationDu
 import { backupSettings, lastBackup } from "@/lib/server/backup";
 import { supplierProcesses } from "@/lib/server/followup";
 import { canSeeDev } from "@/lib/server/dev";
-import { canValidateSheets, sheetsAwaitingValidation, todaySheetExists } from "@/lib/server/sheets";
+import { backfillSheets, canValidateSheets, sheetsAwaitingValidation } from "@/lib/server/sheets";
 import { Icon } from "@/components/Icon";
 
 interface Task { key: string; label: string; detail?: string; count?: number; href: string; tone: "red" | "amber" | "sky" | "stone"; icon: string }
@@ -56,7 +56,7 @@ export default async function HomePage() {
   }
 
   // Fiche de réception de marchandises : au moins une par jour, validée par un responsable désigné
-  if (!(await todaySheetExists())) tasks.push({ key: "sheetToday", label: t.rsheet.todayMissing, href: "/receptions/fiches", tone: "amber", icon: "file" });
+  await backfillSheets();
   if (await canValidateSheets(user)) {
     const n = await sheetsAwaitingValidation();
     if (n) tasks.push({ key: "sheetValidate", label: t.rsheet.toValidate, count: n, href: "/receptions/fiches", tone: "amber", icon: "check" });

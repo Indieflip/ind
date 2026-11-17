@@ -76,8 +76,8 @@ export function StepValidate({
 
       <section className="card p-4">
         <h2 className="mb-3 font-semibold">{t.wizard.summary}</h2>
-        <div className="grid grid-cols-3 gap-2 text-center">
-          {(["conform", "reserve", "refuse"] as const).map((d) => (
+        <div className="grid grid-cols-2 gap-2 text-center">
+          {(count("reserve") ? (["conform", "reserve", "refuse"] as const) : (["conform", "refuse"] as const)).map((d) => (
             <div key={d} className={`rounded-lg p-3 ${decisionStyles[d].badge}`}>
               <div className="text-2xl font-bold">{count(d)}</div>
               <div className="text-xs font-semibold">{t.decision[d]}</div>

@@ -3,9 +3,6 @@
 import { MODES, RESOLUTIONS, STAGES, modeIcon, stageStyles } from "@/lib/anomaly";
 import { useI18n } from "@/lib/i18n/client";
 
-/** Type d'économie de chaque type d'anomalie (même règle que l'onglet Économies) */
-const KIND_OF: Record<string, "quantite" | "prix" | "qualite" | "autre"> = { missing: "quantite", quantity: "quantite", price: "prix", locked_price: "prix", damaged: "qualite", temperature: "qualite", dlc: "qualite", wrong_product: "qualite", hygiene: "autre", missing_bl: "autre", other: "autre" };
-
 /** Règles de gestion de l'application (lecture) : types de suivi et impact sur les économies, étapes, types d'anomalie */
 export function DevRules() {
   const { t } = useI18n();
@@ -44,13 +41,12 @@ export function DevRules() {
       <section className={box}>
         <h2 className="mb-2 font-semibold">{r.typesTitle}</h2>
         <table className="table text-sm">
-          <thead><tr><th>{r.type}</th><th>{r.createdWhen}</th><th>{r.savingKind}</th></tr></thead>
+          <thead><tr><th>{r.type}</th><th>{r.createdWhen}</th></tr></thead>
           <tbody>
             {(Object.keys(t.anomalies.types) as (keyof typeof t.anomalies.types)[]).map((k) => (
               <tr key={k}>
                 <td className="font-medium">{t.anomalies.types[k]}</td>
                 <td className="text-stone-700">{(r.typeText as Record<string, string>)[k] ?? "—"}</td>
-                <td className="whitespace-nowrap">{t.savings.kinds[KIND_OF[k] ?? "autre"]}</td>
               </tr>
             ))}
           </tbody>

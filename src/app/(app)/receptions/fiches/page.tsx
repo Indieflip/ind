@@ -4,10 +4,10 @@ import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { fmtDate, fmtDateTime } from "@/lib/format";
-import { parisDay, purgeOldSheets, sheetNumber, sheetValidatorIds } from "@/lib/server/sheets";
+import { backfillSheets, parisDay, purgeOldSheets, sheetNumber, sheetValidatorIds } from "@/lib/server/sheets";
 import { PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
-import { DeleteExported, EditSheetButton, EditSheetForDate, ValidatorsPicker } from "./SheetClient";
+import { DeleteExported, ValidatorsPicker } from "./SheetClient";
 
 const statusStyle: Record<string, string> = { pending: "bg-amber-100 text-amber-900", validated: "bg-emerald-100 text-emerald-800", rejected: "bg-red-100 text-red-800" };
 
@@ -17,6 +17,7 @@ export default async function SheetsPage() {
   const { t, locale } = await getDict();
   const f = t.rsheet;
   await purgeOldSheets();
+  await backfillSheets();
   const today = parisDay();
   const s = schema.receptionSheets;
   const v = schema.receptionSheetVersions;
@@ -36,10 +37,10 @@ export default async function SheetsPage() {
     <>
       <Link href="/receptions" className="no-print mb-2 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-stone-800">← {t.nav.receptions}</Link>
       <PageHeader title={f.titleShort}>
-        {todaySheet ? <Link href={`/receptions/fiches/${todaySheet.id}`} className="btn-primary"><Icon name="file" className="h-4 w-4" /> {f.openToday}</Link> : <EditSheetButton date={today} label={f.editToday} />}
+        {todaySheet ? <Link href={`/receptions/fiches/${todaySheet.id}`} className="btn-primary"><Icon name="file" className="h-4 w-4" /> {f.openToday}</Link> : <span className="text-sm text-stone-500">{f.noToday}</span>}
       </PageHeader>
-      <p className="mb-4 max-w-4xl text-sm text-stone-600">{f.intro}</p>
-      <div className="card mb-4 p-3"><EditSheetForDate today={today} /></div>
+      <p className="mb-1 max-w-4xl text-sm text-stone-600">{f.intro}</p>
+      <p className="mb-4 max-w-4xl text-sm font-medium text-brand-700">{f.autoHint}</p>
 
       <div className="card mb-6 overflow-x-auto">
         <table className="table">

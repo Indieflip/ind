@@ -509,6 +509,58 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_seed_v5'`
   await db.execute(sql`insert into app_settings (key, value) values ('dev_seed_v5', '1') on conflict (key) do nothing`);
 }
 
+// Seuils : marges acceptables réglementaires (remplacent les marges de réserve provisoires), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'temp_classes_v2'`)).rows.length) {
+  const margin = {
+    "Viandes hachées, viandes séparées mécaniquement": null,
+    "Produits de la pêche frais, crustacés et mollusques cuits réfrigérés": null,
+    "Abats d'ongulés": 6,
+    "Préparations culinaires élaborées à l'avance": null,
+    "Viandes d'ongulés : morceaux de découpe": 7,
+    "Viandes d'ongulés : carcasses et gros morceaux": null,
+    "Ovoproduits (hors UHT), lait cru": null,
+    "Autres denrées très périssables": null,
+    "Autres denrées périssables": null,
+    "Glaces, viandes hachées et produits de la pêche congelés": -15,
+    "Autres denrées congelées": null,
+  };
+  for (const [label, reserve] of Object.entries(margin)) await db.execute(sql`update temp_classes set reserve_max = ${reserve} where label = ${label}`);
+  // « Préparations de viandes, volailles, lapins » : sans tolérance pour les préparations, +3 °C pour volailles et lapins
+  await db.execute(sql`update temp_classes set label = 'Préparations de viandes', reserve_max = null where label = 'Préparations de viandes, volailles, lapins'`);
+  if (!(await db.execute(sql`select 1 from temp_classes where label = 'Volailles, lapins, petit gibier'`)).rows.length) {
+    const pos = (await db.execute(sql`select position from temp_classes where label = 'Préparations de viandes'`)).rows[0]?.position ?? 5;
+    await db.execute(sql`update temp_classes set position = position + 1 where position > ${pos}`);
+    await db.execute(sql`insert into temp_classes (label, max_temp, reserve_max, position) values ('Volailles, lapins, petit gibier', 4, 7, ${Number(pos) + 1})`);
+  }
+  await db.execute(sql`update categories c set conform_max = k.max_temp, reserve_max = k.reserve_max from temp_classes k where c.temp_class_id = k.id`);
+  await db.execute(sql`insert into app_settings (key, value) values ('temp_classes_v2', '1') on conflict (key) do nothing`);
+}
+
+// Dev > Fiches : champs mis à jour (conformité Conforme / Refus, signature du réceptionnaire, fiche automatique), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v2'`)).rows.length) {
+  const upd = async (form, field, set) => {
+    await db.execute(sql`update dev_fields set field = coalesce(${set.field ?? null}, field), rule = coalesce(${set.rule ?? null}, rule), message = coalesce(${set.message ?? null}, message), required = coalesce(${set.required ?? null}, required), updated_at = now() where form = ${form} and field = ${field}`);
+  };
+  await upd("reception", "Signature du livreur", { rule: "Signature du livreur, ou case « Livreur parti sans signer ». Sans l'un des deux, pas d'accès à l'étape 2." });
+  await upd("reception", "T° du camion", { rule: "Obligatoire dès qu'un produit a un seuil de température ; au-delà du seuil + marge acceptable de la denrée : refus proposé pour ces produits." });
+  await upd("reception", "Q Contrôlée", { rule: "Nombre ≥ 0 ; un écart avec la Q facturée est signalé (anomalie + note sur le BL) sans changer la conformité (au kg : écart de pesée)." });
+  await upd("reception", "T° produit", { rule: "Obligatoire pour les catégories avec seuil (protocole Conformité) ; dans la marge acceptable : conforme ; au-delà : refus proposé." });
+  await upd("reception", "DLC / DDM", { rule: "Obligatoire pour les produits frais (viandes, poissons, surgelés). Dépassée : refus proposé ; courte : signalée." });
+  await upd("reception", "Décision (conforme / réserve / refus)", { field: "Conformité produit (Conforme / Refus)", rule: "Proposée automatiquement : Conforme si T° camion, T° produit et DLC sont conformes ; Refus sinon. L'utilisateur peut toujours refuser un produit conforme. Plus d'étape « Réserve ».", message: "Complétez la T° ou la DLC du produit, ou choisissez Conforme / Refus." });
+  await upd("reception", "Motif", { rule: "Obligatoire en cas de refus (proposé automatiquement d'après les contrôles)." });
+  await upd("reception", "Photo du problème", { rule: "Recommandée obligatoire en cas de refus (preuve pour la réclamation)." });
+  await upd("reception", "Texte des réserves", { rule: "Généré automatiquement (refus, manques, véhicule, T° camion), modifiable ; à recopier sur le BL." });
+  await upd("sheet", "Fiche éditée", { field: "Fiche générée", rule: "Générée et mise à jour automatiquement à chaque réception (création, modification, suppression), au moins une par jour de livraison.", message: "" });
+  if (!(await db.execute(sql`select 1 from dev_fields where form = 'reception' and field like 'Signature du réceptionnaire%'`)).rows.length) {
+    const pos = (await db.execute(sql`select position from dev_fields where form = 'reception' and field = 'Signature du livreur'`)).rows[0]?.position ?? 2;
+    await db.execute(sql`update dev_fields set position = position + 1 where position > ${pos}`);
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Étape 1 · Signature', 'Signature du réceptionnaire (nom, prénom, signature)', true, 'Nom et prénom de l''utilisateur connecté (à saisir pour un invité ou un compte sans nom) + signature. Obligatoire avant l''enregistrement de la réception.', 'Indiquez votre nom et prénom et signez avant d''enregistrer la réception.', ${Number(pos) + 1})`);
+  }
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_items`)).rows[0].p);
+  await db.execute(sql`insert into dev_items (kind, title, detail, position) values ('constraint', ${"Tenir à jour Dev > Caractéristiques et Dev > Automatisations"}, ${"À chaque évolution d'une fiche ou d'une règle automatique, le tableau « Fiches : champs obligatoires et règles de saisie » et la vue d'ensemble des automatisations sont mis à jour automatiquement."}, ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v2', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

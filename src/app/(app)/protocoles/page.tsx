@@ -80,13 +80,13 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
               ) : (
                 <div className="overflow-x-auto">
                   <table className="table">
-                    <thead><tr><th>{t.protocols.tempClass}</th><th className="text-center">{t.decision.conform}</th><th className="text-center">{t.decision.reserve}</th><th className="text-center">{t.protocols.refuseProposed}</th></tr></thead>
+                    <thead><tr><th>{t.protocols.tempClass}</th><th className="text-center">{t.decision.conform}</th><th className="text-center">{t.protocols.margin}</th><th className="text-center">{t.protocols.refuseProposed}</th></tr></thead>
                     <tbody>
                       {classes.map((k) => (
                         <tr key={k.id}>
                           <td className="font-medium">{k.label}</td>
                           <td className="bg-emerald-50 text-center font-semibold text-emerald-900">≤ {deg(k.maxTemp)}</td>
-                          <td className="bg-amber-50 text-center text-amber-900">{k.reserveMax != null ? `${deg(k.maxTemp)} → ${deg(k.reserveMax)}` : "—"}</td>
+                          <td className="bg-sky-50 text-center text-sky-900">{k.reserveMax != null ? `+${fmtNum(Math.round((k.reserveMax - k.maxTemp) * 10) / 10, locale, 1)} °C (${t.protocols.upTo} ${deg(k.reserveMax)})` : t.protocols.noMargin}</td>
                           <td className="bg-red-50 text-center text-red-800">&gt; {deg(k.reserveMax ?? k.maxTemp)}</td>
                         </tr>
                       ))}
@@ -94,6 +94,9 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
                   </table>
                 </div>
               )}
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-stone-700">
+                {t.protocols.marginNotes.map((x, i) => <li key={i}>{x}</li>)}
+              </ul>
 
               <h2 className="mb-1 mt-6 text-lg font-semibold">{t.protocols.byCategory}</h2>
               <p className="mb-2 text-sm text-stone-600">{t.protocols.byCategoryIntro}</p>
@@ -102,7 +105,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
                   const k = classes.find((x) => x.id === c.tempClassId);
                   const tempLines = {
                     conform: k ? `${t.protocols.tempLine} ≤ ${deg(k.maxTemp)}` : null,
-                    reserve: k && k.reserveMax != null ? `${t.protocols.tempLine} ${deg(k.maxTemp)} → ${deg(k.reserveMax)}` : null,
+                    reserve: k && k.reserveMax != null ? `${t.protocols.tempLine} ${deg(k.maxTemp)} → ${deg(k.reserveMax)} (${t.protocols.margin.toLowerCase()})` : null,
                     refuse: k ? `${t.protocols.tempLine} > ${deg(k.reserveMax ?? k.maxTemp)}` : null,
                   };
                   return (
@@ -119,9 +122,9 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
                         <table className="table"><tbody><ConformityRow c={{ id: c.id, name: t.protocols.rules, conformRules: c.conformRules ?? "", reserveRules: c.reserveRules ?? "", refuseRules: c.refuseRules ?? "" }} /></tbody></table>
                       ) : (
                         <div className="grid gap-px bg-stone-200 sm:grid-cols-3">
-                          {([["conform", c.conformRules, "bg-emerald-50 text-emerald-900"], ["reserve", c.reserveRules, "bg-amber-50 text-amber-900"], ["refuse", c.refuseRules, "bg-red-50 text-red-900"]] as const).map(([d, rules, cls]) => (
+                          {([["conform", c.conformRules, "bg-emerald-50 text-emerald-900"], ["reserve", c.reserveRules, "bg-sky-50 text-sky-900"], ["refuse", c.refuseRules, "bg-red-50 text-red-900"]] as const).map(([d, rules, cls]) => (
                             <div key={d} className={`p-3 ${cls}`}>
-                              <p className="mb-1 text-xs font-bold uppercase tracking-wide">{t.decision[d]}</p>
+                              <p className="mb-1 text-xs font-bold uppercase tracking-wide">{d === "reserve" ? t.protocols.acceptedWithGap : t.decision[d]}</p>
                               <ul className="list-disc space-y-0.5 pl-4 text-sm">
                                 {tempLines[d] && <li className="font-semibold">{tempLines[d]}</li>}
                                 {(rules ?? "").split(/\r?\n/).filter((x) => x.trim()).map((x, i) => <li key={i}>{x}</li>)}

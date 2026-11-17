@@ -162,6 +162,9 @@ export const receptions = pgTable(
     signatureUrl: text("signature_url"),
     /** Le livreur est parti sans signer (à cocher à l'étape 1 si pas de signature) */
     driverLeftUnsigned: boolean("driver_left_unsigned").notNull().default(false),
+    /** Signature de la personne qui réceptionne (obligatoire) : nom et prénom + signature */
+    receiverName: text("receiver_name"),
+    receiverSignatureUrl: text("receiver_signature_url"),
     notes: text("notes"),
     createdBy: integer("created_by").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

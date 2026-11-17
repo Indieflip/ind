@@ -14,7 +14,7 @@ import { ReadingBanner } from "./ReadingBanner";
 import { StepCheck } from "./StepCheck";
 import { StepValidate } from "./StepValidate";
 
-export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEnabled: boolean; editId?: number; initialDraft?: Draft }) {
+export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { blReadingEnabled: boolean; editId?: number; initialDraft?: Draft; receiver?: { name: string; mustType: boolean } }) {
   const { t } = useI18n();
   const router = useRouter();
   const params = useSearchParams();
@@ -71,10 +71,27 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
     (key: string, patch: Partial<DraftLine>) =>
       setDraft((d) => ({
         ...d,
-        lines: d.lines.map((l) => (l.key === key ? withAutoDecision({ ...l, ...patch }, catalog) : l)),
+        lines: d.lines.map((l) => (l.key === key ? withAutoDecision({ ...l, ...patch }, catalog, d.truckTemp) : l)),
       })),
     [setDraft, catalog],
   );
+
+  // Signature du réceptionnaire : nom et prénom de l'utilisateur connecté (à saisir pour un invité ou un compte sans nom)
+  const receiverDefault = receiver?.name ?? "";
+  useEffect(() => {
+    setDraftState((d) => (d && !d.receiverName && receiverDefault ? { ...d, receiverName: receiverDefault } : d));
+  }, [receiverDefault, draft?.clientUuid]);
+
+  // Conformité produit recalculée quand la T° du camion ou les seuils changent (choix manuels conservés)
+  const truckTemp = draft?.truckTemp;
+  useEffect(() => {
+    if (!catalog) return;
+    setDraftState((d) => {
+      if (!d) return d;
+      const lines = d.lines.map((l) => withAutoDecision(l, catalog, d.truckTemp));
+      return lines.some((l, i) => l !== d.lines[i]) ? { ...d, lines } : d;
+    });
+  }, [truckTemp, catalog]);
 
   // Texte des réserves régénéré tant qu'il n'a pas été modifié à la main
   const autoReserves = useMemo(() => (draft ? buildReservesText(draft, t, catalog) : ""), [draft, t, catalog]);
@@ -123,6 +140,7 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
                 dlc: r.dlc ?? "",
               },
               catalog,
+              x.truckTemp,
             );
           });
           const chosen = !!x.supplierId || x.otherSupplier;
@@ -191,6 +209,12 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
       setError(t.wizard.signRequired);
       go(0);
       setTimeout(() => document.getElementById("signature")?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+      return;
+    }
+    if (!editId && (!draft.receiverName?.trim() || !draft.receiverSignature)) {
+      setError(t.wizard.receiverRequired);
+      go(0);
+      setTimeout(() => document.getElementById("receiver")?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
       return;
     }
     const undecided = draft.lines.filter((l) => !l.decision);
@@ -294,6 +318,7 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
             draft={draft}
             setDraft={setDraft}
             readingEnabled={blReadingEnabled}
+            receiverMustType={!!receiver?.mustType}
             onConfirm={() => {
               const d = { ...draft, photoOk: true, noBl: false };
               setDraft(() => d);

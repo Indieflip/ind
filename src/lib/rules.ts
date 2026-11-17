@@ -14,12 +14,15 @@ export interface LineInput {
   temperature?: number | null;
   dlc?: string | null; // AAAA-MM-JJ
   categoryId?: number | null;
+  /** Température du camion (étape 2) : contrôlée pour les produits à température */
+  truckTemp?: number | null;
 }
 
 export type IssueCode =
   | "temp_missing"
   | "temp_limit"
   | "temp_over"
+  | "truck_over"
   | "dlc_expired"
   | "dlc_short"
   | "qty_less"
@@ -42,22 +45,31 @@ function addDays(iso: string, days: number) {
   return d.toISOString().slice(0, 10);
 }
 
-const rank: Record<Decision, number> = { conform: 0, reserve: 1, refuse: 2 };
-const worst = (a: Decision, b: Decision) => (rank[b] > rank[a] ? b : a);
+/** Limite au-delà de laquelle le produit est refusé : seuil + marge acceptable (sinon le seuil lui-même) */
+export const tempLimit = (c: { conformMax: number | null; reserveMax: number | null }) => (c.reserveMax ?? c.conformMax);
 
+/**
+ * Conformité produit (deux choix : Conforme / Refus) :
+ * - Refus proposé si T° produit ou T° camion au-delà du seuil (+ marge acceptable), ou DLC dépassée ;
+ * - Conforme sinon. Écart de quantité, DLC courte, T° dans la marge : signalés, sans changer la décision.
+ */
 export function evaluateLine(line: LineInput, category: CategoryRule | undefined, now = new Date()): Evaluation {
   let decision: Decision = "conform";
   const issues: IssueCode[] = [];
 
-  if (category?.tempRequired && category.conformMax != null && category.reserveMax != null) {
+  if (category?.tempRequired && category.conformMax != null) {
+    const limit = tempLimit(category)!;
     if (line.temperature == null || Number.isNaN(line.temperature)) {
       issues.push("temp_missing");
-    } else if (line.temperature > category.reserveMax) {
+    } else if (line.temperature > limit) {
       issues.push("temp_over");
-      decision = worst(decision, "refuse");
+      decision = "refuse";
     } else if (line.temperature > category.conformMax) {
       issues.push("temp_limit");
-      decision = worst(decision, "reserve");
+    }
+    if (line.truckTemp != null && !Number.isNaN(line.truckTemp) && line.truckTemp > limit) {
+      issues.push("truck_over");
+      decision = "refuse";
     }
   }
 
@@ -65,23 +77,17 @@ export function evaluateLine(line: LineInput, category: CategoryRule | undefined
     const today = todayISO(now);
     if (line.dlc < today) {
       issues.push("dlc_expired");
-      decision = worst(decision, "refuse");
+      decision = "refuse";
     } else if (line.dlc <= addDays(today, 2)) {
       issues.push("dlc_short");
-      decision = worst(decision, "reserve");
     }
   }
 
   let qtyDiff: number | null = null;
   if (line.qtyOrdered != null && line.qtyReceived != null && !Number.isNaN(line.qtyOrdered) && !Number.isNaN(line.qtyReceived)) {
     qtyDiff = Math.round((line.qtyReceived - line.qtyOrdered) * 1000) / 1000;
-    if (qtyDiff < 0) {
-      issues.push("qty_less");
-      decision = worst(decision, "reserve");
-    } else if (qtyDiff > 0) {
-      issues.push("qty_more");
-      decision = worst(decision, "reserve");
-    }
+    if (qtyDiff < 0) issues.push("qty_less");
+    else if (qtyDiff > 0) issues.push("qty_more");
   }
 
   return { decision, issues, qtyDiff };

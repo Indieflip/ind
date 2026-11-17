@@ -72,6 +72,7 @@ export function DevFields({ fields, natures }: { fields: FieldRow[]; natures: Na
         <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
           <div>
             <h2 className="font-semibold">{c.fieldsTitle}</h2>
+            <p className="text-xs font-medium text-brand-700">{c.autoUpdated}</p>
             <p className="max-w-3xl text-xs text-stone-500">{c.fieldsHint}</p>
           </div>
           {!edit && <button type="button" className="btn-primary py-1.5" onClick={() => setEdit({ form: form === "all" ? "reception" : form, required: false })}><Icon name="plus" className="h-4 w-4" /> {t.common.add}</button>}

@@ -63,10 +63,11 @@ export async function sendReception(p: ReceptionPayload, editId?: number): Promi
     lines.push({ ...l, photos });
   }
   const signature = p.signature ? await uploadIfNeeded(p.signature, "signature") : null;
+  const receiverSignature = p.receiverSignature ? await uploadIfNeeded(p.receiverSignature, "signature") : null;
   const res = await fetch(editId ? `/api/receptions/${editId}` : "/api/receptions", {
     method: editId ? "PUT" : "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...p, blPhotos, labelPhotos, lines, signature }),
+    body: JSON.stringify({ ...p, blPhotos, labelPhotos, lines, signature, receiverSignature }),
   });
   if (res.status === 400 || res.status === 403 || res.status === 404 || res.status === 409) {
     const body = await res.json().catch(() => ({}));
@@ -111,7 +112,8 @@ export async function saveServerDraft(d: Draft): Promise<number> {
   const labelPhotos = [];
   for (const ph of d.labelPhotos ?? []) labelPhotos.push(await uploadIfNeeded(ph, "bl"));
   const signature = d.signature ? await uploadIfNeeded(d.signature, "signature") : "";
-  const data = { ...d, blPhotos, labelPhotos, lines, signature };
+  const receiverSignature = d.receiverSignature ? await uploadIfNeeded(d.receiverSignature, "signature") : "";
+  const data = { ...d, blPhotos, labelPhotos, lines, signature, receiverSignature };
   const res = await fetch("/api/drafts", {
     method: "POST",
     headers: { "content-type": "application/json" },

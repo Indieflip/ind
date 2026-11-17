@@ -71,7 +71,7 @@ export default async function SheetPage({ params }: { params: Promise<{ id: stri
               <div className="flex flex-wrap items-center gap-2">
                 <strong>V{x.version}</strong>
                 <span className={`badge ${statusStyle[x.status]}`}>{f.statuses[x.status as "pending"]}</span>
-                <span className="text-stone-600">{x.version === 1 ? f.created : f.modification} · {fmtDateTime(x.createdAt, locale)}{x.by ? ` ${f.by} ${x.by}` : ""}</span>
+                <span className="text-stone-600">{x.version === 1 ? f.created : f.modification} · {fmtDateTime(x.createdAt, locale)} {f.by} {x.by ?? f.system}</span>
                 <span className="text-xs text-stone-400">{x.receptionCount} {f.receptions.toLowerCase()} · {x.lineCount} {f.lines.toLowerCase()}</span>
               </div>
               {x.reason && <p className="mt-1 text-stone-700">« {x.reason} »</p>}

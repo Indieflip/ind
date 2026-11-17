@@ -8,7 +8,6 @@ import { Field, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { DraftBanner, DeleteDraftButton } from "@/components/reception/DraftBanner";
 import { ReceptionsTable } from "./ReceptionsTable";
-import { EditSheetButton } from "./fiches/SheetClient";
 import { parisDay, sheetNumber, sheetsAwaitingValidation } from "@/lib/server/sheets";
 import { count, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -18,7 +17,6 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
   const { t, locale } = await getDict();
   const sp = await searchParams;
   const f = receptionFilters(sp);
-  const today = parisDay();
   const [raw, drafts, sheets] = await Promise.all([
     listReceptions(f),
     getDb()
@@ -88,12 +86,12 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
           <h2 className="font-semibold">{t.rsheet.title}</h2>
           <Link href="/receptions/fiches" className="text-sm font-semibold text-brand-700 underline">{t.rsheet.list} ({sheets.n})</Link>
         </div>
-        <p className="mt-1 text-sm text-stone-600">{t.rsheet.hint}</p>
+        <p className="mt-1 text-sm text-stone-600">{t.rsheet.hint} {t.rsheet.autoHint}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {sheets.today ? (
             <Link href={`/receptions/fiches/${sheets.today.id}`} className="btn-primary"><Icon name="file" className="h-4 w-4" /> {t.rsheet.openToday} · N° {sheetNumber(sheets.today)}</Link>
           ) : (
-            <EditSheetButton date={today} label={t.rsheet.editToday} />
+            <span className="text-sm text-stone-500">{t.rsheet.noToday}</span>
           )}
           {sheets.pending > 0 && <Link href="/receptions/fiches" className="badge bg-amber-100 text-amber-900">{sheets.pending} {t.rsheet.toValidate.toLowerCase()}</Link>}
         </div>

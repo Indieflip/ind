@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { num } from "@/lib/format";
 import { evaluateLine, receptionStatus } from "@/lib/rules";
+import { syncSheetsSafe } from "./sheets";
 import { checkPrice, fvRange, parisMonth, type PriceCheck, type PriceRef } from "@/lib/pricing";
 
 const fmtEuro = (n: number | null | undefined) => (n == null ? "—" : `${n.toFixed(2).replace(".", ",")} €`);
@@ -45,6 +46,8 @@ export const payloadSchema = z.object({
   signerName: z.string().max(100).nullable(),
   signature: z.string().max(2000).nullable(),
   driverLeftUnsigned: z.boolean().optional(),
+  receiverName: z.string().max(100).nullish(),
+  receiverSignature: z.string().max(2000).nullish(),
   blPhotos: z.array(z.string().max(2000)).max(20),
   labelPhotos: z.array(z.string().max(2000)).max(20).optional(),
   bakery: z
@@ -100,6 +103,8 @@ function headerValues(p: Payload) {
     signerName: p.signerName || null,
     signatureUrl: p.signature,
     driverLeftUnsigned: !p.signature && !!p.driverLeftUnsigned,
+    receiverName: p.receiverName || null,
+    receiverSignatureUrl: p.receiverSignature || null,
   };
 }
 
@@ -322,7 +327,8 @@ async function writeContent(
       { qtyOrdered: l.qtyOrdered, qtyReceived: l.qtyReceived, temperature: l.temperature, dlc: l.dlc, categoryId: l.categoryId },
       cat ? { ...cat, conformMax: cat.conformMax, reserveMax: cat.reserveMax } : undefined,
       date,
-    ).issues.filter((i) => i !== "temp_missing" && !(unitName(l.unit) === "Kg" && (i === "qty_less" || i === "qty_more")));
+    ).issues.filter((i) => i !== "temp_missing" && i !== "temp_limit" && i !== "dlc_short" && !(unitName(l.unit) === "Kg" && (i === "qty_less" || i === "qty_more")));
+    // (T° dans la marge acceptable et DLC courte : tolérées, pas d'anomalie)
     // (au kg, un écart de poids va seulement dans Écarts pesées)
     // Texte clair : « manque 50 pièces (facturé 100, contrôlé 50) », « température 8 °C (maximum 4 °C) »…
     const facts = describeLine(l, detected, cat, t);
@@ -432,6 +438,10 @@ export async function saveReception(p: Payload, user: SessionUser): Promise<numb
     await writeContent(tx, rec.id, supplier, p, user, t);
     await tx.delete(schema.receptionDrafts).where(eq(schema.receptionDrafts.clientUuid, p.clientUuid));
     return rec.id;
+  }).then(async (id) => {
+    // Fiche de réception de marchandises du jour : générée / mise à jour automatiquement
+    await syncSheetsSafe([new Date(p.deliveredAt)], `${t.rsheet.autoUpdate} : ${t.rsheet.autoAdded} (${p.supplierName})`, user);
+    return id;
   });
 }
 
@@ -520,7 +530,12 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
       .set({ ...supplier, ...headerValues(p), updatedBy: user.id, updatedAt: new Date() })
       .where(eq(schema.receptions.id, id));
     await writeContent(tx, id, supplier, p, user, t, keep, claims, unchanged);
-    return id;
+    return { id, before: rec.deliveredAt };
+  }).then(async (r) => {
+    if (!r) return null;
+    // Fiche(s) du jour mises à jour (ancienne et nouvelle date si la date de livraison a changé)
+    await syncSheetsSafe([r.before, new Date(p.deliveredAt)], `${t.rsheet.autoUpdate} : ${t.rsheet.autoEdited} (${p.supplierName})`, user);
+    return r.id;
   });
 }
 

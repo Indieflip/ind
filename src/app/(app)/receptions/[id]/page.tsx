@@ -124,6 +124,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
             <dl className="space-y-1.5 text-sm">
               <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.wizard.dateTime}</dt><dd className="text-right font-medium">{fmtDateTime(rec.deliveredAt, locale)}</dd></div>
               <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.driver}</dt><dd className="text-right font-medium">{rec.driverName ?? "—"}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.wizard.receiverTitle}</dt><dd className="text-right font-medium">{rec.receiverSignatureUrl ? `✓ ${rec.receiverName ?? ""}` : rec.receiverName || "—"}</dd></div>
               <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.signature}</dt><dd className="text-right font-medium">{rec.signatureUrl ? `✓ ${rec.signerName ?? ""}` : rec.driverLeftUnsigned ? `⚠ ${t.wizard.driverLeft}` : "—"}</dd></div>
             </dl>
           </div>

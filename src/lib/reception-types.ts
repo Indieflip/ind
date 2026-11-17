@@ -94,6 +94,9 @@ export interface Draft {
   labelPhotos?: string[];
   /** Étape 1 : le livreur est parti sans signer */
   driverLeft?: boolean;
+  /** Étape 1 : nom, prénom et signature de la personne qui réceptionne (obligatoires) */
+  receiverName?: string;
+  receiverSignature?: string;
   /** Étape 1 : qualité de la photo confirmée, ou livraison sans BL */
   photoOk?: boolean;
   noBl?: boolean;
@@ -123,6 +126,8 @@ export interface ReceptionPayload {
   signerName: string | null;
   signature: string | null;
   driverLeftUnsigned?: boolean;
+  receiverName?: string | null;
+  receiverSignature?: string | null;
   blPhotos: string[];
   labelPhotos?: string[];
   bakery?: { baguette: number | null; hamburger: number | null; rolls: number | null; painDeMie: number | null } | null;

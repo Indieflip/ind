@@ -5,7 +5,7 @@ import { asc, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { dictFor } from "@/lib/i18n";
 import { num } from "@/lib/format";
-import { getSetting } from "@/lib/settings";
+import { getSetting, setSetting } from "@/lib/settings";
 import { receptionWhere } from "./queries";
 
 export type SheetData = { header: string[]; rows: (string | number | null)[][] };
@@ -64,7 +64,7 @@ export async function buildSheetData(date: string, locale: string) {
         dlc(line.dlc),
         line.reason === "label" ? "NC" : "C",
         why && line.decision !== "conform" ? `${decision} (${why})` : decision,
-        initials(by),
+        initials(rec.receiverName || by),
       ];
     }),
   };
@@ -72,7 +72,7 @@ export async function buildSheetData(date: string, locale: string) {
 }
 
 /** Crée la fiche d'un jour (N° suivant de l'année) avec sa première version à valider ; renvoie la fiche existante sinon */
-export async function createSheet(date: string, user: { id: number; locale: string }) {
+export async function createSheet(date: string, user: { id: number | null; locale: string }) {
   const db = getDb();
   const existing = await db.query.receptionSheets.findFirst({ where: eq(schema.receptionSheets.date, date) });
   if (existing) return existing.id;
@@ -93,6 +93,48 @@ export async function createSheet(date: string, user: { id: number; locale: stri
     }
   }
   throw new Error("sheet");
+}
+
+/**
+ * Génération automatique : après chaque réception enregistrée, modifiée ou supprimée, la fiche du jour est créée ou mise à jour.
+ * - pas encore de fiche : création (N° suivant de l'année), à valider ;
+ * - dernière version à valider : mise à jour sur place (elle n'a encore aucune valeur légale) ;
+ * - dernière version validée ou refusée : nouvelle version « Mise à jour automatique », soumise à validation.
+ * Rien n'est fait si le contenu n'a pas changé.
+ */
+export async function syncSheetForDate(date: string, reason: string, user: { id: number | null; locale?: string } = { id: null }) {
+  const db = getDb();
+  const locale = "fr";
+  const sheet = await db.query.receptionSheets.findFirst({ where: eq(schema.receptionSheets.date, date) });
+  const { data, receptionCount } = await buildSheetData(date, locale);
+  if (!sheet) {
+    if (receptionCount === 0) return;
+    await createSheet(date, { id: user.id, locale });
+    return;
+  }
+  const v = schema.receptionSheetVersions;
+  const last = await db.query.receptionSheetVersions.findFirst({ where: eq(v.sheetId, sheet.id), orderBy: desc(v.version) });
+  if (last && JSON.stringify(last.data) === JSON.stringify(data)) return;
+  if (last?.status === "pending") {
+    await db.update(v).set({ data, receptionCount, lineCount: data.rows.length, createdAt: new Date(), reason: last.version > 1 ? reason : null }).where(eq(v.id, last.id));
+  } else {
+    await db.insert(v).values({ sheetId: sheet.id, version: (last?.version ?? 0) + 1, data, receptionCount, lineCount: data.rows.length, reason, createdBy: user.id });
+  }
+}
+
+/** N'interrompt jamais l'enregistrement d'une réception */
+export async function syncSheetsSafe(dates: (Date | string | null | undefined)[], reason: string, user?: { id: number | null }) {
+  for (const d of new Set(dates.filter(Boolean).map((x) => (typeof x === "string" ? x : parisDay(x as Date))))) {
+    try { await syncSheetForDate(d, reason, user); } catch (e) { console.error("[fiche]", e); }
+  }
+}
+
+/** Une fois : fiches générées pour tous les jours ayant des réceptions, dans l'ordre chronologique */
+export async function backfillSheets() {
+  if (await getSetting("sheets_auto_v1")) return;
+  const days = await getDb().execute<{ d: string }>(sql`select distinct to_char(delivered_at at time zone 'Europe/Paris', 'YYYY-MM-DD') as d from receptions order by 1`);
+  for (const { d } of days.rows) await syncSheetForDate(d, "Mise à jour automatique : reprise des réceptions du jour", { id: null });
+  await setSetting("sheets_auto_v1", "1");
 }
 
 /** Purge automatique : fiches de plus de 5 ans */

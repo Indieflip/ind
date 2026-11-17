@@ -66,6 +66,7 @@ export function StepCheck({
           line={l}
           catalog={catalog}
           supplierId={draft.supplierId}
+          truckTemp={draft.truckTemp}
           onChange={(patch) => updateLine(l.key, patch)}
           onRemove={async () => await appConfirm(t.wizard.removeLineConfirm) && setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
         />
@@ -81,16 +82,18 @@ function LineCard({
   supplierId,
   onChange,
   onRemove,
+  truckTemp,
 }: {
   line: DraftLine;
   catalog?: Catalog;
   supplierId: number | null;
   onChange: (patch: Partial<DraftLine>) => void;
   onRemove: () => void;
+  truckTemp?: string;
 }) {
   const { t, locale } = useI18n();
   const cat = catalog?.categories.find((c) => c.id === line.categoryId);
-  const ev = evaluate(line, catalog);
+  const ev = evaluate(line, catalog, truckTemp);
   const [swap, setSwap] = useState(false);
   const [swapQ, setSwapQ] = useState("");
   const [swapBrowse, setSwapBrowse] = useState(false);
@@ -241,18 +244,20 @@ function LineCard({
         </ul>
       )}
 
-      <div className="mt-3 grid grid-cols-3 gap-1.5">
-        {(["conform", "reserve", "refuse"] as Decision[]).map((d) => (
+      <p className="mt-3 mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{t.wizard.productConformity}</p>
+      <div className="grid grid-cols-2 gap-1.5">
+        {(["conform", "refuse"] as Decision[]).map((d) => (
           <button
             key={d}
             type="button"
-            onClick={() => onChange({ decision: d, reason: d === "conform" ? "" : line.reason || suggestedReason(line, catalog) })}
+            onClick={() => onChange({ decision: d, decisionManual: true, reason: d === "conform" ? "" : line.reason || suggestedReason(line, catalog, truckTemp) })}
             className={`rounded-lg border px-2 py-2 text-sm font-semibold ${line.decision === d ? decisionStyles[d].badge + " border-transparent" : "border-stone-200 bg-white text-stone-500"}`}
           >
             {t.decision[d]}
           </button>
         ))}
       </div>
+      <p className="mt-1 text-[11px] text-stone-500">{t.wizard.autoDecisionHint}</p>
 
       {line.decision && line.decision !== "conform" && (
         <div className="mt-3 space-y-2">
@@ -320,7 +325,7 @@ function AddProduct({ draft, setDraft, catalog, doc }: { draft: Draft; setDraft:
                     type="button"
                     className="flex w-full items-center justify-between px-3 py-2.5 text-left hover:bg-stone-50"
                     onClick={() => {
-                      add(withAutoDecision(lineFromProduct(p), catalog));
+                      add(withAutoDecision(lineFromProduct(p), catalog, draft.truckTemp));
                       setQ("");
                       setBrowse(false);
                     }}
@@ -381,7 +386,7 @@ function AddProduct({ draft, setDraft, catalog, doc }: { draft: Draft; setDraft:
               disabled={!custom.name.trim() || !custom.unit.trim() || !custom.categoryId}
               onClick={() => {
                 const line = lineFromProduct(null, { productName: custom.name.trim(), unit: custom.unit.trim(), categoryId: Number(custom.categoryId) });
-                add(withAutoDecision(line, catalog));
+                add(withAutoDecision(line, catalog, draft.truckTemp));
                 setCustom(null);
                 setQ("");
               }}

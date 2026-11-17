@@ -13,12 +13,14 @@ export function StepPhoto({
   onConfirm,
   onNoBl,
   readingEnabled,
+  receiverMustType = false,
 }: {
   draft: Draft;
   setDraft: (fn: (d: Draft) => Draft) => void;
   onConfirm: () => void;
   onNoBl: () => void;
   readingEnabled: boolean;
+  receiverMustType?: boolean;
 }) {
   const { t } = useI18n();
   const w = t.wizard;
@@ -92,7 +94,6 @@ export function StepPhoto({
 
       <section id="signature" className={`card space-y-3 p-4 ${!draft.signature && !draft.driverLeft ? "ring-2 ring-amber-300" : ""}`}>
         <h2 className="font-semibold">3. {w.signTitle} <span className="text-red-600">*</span></h2>
-        <p className="text-xs text-stone-500">{w.signRequired}</p>
         <div>
           <label className="label">{w.signerName} <span className="font-normal text-stone-400">({t.common.optional})</span></label>
           <input className="input" value={draft.signerName} onChange={(e) => setDraft((d) => ({ ...d, signerName: e.target.value }))} />
@@ -107,6 +108,22 @@ export function StepPhoto({
           <input type="checkbox" className="h-5 w-5 accent-brand-600" checked={!!draft.driverLeft} disabled={!!draft.signature} onChange={(e) => setDraft((d) => ({ ...d, driverLeft: e.target.checked }))} />
           {w.driverLeft}
         </label>
+      </section>
+
+      <section id="receiver" className={`card space-y-3 p-4 ${!draft.receiverSignature ? "ring-2 ring-amber-300" : ""}`}>
+        <h2 className="font-semibold">4. {w.receiverTitle} <span className="text-red-600">*</span></h2>
+        <div>
+          <label className="label">{w.receiverName} <span className="text-red-600">*</span></label>
+          {receiverMustType ? (
+            <input className={`input ${!draft.receiverName?.trim() ? "border-amber-400 bg-amber-50" : ""}`} value={draft.receiverName ?? ""} placeholder={w.receiverNamePh} onChange={(e) => setDraft((d) => ({ ...d, receiverName: e.target.value }))} />
+          ) : (
+            <p className="rounded-lg bg-stone-100 px-3 py-2 font-medium">{draft.receiverName || "—"}</p>
+          )}
+        </div>
+        <div>
+          <span className="label">{w.receiverSignHere}</span>
+          <SignaturePad value={draft.receiverSignature ?? ""} onChange={(sig) => setDraft((d) => ({ ...d, receiverSignature: sig }))} clearLabel={w.clearSignature} confirmText={w.clearSignatureConfirm} />
+        </div>
       </section>
     </>
   );

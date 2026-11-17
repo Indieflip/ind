@@ -22,7 +22,7 @@ function toLocalInput(d: Date) {
 }
 
 export default async function EditReceptionPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireUser(can.editReception);
+  const user = await requireUser(can.editReception);
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
   const db = getDb();
@@ -74,6 +74,8 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     blPhotos: photos.filter((p) => p.kind === "bl").map((p) => p.url),
     labelPhotos: photos.filter((p) => p.kind === "label").map((p) => p.url),
     driverLeft: rec.driverLeftUnsigned,
+    receiverName: rec.receiverName ?? "",
+    receiverSignature: rec.receiverSignatureUrl ?? "",
     blRead: "idle",
     photoOk: photos.some((p) => p.kind === "bl"),
     noBl: !photos.some((p) => p.kind === "bl"),
@@ -96,7 +98,7 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
 
   return (
     <Suspense>
-      <Wizard blReadingEnabled={!!process.env.ANTHROPIC_API_KEY} editId={id} initialDraft={draft} />
+      <Wizard blReadingEnabled={!!process.env.ANTHROPIC_API_KEY} editId={id} initialDraft={draft} receiver={{ name: user.role === "invite" ? "" : user.name.trim(), mustType: user.role === "invite" || !user.name.trim() }} />
     </Suspense>
   );
 }

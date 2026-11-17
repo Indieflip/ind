@@ -1,4 +1,5 @@
 import "server-only";
+import { richToText } from "@/lib/richtext";
 import { eq, isNotNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { DEFAULT_FOLLOW_UP_DAYS } from "@/lib/anomaly";
@@ -16,7 +17,7 @@ const delayOf = (text: string) => {
 async function protocolSections() {
   const [p] = await getDb().select().from(schema.protocols).where(sql`lower(${schema.protocols.title}) = lower('Process de réclamation')`).limit(1);
   if (!p) return [];
-  return p.content.split(/\n(?=## )/).filter((x) => x.startsWith("## ")).map((sec) => {
+  return richToText(p.content).split(/\n(?=## )/).filter((x) => x.startsWith("## ")).map((sec) => {
     const [head, ...body] = sec.split("\n");
     return { name: head.replace(/^##\s*/, "").trim(), text: body.join("\n").trim() };
   });

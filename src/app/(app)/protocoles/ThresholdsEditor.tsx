@@ -19,7 +19,7 @@ export function ThresholdsEditor({ classes }: { classes: TempClass[] }) {
   return (
     <div className="overflow-x-auto">
       <table className="table">
-        <thead><tr><th>{p.tempClass}</th><th className="w-28 text-right">{p.maxTemp}</th><th className="w-36 text-right">{p.reserveUpTo}</th><th className="w-10" /></tr></thead>
+        <thead><tr><th>{p.tempClass}</th><th className="w-28 text-right">{p.maxTemp}</th><th className="w-36 text-right">{p.marginUpTo}</th><th className="w-10" /></tr></thead>
         <tbody>
           {classes.map((k) => <ClassRow key={`${k.id}-${k.label}-${k.maxTemp}-${k.reserveMax}`} k={k} onSave={(v) => save(k.id, v)} onDelete={async () => { if (await appConfirm(p.deleteClassConfirm)) start(async () => { await deleteTempClassAction(k.id); router.refresh(); }); }} pending={pending} />)}
           <tr className="bg-stone-50">
