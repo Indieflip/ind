@@ -38,7 +38,6 @@ export function StepValidate({
           <div><dt className="text-stone-500">{t.common.supplier}</dt><dd className="font-semibold">{dash(draft.supplierName)}</dd></div>
           <div><dt className="text-stone-500">{w.dateTime}</dt><dd className="font-medium">{fmtDateTime(draft.deliveredAt)}</dd></div>
           <div className="col-span-2"><dt className="text-stone-500">{w.docType}</dt><dd className="font-medium">{docsOf(draft).filter((x) => x.number.trim()).map((x) => `${w.docTypes[x.type]} ${x.number}${x.date ? ` du ${fmtDate(x.date)}` : ""}`).join(" · ") || "—"}</dd></div>
-          <div><dt className="text-stone-500">{w.driverName}</dt><dd className="font-medium">{dash(draft.driverName)}</dd></div>
           <div><dt className="text-stone-500">{t.receptions.truckTemp}</dt><dd className="font-medium">{draft.truckTemp ? `${draft.truckTemp} °C` : "—"}</dd></div>
           <div><dt className="text-stone-500">{t.receptions.vehicleClean}</dt><dd className="font-medium">{draft.vehicleClean == null ? "—" : draft.vehicleClean ? t.common.yes : t.common.no}</dd></div>
           <div className="col-span-2"><dt className="text-stone-500">{t.receptions.blPhotos}</dt><dd className="font-medium">{draft.blPhotos.length || (draft.noBl ? t.receptions.noBl : "—")}</dd></div>
@@ -80,7 +79,7 @@ export function StepValidate({
           {(count("reserve") ? (["conform", "reserve", "refuse"] as const) : (["conform", "refuse"] as const)).map((d) => (
             <div key={d} className={`rounded-lg p-3 ${decisionStyles[d].badge}`}>
               <div className="text-2xl font-bold">{count(d)}</div>
-              <div className="text-xs font-semibold">{t.decision[d]}</div>
+              <div className="text-xs font-semibold">{d === "conform" ? w.accepted : t.decision[d]}</div>
             </div>
           ))}
         </div>

@@ -20,6 +20,8 @@ export interface ReceptionRow {
   statusLabel: string;
   consolidated: boolean;
   author: string | null;
+  /** Brouillon (réception pas encore enregistrée) : id négatif, lien pour la reprendre */
+  draftId?: number;
 }
 
 export function ReceptionsTable({ rows, canDelete }: { rows: ReceptionRow[]; canDelete: boolean }) {
@@ -27,17 +29,20 @@ export function ReceptionsTable({ rows, canDelete }: { rows: ReceptionRow[]; can
   const router = useRouter();
   const [sel, setSel] = useState<Set<string | number>>(new Set());
   const [pending, start] = useTransition();
-  const stateLabel = (r: ReceptionRow) => (r.consolidated ? t.receptions.consolidated : t.receptions.toConsolidate);
+  const stateLabel = (r: ReceptionRow) => (r.draftId ? "—" : r.consolidated ? t.receptions.consolidated : t.receptions.toConsolidate);
+  const href = (r: ReceptionRow) => (r.draftId ? `/receptions/new?draft=${r.draftId}` : `/receptions/${r.id}`);
   const cols: Col<ReceptionRow>[] = [
-    { key: "number", label: t.receptions.numberLong, align: "right", width: "4.5rem", text: (r) => String(r.number), sort: (r) => r.number },
-    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, href: (r) => `/receptions/${r.id}`, className: "whitespace-nowrap" },
+    { key: "number", label: t.receptions.numberLong, align: "right", width: "4.5rem", text: (r) => (r.draftId ? "" : String(r.number)), sort: (r) => r.number },
+    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, href, className: "whitespace-nowrap" },
     { key: "supplier", label: t.common.supplier, text: (r) => r.supplierName },
-    { key: "bl", label: t.receptions.blInvoice, text: (r) => r.blNumber ?? "", href: (r) => `/receptions/${r.id}`, render: (r) => r.blNumber || t.receptions.noBl },
+    { key: "bl", label: t.receptions.blInvoice, text: (r) => r.blNumber ?? "", href, render: (r) => r.blNumber || (r.draftId ? "—" : t.receptions.noBl) },
     { key: "lines", label: t.mercurial.products, align: "right", text: (r) => String(r.lineCount), sort: (r) => r.lineCount },
     { key: "status", label: t.common.status, text: (r) => r.statusLabel, options: Object.values(t.receptionStatus), render: (r) => <StatusBadge status={r.status} label={r.statusLabel} /> },
     {
       key: "state", label: t.nav.consolidation, text: stateLabel, options: [t.receptions.consolidated, t.receptions.toConsolidate],
-      render: (r) => r.consolidated
+      render: (r) => r.draftId
+        ? <span className="text-xs text-stone-400">—</span>
+        : r.consolidated
         ? <span className="badge bg-emerald-50 text-emerald-800"><Icon name="check" className="mr-0.5 h-3 w-3" />{t.receptions.consolidated}</span>
         : <span className="text-xs text-stone-500">{t.receptions.toConsolidate}</span>,
     },
@@ -45,6 +50,7 @@ export function ReceptionsTable({ rows, canDelete }: { rows: ReceptionRow[]; can
   ];
   const selectedRows = rows.filter((r) => sel.has(r.id));
   const deletable = selectedRows.filter((r) => !r.consolidated);
+  const drafts = deletable.filter((r) => r.draftId);
 
   return (
     <>
@@ -58,7 +64,8 @@ export function ReceptionsTable({ rows, canDelete }: { rows: ReceptionRow[]; can
             onClick={async () => {
               if (!(await appConfirm(`${t.receptions.deleteManyConfirm} (${deletable.length})`))) return;
               start(async () => {
-                await deleteReceptionsAction(deletable.map((r) => r.id));
+                await deleteReceptionsAction(deletable.filter((r) => !r.draftId).map((r) => r.id));
+                for (const d of drafts) await fetch(`/api/drafts/${d.draftId}`, { method: "DELETE" });
                 setSel(new Set());
                 router.refresh();
               });

@@ -574,6 +574,15 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v3
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v3', '1') on conflict (key) do nothing`);
 }
 
+// Dev : objectifs supprimés (recopiés ailleurs) + champs de la fiche de réception mis à jour, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v4'`)).rows.length) {
+  await db.execute(sql`delete from dev_items where kind = 'objective'`);
+  await db.execute(sql`delete from dev_fields where form = 'reception' and field = 'Nom du livreur'`);
+  await db.execute(sql`update dev_fields set required = true, rule = 'Obligatoire pour chaque produit. Comparé au mercurial ; ≥ +10 % au-dessus du maximum : anomalie prix ; prix bloqué non respecté : anomalie.', message = 'Saisissez le prix unitaire de chaque produit : le prix est obligatoire.', updated_at = now() where form = 'reception' and field = 'Prix unitaire'`);
+  await db.execute(sql`update dev_fields set field = 'Conformité produit (Acceptée / Refus)', required = true, rule = 'Obligatoire. Proposée automatiquement : Acceptée si T° camion, T° produit et DLC sont conformes ; Refus sinon. L''utilisateur peut toujours refuser un produit.', message = 'Choisissez Acceptée ou Refus pour chaque produit avant de terminer.', updated_at = now() where form = 'reception' and field like 'Conformité produit%'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v4', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

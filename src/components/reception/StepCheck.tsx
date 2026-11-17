@@ -214,11 +214,11 @@ function LineCard({
         {!noDlc && field("lot", t.wizard.lot)}
         <div>
           <label className="mb-0.5 block text-xs font-medium text-stone-600">
-            {t.wizard.unitPrice}
+            {t.wizard.unitPrice}<span className="ml-0.5 text-red-600">*</span>
             <span className="ml-1 font-normal text-stone-400">{rangeLabel}</span>
             {line.priceLocked && <span className="ml-1 badge bg-sky-100 text-sky-800">🔒 {t.wizard.lockedBadge}</span>}
           </label>
-          <MoneyInput className="input py-2" value={line.unitPrice} onChange={(e) => onChange({ unitPrice: e.target.value })} />
+          <MoneyInput className={`input py-2 ${!line.unitPrice.trim() ? "border-amber-400 bg-amber-50" : ""}`} value={line.unitPrice} onChange={(e) => onChange({ unitPrice: e.target.value })} />
           {pc.kind === "locked" && <p className="mt-0.5 text-xs font-semibold text-red-700">{fmtPct(pc.pct)} · {t.wizard.lockedWarn}</p>}
           {(pc.kind === "increase" || pc.kind === "decrease") && (
             <p className={`mt-0.5 text-xs font-semibold ${pc.kind === "increase" ? "text-red-600" : "text-emerald-600"}`}>{fmtPct(pc.pct)}</p>
@@ -244,7 +244,7 @@ function LineCard({
         </ul>
       )}
 
-      <p className="mt-3 mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{t.wizard.productConformity}</p>
+      <p className="mt-3 mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{t.wizard.productConformity} <span className="text-red-600">*</span></p>
       <div className="grid grid-cols-2 gap-1.5">
         {(["conform", "refuse"] as Decision[]).map((d) => (
           <button
@@ -253,7 +253,7 @@ function LineCard({
             onClick={() => onChange({ decision: d, decisionManual: true, reason: d === "conform" ? "" : line.reason || suggestedReason(line, catalog, truckTemp) })}
             className={`rounded-lg border px-2 py-2 text-sm font-semibold ${line.decision === d ? decisionStyles[d].badge + " border-transparent" : "border-stone-200 bg-white text-stone-500"}`}
           >
-            {t.decision[d]}
+            {d === "conform" ? t.wizard.accepted : t.decision[d]}
           </button>
         ))}
       </div>

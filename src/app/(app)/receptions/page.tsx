@@ -6,8 +6,8 @@ import { fmtDateTime } from "@/lib/format";
 import { listReceptions, one, receptionFilters, type SP } from "@/lib/server/queries";
 import { Field, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
-import { DraftBanner, DeleteDraftButton } from "@/components/reception/DraftBanner";
-import { ReceptionsTable } from "./ReceptionsTable";
+import { DraftBanner } from "@/components/reception/DraftBanner";
+import { ReceptionsTable, type ReceptionRow } from "./ReceptionsTable";
 import { exportNumber, lastAutoExport, runDueExports } from "@/lib/server/sheets";
 import { count, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -32,24 +32,6 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
 
       {can.receive(user.role) && <DraftBanner />}
       {one(sp.draft) === "saved" && <p className="no-print mb-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{t.receptions.draftSaved}</p>}
-      {drafts.length > 0 && can.receive(user.role) && (
-        <section className="no-print card mb-4 border-l-4 border-l-amber-400">
-          <h2 className="px-4 pt-3 text-sm font-semibold">{t.receptions.drafts} ({drafts.length})</h2>
-          <ul className="divide-y divide-stone-100">
-            {drafts.map((d) => (
-              <li key={d.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                <span className="min-w-0 flex-1 truncate">
-                  <strong>{d.supplierName || "—"}</strong>
-                  {d.blNumber && <span className="text-stone-500"> · BL {d.blNumber}</span>}
-                  <span className="text-xs text-stone-500"> · {fmtDateTime(d.updatedAt, locale)}{d.by ? ` ${t.receptions.draftBy} ${d.by}` : ""}</span>
-                </span>
-                <Link href={`/receptions/new?draft=${d.id}`} className="btn-primary px-3 py-1.5">{t.receptions.resumeDraft}</Link>
-                {can.deleteDraftReception(user.role) && <DeleteDraftButton id={d.id} confirmText={t.receptions.deleteDraftConfirm} label={t.common.delete} />}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       <form method="get" className="no-print card mb-3 flex flex-wrap items-end gap-3 p-3">
         <Field label={t.common.from}><input type="date" name="from" defaultValue={f.from} className="input py-2" /></Field>
@@ -60,7 +42,7 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
 
       <ReceptionsTable
         canDelete={can.deleteDraftReception(user.role)}
-        rows={raw.map((r) => ({
+        rows={raw.map((r): ReceptionRow => ({
           id: r.id,
           number: r.number,
           blNumber: (r.documents as { type: string; number: string }[] | null)?.length
@@ -74,13 +56,21 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
           statusLabel: t.receptionStatus[r.status],
           consolidated: !!r.consolidatedAt,
           author: r.createdByName,
-        }))}
+        })).concat(
+          // Brouillons en cours (réceptions pas encore enregistrées) : à reprendre depuis le tableau
+          can.receive(user.role)
+            ? drafts.map((d): ReceptionRow => ({
+                id: -d.id, draftId: d.id, number: 0, blNumber: d.blNumber, date: fmtDateTime(d.updatedAt, locale), dateSort: d.updatedAt.toISOString(),
+                supplierName: d.supplierName || "—", lineCount: 0, status: "draft", statusLabel: t.receptions.draftStatus, consolidated: false, author: d.by,
+              }))
+            : [],
+        )}
       />
 
       <section className="no-print card mt-6 p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="font-semibold">{t.rsheet.title}</h2>
-          <Link href="/receptions/fiches" className="text-sm font-semibold text-brand-700 underline">{t.rsheet.historyTitle} ({sheets.n})</Link>
+          <Link href="/receptions/fiches" className="text-sm font-semibold text-brand-700 underline">{t.rsheet.historyTitle}</Link>
         </div>
         <p className="mt-1 text-sm text-stone-600">{t.rsheet.historyHint}</p>
         <p className="mt-2 text-sm font-medium text-brand-700">{sheets.last ? `${t.rsheet.lastAuto} : N° ${exportNumber(sheets.last)} · ${fmtDateTime(sheets.last.createdAt, locale)} · ` : ""}{t.rsheet.nextAuto}</p>

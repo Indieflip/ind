@@ -64,7 +64,7 @@ export default async function HomePage() {
   // Demandes à l'administrateur
   if (r === "admin") {
     const [q] = await db.select({ n: count() }).from(schema.adminRequests).where(eq(schema.adminRequests.status, "open"));
-    if (q.n) tasks.push({ key: "requests", label: h.requests, count: q.n, href: "/demandes", tone: "sky", icon: "inbox" });
+    if (q.n) tasks.push({ key: "requests", label: h.requests, count: q.n, href: "/accueil/demandes", tone: "sky", icon: "inbox" });
   }
 
   // Mercurial : produits sans unité

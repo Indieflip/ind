@@ -27,13 +27,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
   const devVisible = await canSeeDev(user);
   const items: NavItem[] = [
-    { href: "/accueil", label: t.nav.home, icon: "home", show: true },
+    { href: "/accueil", label: t.nav.home, icon: "home", show: true, badge: r === "admin" ? pendingRequests : 0 },
     { href: "/receptions", label: t.nav.receptions, icon: "truck", show: can.viewReceptions(r) },
     { href: "/mercurial", label: t.nav.mercurial, icon: "list", show: can.viewMercurial(r) },
     { href: "/anomalies", label: t.nav.anomalies, icon: "alert", show: can.viewAnomalies(r) },
     { href: "/reporting", label: t.nav.reporting, icon: "chart", show: true },
     { href: "/protocoles", label: t.nav.protocols, icon: "book", show: can.viewProtocols(r) },
-    { href: "/demandes", label: t.nav.requests, icon: "inbox", show: true, badge: r === "admin" ? pendingRequests : 0 },
     { href: "/settings", label: t.nav.settings, icon: "gear", show: r === "admin" },
     { href: "/dev", label: t.nav.dev, icon: "sparkle", show: devVisible },
   ].filter((i) => i.show) as NavItem[];
@@ -92,7 +91,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {pendingRequests > 0 && (
           <Notice id="requests" version={pendingRequests} closeLabel={t.common.close} className="border-violet-200 bg-violet-50 text-violet-900">
             <strong>{pendingRequests}</strong> {t.requests.pending}
-            <a href="/demandes" className="font-semibold underline">{t.anomalies.reminderLink}</a>
+            <a href="/accueil/demandes" className="font-semibold underline">{t.anomalies.reminderLink}</a>
           </Notice>
         )}
         {dueAnomalies > 0 && (

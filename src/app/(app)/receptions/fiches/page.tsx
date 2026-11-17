@@ -20,9 +20,6 @@ export default async function SheetsPage({ searchParams }: { searchParams: Promi
   await runDueExports();
   await purgeOldExports();
   const today = parisDay();
-  const d30 = new Date(Date.now() - 30 * 86_400_000);
-  const from = /^\d{4}-\d{2}-\d{2}$/.test(one(sp.from) ?? "") ? one(sp.from)! : parisDay(d30);
-  const to = /^\d{4}-\d{2}-\d{2}$/.test(one(sp.to) ?? "") ? one(sp.to)! : today;
   const e = schema.receptionExports;
   const r = schema.receptions;
   const db = getDb();
@@ -31,9 +28,8 @@ export default async function SheetsPage({ searchParams }: { searchParams: Promi
     db
       .select({ id: r.id, deliveredAt: r.deliveredAt, supplierName: r.supplierName, blNumber: r.blNumber, documents: r.documents, status: r.status, consolidatedAt: r.consolidatedAt })
       .from(r)
-      .where(sql`${r.deliveredAt} >= ((${from}::date)::timestamp at time zone 'Europe/Paris') and ${r.deliveredAt} < ((${to}::date + 1)::timestamp at time zone 'Europe/Paris')`)
       .orderBy(desc(r.deliveredAt))
-      .limit(500),
+      .limit(2000),
     user.role === "admin" ? db.select({ id: schema.users.id, name: schema.users.name, role: schema.users.role }).from(schema.users).where(eq(schema.users.active, true)).orderBy(asc(schema.users.name)) : Promise.resolve([]),
     sheetValidatorIds(),
     db.select({ n: sql<number>`count(*)::int` }).from(e).where(isNotNull(e.archivedAt)),
@@ -93,13 +89,8 @@ export default async function SheetsPage({ searchParams }: { searchParams: Promi
       <section className="card mb-6 p-4">
         <h2 className="font-semibold">{f.manualTitle}</h2>
         <p className="mb-3 text-xs text-stone-500">{f.manualHint}</p>
-        <form method="get" className="mb-3 flex flex-wrap items-end gap-3">
-          <label><span className="label">{t.common.from}</span><input type="date" name="from" defaultValue={from} className="input py-2" /></label>
-          <label><span className="label">{t.common.to}</span><input type="date" name="to" defaultValue={to} className="input py-2" /></label>
-          <button className="btn-secondary py-2">{t.common.apply}</button>
-        </form>
         <ManualExport
-          rows={recs.map((x) => ({ id: x.id, date: fmtDateTime(x.deliveredAt, locale), supplier: x.supplierName, docs: docsOf(x), status: t.receptionStatus[x.status], consolidated: !!x.consolidatedAt }))}
+          rows={recs.map((x) => ({ id: x.id, date: fmtDateTime(x.deliveredAt, locale), dateSort: x.deliveredAt.toISOString(), supplier: x.supplierName, docs: docsOf(x), status: t.receptionStatus[x.status], consolidated: !!x.consolidatedAt }))}
         />
       </section>
 

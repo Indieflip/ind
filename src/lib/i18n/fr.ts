@@ -101,6 +101,7 @@ export const fr = {
     page: "page",
   },
   receptions: {
+    draftStatus: "Brouillon",
     actions: "Actions",
     actionSaved: "Action enregistrée (visible aussi dans le tableau Anomalies).",
     anomalyCount: "anomalie(s)",
@@ -164,6 +165,8 @@ export const fr = {
     consolidate: "Consolider ce bon",
   },
   wizard: {
+    accepted: "Acceptée",
+    missingPrice: "produit(s) sans prix unitaire : le prix est obligatoire.",
     noDriverSignature: "Signature du livreur : —",
     receiverTitle: "Signature du réceptionnaire",
     receiverName: "Nom et prénom",
@@ -902,7 +905,7 @@ export const fr = {
     automations: [
       { area: "Réception", trigger: "Photo du BL confirmée (étape 1)", action: "Lecture automatique du BL : fournisseur, n° de document et lignes produits pré-remplis.", where: "Étape 2 et 3 de la saisie" },
       { area: "Réception", trigger: "Passage à l'étape 2", action: "Brouillon enregistré sur le serveur (repris depuis Réceptions > Brouillons en cours).", where: "Réceptions" },
-      { area: "Réception", trigger: "Saisie de la T° camion, T° produit, DLC (étape 3)", action: "Conformité produit proposée : Conforme si tout est conforme, Refus si T° au-delà du seuil + marge acceptable ou DLC dépassée ; motif proposé. Un choix manuel n'est jamais remplacé.", where: "Étape 3 · Conformité produit" },
+      { area: "Réception", trigger: "Saisie de la T° camion, T° produit, DLC (étape 3)", action: "Conformité produit proposée : Acceptée si tout est conforme, Refus si T° au-delà du seuil + marge acceptable ou DLC dépassée ; motif proposé. Un choix manuel n'est jamais remplacé.", where: "Étape 3 · Conformité produit" },
       { area: "Réception", trigger: "Saisie des quantités et des prix", action: "Écart de quantité calculé ; prix comparé au mercurial (tranche min – max, prix bloqué).", where: "Étape 3" },
       { area: "Réception", trigger: "Étape 4", action: "Texte des réserves à recopier sur le BL généré (refus, manques, véhicule, T° camion).", where: "Étape 4 · Validation" },
       { area: "Réception", trigger: "Enregistrement", action: "Anomalies créées : refus, manque, T°, DLC dépassée, prix ≥ +10 % au-dessus du mercurial, prix bloqué, hygiène, BL manquant.", where: "Anomalies" },

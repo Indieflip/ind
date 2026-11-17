@@ -100,20 +100,6 @@ export function StepDelivery({ draft, setDraft, catalog, editId }: { draft: Draf
           />
         </div>
         <Documents draft={draft} setDraft={setDraft} editId={editId} />
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label">{t.wizard.driverName}</label>
-            <input
-              className="input"
-              list="drivers"
-              value={draft.driverName}
-              onChange={(e) => setDraft((d) => ({ ...d, driverName: e.target.value }))}
-            />
-            <datalist id="drivers">
-              {selected?.drivers.map((n) => <option key={n} value={n} />)}
-            </datalist>
-          </div>
-        </div>
         <div>
           <label className="label">{t.wizard.truckTemp}</label>
           <input

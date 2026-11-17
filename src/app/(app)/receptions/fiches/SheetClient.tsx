@@ -4,44 +4,33 @@ import { useState, useTransition } from "react";
 import { deleteExportedSheetsAction, setSheetValidatorsAction } from "@/lib/actions/sheets";
 import { useI18n } from "@/lib/i18n/client";
 import { Icon } from "@/components/Icon";
+import { DataTable, type Col } from "@/components/table/DataTable";
 
-/** Export manuel : choix des bons (n'importe lesquels), puis PDF ou Excel ; l'export est ajouté à l'historique */
-export function ManualExport({ rows }: { rows: { id: number; date: string; supplier: string; docs: string; status: string; consolidated: boolean }[] }) {
+type ManualRow = { id: number; date: string; dateSort: string; supplier: string; docs: string; status: string; consolidated: boolean };
+
+/** Export manuel : choix des bons (n'importe lesquels, filtres dans les en-têtes), puis PDF ou Excel ; l'export est ajouté à l'historique */
+export function ManualExport({ rows }: { rows: ManualRow[] }) {
   const { t } = useI18n();
   const f = t.rsheet;
   const router = useRouter();
-  const [ids, setIds] = useState<number[]>([]);
-  const all = rows.length > 0 && ids.length === rows.length;
+  const [sel, setSel] = useState<Set<string | number>>(new Set());
+  const cols: Col<ManualRow>[] = [
+    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, className: "whitespace-nowrap" },
+    { key: "supplier", label: t.common.supplier, text: (r) => r.supplier },
+    { key: "docs", label: t.receptions.blInvoice, text: (r) => r.docs, keepCase: true },
+    { key: "status", label: t.common.status, text: (r) => r.status },
+    { key: "consolidated", label: t.receptions.consolidated, text: (r) => (r.consolidated ? t.common.yes : t.common.no), options: [t.common.yes, t.common.no] },
+  ];
   return (
     <form method="post" action="/api/fiches/manuel" onSubmit={() => setTimeout(() => router.refresh(), 2500)}>
-      {ids.map((id) => <input key={id} type="hidden" name="ids" value={id} />)}
+      {[...sel].map((id) => <input key={id} type="hidden" name="ids" value={id} />)}
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="text-sm text-stone-600">{ids.length} {f.selected}</span>
-        <button name="format" value="pdf" className="btn-primary py-1.5" disabled={!ids.length}><Icon name="download" className="h-4 w-4" /> {f.exportSelection} · {f.pdf}</button>
-        <button name="format" value="xlsx" className="btn-secondary py-1.5" disabled={!ids.length}><Icon name="download" className="h-4 w-4" /> {f.excel}</button>
+        <span className="text-sm text-stone-600">{sel.size} {f.selected}</span>
+        <button name="format" value="pdf" className="btn-primary py-1.5" disabled={!sel.size}><Icon name="download" className="h-4 w-4" /> {f.exportSelection} · {f.pdf}</button>
+        <button name="format" value="xlsx" className="btn-secondary py-1.5" disabled={!sel.size}><Icon name="download" className="h-4 w-4" /> {f.excel}</button>
+        {sel.size > 0 && <button type="button" className="btn-ghost py-1.5 text-xs" onClick={() => setSel(new Set())}>{t.consolidation.selectNone}</button>}
       </div>
-      <div className="max-h-96 overflow-y-auto rounded-lg border border-stone-200">
-        <table className="table text-sm">
-          <thead className="sticky top-0 bg-white">
-            <tr>
-              <th className="w-10"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={all} onChange={(e) => setIds(e.target.checked ? rows.map((r) => r.id) : [])} aria-label={f.selectAll} /></th>
-              <th>{t.common.date}</th><th>{t.common.supplier}</th><th>{t.receptions.blInvoice}</th><th>{t.common.status}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && <tr><td colSpan={5} className="py-4 text-center text-stone-500">{f.empty}</td></tr>}
-            {rows.map((r) => (
-              <tr key={r.id} className="cursor-pointer" onClick={() => setIds(ids.includes(r.id) ? ids.filter((x) => x !== r.id) : [...ids, r.id])}>
-                <td><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={ids.includes(r.id)} readOnly /></td>
-                <td className="whitespace-nowrap">{r.date}</td>
-                <td>{r.supplier}</td>
-                <td className="text-stone-600">{r.docs}</td>
-                <td className="text-xs text-stone-600">{r.status}{r.consolidated && " · ✓"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} selectable selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} pageSize={50} dense empty={f.empty} />
     </form>
   );
 }
