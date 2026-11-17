@@ -1,0 +1,109 @@
+"use client";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { saveProjectDocAction, saveProjectRoiAction } from "@/lib/actions/dev";
+import { useI18n } from "@/lib/i18n/client";
+import { fmtMoney } from "@/lib/format";
+import { Icon } from "@/components/Icon";
+import { RichEditor, RichView } from "../protocoles/RichEditor";
+
+export interface ProjectKpis {
+  since: string | null; months: number; receptions: number; lines: number; anomalies: number; claims: number;
+  obtained: number; pending: number; rate: number | null; priceChanges: number; sheets: number; users: number;
+}
+export interface Roi { monthlyCost: number; hoursPerWeek: number; hourlyRate: number; sites: number }
+
+/** Dev > Projet : chiffres clés en direct, calcul coût / gains, document de travail (plan, concurrence, coût, objections…) */
+export function DevProject({ doc, kpis, roi }: { doc: string; kpis: ProjectKpis; roi: Roi }) {
+  const { t, locale } = useI18n();
+  const p = t.devProject;
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [html, setHtml] = useState(doc);
+  const [r, setR] = useState(roi);
+  const [pending, start] = useTransition();
+  const money = (n: number) => fmtMoney(n, locale);
+
+  const savingsPerMonth = kpis.obtained / Math.max(1, kpis.months);
+  const timePerMonth = r.hoursPerWeek * r.hourlyRate * 52 / 12;
+  const gains = savingsPerMonth + timePerMonth;
+  const result = gains - r.monthlyCost;
+
+  const kpi = (label: string, value: string, hint?: string) => (
+    <div className="card p-3">
+      <div className="text-xs font-medium uppercase tracking-wide text-stone-500">{label}</div>
+      <div className="mt-0.5 text-xl font-bold tabular-nums">{value}</div>
+      {hint && <div className="text-xs text-stone-500">{hint}</div>}
+    </div>
+  );
+  const field = (k: keyof Roi, label: string, suffix: string) => (
+    <label className="block">
+      <span className="label">{label}</span>
+      <span className="flex items-center gap-1">
+        <input className="input py-1.5 text-right" inputMode="decimal" value={String(r[k])} onChange={(e) => setR({ ...r, [k]: Number(e.target.value.replace(",", ".")) || 0 })} />
+        <span className="text-sm text-stone-500">{suffix}</span>
+      </span>
+    </label>
+  );
+
+  return (
+    <div className="space-y-6">
+      <section>
+        <h2 className="font-semibold">{p.kpisTitle}</h2>
+        <p className="mb-2 text-xs text-stone-500">{kpis.since ? `${p.since} ${kpis.since} · ${kpis.months} ${p.months}` : p.noData}</p>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-6">
+          {kpi(p.obtained, money(kpis.obtained), `${money(savingsPerMonth)} / ${p.month}`)}
+          {kpi(p.pending, money(kpis.pending))}
+          {kpi(p.rate, kpis.rate == null ? "—" : `${Math.round(kpis.rate * 100)} %`)}
+          {kpi(p.receptions, String(kpis.receptions), `${kpis.lines} ${p.lines}`)}
+          {kpi(p.anomalies, String(kpis.anomalies), `${kpis.claims} ${p.claims}`)}
+          {kpi(p.priceChanges, String(kpis.priceChanges))}
+          {kpi(p.sheets, String(kpis.sheets))}
+          {kpi(p.users, String(kpis.users))}
+        </div>
+      </section>
+
+      <section className="card p-4">
+        <h2 className="font-semibold">{p.roiTitle}</h2>
+        <p className="mb-3 text-xs text-stone-500">{p.roiHint}</p>
+        <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
+          <div className="grid grid-cols-2 gap-3">
+            {field("monthlyCost", p.monthlyCost, "€ / " + p.month)}
+            {field("hoursPerWeek", p.hoursPerWeek, "h / " + p.week)}
+            {field("hourlyRate", p.hourlyRate, "€ / h")}
+            {field("sites", p.sites, "")}
+            <div className="col-span-2">
+              <button type="button" className="btn-secondary py-1.5" disabled={pending} onClick={() => start(async () => { await saveProjectRoiAction(r); router.refresh(); })}>{t.common.save}</button>
+            </div>
+          </div>
+          <table className="table text-sm">
+            <tbody>
+              <tr><td>{p.savingsMonth}</td><td className="text-right tabular-nums">{money(savingsPerMonth)}</td></tr>
+              <tr><td>{p.timeMonth}</td><td className="text-right tabular-nums">{money(timePerMonth)}</td></tr>
+              <tr className="font-semibold"><td>{p.gainsMonth}</td><td className="text-right tabular-nums">{money(gains)}</td></tr>
+              <tr><td>{p.costMonth}</td><td className="text-right tabular-nums">− {money(r.monthlyCost)}</td></tr>
+              <tr className={`font-bold ${result >= 0 ? "text-emerald-700" : "text-red-700"}`}><td>{p.resultMonth}</td><td className="text-right tabular-nums">{money(result)}</td></tr>
+              <tr><td>{p.resultYear}{r.sites > 1 ? ` (${r.sites} ${p.sitesShort})` : ""}</td><td className="text-right font-semibold tabular-nums">{money(result * 12 * r.sites)}</td></tr>
+              <tr><td>{p.costPerReception}</td><td className="text-right tabular-nums">{kpis.receptions ? money((r.monthlyCost * kpis.months) / kpis.receptions) : "—"}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="font-semibold">{p.docTitle}</h2>
+          {editing ? (
+            <span className="flex gap-2">
+              <button type="button" className="btn-primary py-1.5" disabled={pending} onClick={() => start(async () => { await saveProjectDocAction(html); setEditing(false); router.refresh(); })}><Icon name="check" className="h-4 w-4" /> {t.common.save}</button>
+              <button type="button" className="btn-ghost py-1.5" onClick={() => { setHtml(doc); setEditing(false); }}>{t.common.cancel}</button>
+            </span>
+          ) : (
+            <button type="button" className="btn-secondary py-1.5" onClick={() => setEditing(true)}><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</button>
+          )}
+        </div>
+        {editing ? <RichEditor value={html} onChange={setHtml} /> : <div className="card p-5 sm:p-6"><RichView html={doc} /></div>}
+      </section>
+    </div>
+  );
+}

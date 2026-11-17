@@ -366,3 +366,30 @@ export async function allSheetsForExport() {
   return out;
 }
 
+
+/** Export manuel d'une période : fiches validées (dernière version validée) entre deux dates */
+export async function validatedSheetsBetween(from?: string, to?: string) {
+  const s = schema.receptionSheets;
+  const conds = [];
+  if (from) conds.push(sql`${s.date} >= ${from}`);
+  if (to) conds.push(sql`${s.date} <= ${to}`);
+  const ids = await getDb().select({ id: s.id }).from(s).where(conds.length ? sql.join(conds, sql` and `) : undefined).orderBy(asc(s.date));
+  const out: { s: LoadedSheet; version: LoadedSheet["versions"][number] }[] = [];
+  for (const { id } of ids) {
+    const x = await loadSheet(id);
+    const version = x && lastValidated(x);
+    if (x && version) out.push({ s: x, version });
+  }
+  return out;
+}
+
+/** Plusieurs fiches dans un seul PDF (une fiche à la suite de l'autre) */
+export async function sheetsPdf(list: { s: LoadedSheet; version: LoadedSheet["versions"][number] }[], meta: ExportMeta) {
+  const doc = await PDFDocument.create();
+  doc.setTitle(dictFor(meta.locale === "en" ? "en" : "fr").rsheet.titleShort);
+  for (const { s, version } of list) {
+    const one = await PDFDocument.load(await sheetPdf(s, version, meta));
+    for (const p of await doc.copyPages(one, one.getPageIndices())) doc.addPage(p);
+  }
+  return Buffer.from(await doc.save());
+}

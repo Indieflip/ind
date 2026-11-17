@@ -56,3 +56,20 @@ export async function deleteDevFieldAction(id: number) {
   await getDb().delete(schema.devFields).where(eq(schema.devFields.id, id));
   revalidatePath("/dev");
 }
+
+/** Dev > Projet : document de travail (éditeur de texte riche) */
+export async function saveProjectDocAction(html: string) {
+  await guard();
+  await setSetting("dev_project_doc", html.slice(0, 500_000));
+  revalidatePath("/dev");
+  return { ok: true };
+}
+
+/** Dev > Projet : hypothèses du calcul coût / gains */
+export async function saveProjectRoiAction(data: { monthlyCost: number; hoursPerWeek: number; hourlyRate: number; sites: number }) {
+  await guard();
+  const n = (v: number) => (Number.isFinite(v) && v >= 0 ? Math.round(v * 100) / 100 : 0);
+  await setSetting("dev_project_roi", JSON.stringify({ monthlyCost: n(data.monthlyCost), hoursPerWeek: n(data.hoursPerWeek), hourlyRate: n(data.hourlyRate), sites: Math.max(1, Math.round(n(data.sites))) }));
+  revalidatePath("/dev");
+  return { ok: true };
+}

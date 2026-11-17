@@ -42,6 +42,17 @@ export default async function SheetsPage() {
       <p className="mb-1 max-w-4xl text-sm text-stone-600">{f.intro}</p>
       <p className="mb-4 max-w-4xl text-sm font-medium text-brand-700">{f.autoHint}</p>
 
+      <section className="card mb-4 p-4">
+        <h2 className="font-semibold">{f.manualExport}</h2>
+        <p className="mb-2 text-xs text-stone-500">{f.manualExportHint}</p>
+        <form method="get" action="/api/fiches/periode" className="flex flex-wrap items-end gap-3">
+          <label><span className="label">{t.common.from}</span><input type="date" name="from" defaultValue={`${today.slice(0, 8)}01`} className="input py-2" /></label>
+          <label><span className="label">{t.common.to}</span><input type="date" name="to" defaultValue={today} className="input py-2" /></label>
+          <button name="format" value="pdf" className="btn-primary py-2"><Icon name="download" className="h-4 w-4" /> {f.pdf}</button>
+          <button name="format" value="xlsx" className="btn-secondary py-2"><Icon name="download" className="h-4 w-4" /> {f.excel}</button>
+        </form>
+      </section>
+
       <div className="card mb-6 overflow-x-auto">
         <table className="table">
           <thead>
