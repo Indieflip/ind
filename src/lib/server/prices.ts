@@ -1,5 +1,5 @@
 import "server-only";
-import { and, desc, eq, isNull, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { dateRange, one, type SP } from "./queries";
 
@@ -22,8 +22,45 @@ export function priceWhere(f: PriceFilters) {
   return conds.length ? and(...conds) : undefined;
 }
 
-export function listPriceChanges(f: PriceFilters, limit = 500) {
-  return getDb().select().from(schema.priceChanges).where(priceWhere(f)).orderBy(desc(schema.priceChanges.date), desc(schema.priceChanges.id)).limit(limit);
+/**
+ * Lignes du Suivi des prix avec leur N° (ordre chronologique de toutes les variations, rajouts produits exclus)
+ * et le document : référence saisie, sinon BL / facture de la réception.
+ */
+export async function listPriceChanges(f: PriceFilters, limit = 2000) {
+  const p = schema.priceChanges;
+  const db = getDb();
+  const [rows, order] = await Promise.all([
+    db
+      .select({ p, documents: schema.receptions.documents, blNumber: schema.receptions.blNumber })
+      .from(p)
+      .leftJoin(schema.receptions, eq(schema.receptions.id, p.receptionId))
+      .where(priceWhere(f))
+      .orderBy(desc(p.date), desc(p.id))
+      .limit(limit),
+    db.select({ id: p.id }).from(p).where(ne(p.type, "new_product")).orderBy(asc(p.date), asc(p.id)),
+  ]);
+  const numbers = new Map(order.map((o, i) => [o.id, i + 1]));
+  return rows.map(({ p: r, documents, blNumber }) => {
+    const docs = (documents as { type: string; number: string }[] | null) ?? [];
+    const recDoc = docs.length
+      ? docs.map((d) => `${d.type === "facture" ? "Facture" : d.type === "autre" ? "Doc." : "BL"} ${d.number}`).join(" · ")
+      : blNumber ? `BL ${blNumber}` : null;
+    return { ...r, number: numbers.get(r.id) ?? null, document: r.invoiceRef || recDoc || null };
+  });
+}
+
+/** Nombre de hausses et de baisses par mois sur 12 mois (rajouts produits exclus) */
+export async function priceMonthly(endMonth: string, supplier?: string) {
+  const p = schema.priceChanges;
+  const bySupplier = supplier && /^\d+$/.test(supplier) ? sql`and ${p.supplierId} = ${Number(supplier)}` : sql``;
+  const res = await getDb().execute<{ month: string; increases: number; decreases: number }>(sql`
+    with m as (select generate_series((${endMonth + "-01"}::date - interval '11 months'), ${endMonth + "-01"}::date, interval '1 month') as m)
+    select to_char(m.m, 'YYYY-MM') as month,
+      count(${p.id}) filter (where ${p.type} = 'increase')::int as increases,
+      count(${p.id}) filter (where ${p.type} = 'decrease')::int as decreases
+    from m left join ${p} on date_trunc('month', ${p.date} at time zone 'Europe/Paris') = m.m ${bySupplier}
+    group by m.m order by m.m`);
+  return res.rows;
 }
 
 export interface PriceRecapRow { supplierId: number | null; supplier: string; increases: number; avgIncrease: number | null; maxIncrease: number | null; unclaimed: number; decreases: number; avgDecrease: number | null }

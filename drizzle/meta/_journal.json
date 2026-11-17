@@ -148,6 +148,13 @@
       "when": 1794870563664,
       "tag": "0020_credit_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794911127692,
+      "tag": "0021_price_maj_haccp",
+      "breakpoints": true
     }
   ]
 }

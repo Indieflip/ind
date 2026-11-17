@@ -7,7 +7,7 @@ import { fmtMoney, fmtPct } from "@/lib/format";
 import { one, type SP } from "@/lib/server/queries";
 import { Field, FilterBar, PageHeader, Stat, qs } from "@/components/ui";
 import Link from "next/link";
-import { MonthlyBars } from "./MonthlyBars";
+import { syncMajPrices } from "@/lib/server/priceSync";
 
 function defaultFrom() {
   const d = new Date();
@@ -24,8 +24,9 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
   const start = sql`((${from}::date)::timestamp at time zone 'Europe/Paris')`;
   const end = sql`((${to}::date + 1)::timestamp at time zone 'Europe/Paris')`;
   const db = getDb();
+  await syncMajPrices();
 
-  const [kpi, anomalyKpi, priceKpi, monthly] = await Promise.all([
+  const [kpi, anomalyKpi, priceKpi] = await Promise.all([
     db.execute<{ receptions: number; conform: number }>(sql`
       select count(*)::int as receptions, count(*) filter (where status = 'conform')::int as conform
       from receptions where delivered_at >= ${start} and delivered_at < ${end}`),
@@ -39,20 +40,12 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
              avg(pct) filter (where type = 'increase') as avg,
              count(*) filter (where type = 'increase' and (claim is null or trim(claim) = ''))::int as unclaimed
       from price_changes where date >= ${start} and date < ${end}`),
-    db.execute<{ month: string; increases: number; decreases: number }>(sql`
-      select to_char(m, 'YYYY-MM') as month,
-        (select count(*)::int from price_changes where type = 'increase' and date_trunc('month', date at time zone 'Europe/Paris') = m) as increases,
-        (select count(*)::int from price_changes where type = 'decrease' and date_trunc('month', date at time zone 'Europe/Paris') = m) as decreases
-      from generate_series(date_trunc('month', now() at time zone 'Europe/Paris') - interval '11 months', date_trunc('month', now() at time zone 'Europe/Paris'), interval '1 month') m
-      order by m`),
   ]);
 
   const k = kpi.rows[0];
   const ak = anomalyKpi.rows[0];
   const pk = priceKpi.rows[0];
   const rate = k.receptions ? Math.round((k.conform / k.receptions) * 100) : null;
-  const monthLabel = (m: string) =>
-    new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "fr-FR", { month: "short" }).format(new Date(m + "-15"));
 
   return (
     <>
@@ -75,15 +68,6 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
           <Stat label={t.reporting.priceIncreases} value={pk.increases} hint={`${t.reporting.avgIncrease} ${fmtPct(pk.avg != null ? Math.round(pk.avg * 10) / 10 : null)} · ${pk.unclaimed} ${t.prices.unclaimed.toLowerCase()}`} />
         )}
       </div>
-
-      <section className="card mb-6 p-4">
-        <h2 className="mb-1 font-semibold">{t.reporting.priceTrend}</h2>
-        <MonthlyBars
-          data={monthly.rows.map((r) => ({ label: monthLabel(r.month), a: r.increases, b: r.decreases }))}
-          aLabel={t.reporting.increases}
-          bLabel={t.reporting.decreases}
-        />
-      </section>
 
     </>
   );

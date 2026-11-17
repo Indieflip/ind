@@ -8,7 +8,7 @@ import { Field, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { DraftBanner, DeleteDraftButton } from "@/components/reception/DraftBanner";
 import { ReceptionsTable } from "./ReceptionsTable";
-import { desc, eq } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 
 export default async function ReceptionsPage({ searchParams }: { searchParams: Promise<SP> }) {
@@ -16,13 +16,19 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
   const { t, locale } = await getDict();
   const sp = await searchParams;
   const f = receptionFilters(sp);
-  const [raw, drafts] = await Promise.all([
+  const h = t.haccpReg;
+  const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date());
+  const [raw, drafts, registers] = await Promise.all([
     listReceptions(f),
     getDb()
       .select({ id: schema.receptionDrafts.id, supplierName: schema.receptionDrafts.supplierName, blNumber: schema.receptionDrafts.blNumber, updatedAt: schema.receptionDrafts.updatedAt, by: schema.users.name })
       .from(schema.receptionDrafts)
       .leftJoin(schema.users, eq(schema.users.id, schema.receptionDrafts.createdBy))
       .orderBy(desc(schema.receptionDrafts.updatedAt)),
+    Promise.all([
+      getDb().select({ n: count() }).from(schema.haccpRegisters),
+      getDb().select({ id: schema.haccpRegisters.id, createdAt: schema.haccpRegisters.createdAt }).from(schema.haccpRegisters).orderBy(desc(schema.haccpRegisters.id)).limit(1),
+    ]).then(([[c], [last]]) => ({ n: c.n, last })),
   ]);
   return (
     <>
@@ -76,12 +82,17 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
       />
 
       <section className="no-print card mt-6 p-4">
-        <h2 className="font-semibold">{t.reporting.haccp}</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold">{t.reporting.haccp}</h2>
+          <Link href="/receptions/registres" className="text-sm font-semibold text-brand-700 underline">{h.history} ({registers.n})</Link>
+        </div>
         <p className="mt-1 text-sm text-stone-600">{t.reporting.haccpHint}</p>
-        <form method="get" action="/api/export/receptions" className="mt-3 flex flex-wrap items-end gap-3">
-          <Field label={t.common.from}><input type="date" name="from" defaultValue={f.from} className="input py-2" /></Field>
-          <Field label={t.common.to}><input type="date" name="to" defaultValue={f.to} className="input py-2" /></Field>
-          <button className="btn-primary py-2"><Icon name="download" className="h-4 w-4" /> {t.reporting.exportHaccp}</button>
+        <p className="mt-1 text-xs text-stone-500">{registers.last ? `${h.last} : N° ${registers.last.id} · ${fmtDateTime(registers.last.createdAt, locale)}` : h.none}</p>
+        <form method="get" action="/api/haccp" className="mt-3 flex flex-wrap items-end gap-3">
+          <Field label={t.common.from}><input type="date" name="from" defaultValue={f.from ?? today} className="input py-2" /></Field>
+          <Field label={t.common.to}><input type="date" name="to" defaultValue={f.to ?? today} className="input py-2" /></Field>
+          <button name="format" value="pdf" className="btn-primary py-2"><Icon name="download" className="h-4 w-4" /> {h.pdf}</button>
+          <button name="format" value="xlsx" className="btn-secondary py-2"><Icon name="download" className="h-4 w-4" /> {h.excel}</button>
         </form>
       </section>
     </>

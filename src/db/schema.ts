@@ -19,7 +19,7 @@ export const roleEnum = pgEnum("role", ["admin", "econome", "comptable", "invite
 export const decisionEnum = pgEnum("decision", ["conform", "reserve", "refuse"]);
 export const receptionStatusEnum = pgEnum("reception_status", ["conform", "with_reserves", "partial_refusal", "refused"]);
 export const priceChangeTypeEnum = pgEnum("price_change_type", ["increase", "decrease", "new_product"]);
-export const priceSourceEnum = pgEnum("price_source", ["reception", "invoice", "manual", "import"]);
+export const priceSourceEnum = pgEnum("price_source", ["reception", "invoice", "manual", "import", "mercurial"]);
 export const anomalyTypeEnum = pgEnum("anomaly_type", [
   "missing",
   "damaged",
@@ -225,8 +225,10 @@ export const priceChanges = pgTable(
     invoiceRef: text("invoice_ref"),
     claim: text("claim"),
     createdBy: integer("created_by").references(() => users.id),
+    /** Ligne de l'historique des modifications du Mercurial qui a généré cette variation */
+    majId: integer("maj_id").references(() => majLog.id, { onDelete: "cascade" }),
   },
-  (t) => [index("price_changes_date_idx").on(t.date)],
+  (t) => [index("price_changes_date_idx").on(t.date), uniqueIndex("price_changes_maj_idx").on(t.majId)],
 );
 
 export const anomalies = pgTable(
@@ -546,4 +548,19 @@ export const devItems = pgTable("dev_items", {
   priority: text("priority"),
   position: integer("position").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Registres HACCP générés (copie figée des lignes, re-téléchargeable en PDF / Excel / CSV) */
+export const haccpRegisters = pgTable("haccp_registers", {
+  id: serial("id").primaryKey(),
+  fromDate: date("from_date"),
+  toDate: date("to_date"),
+  receptionCount: integer("reception_count").notNull().default(0),
+  lineCount: integer("line_count").notNull().default(0),
+  /** Format du premier export (pdf | xlsx | csv) */
+  format: text("format").notNull().default("pdf"),
+  /** En-têtes et lignes du registre au moment de sa création */
+  data: jsonb("data").$type<{ header: string[]; rows: (string | number | null)[][] }>().notNull(),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

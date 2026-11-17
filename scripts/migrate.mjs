@@ -385,6 +385,13 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_seed_v3'`
   await db.execute(sql`insert into app_settings (key, value) values ('dev_seed_v3', '1') on conflict (key) do nothing`);
 }
 
+// Onglet Dev : point en attente sur le registre HACCP quotidien (une fois)
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_seed_v4'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_items`)).rows[0].p);
+  await db.execute(sql`insert into dev_items (kind, title, detail, owner, priority, position) values ('pending', ${"Registre HACCP quotidien + fiche de réception obligatoire en cas de contrôle"}, ${"Le registre HACCP doit être fait au moins une fois par jour. À reprendre quand les règles de conformité et les champs de température obligatoires seront définis : rendre la fiche de réception obligatoire (champs requis, blocage de l'enregistrement si incomplet) et ajouter un rappel quotidien si aucun registre n'a été généré."}, 'moi', 'moyenne', ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_seed_v4', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

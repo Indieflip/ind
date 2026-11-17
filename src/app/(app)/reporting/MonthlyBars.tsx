@@ -1,13 +1,15 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 // Palette catégorielle validée (contrôle daltonisme OK) : bleu = série A, orange = série B
 const A = "#2a78d6";
 const B = "#eb6834";
 
 /** Barres groupées par mois, une seule échelle, survol avec infobulle */
-export function MonthlyBars({ data, aLabel, bLabel }: { data: { label: string; a: number; b: number }[]; aLabel: string; bLabel: string }) {
+export function MonthlyBars({ data, aLabel, bLabel, hint }: { data: { label: string; a: number; b: number; href?: string; active?: boolean }[]; aLabel: string; bLabel: string; hint?: string }) {
   const [hover, setHover] = useState<number | null>(null);
+  const router = useRouter();
   const W = 720, H = 220, padL = 28, padB = 24, padT = 12;
   const max = Math.max(1, ...data.flatMap((d) => [d.a, d.b]));
   const step = Math.max(1, Math.ceil(max / 4));
@@ -39,11 +41,11 @@ export function MonthlyBars({ data, aLabel, bLabel }: { data: { label: string; a
         {data.map((d, i) => {
           const cx = padL + slot * i + slot / 2;
           return (
-            <g key={i} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
-              <rect x={padL + slot * i} y={padT} width={slot} height={H - padT - padB} fill={hover === i ? "#f5f5f4" : "transparent"} />
+            <g key={i} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} onClick={() => d.href && router.push(d.href)} style={{ cursor: d.href ? "pointer" : undefined }}>
+              <rect x={padL + slot * i} y={padT} width={slot} height={H - padT - padB} fill={hover === i ? "#f5f5f4" : d.active ? "#fafaf9" : "transparent"} />
               {bar(cx - bw - 1, d.a, A)}
               {bar(cx + 1, d.b, B)}
-              <text x={cx} y={H - 6} textAnchor="middle" fontSize={10} fill="#78716c">{d.label}</text>
+              <text x={cx} y={H - 6} textAnchor="middle" fontSize={10} fill={d.active ? "#1c1917" : "#78716c"} fontWeight={d.active ? 700 : 400}>{d.label}</text>
             </g>
           );
         })}
@@ -56,6 +58,7 @@ export function MonthlyBars({ data, aLabel, bLabel }: { data: { label: string; a
           <div className="mb-1 font-semibold text-stone-900">{data[hover].label}</div>
           <div className="flex items-center gap-1.5 text-stone-700"><span className="h-2 w-2 rounded-sm" style={{ background: A }} />{aLabel} : <strong>{data[hover].a}</strong></div>
           <div className="flex items-center gap-1.5 text-stone-700"><span className="h-2 w-2 rounded-sm" style={{ background: B }} />{bLabel} : <strong>{data[hover].b}</strong></div>
+          {hint && data[hover].href && <div className="mt-1 text-[11px] text-stone-500">{hint}</div>}
         </div>
       )}
     </div>

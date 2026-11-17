@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   );
   const fmt = (d: Date) => new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeZone: "Europe/Paris" }).format(d);
   return csvResponse(`suivi-prix-${new Date().toISOString().slice(0, 10)}.csv`, [
-    [t.common.date, t.common.supplier, t.common.product, t.common.unit, t.prices.old, t.prices.new, `${t.prices.gap} %`, t.prices.type, t.prices.source, t.prices.invoiceRef, t.prices.claim],
-    ...rows.map((r) => [fmt(r.date), r.supplierName, r.productName, r.unit, num(r.oldPrice), num(r.newPrice), r.pct, t.prices.types[r.type], t.prices.sources[r.source], r.invoiceRef, r.claim]),
+    ["N°", t.common.date, t.common.supplier, t.common.product, t.common.unit, t.prices.document, t.prices.type, `${t.prices.variation} %`, t.prices.old, t.prices.new, t.prices.source, t.prices.claim],
+    ...rows.map((r) => [r.number, fmt(r.date), r.supplierName, r.productName, r.unit, r.document, t.prices.types[r.type], r.pct, num(r.oldPrice), num(r.newPrice), t.prices.sources[r.source], r.claim]),
   ]);
 }

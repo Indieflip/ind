@@ -1,4 +1,5 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, isNotNull } from "drizzle-orm";
+import { syncMajPrices } from "@/lib/server/priceSync";
 import { ensureMajNormalized } from "@/lib/server/maj";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
@@ -9,7 +10,11 @@ import { MajLog } from "./MajLog";
 export default async function MercurialUpdatesPage() {
   const user = await requireUser(can.viewMercurial);
   await ensureMajNormalized();
+  await syncMajPrices();
   const m = schema.majLog;
+  const linked = await getDb().select({ majId: schema.priceChanges.majId, supplierId: schema.priceChanges.supplierId, date: schema.priceChanges.date }).from(schema.priceChanges).where(isNotNull(schema.priceChanges.majId));
+  const price = new Map(linked.map((l) => [l.majId, l]));
+  const day = (d: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(d);
   const rows = await getDb()
     .select({ r: m, supplier: schema.suppliers.name, product: schema.products.name })
     .from(m)
@@ -21,6 +26,7 @@ export default async function MercurialUpdatesPage() {
       rows={rows.map(({ r, supplier, product }) => ({
         id: r.id, date: r.date, nature: r.nature, item: product ?? r.item, original: product && product !== r.item ? r.item : null,
         detail: r.detail, supplier: supplier ?? null, supplierId: r.supplierId, reference: r.reference, claim: r.claim,
+        priceHref: price.has(r.id) ? `/reporting/prix?${new URLSearchParams({ from: day(price.get(r.id)!.date), to: day(price.get(r.id)!.date), ...(price.get(r.id)!.supplierId ? { supplier: String(price.get(r.id)!.supplierId) } : {}) })}` : null,
       }))}
       editable={can.editPrices(user.role)}
     />
