@@ -10,6 +10,8 @@ import { PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { ProtocolEditor, ProtocolView } from "./ProtocolClient";
 import { ContainersTable } from "./ContainersTable";
+import { ProtocolNav } from "./ProtocolNav";
+import { getSetting } from "@/lib/settings";
 import { CategoryClassSelect, ThresholdsEditor } from "./ThresholdsEditor";
 import { ConformityRow } from "../settings/SettingsClient";
 import { backupSettings } from "@/lib/server/backup";
@@ -31,11 +33,13 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   ]);
   const deg = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${fmtNum(Math.abs(v), locale, 1)} °C`;
   const list = await getDb()
-    .select({ id: schema.protocols.id, title: schema.protocols.title, content: schema.protocols.content, updatedAt: schema.protocols.updatedAt, by: schema.users.name })
+    .select({ id: schema.protocols.id, title: schema.protocols.title, content: schema.protocols.content, folder: schema.protocols.folder, updatedAt: schema.protocols.updatedAt, by: schema.users.name })
     .from(schema.protocols)
     .leftJoin(schema.users, eq(schema.users.id, schema.protocols.updatedBy))
     .orderBy(asc(schema.protocols.position), asc(schema.protocols.id));
   const editable = can.editProtocols(user.role);
+  // Dossiers : ceux créés (même vides) + ceux utilisés, par ordre alphabétique
+  const folders = [...new Set([...(JSON.parse((await getSetting("protocol_folders")) ?? "[]") as string[]), ...list.map((x) => x.folder).filter((x): x is string => !!x)])].sort((a, b) => a.localeCompare(b, "fr"));
   const creating = one(sp.new) === "1" && editable;
   const editing = one(sp.edit) === "1" && editable;
   const current = creating || showConformity ? null : list.find((p) => String(p.id) === one(sp.id)) ?? list[0];
@@ -49,17 +53,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
         {editable && <Link href="/protocoles?new=1" className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t.protocols.new}</Link>}
       </PageHeader>
       <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
-        <nav className="no-print card h-fit p-2">
-          {list.length === 0 && <p className="p-2 text-sm text-stone-500">{t.protocols.empty}</p>}
-          {list.map((p) => (
-            <Link key={p.id} href={`/protocoles?id=${p.id}`} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${current?.id === p.id && !creating ? "bg-brand-50 text-brand-700" : "text-stone-700 hover:bg-stone-100"}`}>
-              <Icon name="book" className="h-4 w-4" /> {p.title}
-            </Link>
-          ))}
-          <Link href="/protocoles?id=conformite" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${showConformity ? "bg-brand-50 text-brand-700" : "text-stone-700 hover:bg-stone-100"}`}>
-            <Icon name="check" className="h-4 w-4" /> {t.protocols.conformity}
-          </Link>
-        </nav>
+        <ProtocolNav list={list.map((x) => ({ id: x.id, title: x.title, folder: x.folder }))} folders={folders} currentId={creating || showConformity ? null : current?.id ?? null} conformity={showConformity} editable={editable} />
         <div className="min-w-0">
           {showConformity ? (
             <article className="card p-5 sm:p-6">
@@ -154,10 +148,10 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
               <p className="mt-2 text-xs text-stone-500">{t.settings.regDisclaimer}</p>
             </article>
           ) : creating ? (
-            <ProtocolEditor id={null} title="" content="" />
+            <ProtocolEditor id={null} title="" content="" folder={one(sp.folder) ?? null} folders={folders} />
           ) : current ? (
             editing ? (
-              <ProtocolEditor id={current.id} title={current.title} content={current.content} />
+              <ProtocolEditor id={current.id} title={current.title} content={current.content} folder={current.folder} folders={folders} />
             ) : (
               <article className="card p-5 sm:p-6">
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-2">

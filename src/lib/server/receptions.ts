@@ -6,7 +6,6 @@ import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { num } from "@/lib/format";
 import { evaluateLine, receptionStatus } from "@/lib/rules";
-import { syncSheetsSafe } from "./sheets";
 import { checkPrice, fvRange, parisMonth, type PriceCheck, type PriceRef } from "@/lib/pricing";
 
 const fmtEuro = (n: number | null | undefined) => (n == null ? "—" : `${n.toFixed(2).replace(".", ",")} €`);
@@ -438,10 +437,6 @@ export async function saveReception(p: Payload, user: SessionUser): Promise<numb
     await writeContent(tx, rec.id, supplier, p, user, t);
     await tx.delete(schema.receptionDrafts).where(eq(schema.receptionDrafts.clientUuid, p.clientUuid));
     return rec.id;
-  }).then(async (id) => {
-    // Fiche de réception de marchandises du jour : générée / mise à jour automatiquement
-    await syncSheetsSafe([new Date(p.deliveredAt)], `${t.rsheet.autoUpdate} : ${t.rsheet.autoAdded} (${p.supplierName})`, user);
-    return id;
   });
 }
 
@@ -530,12 +525,7 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
       .set({ ...supplier, ...headerValues(p), updatedBy: user.id, updatedAt: new Date() })
       .where(eq(schema.receptions.id, id));
     await writeContent(tx, id, supplier, p, user, t, keep, claims, unchanged);
-    return { id, before: rec.deliveredAt };
-  }).then(async (r) => {
-    if (!r) return null;
-    // Fiche(s) du jour mises à jour (ancienne et nouvelle date si la date de livraison a changé)
-    await syncSheetsSafe([r.before, new Date(p.deliveredAt)], `${t.rsheet.autoUpdate} : ${t.rsheet.autoEdited} (${p.supplierName})`, user);
-    return r.id;
+    return id;
   });
 }
 

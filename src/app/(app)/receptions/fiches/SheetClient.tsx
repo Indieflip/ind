@@ -1,83 +1,48 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { addModificationAction, createSheetAction, deleteExportedSheetsAction, refreshPendingAction, reviewSheetAction, setSheetValidatorsAction } from "@/lib/actions/sheets";
+import { deleteExportedSheetsAction, setSheetValidatorsAction } from "@/lib/actions/sheets";
 import { useI18n } from "@/lib/i18n/client";
 import { Icon } from "@/components/Icon";
 
-/** Édite (crée ou ouvre) la fiche d'un jour */
-export function EditSheetButton({ date, label, className = "btn-primary" }: { date: string; label: string; className?: string }) {
-  const router = useRouter();
-  const [pending, start] = useTransition();
-  return (
-    <button type="button" className={className} disabled={pending} onClick={() => start(async () => { const r = await createSheetAction(date); if (r.id) router.push(`/receptions/fiches/${r.id}`); })}>
-      <Icon name="file" className="h-4 w-4" /> {pending ? "…" : label}
-    </button>
-  );
-}
-
-/** Choix d'un autre jour */
-export function EditSheetForDate({ today }: { today: string }) {
-  const { t } = useI18n();
-  const [date, setDate] = useState(today);
-  return (
-    <div className="flex flex-wrap items-end gap-2">
-      <label><span className="label">{t.rsheet.editDate}</span><input type="date" className="input py-2" value={date} max={today} onChange={(e) => setDate(e.target.value)} /></label>
-      <EditSheetButton date={date} label={t.rsheet.edit} className="btn-secondary py-2" />
-    </div>
-  );
-}
-
-/** Actions sur la dernière version : mise à jour (en attente), validation / refus (responsable), modification (validée ou refusée) */
-export function SheetActions({ sheetId, versionId, status, canValidate }: { sheetId: number; versionId: number; status: string; canValidate: boolean }) {
+/** Export manuel : choix des bons (n'importe lesquels), puis PDF ou Excel ; l'export est ajouté à l'historique */
+export function ManualExport({ rows }: { rows: { id: number; date: string; supplier: string; docs: string; status: string; consolidated: boolean }[] }) {
   const { t } = useI18n();
   const f = t.rsheet;
   const router = useRouter();
-  const [pending, start] = useTransition();
-  const [reason, setReason] = useState("");
-  const [note, setNote] = useState("");
-  const [rejecting, setRejecting] = useState(false);
-  const [modifying, setModifying] = useState(false);
-  const run = (fn: () => Promise<unknown>) => start(async () => { await fn(); setReason(""); setNote(""); setRejecting(false); setModifying(false); router.refresh(); });
-
-  if (status === "pending") {
-    return (
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className="btn-secondary" disabled={pending} onClick={() => run(() => refreshPendingAction(sheetId))}><Icon name="layers" className="h-4 w-4" /> {f.refresh}</button>
-          <span className="text-xs text-stone-500">{f.refreshHint}</span>
-        </div>
-        {canValidate ? (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-            <p className="mb-2 text-sm text-emerald-900">{f.validateHint}</p>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className="btn-primary" disabled={pending} onClick={() => run(() => reviewSheetAction(versionId, "validated", ""))}><Icon name="check" className="h-4 w-4" /> {f.validate}</button>
-              {!rejecting && <button type="button" className="btn-secondary" onClick={() => setRejecting(true)}>{f.reject}</button>}
-            </div>
-            {rejecting && (
-              <div className="mt-2 flex flex-wrap items-end gap-2">
-                <label className="min-w-64 flex-1"><span className="label">{f.rejectNote}</span><input className="input" value={note} onChange={(e) => setNote(e.target.value)} /></label>
-                <button type="button" className="btn-danger" disabled={pending || !note.trim()} onClick={() => run(() => reviewSheetAction(versionId, "rejected", note))}>{f.reject}</button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{f.notValidator}</p>
-        )}
+  const [ids, setIds] = useState<number[]>([]);
+  const all = rows.length > 0 && ids.length === rows.length;
+  return (
+    <form method="post" action="/api/fiches/manuel" onSubmit={() => setTimeout(() => router.refresh(), 2500)}>
+      {ids.map((id) => <input key={id} type="hidden" name="ids" value={id} />)}
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span className="text-sm text-stone-600">{ids.length} {f.selected}</span>
+        <button name="format" value="pdf" className="btn-primary py-1.5" disabled={!ids.length}><Icon name="download" className="h-4 w-4" /> {f.exportSelection} · {f.pdf}</button>
+        <button name="format" value="xlsx" className="btn-secondary py-1.5" disabled={!ids.length}><Icon name="download" className="h-4 w-4" /> {f.excel}</button>
       </div>
-    );
-  }
-  return modifying ? (
-    <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
-      <p className="text-sm text-amber-900">{f.modificationHint}</p>
-      <label className="block"><span className="label">{f.modificationReason}</span><textarea className="input" rows={2} value={reason} placeholder={f.modificationReasonPh} onChange={(e) => setReason(e.target.value)} /></label>
-      <div className="flex gap-2">
-        <button type="button" className="btn-primary" disabled={pending || !reason.trim()} onClick={() => run(() => addModificationAction(sheetId, reason))}>{f.submit}</button>
-        <button type="button" className="btn-ghost" onClick={() => setModifying(false)}>{t.common.cancel}</button>
+      <div className="max-h-96 overflow-y-auto rounded-lg border border-stone-200">
+        <table className="table text-sm">
+          <thead className="sticky top-0 bg-white">
+            <tr>
+              <th className="w-10"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={all} onChange={(e) => setIds(e.target.checked ? rows.map((r) => r.id) : [])} aria-label={f.selectAll} /></th>
+              <th>{t.common.date}</th><th>{t.common.supplier}</th><th>{t.receptions.blInvoice}</th><th>{t.common.status}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && <tr><td colSpan={5} className="py-4 text-center text-stone-500">{f.empty}</td></tr>}
+            {rows.map((r) => (
+              <tr key={r.id} className="cursor-pointer" onClick={() => setIds(ids.includes(r.id) ? ids.filter((x) => x !== r.id) : [...ids, r.id])}>
+                <td><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={ids.includes(r.id)} readOnly /></td>
+                <td className="whitespace-nowrap">{r.date}</td>
+                <td>{r.supplier}</td>
+                <td className="text-stone-600">{r.docs}</td>
+                <td className="text-xs text-stone-600">{r.status}{r.consolidated && " · ✓"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </div>
-  ) : (
-    <button type="button" className="btn-secondary" onClick={() => setModifying(true)}><Icon name="edit" className="h-4 w-4" /> {f.addModification}</button>
+    </form>
   );
 }
 

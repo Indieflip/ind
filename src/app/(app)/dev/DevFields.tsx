@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { appConfirm } from "@/components/Confirm";
 import { Icon } from "@/components/Icon";
 import { DataTable, type Col } from "@/components/table/DataTable";
+import { DevAutomations } from "./DevAutomations";
 
 export interface FieldRow { id: number; form: string; section: string; field: string; required: boolean; rule: string; message: string; position: number }
 export interface NatureRow { category: string; natures: { name: string; count: number }[]; products: number; threshold: string }
@@ -101,6 +102,8 @@ export function DevFields({ fields, natures }: { fields: FieldRow[]; natures: Na
         )}
         <DataTable rows={list} cols={cols} rowKey={(r) => r.id} dense fixed defaultSort={{ key: "form", dir: "asc" }} empty={c.empty} />
       </section>
+
+      <DevAutomations />
     </div>
   );
 }

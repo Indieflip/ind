@@ -8,7 +8,7 @@ import { Field, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { DraftBanner, DeleteDraftButton } from "@/components/reception/DraftBanner";
 import { ReceptionsTable } from "./ReceptionsTable";
-import { parisDay, sheetNumber, sheetsAwaitingValidation } from "@/lib/server/sheets";
+import { exportNumber, lastAutoExport, runDueExports } from "@/lib/server/sheets";
 import { count, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 
@@ -24,11 +24,7 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
       .from(schema.receptionDrafts)
       .leftJoin(schema.users, eq(schema.users.id, schema.receptionDrafts.createdBy))
       .orderBy(desc(schema.receptionDrafts.updatedAt)),
-    Promise.all([
-      getDb().select({ n: count() }).from(schema.receptionSheets),
-      getDb().query.receptionSheets.findFirst({ where: eq(schema.receptionSheets.date, parisDay()) }),
-      sheetsAwaitingValidation(),
-    ]).then(([[c], today, pending]) => ({ n: c.n, today, pending })),
+    runDueExports().then(async () => { const [[c], last] = await Promise.all([getDb().select({ n: count() }).from(schema.receptionExports), lastAutoExport()]); return { n: c.n, last }; }),
   ]);
   return (
     <>
@@ -84,17 +80,10 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
       <section className="no-print card mt-6 p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="font-semibold">{t.rsheet.title}</h2>
-          <Link href="/receptions/fiches" className="text-sm font-semibold text-brand-700 underline">{t.rsheet.list} ({sheets.n})</Link>
+          <Link href="/receptions/fiches" className="text-sm font-semibold text-brand-700 underline">{t.rsheet.historyTitle} ({sheets.n})</Link>
         </div>
-        <p className="mt-1 text-sm text-stone-600">{t.rsheet.hint} {t.rsheet.autoHint}</p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {sheets.today ? (
-            <Link href={`/receptions/fiches/${sheets.today.id}`} className="btn-primary"><Icon name="file" className="h-4 w-4" /> {t.rsheet.openToday} · N° {sheetNumber(sheets.today)}</Link>
-          ) : (
-            <span className="text-sm text-stone-500">{t.rsheet.noToday}</span>
-          )}
-          {sheets.pending > 0 && <Link href="/receptions/fiches" className="badge bg-amber-100 text-amber-900">{sheets.pending} {t.rsheet.toValidate.toLowerCase()}</Link>}
-        </div>
+        <p className="mt-1 text-sm text-stone-600">{t.rsheet.historyHint}</p>
+        <p className="mt-2 text-sm font-medium text-brand-700">{sheets.last ? `${t.rsheet.lastAuto} : N° ${exportNumber(sheets.last)} · ${fmtDateTime(sheets.last.createdAt, locale)} · ` : ""}{t.rsheet.nextAuto}</p>
       </section>
     </>
   );

@@ -132,7 +132,7 @@ export function StepValidate({
       </section>
 
       <section className="card flex items-center justify-between gap-2 p-4 text-sm">
-        <span>{draft.signature ? <>✓ {w.signedBy} {draft.signerName || draft.driverName || "—"}</> : draft.driverLeft ? <>⚠ {w.driverLeft}</> : <span className="text-red-700">{w.signRequired}</span>}</span>
+        <span>{draft.signature ? <>✓ {w.signedBy} {draft.signerName || draft.driverName || "—"}</> : draft.driverLeft ? <>⚠ {w.driverLeft}</> : <span className="text-stone-500">{w.noDriverSignature}</span>}</span>
         <button type="button" className="btn-ghost py-1 text-xs" onClick={() => setDraft((d) => ({ ...d, step: 0 }))}>{t.common.edit}</button>
       </section>
     </>

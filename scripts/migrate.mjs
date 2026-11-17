@@ -561,6 +561,19 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v2
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v2', '1') on conflict (key) do nothing`);
 }
 
+// Dev > Fiches : fiche de réception de marchandises = exports (auto 23 h + manuel), plus de validation ni de modification, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v3'`)).rows.length) {
+  await db.execute(sql`delete from dev_fields where form = 'sheet' and field in ('Validation du responsable', 'Motif de la modification')`);
+  await db.execute(sql`update dev_fields set field = 'Export automatique (23 h)', rule = 'Chaque jour à 23 h : fiche des bons du jour (N° annuel, contenu figé) ; les bons sont consolidés en même temps et ne sont plus modifiables. Un export n''est jamais modifié.', message = null, updated_at = now() where form = 'sheet' and field in ('Fiche générée', 'Fiche éditée')`);
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  if (!(await db.execute(sql`select 1 from dev_fields where form = 'sheet' and field = 'Export manuel'`)).rows.length) {
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('sheet', 'Export manuel', 'Export manuel', false, 'Demande exceptionnelle : bons choisis librement ; la fiche porte la mention « Export manuel ». Ne consolide rien.', 'Cochez au moins un bon à exporter.', ${pos})`);
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Après enregistrement', 'Modification d''un bon', false, 'Possible jusqu''à l''export automatique de 23 h ; ensuite le bon est consolidé (plus modifiable) et une non-conformité se suit par son anomalie.', 'Ce bon a été consolidé par l''export du soir : il n''est plus modifiable.', ${pos + 1})`);
+  }
+  await db.execute(sql`update dev_items set detail = coalesce(detail, '') || ' → Mis à jour : export automatique chaque soir à 23 h (consolide les bons du jour) + export manuel ; plus de validation ni de modification.', updated_at = now() where kind = 'pending' and title like 'Registre HACCP quotidien%'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v3', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

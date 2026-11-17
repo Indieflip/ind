@@ -8,12 +8,11 @@ import { appConfirm } from "@/components/Confirm";
 import { Icon } from "@/components/Icon";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { DevRules } from "./DevRules";
-import { DevAutomations } from "./DevAutomations";
 import { DevProject, type ProjectKpis, type Roi } from "./DevProject";
 import { DevFields, type FieldRow, type NatureRow } from "./DevFields";
 
 interface Item { id: number; kind: string; title: string; detail: string; owner: string; priority: string; updated: string; updatedSort: string }
-const TABS = ["project", "pending", "objective", "constraint", "idea", "done", "rules", "fields", "automations"] as const;
+const TABS = ["project", "pending", "constraint", "idea", "done", "rules", "fields"] as const;
 const prioStyle: Record<string, string> = { haute: "bg-red-100 text-red-800", moyenne: "bg-amber-100 text-amber-900", basse: "bg-stone-100 text-stone-600" };
 const prioRank: Record<string, number> = { haute: 0, moyenne: 1, basse: 2, "": 3 };
 
@@ -100,8 +99,6 @@ export function DevBoard({ items, reserved, tab, fields = [], natures = [], proj
         <DevRules />
       ) : current === "project" ? (
         project ? <DevProject {...project} /> : null
-      ) : current === "automations" ? (
-        <DevAutomations />
       ) : current === "fields" ? (
         <DevFields fields={fields} natures={natures} />
       ) : (

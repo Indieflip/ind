@@ -11,7 +11,7 @@ import { StatusBadge, decisionStyles } from "@/components/DecisionBadge";
 import { Icon } from "@/components/Icon";
 import { receptionNumbers } from "@/lib/server/queries";
 import { outcomeOf, outcomeStyles } from "@/lib/anomaly";
-import { AnomalyActionField, PrintButton, DeleteReceptionButton, ConsolidateOneButton, AddNote } from "./Actions";
+import { AnomalyActionField, PrintButton, DeleteReceptionButton, AddNote } from "./Actions";
 
 const isPdf = (url: string) => /\.pdf($|\?)/i.test(url) || url.startsWith("data:application/pdf");
 
@@ -64,7 +64,6 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
           {!locked && can.editReception(user.role) && (
             <Link href={`/receptions/${rec.id}/edit`} className="btn-primary"><Icon name="edit" className="h-4 w-4" /> {t.receptions.edit}</Link>
           )}
-          {!locked && can.consolidate(user.role) && <ConsolidateOneButton id={rec.id} label={t.consolidation.thisOne} confirmText={t.consolidation.confirmOne} />}
           {can.createAnomaly(user.role) && (
             <Link href={`/anomalies?reception=${rec.id}#new`} className="btn-secondary"><Icon name="alert" className="h-4 w-4" /> {t.receptions.reportAnomaly}</Link>
           )}
@@ -77,7 +76,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
         <div className="flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">
           <Icon name="check" className="mt-0.5 h-5 w-5 shrink-0" />
           <div>
-            <p className="font-semibold">{t.receptions.consolidatedOn} {fmtDateTime(rec.consolidatedAt, locale)}{consolidator ? ` ${t.consolidation.by} ${consolidator.name}` : ""}</p>
+            <p className="font-semibold">{t.receptions.consolidatedOn} {fmtDateTime(rec.consolidatedAt, locale)}{consolidator ? ` ${t.consolidation.by} ${consolidator.name}` : ` · ${t.rsheet.autoMention}`}</p>
             <p>{t.receptions.locked}</p>
           </div>
         </div>

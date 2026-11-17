@@ -425,6 +425,8 @@ export const protocols = pgTable("protocols", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   content: text("content").notNull().default(""),
+  /** Dossier (onglet Protocoles) ; vide = à la racine */
+  folder: text("folder"),
   position: integer("position").notNull().default(100),
   updatedBy: integer("updated_by").references(() => users.id),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -610,6 +612,31 @@ export const receptionSheetVersions = pgTable(
     reviewNote: text("review_note"),
   },
   (t) => [uniqueIndex("reception_sheet_versions_idx").on(t.sheetId, t.version)],
+);
+
+/**
+ * Fiche de réception de marchandises (Frm) : historique des exports.
+ * mode « auto » : export du soir (23 h) d'un jour, qui consolide ses bons ; « manual » : bons choisis, sur demande exceptionnelle.
+ * Le contenu (data) est figé : un export n'est jamais modifié.
+ */
+export const receptionExports = pgTable(
+  "reception_exports",
+  {
+    id: serial("id").primaryKey(),
+    year: integer("year").notNull(),
+    seq: integer("seq").notNull(),
+    mode: text("mode").notNull().default("auto"),
+    day: date("day"),
+    receptionIds: jsonb("reception_ids").$type<number[]>().notNull(),
+    data: jsonb("data").$type<{ header: string[]; rows: (string | number | null)[][] }>().notNull(),
+    receptionCount: integer("reception_count").notNull().default(0),
+    lineCount: integer("line_count").notNull().default(0),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Export d'archive de l'administrateur (préalable à une suppression avant 5 ans) */
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("reception_exports_year_seq_idx").on(t.year, t.seq), index("reception_exports_day_idx").on(t.day)],
 );
 
 /** Onglet Dev > Caractéristiques : champs des fiches, obligatoires ou non, et règles de saisie */

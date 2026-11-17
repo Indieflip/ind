@@ -32,7 +32,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/mercurial", label: t.nav.mercurial, icon: "list", show: can.viewMercurial(r) },
     { href: "/anomalies", label: t.nav.anomalies, icon: "alert", show: can.viewAnomalies(r) },
     { href: "/reporting", label: t.nav.reporting, icon: "chart", show: true },
-    { href: "/consolidation", label: t.nav.consolidation, icon: "layers", show: can.viewConsolidation(r) },
     { href: "/protocoles", label: t.nav.protocols, icon: "book", show: can.viewProtocols(r) },
     { href: "/demandes", label: t.nav.requests, icon: "inbox", show: true, badge: r === "admin" ? pendingRequests : 0 },
     { href: "/settings", label: t.nav.settings, icon: "gear", show: r === "admin" },

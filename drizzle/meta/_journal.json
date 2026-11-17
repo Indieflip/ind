@@ -169,6 +169,20 @@
       "when": 1794939661837,
       "tag": "0023_receiver_signature",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794956282268,
+      "tag": "0024_reception_exports",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1794956486514,
+      "tag": "0025_protocol_folder",
+      "breakpoints": true
     }
   ]
 }

@@ -9,7 +9,7 @@ import { daysSince, DEFAULT_FOLLOW_UP_DAYS, isClaimMode, stageOf, verificationDu
 import { backupSettings, lastBackup } from "@/lib/server/backup";
 import { supplierProcesses } from "@/lib/server/followup";
 import { canSeeDev } from "@/lib/server/dev";
-import { backfillSheets, canValidateSheets, sheetsAwaitingValidation } from "@/lib/server/sheets";
+import { runDueExports } from "@/lib/server/sheets";
 import { Icon } from "@/components/Icon";
 
 interface Task { key: string; label: string; detail?: string; count?: number; href: string; tone: "red" | "amber" | "sky" | "stone"; icon: string }
@@ -29,10 +29,6 @@ export default async function HomePage() {
   if (can.receive(r)) {
     const [d] = await db.select({ n: count() }).from(schema.receptionDrafts);
     if (d.n) tasks.push({ key: "drafts", label: h.drafts, count: d.n, href: "/receptions", tone: "amber", icon: "truck" });
-  }
-  if (can.consolidate(r)) {
-    const [c] = await db.select({ n: count() }).from(schema.receptions).where(isNull(schema.receptions.consolidatedAt));
-    if (c.n) tasks.push({ key: "toConsolidate", label: h.receptionsToConsolidate, count: c.n, href: "/consolidation", tone: "stone", icon: "layers" });
   }
 
   // Anomalies et réclamations
@@ -55,12 +51,8 @@ export default async function HomePage() {
     if (credits.n) tasks.push({ key: "creditMissing", label: h.creditMissing, count: credits.n, href: "/anomalies/reclamations", tone: "amber", icon: "euro" });
   }
 
-  // Fiche de réception de marchandises : au moins une par jour, validée par un responsable désigné
-  await backfillSheets();
-  if (await canValidateSheets(user)) {
-    const n = await sheetsAwaitingValidation();
-    if (n) tasks.push({ key: "sheetValidate", label: t.rsheet.toValidate, count: n, href: "/receptions/fiches", tone: "amber", icon: "check" });
-  }
+  // Fiche de réception de marchandises : exports automatiques dus (rattrapage si la tâche du soir n'est pas passée)
+  await runDueExports();
 
   // Sauvegarde
   if (can.backup(r)) {
