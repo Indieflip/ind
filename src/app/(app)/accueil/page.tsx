@@ -9,6 +9,7 @@ import { daysSince, DEFAULT_FOLLOW_UP_DAYS, isClaimMode, stageOf, verificationDu
 import { backupSettings, lastBackup } from "@/lib/server/backup";
 import { supplierProcesses } from "@/lib/server/followup";
 import { canSeeDev } from "@/lib/server/dev";
+import { canValidateSheets, sheetsAwaitingValidation, todaySheetExists } from "@/lib/server/sheets";
 import { Icon } from "@/components/Icon";
 
 interface Task { key: string; label: string; detail?: string; count?: number; href: string; tone: "red" | "amber" | "sky" | "stone"; icon: string }
@@ -52,6 +53,13 @@ export default async function HomePage() {
     if (noAmount.length) tasks.push({ key: "noAmount", label: h.noAmount, count: noAmount.length, href: "/anomalies/reclamations?f=sans-montant", tone: "amber", icon: "euro" });
     const [credits] = await db.select({ n: count() }).from(a).where(and(eq(a.stage, "cloturee"), eq(a.resolution, "avoir"), isNull(a.creditAmount)));
     if (credits.n) tasks.push({ key: "creditMissing", label: h.creditMissing, count: credits.n, href: "/anomalies/reclamations", tone: "amber", icon: "euro" });
+  }
+
+  // Fiche de réception de marchandises : au moins une par jour, validée par un responsable désigné
+  if (!(await todaySheetExists())) tasks.push({ key: "sheetToday", label: t.rsheet.todayMissing, href: "/receptions/fiches", tone: "amber", icon: "file" });
+  if (await canValidateSheets(user)) {
+    const n = await sheetsAwaitingValidation();
+    if (n) tasks.push({ key: "sheetValidate", label: t.rsheet.toValidate, count: n, href: "/receptions/fiches", tone: "amber", icon: "check" });
   }
 
   // Sauvegarde

@@ -176,7 +176,9 @@ export function toPayload(d: Draft): ReceptionPayload {
     reservesText: d.reservesText.trim() || null,
     signerName: (d.signerName || d.driverName).trim() || null,
     signature: d.signature || null,
+    driverLeftUnsigned: !d.signature && !!d.driverLeft,
     blPhotos: d.blPhotos,
+    labelPhotos: d.labelPhotos ?? [],
     bakery: d.bakery
       ? { baguette: num(d.bakery.baguette), hamburger: num(d.bakery.hamburger), rolls: num(d.bakery.rolls), painDeMie: num(d.bakery.painDeMie) }
       : null,
@@ -197,6 +199,7 @@ export function toPayload(d: Draft): ReceptionPayload {
         reason: l.reason || null,
         photos: l.photos,
         document: lineDoc(d, l) || null,
+        note: l.note?.trim() || null,
       })),
   };
 }

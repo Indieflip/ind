@@ -4,8 +4,9 @@ import { useI18n } from "@/lib/i18n/client";
 import type { Draft } from "@/lib/reception-types";
 import { Icon } from "../Icon";
 import { PhotoButton, Thumbs } from "./PhotoButton";
+import { SignaturePad } from "./SignaturePad";
 
-/** Étape 1 : photo (ou fichier) du BL, puis confirmation de sa qualité */
+/** Étape 1 : photos (BL / facture, étiquette lot / DLC) et signature du livreur (ou « parti sans signer ») */
 export function StepPhoto({
   draft,
   setDraft,
@@ -25,6 +26,7 @@ export function StepPhoto({
   return (
     <>
       <section className="card space-y-4 p-4">
+        <h2 className="font-semibold">1. {w.photoBlTitle}</h2>
         <p className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm font-medium text-amber-900"><Icon name="alert" className="mt-0.5 h-4 w-4 shrink-0" /> {w.anomalyFirst}</p>
         <p className="text-sm text-stone-600">{w.photoHint}</p>
         <Thumbs
@@ -68,11 +70,44 @@ export function StepPhoto({
         <p className="flex items-center gap-2 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800"><Icon name="check" className="h-4 w-4" /> {w.photoConfirmed}</p>
       )}
 
-      {!has && (
+      {!has && !draft.noBl && (
         <button type="button" className="btn-ghost w-full" onClick={onNoBl}>
           {w.skipNoBl}
         </button>
       )}
+      {draft.noBl && <p className="flex items-center gap-2 rounded-lg bg-stone-100 p-3 text-sm text-stone-700"><Icon name="check" className="h-4 w-4" /> {w.skipNoBl}</p>}
+
+      <section className="card space-y-3 p-4">
+        <h2 className="font-semibold">2. {w.photoLabelTitle} <span className="text-xs font-normal text-stone-400">({t.common.optional})</span></h2>
+        <p className="text-sm text-stone-600">{w.photoLabelHint}</p>
+        <Thumbs
+          photos={draft.labelPhotos ?? []}
+          onRemove={async (i) => {
+            if (!await appConfirm(w.removePhotoConfirm)) return;
+            setDraft((d) => ({ ...d, labelPhotos: (d.labelPhotos ?? []).filter((_, j) => j !== i) }));
+          }}
+        />
+        <PhotoButton multiple className="btn-secondary w-full" label={w.takeLabelPhoto} onPhotos={(urls) => setDraft((d) => ({ ...d, labelPhotos: [...(d.labelPhotos ?? []), ...urls] }))} />
+      </section>
+
+      <section id="signature" className={`card space-y-3 p-4 ${!draft.signature && !draft.driverLeft ? "ring-2 ring-amber-300" : ""}`}>
+        <h2 className="font-semibold">3. {w.signTitle} <span className="text-red-600">*</span></h2>
+        <p className="text-xs text-stone-500">{w.signRequired}</p>
+        <div>
+          <label className="label">{w.signerName} <span className="font-normal text-stone-400">({t.common.optional})</span></label>
+          <input className="input" value={draft.signerName} onChange={(e) => setDraft((d) => ({ ...d, signerName: e.target.value }))} />
+        </div>
+        {!draft.driverLeft && (
+          <div>
+            <span className="label">{w.signHere}</span>
+            <SignaturePad value={draft.signature} onChange={(sig) => setDraft((d) => ({ ...d, signature: sig, driverLeft: sig ? false : d.driverLeft }))} clearLabel={w.clearSignature} confirmText={w.clearSignatureConfirm} />
+          </div>
+        )}
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" className="h-5 w-5 accent-brand-600" checked={!!draft.driverLeft} disabled={!!draft.signature} onChange={(e) => setDraft((d) => ({ ...d, driverLeft: e.target.checked }))} />
+          {w.driverLeft}
+        </label>
+      </section>
     </>
   );
 }

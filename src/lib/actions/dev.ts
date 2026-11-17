@@ -37,3 +37,22 @@ export async function reserveDevAction() {
   await setSetting("dev_users", String(user.id));
   revalidatePath("/", "layout");
 }
+
+const FORMS = ["reception", "anomaly", "claim", "weigh", "product", "supplier", "sheet", "credit"];
+
+/** Dev > Caractéristiques : champ d'une fiche (obligatoire, règle de saisie, message affiché) */
+export async function saveDevFieldAction(id: number | null, data: { form: string; section: string; field: string; required: boolean; rule: string; message: string }) {
+  await guard();
+  if (!data.field.trim() || !FORMS.includes(data.form)) return { error: "invalid" };
+  const values = { form: data.form, section: data.section.trim() || null, field: data.field.trim(), required: data.required, rule: data.rule.trim() || null, message: data.message.trim() || null, updatedAt: new Date() };
+  if (id) await getDb().update(schema.devFields).set(values).where(eq(schema.devFields.id, id));
+  else await getDb().insert(schema.devFields).values({ ...values, position: 10_000 + (Date.now() % 1_000_000) });
+  revalidatePath("/dev");
+  return { ok: true };
+}
+
+export async function deleteDevFieldAction(id: number) {
+  await guard();
+  await getDb().delete(schema.devFields).where(eq(schema.devFields.id, id));
+  revalidatePath("/dev");
+}

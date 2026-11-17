@@ -225,6 +225,11 @@ function LineCard({
         </div>
       </div>
 
+      <div className="mt-2">
+        <label className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.note}</label>
+        <input className="input py-2" value={line.note ?? ""} placeholder={t.wizard.notePh} onChange={(e) => onChange({ note: e.target.value })} />
+      </div>
+
       {ev.issues.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-1.5">
           {ev.issues.map((i) => (

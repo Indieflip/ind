@@ -170,16 +170,29 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
   }
 
   const go = (step: number) => {
+    // Passage à l'étape 2 : brouillon enregistré automatiquement (sur le serveur, visible dans Réceptions)
+    if (draft && !editId && draft.step === 0 && step === 1) {
+      void saveServerDraft({ ...draft, step: 1 })
+        .then(() => { setInfo(t.wizard.draftAuto); setTimeout(() => setInfo(""), 3000); })
+        .catch(() => { /* hors ligne : le brouillon reste sur le téléphone */ });
+    }
     setDraft((d) => ({ ...d, step }));
     topRef.current?.scrollIntoView();
     window.scrollTo({ top: 0 });
   };
 
   const supplierOk = (draft.otherSupplier ? draft.supplierName.trim().length > 0 : !!draft.supplierId) && !!draft.deliveredAt;
-  const canContinue = draft.step === 0 ? !!(draft.photoOk || draft.noBl) : draft.step === 1 ? supplierOk : true;
+  const signed = !!draft.signature || !!draft.driverLeft || !!editId; // anciens bons modifiés : pas de blocage
+  const canContinue = draft.step === 0 ? !!(draft.photoOk || draft.noBl) && signed : draft.step === 1 ? supplierOk : true;
 
   async function finish() {
     if (!draft) return;
+    if (!editId && !draft.signature && !draft.driverLeft) {
+      setError(t.wizard.signRequired);
+      go(0);
+      setTimeout(() => document.getElementById("signature")?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+      return;
+    }
     const undecided = draft.lines.filter((l) => !l.decision);
     if (undecided.length) {
       // On ramène l'utilisateur sur le premier produit à décider (sinon le bouton semble ne rien faire)
@@ -284,12 +297,15 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
             onConfirm={() => {
               const d = { ...draft, photoOk: true, noBl: false };
               setDraft(() => d);
-              go(1);
               void readBl(d);
+              // Signature (ou « parti sans signer ») obligatoire avant l'étape 2
+              if (signed) go(1);
+              else setTimeout(() => document.getElementById("signature")?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
             }}
             onNoBl={() => {
               setDraft((d) => ({ ...d, noBl: true, photoOk: false, blRead: "idle" }));
-              go(1);
+              if (signed) go(1);
+              else setTimeout(() => document.getElementById("signature")?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
             }}
           />
         )}

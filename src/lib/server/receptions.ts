@@ -28,6 +28,7 @@ const lineSchema = z.object({
   reason: z.string().max(60).nullable(),
   photos: z.array(z.string().max(2000)).max(10),
   document: z.string().trim().max(100).nullish(),
+  note: z.string().trim().max(500).nullish(),
 });
 
 export const payloadSchema = z.object({
@@ -43,7 +44,9 @@ export const payloadSchema = z.object({
   reservesText: z.string().max(5000).nullable(),
   signerName: z.string().max(100).nullable(),
   signature: z.string().max(2000).nullable(),
+  driverLeftUnsigned: z.boolean().optional(),
   blPhotos: z.array(z.string().max(2000)).max(20),
+  labelPhotos: z.array(z.string().max(2000)).max(20).optional(),
   bakery: z
     .object({ baguette: z.number().nullable(), hamburger: z.number().nullable(), rolls: z.number().nullable(), painDeMie: z.number().nullable() })
     .nullable()
@@ -96,6 +99,7 @@ function headerValues(p: Payload) {
     reservesText: p.reservesText || null,
     signerName: p.signerName || null,
     signatureUrl: p.signature,
+    driverLeftUnsigned: !p.signature && !!p.driverLeftUnsigned,
   };
 }
 
@@ -121,6 +125,9 @@ async function writeContent(
 
   for (const url of p.blPhotos) {
     await tx.insert(schema.receptionPhotos).values({ receptionId: recId, kind: "bl", url });
+  }
+  for (const url of p.labelPhotos ?? []) {
+    await tx.insert(schema.receptionPhotos).values({ receptionId: recId, kind: "label", url });
   }
 
   // Suivi Viande / Poisson : kg facturés des produits de ces catégories, à la date de livraison
@@ -299,6 +306,7 @@ async function writeContent(
         decision: l.decision,
         reason: l.reason,
         document: l.document || null,
+        note: l.note || null,
         position: position++,
       })
       .returning();

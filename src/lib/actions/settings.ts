@@ -121,7 +121,7 @@ export async function updateConformityAction(id: number, data: { conformRules?: 
   if (data.reserveRules !== undefined) set.reserveRules = data.reserveRules.trim() || null;
   if (data.refuseRules !== undefined) set.refuseRules = data.refuseRules.trim() || null;
   await getDb().update(schema.categories).set(set).where(eq(schema.categories.id, id));
-  revalidatePath("/settings/reglementation", "layout");
+
   revalidatePath("/protocoles");
 }
 

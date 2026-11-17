@@ -392,6 +392,123 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_seed_v4'`
   await db.execute(sql`insert into app_settings (key, value) values ('dev_seed_v4', '1') on conflict (key) do nothing`);
 }
 
+// Seuils de température réglementaires (protocole Conformité) + application par catégorie (une fois)
+if (!(await db.execute(sql`select 1 from app_settings where key = 'temp_classes_v1'`)).rows.length) {
+  const classes = [
+    ["Viandes hachées, viandes séparées mécaniquement", 2, 4],
+    ["Produits de la pêche frais, crustacés et mollusques cuits réfrigérés", 2, 4],
+    ["Abats d'ongulés", 3, 5],
+    ["Préparations culinaires élaborées à l'avance", 3, 5],
+    ["Préparations de viandes, volailles, lapins", 4, 6],
+    ["Viandes d'ongulés : morceaux de découpe", 4, 6],
+    ["Viandes d'ongulés : carcasses et gros morceaux", 7, 9],
+    ["Ovoproduits (hors UHT), lait cru", 4, 6],
+    ["Autres denrées très périssables", 4, 6],
+    ["Autres denrées périssables", 8, 10],
+    ["Glaces, viandes hachées et produits de la pêche congelés", -18, -15],
+    ["Autres denrées congelées", -12, -9],
+  ];
+  if (!(await db.execute(sql`select 1 from temp_classes limit 1`)).rows.length) {
+    let pos = 0;
+    for (const [label, max, reserve] of classes) await db.execute(sql`insert into temp_classes (label, max_temp, reserve_max, position) values (${label}, ${max}, ${reserve}, ${pos++})`);
+  }
+  const map = { meat: "Préparations de viandes, volailles, lapins", fish: "Produits de la pêche frais, crustacés et mollusques cuits réfrigérés", dairy: "Autres denrées très périssables", deli: "Préparations culinaires élaborées à l'avance", frozen: "Glaces, viandes hachées et produits de la pêche congelés" };
+  for (const [code, label] of Object.entries(map)) {
+    await db.execute(sql`update categories c set temp_class_id = k.id, conform_max = k.max_temp, reserve_max = k.reserve_max, temp_required = true from temp_classes k where c.code = ${code} and k.label = ${label}`);
+  }
+  // La ligne « Température … » des règles est désormais calculée à partir des seuils : on la retire du texte
+  for (const col of ["conform_rules", "reserve_rules", "refuse_rules"]) {
+    await db.execute(sql.raw(`update categories set ${col} = nullif(array_to_string(array(select x from unnest(string_to_array(${col}, E'\\n')) x where x !~* '^\\s*temp[ée]rature'), E'\\n'), '') where ${col} is not null`));
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('temp_classes_v1', '1') on conflict (key) do nothing`);
+}
+
+// Onglet Dev > Caractéristiques : champs des fiches pré-remplis (obligatoires recommandés), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v1'`)).rows.length) {
+  if (!(await db.execute(sql`select 1 from dev_fields limit 1`)).rows.length) {
+    const F = [
+      // Fiche de réception (saisie sur téléphone)
+      ["reception", "Étape 1 · Photos", "Photo du BL / de la facture", true, "Photo nette de toutes les pages. Sans document : cocher « Pas de BL / saisie manuelle » (crée une anomalie « BL manquant »).", "Prenez le BL en photo, ou cochez « Pas de BL / saisie manuelle »."],
+      ["reception", "Étape 1 · Photos", "Photo de l'étiquette (lot / DLC)", false, "Recommandée ; à rendre obligatoire pour les produits à DLC obligatoire (preuve de traçabilité).", "Photographiez l'étiquette (n° de lot, DLC) du produit."],
+      ["reception", "Étape 1 · Signature", "Signature du livreur", true, "Signature, ou case « Livreur parti sans signer ». Sans l'un des deux, pas d'accès à l'étape 2.", "Faites signer le livreur, ou cochez « Livreur parti sans signer », pour passer à l'étape 2."],
+      ["reception", "Étape 2 · Livraison", "Fournisseur", true, "Choisi dans la liste (ou « Autre fournisseur » avec son nom).", "Choisissez le fournisseur pour continuer."],
+      ["reception", "Étape 2 · Livraison", "Date et heure de livraison", true, "Pas dans le futur.", "Indiquez la date et l'heure de la livraison."],
+      ["reception", "Étape 2 · Livraison", "Type et N° de document (BL / Facture)", true, "Obligatoire sauf « Pas de BL ». Un même N° ne peut pas être enregistré deux fois pour un fournisseur.", "Ce N° de document est déjà enregistré pour ce fournisseur."],
+      ["reception", "Étape 2 · Livraison", "Date du document", true, "Date imprimée sur le BL / la facture (rapprochement comptable).", "Indiquez la date figurant sur le document."],
+      ["reception", "Étape 2 · Livraison", "Nom du livreur", false, "Proposé à partir des livreurs connus du fournisseur.", ""],
+      ["reception", "Étape 2 · Livraison", "T° du camion", true, "Obligatoire dès qu'un produit de la livraison a un seuil de température.", "Relevez la température du camion (produits frais ou surgelés)."],
+      ["reception", "Étape 2 · Livraison", "Propreté du véhicule", true, "Oui / Non ; « Non » crée une anomalie Hygiène.", "Indiquez si le véhicule est propre."],
+      ["reception", "Étape 3 · Produits", "Produit", true, "Choisi dans le mercurial du fournisseur ; un produit hors mercurial est signalé.", "Choisissez ou saisissez le produit."],
+      ["reception", "Étape 3 · Produits", "Q Facturée", true, "Nombre ≥ 0, dans l'unité du produit.", "Saisissez la quantité facturée."],
+      ["reception", "Étape 3 · Produits", "Q Contrôlée", true, "Nombre ≥ 0 ; un écart avec la Q facturée propose une réserve (au kg : écart de pesée).", "Saisissez la quantité contrôlée."],
+      ["reception", "Étape 3 · Produits", "Unité", true, "Unité du mercurial (Pièce par défaut).", ""],
+      ["reception", "Étape 3 · Produits", "T° produit", true, "Obligatoire pour les catégories avec seuil (protocole Conformité) ; au-delà du seuil : réserve ou refus proposé.", "Relevez la température à cœur de ce produit."],
+      ["reception", "Étape 3 · Produits", "DLC / DDM", true, "Obligatoire pour les produits frais (sauf fruits et légumes, épicerie sèche, hygiène). Dépassée : refus proposé ; courte : réserve.", "Saisissez la DLC de ce produit avant de terminer."],
+      ["reception", "Étape 3 · Produits", "N° de lot", true, "Recommandé obligatoire pour les produits à DLC (traçabilité en cas de rappel).", "Saisissez le n° de lot (traçabilité)."],
+      ["reception", "Étape 3 · Produits", "Prix unitaire", true, "Comparé au mercurial ; ≥ +10 % au-dessus du maximum : anomalie prix ; prix bloqué non respecté : anomalie.", "Saisissez le prix unitaire facturé."],
+      ["reception", "Étape 3 · Produits", "Décision (conforme / réserve / refus)", true, "Toujours choisie par l'utilisateur (jamais cochée automatiquement).", "Choisissez une décision pour chaque produit avant de terminer."],
+      ["reception", "Étape 3 · Produits", "Motif", true, "Obligatoire si réserve ou refus.", "Indiquez le motif de la réserve ou du refus."],
+      ["reception", "Étape 3 · Produits", "Photo du problème", true, "Recommandée obligatoire si réserve ou refus (preuve pour la réclamation).", "Prenez une photo du problème."],
+      ["reception", "Étape 3 · Produits", "Note", false, "Texte libre sur le produit.", ""],
+      ["reception", "Étape 4 · Validation", "Texte des réserves", false, "Généré automatiquement, modifiable ; à recopier sur le BL.", ""],
+      // Anomalie
+      ["anomaly", "Fiche", "Type d'anomalie", true, "Liste des types (Dev > Règles).", "Choisissez le type d'anomalie."],
+      ["anomaly", "Fiche", "Fournisseur", true, "Rattaché au compte fournisseur.", ""],
+      ["anomaly", "Fiche", "Produit", true, "Sauf Hygiène et BL manquant.", ""],
+      ["anomaly", "Fiche", "Description", true, "Écart constaté, clair et chiffré (ex. « 2 kg manquants sur 10 facturés »).", "Décrivez l'écart constaté."],
+      ["anomaly", "Fiche", "Type de suivi", true, "Réclamation avec relances / Vérification de l'avoir avec ou sans réclamation.", ""],
+      ["anomaly", "Fiche", "Montant réclamé", true, "Obligatoire avant de passer en « Réclamée » (base des économies).", "Indiquez le montant réclamé avant de marquer la réclamation comme envoyée."],
+      ["anomaly", "Clôture", "Résolution", true, "Avoir / régularisation, livraison, sans suite.", "Indiquez comment l'anomalie a été résolue."],
+      ["anomaly", "Clôture", "Montant de l'avoir", true, "Obligatoire si résolution « Avoir / régularisation ».", "Saisissez le montant de l'avoir."],
+      ["anomaly", "Clôture", "N° et date de l'avoir / de la facture", true, "Obligatoires si résolution « Avoir / régularisation » (rapprochement comptable).", "Saisissez le n° et la date de l'avoir."],
+      // Réclamation
+      ["claim", "Envoi", "Contact de réclamation (mail / téléphone)", true, "Pris dans le compte fournisseur (bloc Réclamation).", "Ajoutez un mail de réclamation dans le compte du fournisseur."],
+      ["claim", "Envoi", "Date d'envoi", true, "Renseignée au passage en « Réclamée ».", ""],
+      ["claim", "Suivi", "Date de dernière relance", true, "Relance au-delà du délai du fournisseur (3 jours par défaut).", ""],
+      ["claim", "Suivi", "Réponse du fournisseur", false, "Texte libre.", ""],
+      // Écart de pesée
+      ["weigh", "Pesée", "Poids facturé (kg)", true, "Repris du bon.", ""],
+      ["weigh", "Pesée", "Poids pesé (kg)", true, "Poids net (tare des contenants déduite).", "Saisissez le poids pesé."],
+      ["weigh", "Pesée", "Contenant (tare)", false, "Liste des contenants (Process pèse).", ""],
+      // Produit du mercurial
+      ["product", "Mercurial", "Nom", true, "Unique par fournisseur.", ""],
+      ["product", "Mercurial", "Fournisseur", true, "", ""],
+      ["product", "Mercurial", "Catégorie", true, "Détermine le seuil de température et la DLC obligatoire.", "Choisissez la catégorie du produit."],
+      ["product", "Mercurial", "Unité", true, "Pièce par défaut.", ""],
+      ["product", "Mercurial", "Prix (min / max)", true, "Référence du contrôle des prix.", ""],
+      ["product", "Mercurial", "Nature", false, "Voir le récapitulatif Catégorie / Nature.", ""],
+      // Fournisseur
+      ["supplier", "Compte", "Nom", true, "Unique.", ""],
+      ["supplier", "Compte", "Mail de réclamation", true, "Recommandé obligatoire : utilisé par le bouton mail des anomalies.", "Ajoutez un mail de réclamation."],
+      ["supplier", "Compte", "Process de réclamation", false, "Délai de relance déduit du texte (jour même, 48 h…).", ""],
+      ["supplier", "Compte", "SIREN / TVA", false, "9 chiffres pour le SIREN.", ""],
+      // Fiche de réception de marchandises
+      ["sheet", "Fiche du jour", "Fiche éditée", true, "Au moins une fois par jour.", "La fiche de réception du jour n'a pas encore été éditée."],
+      ["sheet", "Fiche du jour", "Validation du responsable", true, "Obligatoire avant tout export ; une fois validée, la fiche n'est plus modifiable.", "Cette fiche doit être validée par le responsable avant export."],
+      ["sheet", "Modification", "Motif de la modification", true, "Toute modification d'une fiche validée crée une nouvelle version à valider.", "Indiquez le motif de la modification."],
+    ];
+    let pos = 0;
+    for (const [form, section, field, required, rule, message] of F) {
+      await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values (${form}, ${section}, ${field}, ${required}, ${rule || null}, ${message || null}, ${pos++})`);
+    }
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v1', '1') on conflict (key) do nothing`);
+}
+
+// Onglet Dev : nouveaux points en attente (une fois)
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_seed_v5'`)).rows.length) {
+  let pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_items`)).rows[0].p);
+  const items = [
+    ["Indications à l'utilisateur quand une règle bloque", "Afficher sur chaque fiche (réception, anomalie, réclamation, écart de pesée, produit, fournisseur, fiche de réception de marchandises) un message clair quand un champ obligatoire manque, pour ne pas bloquer l'utilisateur sans explication (ex. « on ne peut pas passer à l'étape 2 si… »). Base : colonne « Message affiché » de Dev > Caractéristiques.", "dev", "haute"],
+    ["Photo de l'étiquette (lot / DLC) obligatoire pour les produits à DLC obligatoire", "Aujourd'hui facultative à l'étape 1. À rendre obligatoire pour les produits dont la DLC est obligatoire (une fois les règles validées dans Dev > Caractéristiques).", "moi", "moyenne"],
+    ["Paramétrer les champs obligatoires (Dev > Caractéristiques)", "Premier paramétrage : vérifier la liste pré-remplie (obligatoire, règle de saisie, message), puis l'appliquer dans l'application.", "moi", "haute"],
+    ["Modèles « Fiche d'organisation à réception » et « Fiche de suivi d'anomalie »", "Onglets 2 et 3 du fichier Model_2 : à préciser (quand les éditer, qui les valide, export PDF / Excel).", "moi", "basse"],
+  ];
+  for (const [title, detail, owner, priority] of items) await db.execute(sql`insert into dev_items (kind, title, detail, owner, priority, position) values ('pending', ${title}, ${detail}, ${owner}, ${priority}, ${pos++})`);
+  await db.execute(sql`update dev_items set detail = coalesce(detail, '') || ' → Fait : fiche de réception de marchandises journalière (N° annuel, validation du responsable, modifications avec historique, rappel sur l''Accueil, archivage 5 ans). Reste : champs obligatoires (Dev > Caractéristiques).', updated_at = now() where kind = 'pending' and title like 'Registre HACCP quotidien%'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_seed_v5', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

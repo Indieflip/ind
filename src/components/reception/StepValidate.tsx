@@ -4,7 +4,6 @@ import { fmtDate, fmtDateTime } from "@/lib/format";
 import type { Catalog, Draft } from "@/lib/reception-types";
 import { decisionStyles } from "../DecisionBadge";
 import { docNumbers, docsOf, lineDoc, needsDlc, needsTemp, priceGap } from "./helpers";
-import { SignaturePad } from "./SignaturePad";
 
 export function StepValidate({
   draft,
@@ -132,17 +131,9 @@ export function StepValidate({
         )}
       </section>
 
-      <section className="card space-y-3 p-4">
-        <div>
-          <label className="label">
-            {t.wizard.signerName} <span className="font-normal text-stone-400">({t.common.optional})</span>
-          </label>
-          <input className="input" value={draft.signerName || draft.driverName} onChange={(e) => setDraft((d) => ({ ...d, signerName: e.target.value }))} />
-        </div>
-        <div>
-          <span className="label">{t.wizard.signHere}</span>
-          <SignaturePad value={draft.signature} onChange={(sig) => setDraft((d) => ({ ...d, signature: sig, signerName: d.signerName || d.driverName }))} clearLabel={t.wizard.clearSignature} confirmText={t.wizard.clearSignatureConfirm} />
-        </div>
+      <section className="card flex items-center justify-between gap-2 p-4 text-sm">
+        <span>{draft.signature ? <>✓ {w.signedBy} {draft.signerName || draft.driverName || "—"}</> : draft.driverLeft ? <>⚠ {w.driverLeft}</> : <span className="text-red-700">{w.signRequired}</span>}</span>
+        <button type="button" className="btn-ghost py-1 text-xs" onClick={() => setDraft((d) => ({ ...d, step: 0 }))}>{t.common.edit}</button>
       </section>
     </>
   );

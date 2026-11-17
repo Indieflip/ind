@@ -47,6 +47,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
     return c ? (locale === "en" ? c.nameEn : c.nameFr) : "—";
   };
   const blPhotos = photos.filter((p) => p.kind === "bl");
+  const labelPhotos = photos.filter((p) => p.kind === "label");
   const docs = ((rec.documents as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[] | null) ?? (rec.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : [])) as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[];
   const seq = (await receptionNumbers()).get(rec.id);
   const [recAnomalies, recGaps] = await Promise.all([
@@ -123,7 +124,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
             <dl className="space-y-1.5 text-sm">
               <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.wizard.dateTime}</dt><dd className="text-right font-medium">{fmtDateTime(rec.deliveredAt, locale)}</dd></div>
               <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.driver}</dt><dd className="text-right font-medium">{rec.driverName ?? "—"}</dd></div>
-              <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.signature}</dt><dd className="text-right font-medium">{rec.signatureUrl ? `✓ ${rec.signerName ?? ""}` : "—"}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.signature}</dt><dd className="text-right font-medium">{rec.signatureUrl ? `✓ ${rec.signerName ?? ""}` : rec.driverLeftUnsigned ? `⚠ ${t.wizard.driverLeft}` : "—"}</dd></div>
             </dl>
           </div>
 
@@ -181,6 +182,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
                 )}
               </dl>
               {l.reason && <p className="mt-1 text-xs text-stone-600">{(t.reasons as Record<string, string>)[l.reason] ?? l.reason}</p>}
+              {l.note && <p className="mt-1 text-xs italic text-stone-600">{t.wizard.note} : {l.note}</p>}
               <div className="mt-1 flex gap-2">
                 {photos.filter((p) => p.lineId === l.id).map((p) => (
                   <a key={p.id} href={p.url} target="_blank"><img src={p.url} alt="" className="h-14 w-14 rounded object-cover" /></a>
@@ -231,6 +233,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
                   <td>
                     <span className={`badge ${decisionStyles[l.decision].badge}`}>{t.decision[l.decision]}</span>
                     {l.reason && <div className="mt-1 text-xs text-stone-600">{(t.reasons as Record<string, string>)[l.reason] ?? l.reason}</div>}
+                    {l.note && <div className="mt-1 text-xs italic text-stone-600">{t.wizard.note} : {l.note}</div>}
                     {linePhotos.map((p) => (
                       <a key={p.id} href={p.url} target="_blank" className="mt-1 block"><img src={p.url} alt="" className="h-14 w-14 rounded object-cover" /></a>
                     ))}
@@ -348,6 +351,16 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
                   <img src={p.url} alt="" className="w-full rounded-lg border border-stone-200" />
                 )}
               </a>
+            ))}
+          </div>
+        </section>
+      )}
+      {labelPhotos.length > 0 && (
+        <section className="card p-5">
+          <h2 className="mb-3 font-semibold">{t.wizard.photoLabelTitle}</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {labelPhotos.map((p) => (
+              <a key={p.id} href={p.url} target="_blank"><img src={p.url} alt="" className="w-full rounded-lg border border-stone-200" /></a>
             ))}
           </div>
         </section>

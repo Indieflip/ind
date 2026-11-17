@@ -69,6 +69,8 @@ export interface DraftLine {
   fromBl?: boolean;
   /** Numéro du document (BL / facture) auquel le produit est rattaché */
   doc?: string;
+  /** Note libre sur le produit */
+  note?: string;
 }
 
 export type DocType = "bl" | "facture" | "autre";
@@ -88,6 +90,10 @@ export interface Draft {
   truckTemp: string;
   vehicleClean: boolean | null;
   blPhotos: string[];
+  /** Étape 1 : photos de l'étiquette (lot / DLC) */
+  labelPhotos?: string[];
+  /** Étape 1 : le livreur est parti sans signer */
+  driverLeft?: boolean;
   /** Étape 1 : qualité de la photo confirmée, ou livraison sans BL */
   photoOk?: boolean;
   noBl?: boolean;
@@ -116,7 +122,9 @@ export interface ReceptionPayload {
   reservesText: string | null;
   signerName: string | null;
   signature: string | null;
+  driverLeftUnsigned?: boolean;
   blPhotos: string[];
+  labelPhotos?: string[];
   bakery?: { baguette: number | null; hamburger: number | null; rolls: number | null; painDeMie: number | null } | null;
   lines: {
     productId: number | null;
@@ -133,5 +141,6 @@ export interface ReceptionPayload {
     reason: string | null;
     photos: string[];
     document?: string | null;
+    note?: string | null;
   }[];
 }

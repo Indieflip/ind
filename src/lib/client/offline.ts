@@ -54,6 +54,8 @@ async function uploadIfNeeded(src: string, folder: string): Promise<string> {
 export async function sendReception(p: ReceptionPayload, editId?: number): Promise<number> {
   const blPhotos = [];
   for (const ph of p.blPhotos) blPhotos.push(await uploadIfNeeded(ph, "bl"));
+  const labelPhotos = [];
+  for (const ph of p.labelPhotos ?? []) labelPhotos.push(await uploadIfNeeded(ph, "bl"));
   const lines = [];
   for (const l of p.lines) {
     const photos = [];
@@ -64,7 +66,7 @@ export async function sendReception(p: ReceptionPayload, editId?: number): Promi
   const res = await fetch(editId ? `/api/receptions/${editId}` : "/api/receptions", {
     method: editId ? "PUT" : "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...p, blPhotos, lines, signature }),
+    body: JSON.stringify({ ...p, blPhotos, labelPhotos, lines, signature }),
   });
   if (res.status === 400 || res.status === 403 || res.status === 404 || res.status === 409) {
     const body = await res.json().catch(() => ({}));
@@ -106,8 +108,10 @@ export async function saveServerDraft(d: Draft): Promise<number> {
     for (const ph of l.photos) photos.push(await uploadIfNeeded(ph, "issue"));
     lines.push({ ...l, photos });
   }
+  const labelPhotos = [];
+  for (const ph of d.labelPhotos ?? []) labelPhotos.push(await uploadIfNeeded(ph, "bl"));
   const signature = d.signature ? await uploadIfNeeded(d.signature, "signature") : "";
-  const data = { ...d, blPhotos, lines, signature };
+  const data = { ...d, blPhotos, labelPhotos, lines, signature };
   const res = await fetch("/api/drafts", {
     method: "POST",
     headers: { "content-type": "application/json" },

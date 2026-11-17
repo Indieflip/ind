@@ -8,14 +8,15 @@ import { appConfirm } from "@/components/Confirm";
 import { Icon } from "@/components/Icon";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { DevRules } from "./DevRules";
+import { DevFields, type FieldRow, type NatureRow } from "./DevFields";
 
 interface Item { id: number; kind: string; title: string; detail: string; owner: string; priority: string; updated: string; updatedSort: string }
-const TABS = ["pending", "objective", "constraint", "idea", "done", "rules"] as const;
+const TABS = ["pending", "objective", "constraint", "idea", "done", "rules", "fields"] as const;
 const prioStyle: Record<string, string> = { haute: "bg-red-100 text-red-800", moyenne: "bg-amber-100 text-amber-900", basse: "bg-stone-100 text-stone-600" };
 const prioRank: Record<string, number> = { haute: 0, moyenne: 1, basse: 2, "": 3 };
 
 /** Onglet Dev : sous-onglets (en attente, objectifs, contraintes, idées, réalisé, règles) ; tout est modifiable */
-export function DevBoard({ items, reserved, tab }: { items: Item[]; reserved: boolean; tab: string }) {
+export function DevBoard({ items, reserved, tab, fields = [], natures = [] }: { items: Item[]; reserved: boolean; tab: string; fields?: FieldRow[]; natures?: NatureRow[] }) {
   const { t } = useI18n();
   const d = t.dev;
   const router = useRouter();
@@ -88,13 +89,15 @@ export function DevBoard({ items, reserved, tab }: { items: Item[]; reserved: bo
       <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-stone-200">
         {TABS.map((s) => (
           <Link key={s} href={s === "pending" ? "/dev" : `/dev?tab=${s}`} className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold ${current === s ? "border-brand-600 text-brand-700" : "border-transparent text-stone-500 hover:text-stone-800"}`}>
-            {d.sections[s]}{s !== "rules" && <span className="ml-1 text-xs font-normal text-stone-400">({count(s)})</span>}
+            {d.sections[s]}{s !== "rules" && s !== "fields" && <span className="ml-1 text-xs font-normal text-stone-400">({count(s)})</span>}
           </Link>
         ))}
       </nav>
 
       {current === "rules" ? (
         <DevRules />
+      ) : current === "fields" ? (
+        <DevFields fields={fields} natures={natures} />
       ) : (
         <>
           <div className="mb-3 flex items-center justify-between gap-2">

@@ -34,7 +34,7 @@ export const anomalyTypeEnum = pgEnum("anomaly_type", [
   "other",
 ]);
 export const anomalyStatusEnum = pgEnum("anomaly_status", ["open", "claimed", "credit_received", "closed"]);
-export const photoKindEnum = pgEnum("photo_kind", ["bl", "issue", "signature"]);
+export const photoKindEnum = pgEnum("photo_kind", ["bl", "issue", "signature", "label"]);
 
 /** Paramètres clé/valeur (secret de session, nom du restaurant…) */
 export const appSettings = pgTable("app_settings", {
@@ -79,6 +79,19 @@ export const categories = pgTable("categories", {
   conformRules: text("conform_rules"),
   reserveRules: text("reserve_rules"),
   refuseRules: text("refuse_rules"),
+  /** Classe de température réglementaire appliquée par défaut aux produits de la catégorie */
+  tempClassId: integer("temp_class_id"),
+  position: integer("position").notNull().default(0),
+});
+
+/** Seuils de température réglementaires (protocole Conformité), modifiables par l'administrateur */
+export const tempClasses = pgTable("temp_classes", {
+  id: serial("id").primaryKey(),
+  label: text("label").notNull(),
+  /** Température maximale (°C) */
+  maxTemp: real("max_temp").notNull(),
+  /** Au-delà de maxTemp et jusqu'à reserveMax : réserve ; au-delà : refus proposé */
+  reserveMax: real("reserve_max"),
   position: integer("position").notNull().default(0),
 });
 
@@ -147,6 +160,8 @@ export const receptions = pgTable(
     reservesText: text("reserves_text"),
     signerName: text("signer_name"),
     signatureUrl: text("signature_url"),
+    /** Le livreur est parti sans signer (à cocher à l'étape 1 si pas de signature) */
+    driverLeftUnsigned: boolean("driver_left_unsigned").notNull().default(false),
     notes: text("notes"),
     createdBy: integer("created_by").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -186,6 +201,8 @@ export const receptionLines = pgTable(
     reason: text("reason"),
     /** Numéro du BL / de la facture auquel la ligne appartient (bons à plusieurs documents) */
     document: text("document"),
+    /** Note libre saisie sur le produit */
+    note: text("note"),
     position: integer("position").notNull().default(0),
   },
   (t) => [index("lines_reception_idx").on(t.receptionId), index("lines_product_idx").on(t.productId)],
@@ -550,7 +567,65 @@ export const devItems = pgTable("dev_items", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** Registres HACCP générés (copie figée des lignes, re-téléchargeable en PDF / Excel / CSV) */
+/**
+ * Fiche de réception de marchandises (une par jour) : N° annuel (2026-001…), validée par un responsable désigné.
+ * Une fois validée, elle n'est plus modifiable : toute modification est une nouvelle version soumise à validation.
+ */
+export const receptionSheets = pgTable(
+  "reception_sheets",
+  {
+    id: serial("id").primaryKey(),
+    year: integer("year").notNull(),
+    seq: integer("seq").notNull(),
+    date: date("date").notNull(),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Export de l'administrateur (préalable à une suppression avant 5 ans) */
+    exportedAt: timestamp("exported_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("reception_sheets_year_seq_idx").on(t.year, t.seq), uniqueIndex("reception_sheets_date_idx").on(t.date)],
+);
+
+export const receptionSheetVersions = pgTable(
+  "reception_sheet_versions",
+  {
+    id: serial("id").primaryKey(),
+    sheetId: integer("sheet_id").notNull().references(() => receptionSheets.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    /** Lignes de la fiche au moment de la version (copie figée) */
+    data: jsonb("data").$type<{ header: string[]; rows: (string | number | null)[][] }>().notNull(),
+    receptionCount: integer("reception_count").notNull().default(0),
+    lineCount: integer("line_count").notNull().default(0),
+    /** Motif de la modification (vide pour la première version) */
+    reason: text("reason"),
+    /** pending | validated | rejected */
+    status: text("status").notNull().default("pending"),
+    createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewNote: text("review_note"),
+  },
+  (t) => [uniqueIndex("reception_sheet_versions_idx").on(t.sheetId, t.version)],
+);
+
+/** Onglet Dev > Caractéristiques : champs des fiches, obligatoires ou non, et règles de saisie */
+export const devFields = pgTable("dev_fields", {
+  id: serial("id").primaryKey(),
+  /** reception | anomaly | claim | weigh | product | supplier | sheet */
+  form: text("form").notNull(),
+  /** Étape ou partie de la fiche */
+  section: text("section"),
+  field: text("field").notNull(),
+  required: boolean("required").notNull().default(false),
+  rule: text("rule"),
+  /** Message affiché à l'utilisateur quand la règle bloque */
+  message: text("message"),
+  position: integer("position").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Ancien registre HACCP (remplacé par les fiches de réception ; conservé pour l'historique) (copie figée des lignes, re-téléchargeable en PDF / Excel / CSV) */
 export const haccpRegisters = pgTable("haccp_registers", {
   id: serial("id").primaryKey(),
   fromDate: date("from_date"),
