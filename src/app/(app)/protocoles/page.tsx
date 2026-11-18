@@ -27,9 +27,9 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   const categories = await getDb().select().from(schema.categories).orderBy(asc(schema.categories.position));
   // « Seuils de température » fait désormais partie du protocole Conformité
   // La conformité des produits est l'onglet « Le contrôle » de la procédure de réception ; ?id=conformite ne sert plus qu'à la modifier
-  if ((one(sp.id) === "conformite" || one(sp.id) === "seuils") && one(sp.edit) !== "1") redirect("/protocoles?id=proc-reception&tab=conformite");
+  if ((one(sp.id) === "conformite" || one(sp.id) === "seuils") && one(sp.edit) !== "1") redirect("/protocoles?id=proc-reception&tab=livraison");
   const showConformity = one(sp.id) === "conformite" || one(sp.id) === "seuils";
-  const tabParam = one(sp.tab) === "controle" ? "conformite" : one(sp.tab); // ancien nom de la partie
+  const tabParam = ["controle", "conformite"].includes(one(sp.tab) ?? "") ? "livraison" : one(sp.tab); // anciennes parties, fusionnées dans « Contrôler la livraison »
   const receptionTab = (RECEPTION_TABS.map((x) => x.key) as string[]).includes(tabParam ?? "") ? (tabParam as ReceptionTab) : undefined;
   const showProc = one(sp.id) === "proc-reception" ? "reception" : one(sp.id) === "proc-reclamation" ? "reclamation" : one(sp.id) === "proc-reglementation" ? "reglementation" : null;
   const isAdmin = user.role === "admin";
@@ -149,7 +149,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
                   <section className="space-y-6">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <h2 className="text-xl font-bold">{t.protocols.conformityTitle}</h2>
+                        <h3 className="text-lg font-bold">{t.protocols.decisionFlow}</h3>
                         <p className="max-w-2xl text-sm text-stone-600">{t.protocols.conformityProcIntro}</p>
                       </div>
                       {isAdmin && <Link href="/protocoles?id=conformite&edit=1" className="btn-secondary no-print"><Icon name="edit" className="h-4 w-4" /> {t.protocols.editThresholds}</Link>}
@@ -179,7 +179,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
                   <p className="text-xs font-medium text-brand-700">{t.devFields.autoUpdated}</p>
                 </div>
                 {isAdmin && (editingConformity
-                  ? <Link href="/protocoles?id=proc-reception&tab=conformite" className="btn-primary no-print"><Icon name="check" className="h-4 w-4" /> {t.protocols.doneEditing}</Link>
+                  ? <Link href="/protocoles?id=proc-reception&tab=livraison" className="btn-primary no-print"><Icon name="check" className="h-4 w-4" /> {t.protocols.doneEditing}</Link>
                   : <Link href="/protocoles?id=conformite&edit=1" className="btn-secondary no-print"><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</Link>)}
               </div>
 

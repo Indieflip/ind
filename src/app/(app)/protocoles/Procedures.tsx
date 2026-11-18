@@ -86,7 +86,7 @@ function Problems({ items }: { items: [string, string][] }) {
 const RECEPTION: Step[] = [
   { title: "Photos et signatures", icon: "camera", you: ["Réceptions › Nouvelle réception", "Photo du BL ou de la facture, bien à plat, entier et lisible, une photo par page (ou « Importer un fichier » : PNG, JPG, PDF)", "Pas de BL ? « Pas de BL / saisie manuelle »", "Photo de l'étiquette (lot, DLC) des produits frais", "Signature du livreur, ou « Livreur parti sans signer »", "Votre signature"], app: ["Lit le BL dès que la photo est confirmée : fournisseur, N° et produits pré-remplis", "Sans BL : crée une anomalie « BL manquant »"], block: "Pas d'étape 2 sans signature du livreur ou case cochée" },
   { title: "La livraison", icon: "truck", you: ["Vérifier le fournisseur proposé, la date, l'heure et le N° du document", "Relever la T° de la caisse du camion (frais et surgelés) et noter s'il est propre", "Rush de livraisons ? « Enregistrement brouillon » et reprise plus tard"], app: ["Enregistre un brouillon au passage à l'étape 2", "Refuse un N° de document déjà saisi"] },
-  { title: "Les produits", icon: "thermo", you: ["Vérifier chaque ligne lue ; ajouter les produits manquants (recherche ou « Produit hors liste »)", "Compter, ou peser selon la procédure de pesée ci-dessous : Q contrôlée", "T° à cœur des produits frais et surgelés", "DLC et n° de lot (obligatoires pour viandes, poissons, surgelés)", "Prix unitaire HT", "Vérifier la décision : Acceptée ou Refus ; en cas de refus, motif + photo"], app: ["Propose Acceptée ou Refus selon les seuils (partie 5, La conformité des produits)", "Prix hors de la tranche du mercurial : variation de prix ; prix bloqué non respecté : anomalie", "Calcule les écarts de quantité et de poids"], block: "Pas d'enregistrement sans prix, décision ou DLC obligatoire" },
+  { title: "Les produits", icon: "thermo", you: ["Vérifier chaque ligne lue ; ajouter les produits manquants (recherche ou « Produit hors liste »)", "Compter, ou peser selon la procédure de pesée ci-dessous : Q contrôlée", "T° à cœur des produits frais et surgelés", "DLC et n° de lot (obligatoires pour viandes, poissons, surgelés)", "Prix unitaire HT", "Vérifier la décision : Acceptée ou Refus ; en cas de refus, motif + photo"], app: ["Propose Acceptée ou Refus selon les seuils (partie 2, Contrôler la livraison)", "Prix hors de la tranche du mercurial : variation de prix ; prix bloqué non respecté : anomalie", "Calcule les écarts de quantité et de poids"], block: "Pas d'enregistrement sans prix, décision ou DLC obligatoire" },
   { title: "La validation", icon: "check", you: ["Relire le récapitulatif (en-tête, produits, températures, prix)", "Compléter les températures manquantes si un bandeau le signale", "Recopier le texte des réserves sur le BL du livreur avant qu'il parte", "« Enregistrer la réception »"], app: ["Crée les anomalies et met à jour le mercurial et les prix", "Enregistre même sans réseau (envoi au retour du réseau)"] },
 ];
 
@@ -103,7 +103,6 @@ export const RECEPTION_TABS = [
   { key: "livraison", label: "Contrôler la livraison" },
   { key: "saisie", label: "La saisie sur le téléphone" },
   { key: "pesee", label: "La pesée" },
-  { key: "conformite", label: "La conformité des produits" },
 ] as const;
 export type ReceptionTab = (typeof RECEPTION_TABS)[number]["key"];
 
@@ -149,7 +148,12 @@ export function ReceptionProcedure({ containers, editable, tab, control }: { con
         </section>
       </Fold>
 
-      <Fold n={2} title={RECEPTION_TABS[1].label} open={tab === "livraison"}><ControlChecks /></Fold>
+      <Fold n={2} title={RECEPTION_TABS[1].label} open={tab === "livraison"}>
+        <div className="space-y-8">
+          <ControlChecks />
+          {control}
+        </div>
+      </Fold>
 
       <Fold n={3} title={RECEPTION_TABS[2].label} open={tab === "saisie"}>
           <Timeline steps={RECEPTION} />
@@ -192,7 +196,7 @@ export function ReceptionProcedure({ containers, editable, tab, control }: { con
       </section>
       </Fold>
 
-      <Fold n={5} title={RECEPTION_TABS[4].label} open={tab === "conformite"}>{control}</Fold>
+
     </div>
   );
 }
@@ -285,7 +289,7 @@ const CONTROLS: { icon: string; title: string; how: string; ko: string; tone: "r
   { icon: "box", title: "Quantité", how: "Compter ou peser ce qui est livré et comparer à la quantité facturée sur le BL. Pour les produits au kg, peser comme indiqué dans la partie 4, La pesée.", ko: "Noter l'écart sur le BL : l'application crée l'anomalie et la réclamation.", tone: "amber" },
   { icon: "list", title: "Conformité à la commande", how: "Comparer ce qui est reçu à ce qui a été commandé : bon produit, bonne quantité.", ko: "Prévenir le chef ou le sous-chef.", tone: "amber" },
   { icon: "search", title: "Emballage et aspect", how: "Emballage intact, produit sain, étiquette lisible (n° de lot, DLC).", ko: "Refus, avec le motif et une photo.", tone: "red" },
-  { icon: "thermo", title: "Température", how: "Produits frais : sonde à cœur. Surgelés : sonde glissée entre deux paquets, sans percer l'emballage.", ko: "Au-delà de la limite du tableau des seuils : refus.", tone: "red" },
+  { icon: "thermo", title: "Température", how: "Produits frais : sonde à cœur. Surgelés : sonde glissée entre deux paquets, sans percer l'emballage.", ko: "Au-delà de la limite du tableau des seuils (ci-dessous) : refus.", tone: "red" },
   { icon: "file", title: "DLC", how: "Vérifier que la date laisse le temps de l'utilisation prévue.", ko: "DLC dépassée : refus. Trop courte pour l'utilisation prévue : refuser (l'application la signale).", tone: "red" },
 ];
 
@@ -373,7 +377,7 @@ export function ConformityFlow() {
 export function RegulationProcedure({ retentionYears, notes }: { retentionYears: number; notes?: React.ReactNode }) {
   const rules: { icon: string; tag: string; title: string; text: string; inApp: string }[] = [
     { icon: "book", tag: "Règlement (CE) 852/2004", title: "Hygiène : le contrôle à réception", text: "Le contrôle des marchandises à réception fait partie du plan de maîtrise sanitaire (PMS) de l'établissement.", inApp: "Fiche de réception exportée chaque soir, contrôles guidés à chaque livraison." },
-    { icon: "thermo", tag: "Arrêté du 21 décembre 2009", title: "Températures de conservation", text: "Chaque denrée a une température maximale ; au-delà, le produit ne doit pas être accepté.", inApp: "Seuils et marges dans Procédures › Réception › La conformité des produits ; refus proposé automatiquement." },
+    { icon: "thermo", tag: "Arrêté du 21 décembre 2009", title: "Températures de conservation", text: "Chaque denrée a une température maximale ; au-delà, le produit ne doit pas être accepté.", inApp: "Seuils et marges dans Procédures › Réception › Contrôler la livraison ; refus proposé automatiquement." },
     { icon: "list", tag: "Règlement (CE) 178/2002", title: "Traçabilité", text: "Conserver pour chaque produit reçu : le fournisseur, le produit, le n° de lot, la DLC et la date de réception.", inApp: "Lot, DLC, photos d'étiquettes et de BL enregistrés avec chaque réception." },
     { icon: "alert", tag: "Bonnes pratiques", title: "Refuser ce qui n'est pas conforme", text: "Produit hors température, DLC dépassée ou emballage abîmé : refusé, avec le motif noté sur le BL avant signature.", inApp: "Bouton Refus + motif + photo ; texte des réserves à recopier sur le BL." },
     { icon: "file", tag: "Code de commerce, art. L123-22", title: "Conservation des documents", text: "Les BL et factures sont des pièces comptables : 10 ans.", inApp: `Fiches de réception conservées ${retentionYears || 5} ans ; sauvegardes et exports PDF / Excel.` },
