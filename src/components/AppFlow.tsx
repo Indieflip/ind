@@ -51,7 +51,7 @@ const NIGHT: { when: string; title: string; text: string }[] = [
 
 const PILOT: { title: string; items: string[]; planned?: boolean }[] = [
   { title: "Reporting", items: ["Économies obtenues et en attente", "Par fournisseur, mois, type", "Suivi des prix et évolution par mois"] },
-  { title: "Mercurial et protocoles", items: ["Produits, prix min / max, prix bloqués", "Procédures : réception et pesée, réclamation, conformité des produits, réglementation", "Protocoles rédigés par l'équipe"] },
+  { title: "Mercurial et protocoles", items: ["Produits, prix min / max, prix bloqués", "Procédures : réception (avant, saisie, pesée, contrôle), réclamation, réglementation", "Procédures rédigées par l'équipe"] },
   { title: "Commandes fournisseurs", items: ["Commande depuis le mercurial", "Lignes pré-remplies à la réception", "Commandé / livré / facturé"], planned: true },
 ];
 

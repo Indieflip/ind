@@ -111,7 +111,9 @@ Réalisation de la pesée :
 ## 3. Saisie des informations
 
 • Indiquer le poids dans le BL.`;
-await db.execute(sql`insert into protocols (title, content, position)
+// Protocoles de départ : créés une seule fois (une suppression faite dans l'application n'est jamais annulée)
+const protocolsSeeded = (await db.execute(sql`select 1 from app_settings where key = 'protocols_seed_v1'`)).rows.length > 0;
+if (!protocolsSeeded) await db.execute(sql`insert into protocols (title, content, position)
   select 'Process pèse', ${processPese}, 1 where not exists (select 1 from protocols)`);
 
 // Protocole de réception (procédure rapide, d'après le manuel d'utilisation)
@@ -148,12 +150,12 @@ const receptionProcess = `## Avant de commencer
 • Le bon reste modifiable tant qu'il n'est pas consolidé.
 • L'administrateur le consolide (onglet Consolidation) : il devient une preuve et ne peut plus être modifié ni supprimé.
 • Une anomalie (produit manquant, avoir…) se signale depuis la fiche du bon : « Signaler une anomalie ».`;
-await db.execute(sql`insert into protocols (title, content, position)
+if (!protocolsSeeded) await db.execute(sql`insert into protocols (title, content, position)
   select 'Réception d''une livraison', ${receptionProcess}, 0 where not exists (select 1 from protocols where title = 'Réception d''une livraison')`);
 
 // Protocole « Process de réclamation » (onglet « Process » du fichier Suivi contrôle), créé une seule fois
 const reclamation = "Contacts et démarches à suivre en cas de manquant, refus, retour ou erreur de facturation, par fournisseur.\n\n## Boulangerie Thierry\nRéclamation :\n• Rappeler Céline la comptable dans la journée / dès que possible\n\n## Case / Cash\nRéclamation :\n• Livraison : en cas d'un retour de produit, le livreur rentre au dépôt et scanne les produits en question. Cela permet de générer un avoir qui est envoyé par la compta à compta@nynycannes.com dans la journée\n\n## JFC France\nRéclamation :\n• Contacter le commercial mickael@jfc.eu directement (la compta ne pourra rien faire)\n\n## Gineys\nRéclamation :\n• Si PB (manque / refus / remplacement / erreur) le stipuler sur le BL avant que le livreur parte, au pire dans la journée (max 48h) en appelant le numéro du commercial sur le BL\n\n## Terres de Truffes\nRéclamation :\n• Réclamation process : la rappeler dans la journée / dès que possible\n\n## Marr\nRéclamation :\n• Réclamation à faire le jour même (pas de dépôt en France, le BL = marchandises pour pouvoir passer la frontière) dans le groupe Whatsapp + par mail\n• Si il y a un manquant, un avoir sera édité\n• En cas de pb de manquant livré le lendemain : Au passage à la frontière, les douanes vérifient la marchandise donc si il y a de la marchandise en + ça doit être noté sur un doc";
-await db.execute(sql`insert into protocols (title, content, position)
+if (!protocolsSeeded) await db.execute(sql`insert into protocols (title, content, position)
   select 'Process de réclamation', ${reclamation}, 3 where not exists (select 1 from protocols where lower(title) = lower('Process de réclamation'))`);
 
 // Liste des contenants : table dédiée (filtres, ajout, modification) affichée sous le protocole « Process pèse »
@@ -644,6 +646,14 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'procedures_v3
   await db.execute(sql`update protocols set folder = null where folder is not null`);
   await db.execute(sql`delete from app_settings where key = 'protocol_folders'`);
   await db.execute(sql`insert into app_settings (key, value) values ('procedures_v3', '1') on conflict (key) do nothing`);
+}
+
+// Protocoles recréés par erreur à chaque déploiement (« Réception d'une livraison », « Process pèse », « Process de réclamation ») : retirés une fois,
+// puis plus jamais recréés (drapeau protocols_seed_v1). Les process de réclamation sont dans les comptes fournisseurs.
+if (!(await db.execute(sql`select 1 from app_settings where key = 'procedures_v4'`)).rows.length) {
+  await db.execute(sql`delete from protocols where lower(title) in (lower('Réception d''une livraison'), lower('Process pèse'), lower('Process de réclamation'))`);
+  await db.execute(sql`insert into app_settings (key, value) values ('protocols_seed_v1', '1') on conflict (key) do nothing`);
+  await db.execute(sql`insert into app_settings (key, value) values ('procedures_v4', '1') on conflict (key) do nothing`);
 }
 
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom

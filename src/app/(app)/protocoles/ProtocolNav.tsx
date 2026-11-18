@@ -17,14 +17,13 @@ export function ProtocolNav({ list, currentId, conformity, proc = null }: { list
   return (
     <nav className="no-print card h-fit p-2">
       <p className="px-3 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wider text-stone-400">{p.procedures}</p>
-      {link("/protocoles?id=proc-reception", proc === "reception", "truck", p.procReception)}
+      {link("/protocoles?id=proc-reception", proc === "reception" || conformity, "truck", p.procReception)}
       {link("/protocoles?id=proc-reclamation", proc === "reclamation", "inbox", p.procClaim)}
-      {link("/protocoles?id=conformite", conformity, "check", p.conformity)}
       {link("/protocoles?id=proc-reglementation", proc === "reglementation", "file", p.procRegulation)}
       {list.length > 0 && (
         <>
           <div className="my-1 border-t border-stone-100" />
-          <p className="px-3 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wider text-stone-400">{p.title}</p>
+          <p className="px-3 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wider text-stone-400">{p.teamProcedures}</p>
           {list.map((x) => link(`/protocoles?id=${x.id}`, currentId === x.id, "book", x.title))}
         </>
       )}

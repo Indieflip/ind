@@ -11,7 +11,9 @@ import { Icon } from "@/components/Icon";
 import { ProtocolEditor, ProtocolView } from "./ProtocolClient";
 import { ContainersTable } from "./ContainersTable";
 import { ProtocolNav } from "./ProtocolNav";
-import { ClaimProcedure, ConformityFlow, ReceptionProcedure, RegulationProcedure } from "./Procedures";
+import { ClaimProcedure, ConformityFlow, RECEPTION_TABS, ReceptionProcedure, RegulationProcedure, type ReceptionTab } from "./Procedures";
+import { redirect } from "next/navigation";
+import { extractSection } from "@/lib/richtext";
 import { CategoryClassSelect, ThresholdsEditor } from "./ThresholdsEditor";
 import { ConformityRow } from "../settings/SettingsClient";
 import { backupSettings } from "@/lib/server/backup";
@@ -25,7 +27,10 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   const categories = await getDb().select().from(schema.categories).orderBy(asc(schema.categories.position));
   // « Seuils de température » fait désormais partie du protocole Conformité
+  // La conformité des produits est l'onglet « Le contrôle » de la procédure de réception ; ?id=conformite ne sert plus qu'à la modifier
+  if ((one(sp.id) === "conformite" || one(sp.id) === "seuils") && one(sp.edit) !== "1") redirect("/protocoles?id=proc-reception&tab=controle");
   const showConformity = one(sp.id) === "conformite" || one(sp.id) === "seuils";
+  const receptionTab = (RECEPTION_TABS.map((x) => x.key) as string[]).includes(one(sp.tab) ?? "") ? (one(sp.tab) as ReceptionTab) : "avant";
   const showProc = one(sp.id) === "proc-reception" ? "reception" : one(sp.id) === "proc-reclamation" ? "reclamation" : one(sp.id) === "proc-reglementation" ? "reglementation" : null;
   const isAdmin = user.role === "admin";
   const editingConformity = showConformity && isAdmin && one(sp.edit) === "1";
@@ -54,40 +59,9 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   const containers = isWeighing || showProc === "reception" ? await getDb().select().from(schema.containers).orderBy(asc(schema.containers.position), asc(schema.containers.id)) : [];
   const containerRows = containers.map((x) => ({ id: x.id, supplier: x.supplier ?? "", product: x.product ?? "", tare: num(x.tare), container: x.container ?? "" }));
 
-  return (
+  // Contenu « conformité des produits » : schéma, tableau des seuils, conditions par catégorie (lecture ou modification)
+  const conformityBody = (
     <>
-      <PageHeader title={t.protocols.title}>
-        {editable && <Link href="/protocoles?new=1" className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t.protocols.new}</Link>}
-      </PageHeader>
-      <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
-        <ProtocolNav list={ownList.map((x) => ({ id: x.id, title: x.title }))} currentId={creating || showConformity || showProc ? null : current?.id ?? null} conformity={showConformity} proc={showProc} editable={editable} />
-        <div className="min-w-0">
-          {showProc === "reception" ? (
-            <article className="card p-5 sm:p-8"><ReceptionProcedure containers={containerRows} editable={editable} /></article>
-          ) : showProc === "reclamation" ? (
-            <article className="card p-5 sm:p-8"><ClaimProcedure /></article>
-          ) : showProc === "reglementation" ? (
-            <article className="card p-5 sm:p-8">
-              <RegulationProcedure retentionYears={RETENTION_YEARS} notes={regulationNotes ? (
-                <>
-                  <ProtocolView content={regulationNotes.content} />
-                  {editable && <Link href={`/protocoles?id=${regulationNotes.id}&edit=1`} className="btn-secondary no-print mt-4"><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</Link>}
-                </>
-              ) : undefined} />
-            </article>
-          ) : showConformity ? (
-            <article className="card p-5 sm:p-8">
-              <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-2">
-                  <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t.protocols.conformityProcTitle}</h1>
-                  <p className="max-w-2xl text-stone-600">{t.protocols.conformityProcIntro}</p>
-                  <p className="text-xs font-medium text-brand-700">{t.devFields.autoUpdated}</p>
-                </div>
-                {isAdmin && (editingConformity
-                  ? <Link href="/protocoles?id=conformite" className="btn-primary no-print"><Icon name="check" className="h-4 w-4" /> {t.protocols.doneEditing}</Link>
-                  : <Link href="/protocoles?id=conformite&edit=1" className="btn-secondary no-print"><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</Link>)}
-              </div>
-
               {!editingConformity && <ConformityFlow />}
 
               <h2 className="mb-1 mt-8 text-lg font-bold">{t.protocols.thresholdsTable}</h2>
@@ -154,6 +128,71 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
                   </details>
                 ))}
               </div>
+    </>
+  );
+  // Partie « Contrôler la livraison » d'une procédure de réception rédigée par l'équipe, reprise dans l'onglet Le contrôle
+  const teamReception = list.find((x) => /proc[ée]dure de r[ée]ception/i.test(x.title));
+  const teamControl = teamReception ? extractSection(teamReception.content, /contr[ôo]ler la livraison/i) : null;
+
+  return (
+    <>
+      <PageHeader title={t.protocols.title}>
+        {editable && <Link href="/protocoles?new=1" className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t.protocols.new}</Link>}
+      </PageHeader>
+      <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
+        <ProtocolNav list={ownList.map((x) => ({ id: x.id, title: x.title }))} currentId={creating || showConformity || showProc ? null : current?.id ?? null} conformity={showConformity} proc={showProc} editable={editable} />
+        <div className="min-w-0">
+          {showProc === "reception" ? (
+            <article className="card p-5 sm:p-8">
+              <ReceptionProcedure
+                containers={containerRows}
+                editable={editable}
+                tab={receptionTab}
+                control={
+                  <section className="space-y-6">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-xl font-bold">{t.protocols.controlTitle}</h2>
+                        <p className="max-w-2xl text-sm text-stone-600">{t.protocols.conformityProcIntro}</p>
+                      </div>
+                      {isAdmin && <Link href="/protocoles?id=conformite&edit=1" className="btn-secondary no-print"><Icon name="edit" className="h-4 w-4" /> {t.protocols.editThresholds}</Link>}
+                    </div>
+                    {teamControl && (
+                      <div className="rounded-2xl border border-stone-200 bg-white p-5">
+                        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-stone-400">{t.protocols.fromTeam} « {teamReception!.title} »</p>
+                        <ProtocolView content={teamControl} />
+                      </div>
+                    )}
+                    {conformityBody}
+                  </section>
+                }
+              />
+            </article>
+          ) : showProc === "reclamation" ? (
+            <article className="card p-5 sm:p-8"><ClaimProcedure /></article>
+          ) : showProc === "reglementation" ? (
+            <article className="card p-5 sm:p-8">
+              <RegulationProcedure retentionYears={RETENTION_YEARS} notes={regulationNotes ? (
+                <>
+                  <ProtocolView content={regulationNotes.content} />
+                  {editable && <Link href={`/protocoles?id=${regulationNotes.id}&edit=1`} className="btn-secondary no-print mt-4"><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</Link>}
+                </>
+              ) : undefined} />
+            </article>
+          ) : showConformity ? (
+            <article className="card p-5 sm:p-8">
+              <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-2">
+                  <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t.protocols.conformityProcTitle}</h1>
+                  <p className="max-w-2xl text-stone-600">{t.protocols.conformityProcIntro}</p>
+                  <p className="text-xs font-medium text-brand-700">{t.devFields.autoUpdated}</p>
+                </div>
+                {isAdmin && (editingConformity
+                  ? <Link href="/protocoles?id=proc-reception&tab=controle" className="btn-primary no-print"><Icon name="check" className="h-4 w-4" /> {t.protocols.doneEditing}</Link>
+                  : <Link href="/protocoles?id=conformite&edit=1" className="btn-secondary no-print"><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</Link>)}
+              </div>
+
+              {conformityBody}
             </article>
           ) : creating ? (
             <ProtocolEditor id={null} title="" content="" />

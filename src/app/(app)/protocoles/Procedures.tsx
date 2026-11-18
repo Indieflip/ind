@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { ContainersTable } from "./ContainersTable";
 
@@ -85,15 +86,25 @@ function Problems({ items }: { items: [string, string][] }) {
 const RECEPTION: Step[] = [
   { title: "Photos et signatures", icon: "camera", you: ["Réceptions › Nouvelle réception", "Photo du BL ou de la facture, bien à plat, entier et lisible, une photo par page (ou « Importer un fichier » : PNG, JPG, PDF)", "Pas de BL ? « Pas de BL / saisie manuelle »", "Photo de l'étiquette (lot, DLC) des produits frais", "Signature du livreur, ou « Livreur parti sans signer »", "Votre signature"], app: ["Lit le BL dès que la photo est confirmée : fournisseur, N° et produits pré-remplis", "Sans BL : crée une anomalie « BL manquant »"], block: "Pas d'étape 2 sans signature du livreur ou case cochée" },
   { title: "La livraison", icon: "truck", you: ["Vérifier le fournisseur proposé, la date, l'heure et le N° du document", "Relever la T° de la caisse du camion (frais et surgelés) et noter s'il est propre", "Rush de livraisons ? « Enregistrement brouillon » et reprise plus tard"], app: ["Enregistre un brouillon au passage à l'étape 2", "Refuse un N° de document déjà saisi"] },
-  { title: "Les produits", icon: "thermo", you: ["Vérifier chaque ligne lue ; ajouter les produits manquants (recherche ou « Produit hors liste »)", "Compter, ou peser selon la procédure de pesée ci-dessous : Q contrôlée", "T° à cœur des produits frais et surgelés", "DLC et n° de lot (obligatoires pour viandes, poissons, surgelés)", "Prix unitaire HT", "Vérifier la décision : Acceptée ou Refus ; en cas de refus, motif + photo"], app: ["Propose Acceptée ou Refus selon les seuils (voir Conformité des produits)", "Prix hors de la tranche du mercurial : variation de prix ; prix bloqué non respecté : anomalie", "Calcule les écarts de quantité et de poids"], block: "Pas d'enregistrement sans prix, décision ou DLC obligatoire" },
+  { title: "Les produits", icon: "thermo", you: ["Vérifier chaque ligne lue ; ajouter les produits manquants (recherche ou « Produit hors liste »)", "Compter, ou peser selon la procédure de pesée ci-dessous : Q contrôlée", "T° à cœur des produits frais et surgelés", "DLC et n° de lot (obligatoires pour viandes, poissons, surgelés)", "Prix unitaire HT", "Vérifier la décision : Acceptée ou Refus ; en cas de refus, motif + photo"], app: ["Propose Acceptée ou Refus selon les seuils (onglet Le contrôle)", "Prix hors de la tranche du mercurial : variation de prix ; prix bloqué non respecté : anomalie", "Calcule les écarts de quantité et de poids"], block: "Pas d'enregistrement sans prix, décision ou DLC obligatoire" },
   { title: "La validation", icon: "check", you: ["Relire le récapitulatif (en-tête, produits, températures, prix)", "Compléter les températures manquantes si un bandeau le signale", "Recopier le texte des réserves sur le BL du livreur avant qu'il parte", "« Enregistrer la réception »"], app: ["Crée les anomalies et met à jour le mercurial et les prix", "Enregistre même sans réseau (envoi au retour du réseau)"] },
 ];
 
 const BEFORE: [string, string, string][] = [
+  ["layers", "Préparer la zone", "Dégager la zone de réception et mettre les palettes en place avant l'arrivée du camion."],
+  ["alert", "Rien au sol", "Aucune marchandise n'est posée directement au sol : tout va sur les palettes ou les plans de travail."],
   ["truck", "Devant le livreur", "Contrôler la livraison avec lui, avant qu'il reparte."],
   ["thermo", "Le bon matériel", "Téléphone chargé, sonde propre, balance prête."],
   ["leaf", "Le frais d'abord", "Contrôler en premier les produits frais et surgelés, puis les ranger aussitôt."],
 ];
+
+export const RECEPTION_TABS = [
+  { key: "avant", label: "Avant de commencer" },
+  { key: "saisie", label: "La saisie pas à pas" },
+  { key: "pesee", label: "La pesée" },
+  { key: "controle", label: "Le contrôle" },
+] as const;
+export type ReceptionTab = (typeof RECEPTION_TABS)[number]["key"];
 
 const WEIGH: { title: string; items: string[] }[] = [
   { title: "Préparer la balance", items: ["Balance de niveau et stable", "Affichage à zéro avant toute pesée", "Contrôle avec un poids de 5 kg"] },
@@ -102,28 +113,64 @@ const WEIGH: { title: string; items: string[] }[] = [
   { title: "Saisir", items: ["Q contrôlée = poids net, dans l'application", "Noter le poids sur le BL"] },
 ];
 
-export function ReceptionProcedure({ containers, editable }: { containers: Parameters<typeof ContainersTable>[0]["rows"]; editable: boolean }) {
+export function ReceptionProcedure({ containers, editable, tab, control }: { containers: Parameters<typeof ContainersTable>[0]["rows"]; editable: boolean; tab: ReceptionTab; control: React.ReactNode }) {
   return (
     <div>
       <Header
         title="Procédure de réception"
-        intro="Une livraison en 4 étapes sur le téléphone. L'application vous guide et vous bloque, avec un message, si quelque chose manque."
+        intro="Préparer, saisir sur le téléphone, peser, contrôler. L'application vous guide et vous bloque, avec un message, si quelque chose manque."
         meta={[["Pour qui", "toute personne qui réceptionne"], ["Où", "Réceptions › Nouvelle réception"], ["Durée", "5 à 10 min"]]}
       />
-      <section className="mb-8">
-        <h2 className="mb-3 text-lg font-bold">Avant de commencer</h2>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {BEFORE.map(([icon, k, v]) => (
-            <div key={k} className="flex gap-3 rounded-xl border border-stone-200 bg-white p-4">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><Icon name={icon} className="h-5 w-5" /></span>
-              <div><p className="font-semibold">{k}</p><p className="text-sm text-stone-600">{v}</p></div>
-            </div>
-          ))}
-        </div>
-      </section>
-      <h2 className="mb-3 text-lg font-bold">Les 4 étapes</h2>
-      <Timeline steps={RECEPTION} />
-      <section id="pesee" className="mt-10 scroll-mt-20">
+      <nav className="no-print -mx-1 mb-6 flex gap-1 overflow-x-auto rounded-xl bg-stone-100 p-1">
+        {RECEPTION_TABS.map((t, i) => (
+          <Link
+            key={t.key}
+            href={`/protocoles?id=proc-reception&tab=${t.key}`}
+            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition ${tab === t.key ? "bg-white text-brand-700 shadow-sm" : "text-stone-600 hover:text-stone-900"}`}
+          >
+            <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${tab === t.key ? "bg-brand-600 text-white" : "bg-stone-300 text-white"}`}>{i + 1}</span>
+            {t.label}
+          </Link>
+        ))}
+      </nav>
+
+      {tab === "avant" && (
+        <section>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {BEFORE.map(([icon, k, v]) => (
+              <div key={k} className="flex gap-3 rounded-xl border border-stone-200 bg-white p-4">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><Icon name={icon} className="h-5 w-5" /></span>
+                <div><p className="font-semibold">{k}</p><p className="text-sm text-stone-600">{v}</p></div>
+              </div>
+            ))}
+          </div>
+          <Link href="/protocoles?id=proc-reception&tab=saisie" className="btn-primary mt-6">Commencer la saisie →</Link>
+        </section>
+      )}
+
+      {tab === "saisie" && (
+        <>
+          <Timeline steps={RECEPTION} />
+      <div className="mt-6 flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
+        <Icon name="cloudOff" className="mt-0.5 h-5 w-5 shrink-0" />
+        <p><strong>Chaque soir à 23 h</strong>, la fiche de réception du jour est exportée et les bons sont consolidés : ils ne sont plus modifiables.</p>
+      </div>
+      <Problems
+        items={[
+          ["Pas de BL", "« Pas de BL / saisie manuelle » à l'étape 1 : une anomalie BL manquant est créée."],
+          ["Le livreur est parti", "Cocher « Livreur parti sans signer »."],
+          ["Produit trop chaud, DLC dépassée, emballage abîmé", "Refus + motif + photo. Le livreur reprend le produit, on l'écrit sur le BL."],
+          ["Produit manquant ou en trop", "Saisir la quantité réellement livrée : l'écart est réclamé automatiquement."],
+          ["Pas de réseau", "Terminer quand même : la réception part dès que le réseau revient."],
+          ["Je dois m'interrompre", "« Enregistrement brouillon » : le brouillon reste dans le tableau des réceptions."],
+          ["Erreur vue après coup", "Corriger avant 23 h. Après, le bon est consolidé : prévenir le responsable."],
+        ]}
+      />
+        </>
+      )}
+
+      {tab === "pesee" && (
+      <section>
         <h2 className="mb-1 text-lg font-bold">La pesée des produits au kg</h2>
         <p className="mb-4 text-sm text-stone-600">Pour tout produit vendu au poids. L'application compare le poids net au poids facturé : au-delà de 10 g ou 0,10 € d'écart, un écart de pesée est créé et réclamé (une anomalie par bon).</p>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -142,22 +189,9 @@ export function ReceptionProcedure({ containers, editable }: { containers: Param
           <ContainersTable editable={editable} rows={containers} />
         </div>
       </section>
+      )}
 
-      <div className="mt-8 flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
-        <Icon name="cloudOff" className="mt-0.5 h-5 w-5 shrink-0" />
-        <p><strong>Chaque soir à 23 h</strong>, la fiche de réception du jour est exportée et les bons sont consolidés : ils ne sont plus modifiables.</p>
-      </div>
-      <Problems
-        items={[
-          ["Pas de BL", "« Pas de BL / saisie manuelle » à l'étape 1 : une anomalie BL manquant est créée."],
-          ["Le livreur est parti", "Cocher « Livreur parti sans signer »."],
-          ["Produit trop chaud, DLC dépassée, emballage abîmé", "Refus + motif + photo. Le livreur reprend le produit, on l'écrit sur le BL."],
-          ["Produit manquant ou en trop", "Saisir la quantité réellement livrée : l'écart est réclamé automatiquement."],
-          ["Pas de réseau", "Terminer quand même : la réception part dès que le réseau revient."],
-          ["Je dois m'interrompre", "« Enregistrement brouillon » : le brouillon reste dans le tableau des réceptions."],
-          ["Erreur vue après coup", "Corriger avant 23 h. Après, le bon est consolidé : prévenir le responsable."],
-        ]}
-      />
+      {tab === "controle" && control}
     </div>
   );
 }
@@ -298,7 +332,7 @@ export function ConformityFlow() {
 export function RegulationProcedure({ retentionYears, notes }: { retentionYears: number; notes?: React.ReactNode }) {
   const rules: { icon: string; tag: string; title: string; text: string; inApp: string }[] = [
     { icon: "book", tag: "Règlement (CE) 852/2004", title: "Hygiène : le contrôle à réception", text: "Le contrôle des marchandises à réception fait partie du plan de maîtrise sanitaire (PMS) de l'établissement.", inApp: "Fiche de réception exportée chaque soir, contrôles guidés à chaque livraison." },
-    { icon: "thermo", tag: "Arrêté du 21 décembre 2009", title: "Températures de conservation", text: "Chaque denrée a une température maximale ; au-delà, le produit ne doit pas être accepté.", inApp: "Seuils et marges dans Conformité des produits ; refus proposé automatiquement." },
+    { icon: "thermo", tag: "Arrêté du 21 décembre 2009", title: "Températures de conservation", text: "Chaque denrée a une température maximale ; au-delà, le produit ne doit pas être accepté.", inApp: "Seuils et marges dans Procédures › Réception › Le contrôle ; refus proposé automatiquement." },
     { icon: "list", tag: "Règlement (CE) 178/2002", title: "Traçabilité", text: "Conserver pour chaque produit reçu : le fournisseur, le produit, le n° de lot, la DLC et la date de réception.", inApp: "Lot, DLC, photos d'étiquettes et de BL enregistrés avec chaque réception." },
     { icon: "alert", tag: "Bonnes pratiques", title: "Refuser ce qui n'est pas conforme", text: "Produit hors température, DLC dépassée ou emballage abîmé : refusé, avec le motif noté sur le BL avant signature.", inApp: "Bouton Refus + motif + photo ; texte des réserves à recopier sur le BL." },
     { icon: "file", tag: "Code de commerce, art. L123-22", title: "Conservation des documents", text: "Les BL et factures sont des pièces comptables : 10 ans.", inApp: `Fiches de réception conservées ${retentionYears || 5} ans ; sauvegardes et exports PDF / Excel.` },
