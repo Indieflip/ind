@@ -6,4 +6,5 @@
   - `Dev > Caractéristiques` (bloc « Vue d'ensemble des étapes automatisées ») : liste `devFields.automations` dans `src/lib/i18n/fr.ts` (et `en.ts`), à compléter dès qu'une étape automatique est ajoutée ou modifiée.
   - `Dev > Règles` : textes `rules` dans les fichiers i18n.
   - **Schéma de l'application** (bouton du menu, fenêtre « Le parcours d'une livraison ») : `src/components/AppFlow.tsx`, à mettre à jour dès qu'une étape, un blocage, une automatisation ou un module change.
+  - **Procédures** (Protocoles > Procédures : réception, réclamation, conformité des produits) : `src/app/(app)/protocoles/Procedures.tsx`, à tenir à jour de la même façon.
 - Les étapes de données ponctuelles vont dans `scripts/migrate.mjs`, avant le commentaire « Fruits et légumes : rattacher les produits », protégées par un drapeau `app_settings`.

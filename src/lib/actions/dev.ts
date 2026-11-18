@@ -15,10 +15,10 @@ async function guard() {
 const KINDS = ["objective", "pending", "constraint", "idea", "done"];
 const PRIORITIES = ["haute", "moyenne", "basse"];
 
-export async function saveDevItemAction(id: number | null, data: { kind: string; title: string; detail: string; owner: string; priority?: string }) {
+export async function saveDevItemAction(id: number | null, data: { kind: string; title: string; detail: string; owner: string; priority?: string; task?: string }) {
   await guard();
   if (!data.title.trim() || !KINDS.includes(data.kind)) return { error: "invalid" };
-  const values = { kind: data.kind, title: data.title.trim(), detail: data.detail.trim() || null, owner: data.owner || null, priority: PRIORITIES.includes(data.priority ?? "") ? data.priority! : null, updatedAt: new Date() };
+  const values = { kind: data.kind, title: data.title.trim(), detail: data.detail.trim() || null, owner: data.owner || null, priority: PRIORITIES.includes(data.priority ?? "") ? data.priority! : null, task: data.task?.trim() || null, updatedAt: new Date() };
   if (id) await getDb().update(schema.devItems).set(values).where(eq(schema.devItems.id, id));
   else await getDb().insert(schema.devItems).values({ ...values, position: Date.now() % 1_000_000 });
   revalidatePath("/dev");
@@ -70,6 +70,14 @@ export async function saveProjectRoiAction(data: { monthlyCost: number; hoursPer
   await guard();
   const n = (v: number) => (Number.isFinite(v) && v >= 0 ? Math.round(v * 100) / 100 : 0);
   await setSetting("dev_project_roi", JSON.stringify({ monthlyCost: n(data.monthlyCost), hoursPerWeek: n(data.hoursPerWeek), hourlyRate: n(data.hourlyRate), sites: Math.max(1, Math.round(n(data.sites))) }));
+  revalidatePath("/dev");
+  return { ok: true };
+}
+
+/** Dev : saisie directe de la colonne « Tâche » */
+export async function setDevTaskAction(id: number, task: string) {
+  await guard();
+  await getDb().update(schema.devItems).set({ task: task.trim().slice(0, 120) || null }).where(eq(schema.devItems.id, id));
   revalidatePath("/dev");
   return { ok: true };
 }

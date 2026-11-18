@@ -568,6 +568,8 @@ export const devItems = pgTable("dev_items", {
   owner: text("owner"),
   /** haute | moyenne | basse */
   priority: text("priority"),
+  /** Tâche (regroupement libre : « Fiche de réception », « Droits utilisateurs »…) */
+  task: text("task"),
   position: integer("position").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -15,7 +15,7 @@ const ROOT = "__root";
  * Dossier : « Nouveau dossier » → on tape le nom (Entrée) ; on glisse les protocoles dedans ; ✕ pour supprimer.
  * Sur téléphone (pas de glisser-déposer) : le petit menu ⇄ à côté d'un protocole.
  */
-export function ProtocolNav({ list, folders, currentId, conformity, editable }: { list: P[]; folders: string[]; currentId: number | null; conformity: boolean; editable: boolean }) {
+export function ProtocolNav({ list, folders, currentId, conformity, proc = null, editable }: { list: P[]; folders: string[]; currentId: number | null; conformity: boolean; proc?: string | null; editable: boolean }) {
   const { t } = useI18n();
   const p = t.protocols;
   const router = useRouter();
@@ -117,9 +117,15 @@ export function ProtocolNav({ list, folders, currentId, conformity, editable }: 
       })}
       {list.length === 0 && <p className="p-2 text-sm text-stone-500">{p.empty}</p>}
       <div className="my-1 border-t border-stone-100" />
-      <Link href="/protocoles?id=conformite" className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${conformity ? "bg-brand-50 text-brand-700" : "text-stone-700 hover:bg-stone-100"}`}>
-        <Icon name="check" className="h-4 w-4" /> {p.conformity}
-      </Link>
+      <p className="px-3 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wider text-stone-400">{p.procedures}</p>
+      {([["proc-reception", "reception", p.procReception, "truck"], ["proc-reclamation", "reclamation", p.procClaim, "inbox"], ["conformite", "conformite", p.conformity, "check"]] as const).map(([id, key, label, icon]) => {
+        const on = key === "conformite" ? conformity : proc === key;
+        return (
+          <Link key={id} href={`/protocoles?id=${id}`} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${on ? "bg-brand-50 text-brand-700" : "text-stone-700 hover:bg-stone-100"}`}>
+            <Icon name={icon} className="h-4 w-4" /> {label}
+          </Link>
+        );
+      })}
       {editable && (creating ? (
         <form
           className="mt-1 flex items-center gap-1 px-1"

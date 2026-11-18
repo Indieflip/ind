@@ -29,7 +29,7 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
   return (
     <>
       <PageHeader title={t.receptions.title}>
-        <Link href={`/protocoles?titre=${encodeURIComponent("Procédure de réception")}`} className="btn-secondary py-1.5"><Icon name="book" className="h-4 w-4" /> {t.protocols.procedure}</Link>
+        <Link href="/protocoles?id=proc-reception" className="btn-secondary py-1.5"><Icon name="book" className="h-4 w-4" /> {t.protocols.procedure}</Link>
       </PageHeader>
 
       {can.receive(user.role) && <DraftBanner />}

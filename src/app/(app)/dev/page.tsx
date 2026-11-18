@@ -33,7 +33,7 @@ export default async function DevPage({ searchParams }: { searchParams: Promise<
         fields={fieldsTab?.fields}
         natures={fieldsTab?.natures}
         project={project}
-        items={items.map((i) => ({ id: i.id, kind: i.kind, title: i.title, detail: i.detail ?? "", owner: i.owner ?? "", priority: i.priority ?? "", updated: fmtDateTime(i.updatedAt, locale), updatedSort: i.updatedAt.toISOString() }))}
+        items={items.map((i) => ({ id: i.id, kind: i.kind, title: i.title, detail: i.detail ?? "", owner: i.owner ?? "", priority: i.priority ?? "", task: i.task ?? "", updated: fmtDateTime(i.updatedAt, locale), updatedSort: i.updatedAt.toISOString() }))}
       />
     </>
   );

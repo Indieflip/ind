@@ -627,6 +627,17 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'procedures_v1
   await db.execute(sql`insert into app_settings (key, value) values ('procedures_v1', '1') on conflict (key) do nothing`);
 }
 
+// Protocoles : procédures de réception / réclamation remplacées par des pages visuelles (Protocoles > Procédures), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'procedures_v2'`)).rows.length) {
+  await db.execute(sql`delete from protocols where title in ('Procédure de réception', 'Procédure de réclamation')`);
+  const left = (await db.execute(sql`select 1 from protocols where folder = 'Procédures' limit 1`)).rows.length;
+  if (!left) {
+    const cur = (await db.execute(sql`select value from app_settings where key = 'protocol_folders'`)).rows[0]?.value;
+    if (cur) await db.execute(sql`update app_settings set value = ${JSON.stringify(JSON.parse(cur).filter((f) => f !== "Procédures"))} where key = 'protocol_folders'`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('procedures_v2', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

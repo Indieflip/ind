@@ -11,6 +11,7 @@ import { Icon } from "@/components/Icon";
 import { ProtocolEditor, ProtocolView } from "./ProtocolClient";
 import { ContainersTable } from "./ContainersTable";
 import { ProtocolNav } from "./ProtocolNav";
+import { ClaimProcedure, ConformityFlow, ReceptionProcedure } from "./Procedures";
 import { getSetting } from "@/lib/settings";
 import { CategoryClassSelect, ThresholdsEditor } from "./ThresholdsEditor";
 import { ConformityRow } from "../settings/SettingsClient";
@@ -25,6 +26,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   const categories = await getDb().select().from(schema.categories).orderBy(asc(schema.categories.position));
   // « Seuils de température » fait désormais partie du protocole Conformité
   const showConformity = one(sp.id) === "conformite" || one(sp.id) === "seuils";
+  const showProc = one(sp.id) === "proc-reception" ? "reception" : one(sp.id) === "proc-reclamation" ? "reclamation" : null;
   const isAdmin = user.role === "admin";
   const editingConformity = showConformity && isAdmin && one(sp.edit) === "1";
   const [classes, retentionYears] = await Promise.all([
@@ -44,7 +46,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   const editing = one(sp.edit) === "1" && editable;
   // ?titre=… : ouvre un protocole par son titre (liens « Procédure » des pages Réceptions et Anomalies)
   const byTitle = one(sp.titre) ? list.find((p) => p.title.toLowerCase() === one(sp.titre)!.toLowerCase()) : undefined;
-  const current = creating || showConformity ? null : byTitle ?? list.find((p) => String(p.id) === one(sp.id)) ?? list[0];
+  const current = creating || showConformity || showProc ? null : byTitle ?? list.find((p) => String(p.id) === one(sp.id)) ?? list[0];
   // Le protocole « Process pèse » affiche la liste des contenants (tares)
   const isWeighing = !!current && normalize(current.title) === "process pese";
   const containers = isWeighing ? await getDb().select().from(schema.containers).orderBy(asc(schema.containers.position), asc(schema.containers.id)) : [];
@@ -55,115 +57,91 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
         {editable && <Link href="/protocoles?new=1" className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t.protocols.new}</Link>}
       </PageHeader>
       <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
-        <ProtocolNav list={list.map((x) => ({ id: x.id, title: x.title, folder: x.folder }))} folders={folders} currentId={creating || showConformity ? null : current?.id ?? null} conformity={showConformity} editable={editable} />
+        <ProtocolNav list={list.map((x) => ({ id: x.id, title: x.title, folder: x.folder }))} folders={folders} currentId={creating || showConformity || showProc ? null : current?.id ?? null} conformity={showConformity} proc={showProc} editable={editable} />
         <div className="min-w-0">
-          {showConformity ? (
-            <article className="card p-5 sm:p-6">
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h1 className="text-2xl font-bold">{t.protocols.conformityProcTitle}</h1>
-                  <p className="text-sm text-stone-600">{t.protocols.conformityProcIntro}</p>
+          {showProc === "reception" ? (
+            <article className="card p-5 sm:p-8"><ReceptionProcedure /></article>
+          ) : showProc === "reclamation" ? (
+            <article className="card p-5 sm:p-8"><ClaimProcedure /></article>
+          ) : showConformity ? (
+            <article className="card p-5 sm:p-8">
+              <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-2">
+                  <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t.protocols.conformityProcTitle}</h1>
+                  <p className="max-w-2xl text-stone-600">{t.protocols.conformityProcIntro}</p>
+                  <p className="text-xs font-medium text-brand-700">{t.devFields.autoUpdated}</p>
                 </div>
                 {isAdmin && (editingConformity
                   ? <Link href="/protocoles?id=conformite" className="btn-primary no-print"><Icon name="check" className="h-4 w-4" /> {t.protocols.doneEditing}</Link>
                   : <Link href="/protocoles?id=conformite&edit=1" className="btn-secondary no-print"><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</Link>)}
               </div>
 
-              {!editingConformity && (
-                <>
-                  <ol className="mb-6 space-y-3">
-                    {t.protocols.procSteps.map((st, i) => (
-                      <li key={i} className="flex gap-3 rounded-xl border border-stone-200 bg-white p-4">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">{i + 1}</span>
-                        <div className="min-w-0 space-y-1.5">
-                          <h2 className="font-semibold">{st.title}</h2>
-                          <p className="text-sm text-stone-700">{st.how}</p>
-                          <div className="flex flex-wrap gap-2 text-xs">
-                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800">✓ {st.ok}</span>
-                            <span className="rounded-full bg-red-50 px-2.5 py-1 text-red-800">✕ {st.ko}</span>
-                          </div>
-                          {st.app && <p className="text-xs text-sky-700">{t.protocols.procApp} {st.app}</p>}
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                  <div className="mb-6 rounded-lg border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">{t.protocols.procRefuse}</div>
-                </>
-              )}
+              {!editingConformity && <ConformityFlow />}
 
-              <h2 className="mb-1 text-lg font-semibold">{t.protocols.procRef1}</h2>
-              <p className="mb-2 text-sm text-stone-600">{t.protocols.thresholdsIntro}</p>
+              <h2 className="mb-1 mt-8 text-lg font-bold">{t.protocols.thresholdsTable}</h2>
+              <p className="mb-3 text-sm text-stone-600">{t.protocols.thresholdsTableIntro}</p>
               {editingConformity ? (
                 <ThresholdsEditor classes={classes} />
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto rounded-xl border border-stone-200">
                   <table className="table">
-                    <thead><tr><th>{t.protocols.tempClass}</th><th className="text-center">{t.decision.conform}</th><th className="text-center">{t.protocols.margin}</th><th className="text-center">{t.protocols.refuseProposed}</th></tr></thead>
+                    <thead>
+                      <tr>
+                        <th>{t.protocols.tempClass}</th>
+                        <th>{t.protocols.appliedTo}</th>
+                        <th className="text-center">{t.wizard.accepted}</th>
+                        <th className="text-center">{t.protocols.margin}</th>
+                        <th className="text-center">{t.decision.refuse}</th>
+                      </tr>
+                    </thead>
                     <tbody>
-                      {classes.map((k) => (
-                        <tr key={k.id}>
-                          <td className="font-medium">{k.label}</td>
-                          <td className="bg-emerald-50 text-center font-semibold text-emerald-900">≤ {deg(k.maxTemp)}</td>
-                          <td className="bg-sky-50 text-center text-sky-900">{k.reserveMax != null ? `+${fmtNum(Math.round((k.reserveMax - k.maxTemp) * 10) / 10, locale, 1)} °C (${t.protocols.upTo} ${deg(k.reserveMax)})` : t.protocols.noMargin}</td>
-                          <td className="bg-red-50 text-center text-red-800">&gt; {deg(k.reserveMax ?? k.maxTemp)}</td>
-                        </tr>
-                      ))}
+                      {classes.map((k) => {
+                        const cats = categories.filter((c) => c.tempClassId === k.id).map((c) => (locale === "en" ? c.nameEn : c.nameFr));
+                        return (
+                          <tr key={k.id} className={cats.length ? "bg-brand-50/40" : ""}>
+                            <td className="font-medium">{k.label}</td>
+                            <td className="text-sm">{cats.length ? cats.map((c) => <span key={c} className="badge mr-1 bg-brand-100 text-brand-800">{c}</span>) : <span className="text-stone-400">—</span>}</td>
+                            <td className="whitespace-nowrap text-center font-semibold text-emerald-800">≤ {deg(k.maxTemp)}</td>
+                            <td className="whitespace-nowrap text-center text-sky-800">{k.reserveMax != null ? `+${fmtNum(Math.round((k.reserveMax - k.maxTemp) * 10) / 10, locale, 1)} °C (${t.protocols.upTo} ${deg(k.reserveMax)})` : t.protocols.noMargin}</td>
+                            <td className="whitespace-nowrap text-center font-semibold text-red-700">&gt; {deg(k.reserveMax ?? k.maxTemp)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-stone-700">
-                {t.protocols.marginNotes.map((x, i) => <li key={i}>{x}</li>)}
+              <ul className="mt-3 space-y-1 text-xs text-stone-600">
+                {t.protocols.marginNotes.map((x, i) => <li key={i}>• {x}</li>)}
+                <li>• {t.protocols.noReadingFor} {categories.filter((c) => !c.tempClassId).map((c) => (locale === "en" ? c.nameEn : c.nameFr)).join(", ") || "—"}.</li>
               </ul>
 
-              <h2 className="mb-1 mt-6 text-lg font-semibold">{t.protocols.procRef2}</h2>
-              <p className="mb-2 text-sm text-stone-600">{t.protocols.byCategoryIntro}</p>
-              <div className="space-y-4">
-                {categories.map((c) => {
-                  const k = classes.find((x) => x.id === c.tempClassId);
-                  const tempLines = {
-                    conform: k ? `${t.protocols.tempLine} ≤ ${deg(k.maxTemp)}` : null,
-                    reserve: k && k.reserveMax != null ? `${t.protocols.tempLine} ${deg(k.maxTemp)} → ${deg(k.reserveMax)} (${t.protocols.margin.toLowerCase()})` : null,
-                    refuse: k ? `${t.protocols.tempLine} > ${deg(k.reserveMax ?? k.maxTemp)}` : null,
-                  };
-                  return (
-                    <details key={c.id} open={editingConformity} className="group rounded-xl border border-stone-200">
-                      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-xl bg-stone-50 px-4 py-2 group-open:rounded-b-none group-open:border-b group-open:border-stone-200">
-                        <h3 className="font-semibold"><span className="mr-1 inline-block text-stone-400 transition group-open:rotate-90">▸</span>{locale === "en" ? c.nameEn : c.nameFr}</h3>
-                        {editingConformity ? (
-                          <div className="w-full max-w-md"><CategoryClassSelect categoryId={c.id} value={c.tempClassId} classes={classes} /></div>
-                        ) : (
-                          <span className="flex items-center gap-1 text-xs text-stone-600"><Icon name="thermo" className="h-3.5 w-3.5" /> {k ? `${k.label} · ≤ ${deg(k.maxTemp)}` : t.protocols.noReading}</span>
-                        )}
-                      </summary>
-                      {editingConformity ? (
-                        <table className="table"><tbody><ConformityRow c={{ id: c.id, name: t.protocols.rules, conformRules: c.conformRules ?? "", reserveRules: c.reserveRules ?? "", refuseRules: c.refuseRules ?? "" }} /></tbody></table>
-                      ) : (
-                        <div className="grid gap-px bg-stone-200 sm:grid-cols-3">
-                          {([["conform", c.conformRules, "bg-emerald-50 text-emerald-900"], ["reserve", c.reserveRules, "bg-sky-50 text-sky-900"], ["refuse", c.refuseRules, "bg-red-50 text-red-900"]] as const).map(([d, rules, cls]) => (
-                            <div key={d} className={`p-3 ${cls}`}>
-                              <p className="mb-1 text-xs font-bold uppercase tracking-wide">{d === "reserve" ? t.protocols.acceptedWithGap : d === "conform" ? t.wizard.accepted : t.decision[d]}</p>
-                              <ul className="list-disc space-y-0.5 pl-4 text-sm">
-                                {tempLines[d] && <li className="font-semibold">{tempLines[d]}</li>}
-                                {(rules ?? "").split(/\r?\n/).filter((x) => x.trim()).map((x, i) => <li key={i}>{x}</li>)}
-                              </ul>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </details>
-                  );
-                })}
+              <h2 className="mb-1 mt-8 text-lg font-bold">{t.protocols.procRef2}</h2>
+              <p className="mb-3 text-sm text-stone-600">{t.protocols.byCategoryIntro2}</p>
+              <div className="space-y-2">
+                {categories.map((c) => (
+                  <details key={c.id} open={editingConformity} className="group rounded-xl border border-stone-200 bg-white">
+                    <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-2.5 group-open:rounded-b-none group-open:border-b group-open:border-stone-200">
+                      <h3 className="font-semibold"><span className="mr-1 inline-block text-stone-400 transition group-open:rotate-90">▸</span>{locale === "en" ? c.nameEn : c.nameFr}</h3>
+                      {editingConformity && <div className="w-full max-w-md"><CategoryClassSelect categoryId={c.id} value={c.tempClassId} classes={classes} /></div>}
+                    </summary>
+                    {editingConformity ? (
+                      <table className="table"><tbody><ConformityRow c={{ id: c.id, name: t.protocols.rules, conformRules: c.conformRules ?? "", reserveRules: c.reserveRules ?? "", refuseRules: c.refuseRules ?? "" }} /></tbody></table>
+                    ) : (
+                      <div className="grid gap-px bg-stone-200 sm:grid-cols-3">
+                        {([["conform", c.conformRules, "bg-emerald-50 text-emerald-900"], ["reserve", c.reserveRules, "bg-sky-50 text-sky-900"], ["refuse", c.refuseRules, "bg-red-50 text-red-900"]] as const).map(([d, rules, cls]) => (
+                          <div key={d} className={`p-3 ${cls}`}>
+                            <p className="mb-1 text-xs font-bold uppercase tracking-wide">{d === "reserve" ? t.protocols.acceptedWithGap : d === "conform" ? t.wizard.accepted : t.decision[d]}</p>
+                            <ul className="list-disc space-y-0.5 pl-4 text-sm">
+                              {(rules ?? "").split(/\r?\n/).filter((x) => x.trim()).map((x, i) => <li key={i}>{x}</li>)}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </details>
+                ))}
               </div>
-
-              <h2 className="mb-1 mt-6 text-lg font-semibold">{t.protocols.procRef3}</h2>
-              <ul className="list-disc space-y-1.5 pl-5 text-sm text-stone-700">
-                <li>{t.settings.regHaccp}</li>
-                <li>{t.settings.regTrace}</li>
-                <li>{t.settings.regRetention.replace("{years}", String(retentionYears))}</li>
-                <li>{t.settings.regRefuse}</li>
-              </ul>
-              <p className="mt-2 text-xs text-stone-500">{t.settings.regDisclaimer}</p>
             </article>
           ) : creating ? (
             <ProtocolEditor id={null} title="" content="" folder={one(sp.folder) ?? null} folders={folders} />

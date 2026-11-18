@@ -1,0 +1,1 @@
+ALTER TABLE "dev_items" ADD COLUMN "task" text;
