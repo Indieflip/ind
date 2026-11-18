@@ -207,13 +207,6 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
         control.anomalies = list.length;
       }
 
-      const upsertProtocol = async (title: string, content: string, position: number) => {
-        const [p] = await db.select().from(schema.protocols).where(sql`lower(${schema.protocols.title}) = lower(${title})`).limit(1);
-        if (p) await db.update(schema.protocols).set({ content, updatedAt: new Date() }).where(eq(schema.protocols.id, p.id));
-        else await db.insert(schema.protocols).values({ title, content, position });
-        control.protocols.push(title);
-      };
-
       if (wsProc) {
         const rows = rowsOf(wsProc, 3);
         const hi = headerIndex(rows, "Fournisseur");
@@ -225,16 +218,16 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
           const key = sup ?? [...bySupplier.keys()].pop() ?? "—";
           bySupplier.set(key, [...(bySupplier.get(key) ?? []), { process: text(r[1]) ?? "", lines: detail.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) }]);
         }
-        const out: string[] = ["Contacts et démarches à suivre en cas de manquant, refus, retour ou erreur de facturation, par fournisseur.", ""];
-        for (const [sup, items] of [...bySupplier].sort((a, b) => a[0].localeCompare(b[0], "fr", { sensitivity: "base" }))) {
-          out.push(`## ${sup}`);
-          for (const it of items) {
-            if (it.process) out.push(`${it.process} :`);
-            for (const l of it.lines) out.push(`• ${l}`);
-          }
-          out.push("");
+        // Process de réclamation : recopié dans le compte de chaque fournisseur (s'il n'en a pas déjà un), plus de protocole séparé
+        const m = await supplierMatcher();
+        for (const [sup, items] of bySupplier) {
+          const id = m.find(sup);
+          if (!id) continue;
+          const textOf = items.flatMap((it) => [it.process ? `${it.process} :` : "", ...it.lines.map((l) => `• ${l}`)]).filter(Boolean).join("\n");
+          const cur = await db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, id), columns: { claimProcess: true } });
+          if (!cur?.claimProcess?.trim() && textOf) await db.update(schema.suppliers).set({ claimProcess: textOf }).where(eq(schema.suppliers.id, id));
         }
-        await upsertProtocol("Process de réclamation", out.join("\n").trim(), 3);
+        control.protocols.push("Process de réclamation (comptes fournisseurs)");
       }
 
       if (wsInfo) {
@@ -253,11 +246,7 @@ export async function importWorkbook(buffer: ArrayBuffer, sheets: { mercurial: b
           await tx.delete(schema.containers);
           if (list.length) await tx.insert(schema.containers).values(list.map((x, k) => ({ ...x, position: k })));
         });
-        const [p] = await db.select().from(schema.protocols).where(sql`lower(${schema.protocols.title}) = lower('Process pèse')`).limit(1);
-        const intro = "Tares des contenants : voir la « Liste des contenants (tares) » en bas de ce protocole (poids en kg à déduire du poids pesé).";
-        let base = (p?.content ?? "").split(/\n*## Liste des contenants/)[0].trimEnd();
-        if (!base.startsWith("Tares des contenants : voir")) base = `${intro}\n\n${base}`;
-        await upsertProtocol("Process pèse", base, 1);
+        // Tares : affichées dans Protocoles > Procédures > Réception (partie pesée)
       }
 
       report.control = control;

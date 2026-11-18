@@ -11,11 +11,11 @@ import { Icon } from "@/components/Icon";
 import { ProtocolEditor, ProtocolView } from "./ProtocolClient";
 import { ContainersTable } from "./ContainersTable";
 import { ProtocolNav } from "./ProtocolNav";
-import { ClaimProcedure, ConformityFlow, ReceptionProcedure } from "./Procedures";
-import { getSetting } from "@/lib/settings";
+import { ClaimProcedure, ConformityFlow, ReceptionProcedure, RegulationProcedure } from "./Procedures";
 import { CategoryClassSelect, ThresholdsEditor } from "./ThresholdsEditor";
 import { ConformityRow } from "../settings/SettingsClient";
 import { backupSettings } from "@/lib/server/backup";
+import { RETENTION_YEARS } from "@/lib/server/sheets";
 import { normalize } from "@/lib/search";
 import { num } from "@/lib/format";
 
@@ -26,12 +26,12 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   const categories = await getDb().select().from(schema.categories).orderBy(asc(schema.categories.position));
   // « Seuils de température » fait désormais partie du protocole Conformité
   const showConformity = one(sp.id) === "conformite" || one(sp.id) === "seuils";
-  const showProc = one(sp.id) === "proc-reception" ? "reception" : one(sp.id) === "proc-reclamation" ? "reclamation" : null;
+  const showProc = one(sp.id) === "proc-reception" ? "reception" : one(sp.id) === "proc-reclamation" ? "reclamation" : one(sp.id) === "proc-reglementation" ? "reglementation" : null;
   const isAdmin = user.role === "admin";
   const editingConformity = showConformity && isAdmin && one(sp.edit) === "1";
   const [classes, retentionYears] = await Promise.all([
     getDb().select().from(schema.tempClasses).orderBy(asc(schema.tempClasses.position), asc(schema.tempClasses.id)),
-    showConformity ? backupSettings().then((b) => b.retentionYears) : Promise.resolve(0),
+    showConformity || showProc ? backupSettings().then((b) => b.retentionYears) : Promise.resolve(0),
   ]);
   const deg = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${fmtNum(Math.abs(v), locale, 1)} °C`;
   const list = await getDb()
@@ -40,16 +40,19 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
     .leftJoin(schema.users, eq(schema.users.id, schema.protocols.updatedBy))
     .orderBy(asc(schema.protocols.position), asc(schema.protocols.id));
   const editable = can.editProtocols(user.role);
-  // Dossiers : ceux créés (même vides) + ceux utilisés, par ordre alphabétique
-  const folders = [...new Set([...(JSON.parse((await getSetting("protocol_folders")) ?? "[]") as string[]), ...list.map((x) => x.folder).filter((x): x is string => !!x)])].sort((a, b) => a.localeCompare(b, "fr"));
+  // Un protocole « Réglementation(s) » rédigé à la main s'affiche dans la procédure Réglementation (« Vos notes »)
+  const isRegulation = (title: string) => /^r[eé]glementations?$/i.test(title.trim());
+  const regulationNotes = list.find((x) => isRegulation(x.title));
+  const ownList = list.filter((x) => !isRegulation(x.title));
   const creating = one(sp.new) === "1" && editable;
   const editing = one(sp.edit) === "1" && editable;
   // ?titre=… : ouvre un protocole par son titre (liens « Procédure » des pages Réceptions et Anomalies)
   const byTitle = one(sp.titre) ? list.find((p) => p.title.toLowerCase() === one(sp.titre)!.toLowerCase()) : undefined;
-  const current = creating || showConformity || showProc ? null : byTitle ?? list.find((p) => String(p.id) === one(sp.id)) ?? list[0];
+  const current = creating || showConformity || showProc ? null : byTitle ?? list.find((p) => String(p.id) === one(sp.id)) ?? ownList[0];
   // Le protocole « Process pèse » affiche la liste des contenants (tares)
   const isWeighing = !!current && normalize(current.title) === "process pese";
-  const containers = isWeighing ? await getDb().select().from(schema.containers).orderBy(asc(schema.containers.position), asc(schema.containers.id)) : [];
+  const containers = isWeighing || showProc === "reception" ? await getDb().select().from(schema.containers).orderBy(asc(schema.containers.position), asc(schema.containers.id)) : [];
+  const containerRows = containers.map((x) => ({ id: x.id, supplier: x.supplier ?? "", product: x.product ?? "", tare: num(x.tare), container: x.container ?? "" }));
 
   return (
     <>
@@ -57,12 +60,21 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
         {editable && <Link href="/protocoles?new=1" className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t.protocols.new}</Link>}
       </PageHeader>
       <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
-        <ProtocolNav list={list.map((x) => ({ id: x.id, title: x.title, folder: x.folder }))} folders={folders} currentId={creating || showConformity || showProc ? null : current?.id ?? null} conformity={showConformity} proc={showProc} editable={editable} />
+        <ProtocolNav list={ownList.map((x) => ({ id: x.id, title: x.title }))} currentId={creating || showConformity || showProc ? null : current?.id ?? null} conformity={showConformity} proc={showProc} editable={editable} />
         <div className="min-w-0">
           {showProc === "reception" ? (
-            <article className="card p-5 sm:p-8"><ReceptionProcedure /></article>
+            <article className="card p-5 sm:p-8"><ReceptionProcedure containers={containerRows} editable={editable} /></article>
           ) : showProc === "reclamation" ? (
             <article className="card p-5 sm:p-8"><ClaimProcedure /></article>
+          ) : showProc === "reglementation" ? (
+            <article className="card p-5 sm:p-8">
+              <RegulationProcedure retentionYears={RETENTION_YEARS} notes={regulationNotes ? (
+                <>
+                  <ProtocolView content={regulationNotes.content} />
+                  {editable && <Link href={`/protocoles?id=${regulationNotes.id}&edit=1`} className="btn-secondary no-print mt-4"><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</Link>}
+                </>
+              ) : undefined} />
+            </article>
           ) : showConformity ? (
             <article className="card p-5 sm:p-8">
               <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -144,10 +156,10 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
               </div>
             </article>
           ) : creating ? (
-            <ProtocolEditor id={null} title="" content="" folder={one(sp.folder) ?? null} folders={folders} />
+            <ProtocolEditor id={null} title="" content="" />
           ) : current ? (
             editing ? (
-              <ProtocolEditor id={current.id} title={current.title} content={current.content} folder={current.folder} folders={folders} />
+              <ProtocolEditor id={current.id} title={current.title} content={current.content} />
             ) : (
               <article className="card p-5 sm:p-6">
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
@@ -161,7 +173,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
                 {isWeighing && (
                   <ContainersTable
                     editable={editable}
-                    rows={containers.map((x) => ({ id: x.id, supplier: x.supplier ?? "", product: x.product ?? "", tare: num(x.tare), container: x.container ?? "" }))}
+                    rows={containerRows}
                   />
                 )}
               </article>

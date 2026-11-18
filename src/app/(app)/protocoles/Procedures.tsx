@@ -1,4 +1,5 @@
 import { Icon } from "@/components/Icon";
+import { ContainersTable } from "./ContainersTable";
 
 /**
  * Procédures visuelles (Protocoles > Procédures) : réception, réclamation, conformité des produits.
@@ -82,13 +83,26 @@ function Problems({ items }: { items: [string, string][] }) {
 /* ---------------------------------------------------------------- Réception ---------------------------------------------------------------- */
 
 const RECEPTION: Step[] = [
-  { title: "Photos et signatures", icon: "camera", you: ["Photo du BL ou de la facture, à plat, une par page (ou « Pas de BL »)", "Photo de l'étiquette (lot, DLC) des produits frais", "Signature du livreur, ou « Livreur parti sans signer »", "Votre signature"], app: ["Lit le BL : fournisseur, N° et produits pré-remplis"], block: "Pas d'étape 2 sans signature du livreur ou case cochée" },
-  { title: "La livraison", icon: "truck", you: ["Vérifier le fournisseur, la date et le N° du document", "Relever la T° du camion et noter s'il est propre"], app: ["Enregistre un brouillon", "Refuse un N° de document déjà saisi"] },
-  { title: "Les produits", icon: "thermo", you: ["Compter ou peser : Q contrôlée", "T° à cœur des produits frais et surgelés", "DLC et lot (viandes, poissons, surgelés)", "Prix unitaire", "Vérifier la décision : Acceptée ou Refus (motif + photo)"], app: ["Propose Acceptée ou Refus selon les seuils", "Signale les écarts de quantité et de prix"], block: "Pas d'enregistrement sans prix, décision ou DLC obligatoire" },
-  { title: "La validation", icon: "check", you: ["Relire le récapitulatif", "Recopier le texte des réserves sur le BL", "« Enregistrer la réception »"], app: ["Crée les anomalies et met à jour les prix", "Enregistre même sans réseau"] },
+  { title: "Photos et signatures", icon: "camera", you: ["Réceptions › Nouvelle réception", "Photo du BL ou de la facture, bien à plat, entier et lisible, une photo par page (ou « Importer un fichier » : PNG, JPG, PDF)", "Pas de BL ? « Pas de BL / saisie manuelle »", "Photo de l'étiquette (lot, DLC) des produits frais", "Signature du livreur, ou « Livreur parti sans signer »", "Votre signature"], app: ["Lit le BL dès que la photo est confirmée : fournisseur, N° et produits pré-remplis", "Sans BL : crée une anomalie « BL manquant »"], block: "Pas d'étape 2 sans signature du livreur ou case cochée" },
+  { title: "La livraison", icon: "truck", you: ["Vérifier le fournisseur proposé, la date, l'heure et le N° du document", "Relever la T° de la caisse du camion (frais et surgelés) et noter s'il est propre", "Rush de livraisons ? « Enregistrement brouillon » et reprise plus tard"], app: ["Enregistre un brouillon au passage à l'étape 2", "Refuse un N° de document déjà saisi"] },
+  { title: "Les produits", icon: "thermo", you: ["Vérifier chaque ligne lue ; ajouter les produits manquants (recherche ou « Produit hors liste »)", "Compter, ou peser selon la procédure de pesée ci-dessous : Q contrôlée", "T° à cœur des produits frais et surgelés", "DLC et n° de lot (obligatoires pour viandes, poissons, surgelés)", "Prix unitaire HT", "Vérifier la décision : Acceptée ou Refus ; en cas de refus, motif + photo"], app: ["Propose Acceptée ou Refus selon les seuils (voir Conformité des produits)", "Prix hors de la tranche du mercurial : variation de prix ; prix bloqué non respecté : anomalie", "Calcule les écarts de quantité et de poids"], block: "Pas d'enregistrement sans prix, décision ou DLC obligatoire" },
+  { title: "La validation", icon: "check", you: ["Relire le récapitulatif (en-tête, produits, températures, prix)", "Compléter les températures manquantes si un bandeau le signale", "Recopier le texte des réserves sur le BL du livreur avant qu'il parte", "« Enregistrer la réception »"], app: ["Crée les anomalies et met à jour le mercurial et les prix", "Enregistre même sans réseau (envoi au retour du réseau)"] },
 ];
 
-export function ReceptionProcedure() {
+const BEFORE: [string, string, string][] = [
+  ["truck", "Devant le livreur", "Contrôler la livraison avec lui, avant qu'il reparte."],
+  ["thermo", "Le bon matériel", "Téléphone chargé, sonde propre, balance prête."],
+  ["leaf", "Le frais d'abord", "Contrôler en premier les produits frais et surgelés, puis les ranger aussitôt."],
+];
+
+const WEIGH: { title: string; items: string[] }[] = [
+  { title: "Préparer la balance", items: ["Balance de niveau et stable", "Affichage à zéro avant toute pesée", "Contrôle avec un poids de 5 kg"] },
+  { title: "Peser", items: ["Marchandise au centre du plateau", "Attendre que l'affichage soit stable avant de lire", "Produits préemballés : échantillonner (norme NF X 06-031-1 ou règles DGCCRF) ; la moyenne du lot doit atteindre le poids annoncé"] },
+  { title: "Déduire la tare", items: ["Poids net = poids pesé − tares des contenants", "Tares : liste des contenants ci-dessous (en kg)"] },
+  { title: "Saisir", items: ["Q contrôlée = poids net, dans l'application", "Noter le poids sur le BL"] },
+];
+
+export function ReceptionProcedure({ containers, editable }: { containers: Parameters<typeof ContainersTable>[0]["rows"]; editable: boolean }) {
   return (
     <div>
       <Header
@@ -96,8 +110,40 @@ export function ReceptionProcedure() {
         intro="Une livraison en 4 étapes sur le téléphone. L'application vous guide et vous bloque, avec un message, si quelque chose manque."
         meta={[["Pour qui", "toute personne qui réceptionne"], ["Où", "Réceptions › Nouvelle réception"], ["Durée", "5 à 10 min"]]}
       />
+      <section className="mb-8">
+        <h2 className="mb-3 text-lg font-bold">Avant de commencer</h2>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {BEFORE.map(([icon, k, v]) => (
+            <div key={k} className="flex gap-3 rounded-xl border border-stone-200 bg-white p-4">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><Icon name={icon} className="h-5 w-5" /></span>
+              <div><p className="font-semibold">{k}</p><p className="text-sm text-stone-600">{v}</p></div>
+            </div>
+          ))}
+        </div>
+      </section>
+      <h2 className="mb-3 text-lg font-bold">Les 4 étapes</h2>
       <Timeline steps={RECEPTION} />
-      <div className="mt-6 flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
+      <section id="pesee" className="mt-10 scroll-mt-20">
+        <h2 className="mb-1 text-lg font-bold">La pesée des produits au kg</h2>
+        <p className="mb-4 text-sm text-stone-600">Pour tout produit vendu au poids. L'application compare le poids net au poids facturé : au-delà de 10 g ou 0,10 € d'écart, un écart de pesée est créé et réclamé (une anomalie par bon).</p>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {WEIGH.map((w, i) => (
+            <div key={w.title} className="relative rounded-xl border border-stone-200 bg-white p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">{i + 1}</span>
+                <p className="font-semibold">{w.title}</p>
+              </div>
+              <ul className="space-y-1 text-sm text-stone-600">{w.items.map((x) => <li key={x} className="flex gap-2"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />{x}</li>)}</ul>
+              {i < WEIGH.length - 1 && <span className="absolute -right-2.5 top-1/2 hidden -translate-y-1/2 text-stone-300 xl:block">→</span>}
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 rounded-2xl border border-stone-200 bg-white p-2">
+          <ContainersTable editable={editable} rows={containers} />
+        </div>
+      </section>
+
+      <div className="mt-8 flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
         <Icon name="cloudOff" className="mt-0.5 h-5 w-5 shrink-0" />
         <p><strong>Chaque soir à 23 h</strong>, la fiche de réception du jour est exportée et les bons sont consolidés : ils ne sont plus modifiables.</p>
       </div>
@@ -244,5 +290,49 @@ export function ConformityFlow() {
         <p className="px-1 text-xs text-stone-500">L'application propose Acceptée ou Refus à partir de vos relevés ; vous gardez le dernier mot.</p>
       </aside>
     </section>
+  );
+}
+
+/* ---------------------------------------------------------------- Réglementation ---------------------------------------------------------------- */
+
+export function RegulationProcedure({ retentionYears, notes }: { retentionYears: number; notes?: React.ReactNode }) {
+  const rules: { icon: string; tag: string; title: string; text: string; inApp: string }[] = [
+    { icon: "book", tag: "Règlement (CE) 852/2004", title: "Hygiène : le contrôle à réception", text: "Le contrôle des marchandises à réception fait partie du plan de maîtrise sanitaire (PMS) de l'établissement.", inApp: "Fiche de réception exportée chaque soir, contrôles guidés à chaque livraison." },
+    { icon: "thermo", tag: "Arrêté du 21 décembre 2009", title: "Températures de conservation", text: "Chaque denrée a une température maximale ; au-delà, le produit ne doit pas être accepté.", inApp: "Seuils et marges dans Conformité des produits ; refus proposé automatiquement." },
+    { icon: "list", tag: "Règlement (CE) 178/2002", title: "Traçabilité", text: "Conserver pour chaque produit reçu : le fournisseur, le produit, le n° de lot, la DLC et la date de réception.", inApp: "Lot, DLC, photos d'étiquettes et de BL enregistrés avec chaque réception." },
+    { icon: "alert", tag: "Bonnes pratiques", title: "Refuser ce qui n'est pas conforme", text: "Produit hors température, DLC dépassée ou emballage abîmé : refusé, avec le motif noté sur le BL avant signature.", inApp: "Bouton Refus + motif + photo ; texte des réserves à recopier sur le BL." },
+    { icon: "file", tag: "Code de commerce, art. L123-22", title: "Conservation des documents", text: "Les BL et factures sont des pièces comptables : 10 ans.", inApp: `Fiches de réception conservées ${retentionYears || 5} ans ; sauvegardes et exports PDF / Excel.` },
+    { icon: "search", tag: "Contrôle sanitaire (DDPP)", title: "En cas de contrôle", text: "Présenter les fiches de réception, les relevés de températures, les lots et DLC, les refus et leurs motifs.", inApp: "Réceptions › Fiches de réception : export PDF / Excel immédiat." },
+  ];
+  return (
+    <div>
+      <Header
+        title="Réglementation"
+        intro="Les règles qui encadrent la réception des marchandises, et comment l'application vous aide à les respecter."
+        meta={[["Pour qui", "responsables et économes"], ["Utile", "en cas de contrôle"]]}
+      />
+      <div className="grid gap-4 md:grid-cols-2">
+        {rules.map((r) => (
+          <article key={r.title} className="flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+            <div className="flex items-start gap-3 p-4">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700"><Icon name={r.icon} className="h-5 w-5" /></span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">{r.tag}</p>
+                <h3 className="font-semibold">{r.title}</h3>
+                <p className="mt-1 text-sm text-stone-600">{r.text}</p>
+              </div>
+            </div>
+            <p className="mt-auto border-t border-sky-100 bg-sky-50/60 px-4 py-2.5 text-xs text-sky-800"><span className="font-semibold">Dans l'application :</span> {r.inApp}</p>
+          </article>
+        ))}
+      </div>
+      {notes && (
+        <section className="mt-10">
+          <h2 className="mb-3 text-lg font-bold">Vos notes</h2>
+          <div className="rounded-2xl border border-stone-200 bg-white p-5">{notes}</div>
+        </section>
+      )}
+      <p className="mt-6 text-xs text-stone-500">Repères indicatifs, à valider avec votre plan de maîtrise sanitaire et vos obligations comptables.</p>
+    </div>
   );
 }

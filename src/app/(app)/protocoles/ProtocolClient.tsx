@@ -12,31 +12,22 @@ export function ProtocolView({ content }: { content: string }) {
   return <RichView html={content} />;
 }
 
-export function ProtocolEditor({ id, title, content, folder = null, folders = [] }: { id: number | null; title: string; content: string; folder?: string | null; folders?: string[] }) {
+export function ProtocolEditor({ id, title, content }: { id: number | null; title: string; content: string }) {
   const { t } = useI18n();
   const router = useRouter();
   const [ti, setTi] = useState(title);
   const [co, setCo] = useState(content);
-  const [fo, setFo] = useState(folder ?? "");
   const [pending, start] = useTransition();
   return (
     <div className="card space-y-3 p-5">
-      <div className="grid gap-3 sm:grid-cols-[1fr_16rem]">
-        <label className="block"><span className="label">{t.protocols.name}</span><input className="input text-lg font-semibold" value={ti} onChange={(e) => setTi(e.target.value)} /></label>
-        <label className="block"><span className="label">{t.protocols.folder}</span>
-          <select className="input" value={fo} onChange={(e) => setFo(e.target.value)}>
-            <option value="">{t.protocols.root}</option>
-            {folders.map((f) => <option key={f} value={f}>{f}</option>)}
-          </select>
-        </label>
-      </div>
+      <label className="block"><span className="label">{t.protocols.name}</span><input className="input text-lg font-semibold" value={ti} onChange={(e) => setTi(e.target.value)} /></label>
       <div>
         <span className="label">{t.protocols.content}</span>
         <RichEditor value={co} onChange={setCo} />
       </div>
       <div className="flex flex-wrap gap-2">
         <button className="btn-primary" disabled={!ti.trim() || pending} onClick={() => start(async () => {
-          const r = await saveProtocolAction(id, ti, co, fo || null);
+          const r = await saveProtocolAction(id, ti, co);
           if (r.id) router.push(`/protocoles?id=${r.id}`);
         })}>
           <Icon name="check" className="h-4 w-4" /> {t.common.save}

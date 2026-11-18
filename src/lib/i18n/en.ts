@@ -923,7 +923,7 @@ export const en: Dict = {
       { area: "Économies", trigger: "À chaque affichage", action: "Économies obtenues / en attente calculées à partir des avoirs, livraisons différées et montants réclamés, par fournisseur, mois et type.", where: "Reporting > Économies" },
       { area: "Mercurial", trigger: "Historique des modifications du Mercurial", action: "Chaque hausse / baisse devient une ligne du Suivi des prix (N°, BL / Facture, réclamation partagée).", where: "Reporting > Suivi des prix" },
       { area: "Mercurial", trigger: "Correction d'un prix", action: "Ligne « Correction du mercurial » ajoutée au Suivi des prix.", where: "Reporting > Suivi des prix" },
-      { area: "Fournisseurs", trigger: "Première ouverture", action: "Process de réclamation recopié depuis le protocole dans le compte du fournisseur ; délai de relance déduit.", where: "Compte fournisseur" },
+      { area: "Fournisseurs", trigger: "Import du fichier de contrôle / saisie du process", action: "Process de réclamation enregistré dans le compte du fournisseur ; délai de relance déduit (jour même, 48 h, 3 jours par défaut).", where: "Compte fournisseur" },
       { area: "Accueil", trigger: "À chaque connexion", action: "Liste des tâches : brouillons, bons à consolider, relances, anomalies à traiter, sauvegarde, demandes.", where: "Accueil" },
       { area: "Sauvegarde", trigger: "Selon la fréquence choisie", action: "Rappel de sauvegarde (et envoi par mail si configuré).", where: "Réglages > Import / export" },
       { area: "Dev > Projet", trigger: "À chaque affichage", action: "Chiffres clés (économies, réceptions, anomalies, fiches validées…) et calcul coût / gains recalculés à partir des données.", where: "Dev > Projet" },
@@ -1145,6 +1145,7 @@ export const en: Dict = {
     deleteTable: "Delete table",
   },
   protocols: {
+    procRegulation: "Regulations",
     procedures: "Procedures",
     procReception: "Delivery",
     procClaim: "Claim",

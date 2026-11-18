@@ -638,6 +638,14 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'procedures_v2
   await db.execute(sql`insert into app_settings (key, value) values ('procedures_v2', '1') on conflict (key) do nothing`);
 }
 
+// Protocoles : « Réception d'une livraison » et « Process pèse » intégrés à la procédure Réception ; dossiers supprimés (une fois)
+if (!(await db.execute(sql`select 1 from app_settings where key = 'procedures_v3'`)).rows.length) {
+  await db.execute(sql`delete from protocols where lower(title) in (lower('Réception d''une livraison'), lower('Process pèse'))`);
+  await db.execute(sql`update protocols set folder = null where folder is not null`);
+  await db.execute(sql`delete from app_settings where key = 'protocol_folders'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('procedures_v3', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
