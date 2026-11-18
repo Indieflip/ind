@@ -47,6 +47,7 @@ export const en: Dict = {
     optional: "optional",
   },
   nav: {
+    flow: "App overview",
     home: "Home",
     dev: "Dev",
     requests: "Requests",

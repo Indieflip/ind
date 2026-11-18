@@ -73,6 +73,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         userName={user.name}
         roleLabel={t.roles[user.role]}
         logoutLabel={t.nav.logout}
+        flowLabel={t.nav.flow}
         restaurant={await getRestaurantName()}
         appName={t.app.name}
         moreLabel={t.nav.more}

@@ -45,6 +45,7 @@ export const fr = {
     optional: "facultatif",
   },
   nav: {
+    flow: "Schéma de l'application",
     home: "Accueil",
     dev: "Dev",
     requests: "Demandes",

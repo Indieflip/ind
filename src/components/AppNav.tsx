@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Icon } from "./Icon";
 import { GlobalSearch } from "./GlobalSearch";
+import { AppFlowButton } from "./AppFlow";
 import { LocaleSwitch } from "./LocaleSwitch";
 import { logoutAction } from "@/lib/actions/auth";
 
@@ -14,6 +15,7 @@ export function AppNav(props: {
   userName: string;
   roleLabel: string;
   logoutLabel: string;
+  flowLabel: string;
   restaurant: string;
   appName: string;
   moreLabel: string;
@@ -45,6 +47,7 @@ export function AppNav(props: {
               {!!i.badge && <span className="ml-auto rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white">{i.badge}</span>}
             </Link>
           ))}
+          <div className="border-t border-stone-100 pt-1"><AppFlowButton label={props.flowLabel} /></div>
         </nav>
         <div className="border-t border-stone-200 p-4">
           <div className="text-sm font-semibold">{props.userName}</div>
@@ -70,6 +73,7 @@ export function AppNav(props: {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <AppFlowButton label={props.flowLabel} compact />
           <LocaleSwitch />
           <form action={logoutAction}>
             <button className="btn-ghost p-2" aria-label={props.logoutLabel}><Icon name="logout" className="h-4 w-4" /></button>
