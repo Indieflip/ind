@@ -16,6 +16,7 @@ import { supplierProcesses } from "@/lib/server/followup";
 import { daysSince, stageOf, isClaimMode, verificationDue } from "@/lib/anomaly";
 import { DueBox, Kanban } from "./Kanban";
 import Link from "next/link";
+import { Icon } from "@/components/Icon";
 
 const today = () => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(new Date());
 
@@ -98,6 +99,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader title={t.anomalies.title}>
+        <Link href={`/protocoles?titre=${encodeURIComponent("Procédure de réclamation")}`} className="btn-secondary py-1.5"><Icon name="book" className="h-4 w-4" /> {t.protocols.procedure}</Link>
         <div className="flex rounded-lg border border-stone-200 bg-white p-0.5 text-sm">
           <Link href="/anomalies" className={`rounded-md px-3 py-1.5 font-medium ${view === "board" ? "bg-brand-600 text-white" : "text-stone-600"}`}>{t.kanban.board}</Link>
           <Link href="/anomalies?view=liste" className={`rounded-md px-3 py-1.5 font-medium ${view === "list" ? "bg-brand-600 text-white" : "text-stone-600"}`}>{t.kanban.list}</Link>

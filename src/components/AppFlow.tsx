@@ -51,7 +51,7 @@ const NIGHT: { when: string; title: string; text: string }[] = [
 
 const PILOT: { title: string; items: string[]; planned?: boolean }[] = [
   { title: "Reporting", items: ["Économies obtenues et en attente", "Par fournisseur, mois, type", "Suivi des prix et évolution par mois"] },
-  { title: "Mercurial et protocoles", items: ["Produits, prix min / max, prix bloqués", "Seuils de température et conformité", "Protocoles rangés par dossiers"] },
+  { title: "Mercurial et protocoles", items: ["Produits, prix min / max, prix bloqués", "Procédures : réception, réclamation, conformité des produits", "Protocoles rangés par dossiers (glisser-déposer)"] },
   { title: "Commandes fournisseurs", items: ["Commande depuis le mercurial", "Lignes pré-remplies à la réception", "Commandé / livré / facturé"], planned: true },
 ];
 
@@ -169,7 +169,7 @@ export function AppFlowButton({ label, compact = false }: { label: string; compa
       {compact ? (
         <button type="button" className="btn-ghost p-2" aria-label={label} title={label} onClick={() => setOpen(true)}><Icon name="layers" className="h-4 w-4" /></button>
       ) : (
-        <button type="button" onClick={() => setOpen(true)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">
+        <button type="button" onClick={() => setOpen(true)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-stone-700 hover:bg-stone-100">
           <Icon name="layers" /> {label}
         </button>
       )}

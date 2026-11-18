@@ -42,7 +42,9 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   const folders = [...new Set([...(JSON.parse((await getSetting("protocol_folders")) ?? "[]") as string[]), ...list.map((x) => x.folder).filter((x): x is string => !!x)])].sort((a, b) => a.localeCompare(b, "fr"));
   const creating = one(sp.new) === "1" && editable;
   const editing = one(sp.edit) === "1" && editable;
-  const current = creating || showConformity ? null : list.find((p) => String(p.id) === one(sp.id)) ?? list[0];
+  // ?titre=… : ouvre un protocole par son titre (liens « Procédure » des pages Réceptions et Anomalies)
+  const byTitle = one(sp.titre) ? list.find((p) => p.title.toLowerCase() === one(sp.titre)!.toLowerCase()) : undefined;
+  const current = creating || showConformity ? null : byTitle ?? list.find((p) => String(p.id) === one(sp.id)) ?? list[0];
   // Le protocole « Process pèse » affiche la liste des contenants (tares)
   const isWeighing = !!current && normalize(current.title) === "process pese";
   const containers = isWeighing ? await getDb().select().from(schema.containers).orderBy(asc(schema.containers.position), asc(schema.containers.id)) : [];
@@ -59,15 +61,37 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
             <article className="card p-5 sm:p-6">
               <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <h1 className="text-2xl font-bold">{t.protocols.conformity}</h1>
-                  <p className="text-sm text-stone-600">{t.protocols.conformityIntro}</p>
+                  <h1 className="text-2xl font-bold">{t.protocols.conformityProcTitle}</h1>
+                  <p className="text-sm text-stone-600">{t.protocols.conformityProcIntro}</p>
                 </div>
                 {isAdmin && (editingConformity
                   ? <Link href="/protocoles?id=conformite" className="btn-primary no-print"><Icon name="check" className="h-4 w-4" /> {t.protocols.doneEditing}</Link>
                   : <Link href="/protocoles?id=conformite&edit=1" className="btn-secondary no-print"><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</Link>)}
               </div>
 
-              <h2 className="mb-1 text-lg font-semibold">{t.protocols.thresholds}</h2>
+              {!editingConformity && (
+                <>
+                  <ol className="mb-6 space-y-3">
+                    {t.protocols.procSteps.map((st, i) => (
+                      <li key={i} className="flex gap-3 rounded-xl border border-stone-200 bg-white p-4">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">{i + 1}</span>
+                        <div className="min-w-0 space-y-1.5">
+                          <h2 className="font-semibold">{st.title}</h2>
+                          <p className="text-sm text-stone-700">{st.how}</p>
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800">✓ {st.ok}</span>
+                            <span className="rounded-full bg-red-50 px-2.5 py-1 text-red-800">✕ {st.ko}</span>
+                          </div>
+                          {st.app && <p className="text-xs text-sky-700">{t.protocols.procApp} {st.app}</p>}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                  <div className="mb-6 rounded-lg border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">{t.protocols.procRefuse}</div>
+                </>
+              )}
+
+              <h2 className="mb-1 text-lg font-semibold">{t.protocols.procRef1}</h2>
               <p className="mb-2 text-sm text-stone-600">{t.protocols.thresholdsIntro}</p>
               {editingConformity ? (
                 <ThresholdsEditor classes={classes} />
@@ -92,7 +116,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
                 {t.protocols.marginNotes.map((x, i) => <li key={i}>{x}</li>)}
               </ul>
 
-              <h2 className="mb-1 mt-6 text-lg font-semibold">{t.protocols.byCategory}</h2>
+              <h2 className="mb-1 mt-6 text-lg font-semibold">{t.protocols.procRef2}</h2>
               <p className="mb-2 text-sm text-stone-600">{t.protocols.byCategoryIntro}</p>
               <div className="space-y-4">
                 {categories.map((c) => {
@@ -103,22 +127,22 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
                     refuse: k ? `${t.protocols.tempLine} > ${deg(k.reserveMax ?? k.maxTemp)}` : null,
                   };
                   return (
-                    <section key={c.id} className="rounded-xl border border-stone-200">
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 bg-stone-50 px-4 py-2">
-                        <h3 className="font-semibold">{locale === "en" ? c.nameEn : c.nameFr}</h3>
+                    <details key={c.id} open={editingConformity} className="group rounded-xl border border-stone-200">
+                      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-xl bg-stone-50 px-4 py-2 group-open:rounded-b-none group-open:border-b group-open:border-stone-200">
+                        <h3 className="font-semibold"><span className="mr-1 inline-block text-stone-400 transition group-open:rotate-90">▸</span>{locale === "en" ? c.nameEn : c.nameFr}</h3>
                         {editingConformity ? (
                           <div className="w-full max-w-md"><CategoryClassSelect categoryId={c.id} value={c.tempClassId} classes={classes} /></div>
                         ) : (
                           <span className="flex items-center gap-1 text-xs text-stone-600"><Icon name="thermo" className="h-3.5 w-3.5" /> {k ? `${k.label} · ≤ ${deg(k.maxTemp)}` : t.protocols.noReading}</span>
                         )}
-                      </div>
+                      </summary>
                       {editingConformity ? (
                         <table className="table"><tbody><ConformityRow c={{ id: c.id, name: t.protocols.rules, conformRules: c.conformRules ?? "", reserveRules: c.reserveRules ?? "", refuseRules: c.refuseRules ?? "" }} /></tbody></table>
                       ) : (
                         <div className="grid gap-px bg-stone-200 sm:grid-cols-3">
                           {([["conform", c.conformRules, "bg-emerald-50 text-emerald-900"], ["reserve", c.reserveRules, "bg-sky-50 text-sky-900"], ["refuse", c.refuseRules, "bg-red-50 text-red-900"]] as const).map(([d, rules, cls]) => (
                             <div key={d} className={`p-3 ${cls}`}>
-                              <p className="mb-1 text-xs font-bold uppercase tracking-wide">{d === "reserve" ? t.protocols.acceptedWithGap : t.decision[d]}</p>
+                              <p className="mb-1 text-xs font-bold uppercase tracking-wide">{d === "reserve" ? t.protocols.acceptedWithGap : d === "conform" ? t.wizard.accepted : t.decision[d]}</p>
                               <ul className="list-disc space-y-0.5 pl-4 text-sm">
                                 {tempLines[d] && <li className="font-semibold">{tempLines[d]}</li>}
                                 {(rules ?? "").split(/\r?\n/).filter((x) => x.trim()).map((x, i) => <li key={i}>{x}</li>)}
@@ -127,18 +151,12 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
                           ))}
                         </div>
                       )}
-                    </section>
+                    </details>
                   );
                 })}
               </div>
 
-              <h2 className="mb-1 mt-6 text-lg font-semibold">{t.protocols.otherRules}</h2>
-              <ul className="list-disc space-y-1 pl-5 text-sm text-stone-700">
-                <li>{t.protocols.ruleDlcExpired}</li>
-                <li>{t.protocols.ruleDlcShort}</li>
-                <li>{t.protocols.ruleQty}</li>
-              </ul>
-              <h2 className="mb-1 mt-6 text-lg font-semibold">{t.settings.regulationTitle}</h2>
+              <h2 className="mb-1 mt-6 text-lg font-semibold">{t.protocols.procRef3}</h2>
               <ul className="list-disc space-y-1.5 pl-5 text-sm text-stone-700">
                 <li>{t.settings.regHaccp}</li>
                 <li>{t.settings.regTrace}</li>
