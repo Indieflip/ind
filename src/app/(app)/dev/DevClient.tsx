@@ -7,7 +7,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { appConfirm } from "@/components/Confirm";
 import { Icon } from "@/components/Icon";
 import { DataTable, type Col } from "@/components/table/DataTable";
-import { DevRules } from "./DevRules";
+import { DevRules, type CategoryRule } from "./DevRules";
 import { DevProject, type ProjectKpis, type Roi } from "./DevProject";
 import { DevFields, type FieldRow, type NatureRow } from "./DevFields";
 
@@ -17,7 +17,7 @@ const prioStyle: Record<string, string> = { haute: "bg-red-100 text-red-800", mo
 const prioRank: Record<string, number> = { haute: 0, moyenne: 1, basse: 2, "": 3 };
 
 /** Onglet Dev : sous-onglets (en attente, objectifs, contraintes, idées, réalisé, règles) ; tout est modifiable */
-export function DevBoard({ items, reserved, tab, fields = [], natures = [], project }: { items: Item[]; reserved: boolean; tab: string; fields?: FieldRow[]; natures?: NatureRow[]; project?: { doc: string; kpis: ProjectKpis; roi: Roi } }) {
+export function DevBoard({ items, reserved, tab, fields = [], natures = [], project, categories, canEdit = false }: { categories?: CategoryRule[]; canEdit?: boolean; items: Item[]; reserved: boolean; tab: string; fields?: FieldRow[]; natures?: NatureRow[]; project?: { doc: string; kpis: ProjectKpis; roi: Roi } }) {
   const { t } = useI18n();
   const d = t.dev;
   const router = useRouter();
@@ -113,7 +113,7 @@ export function DevBoard({ items, reserved, tab, fields = [], natures = [], proj
       </nav>
 
       {current === "rules" ? (
-        <DevRules />
+        <DevRules categories={categories} canEdit={canEdit} />
       ) : current === "project" ? (
         project ? <DevProject {...project} /> : null
       ) : current === "fields" ? (

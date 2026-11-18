@@ -102,7 +102,6 @@ export const RECEPTION_TABS = [
   { key: "avant", label: "Avant de commencer" },
   { key: "livraison", label: "Contrôler la livraison" },
   { key: "saisie", label: "La saisie sur le téléphone" },
-  { key: "pesee", label: "La pesée" },
 ] as const;
 export type ReceptionTab = (typeof RECEPTION_TABS)[number]["key"];
 
@@ -151,6 +150,26 @@ export function ReceptionProcedure({ containers, editable, tab, control }: { con
       <Fold n={2} title={RECEPTION_TABS[1].label} open={tab === "livraison"}>
         <div className="space-y-8">
           <ControlChecks />
+          <RefusalCard />
+      <section>
+        <h2 className="mb-1 text-lg font-bold">La pesée des produits au kg</h2>
+        <p className="mb-4 text-sm text-stone-600">Pour tout produit vendu au poids. L'application compare le poids net au poids facturé : au-delà de 10 g ou 0,10 € d'écart, un écart de pesée est créé et réclamé (une anomalie par bon).</p>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {WEIGH.map((w, i) => (
+            <div key={w.title} className="relative rounded-xl border border-stone-200 bg-white p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">{i + 1}</span>
+                <p className="font-semibold">{w.title}</p>
+              </div>
+              <ul className="space-y-1 text-sm text-stone-600">{w.items.map((x) => <li key={x} className="flex gap-2"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />{x}</li>)}</ul>
+              {i < WEIGH.length - 1 && <span className="absolute -right-2.5 top-1/2 hidden -translate-y-1/2 text-stone-300 xl:block">→</span>}
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 rounded-2xl border border-stone-200 bg-white p-2">
+          <ContainersTable editable={editable} rows={containers} />
+        </div>
+      </section>
           {control}
         </div>
       </Fold>
@@ -174,27 +193,6 @@ export function ReceptionProcedure({ containers, editable, tab, control }: { con
       />
       </Fold>
 
-      <Fold n={4} title={RECEPTION_TABS[3].label} open={tab === "pesee"}>
-      <section>
-        <h2 className="mb-1 text-lg font-bold">La pesée des produits au kg</h2>
-        <p className="mb-4 text-sm text-stone-600">Pour tout produit vendu au poids. L'application compare le poids net au poids facturé : au-delà de 10 g ou 0,10 € d'écart, un écart de pesée est créé et réclamé (une anomalie par bon).</p>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {WEIGH.map((w, i) => (
-            <div key={w.title} className="relative rounded-xl border border-stone-200 bg-white p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">{i + 1}</span>
-                <p className="font-semibold">{w.title}</p>
-              </div>
-              <ul className="space-y-1 text-sm text-stone-600">{w.items.map((x) => <li key={x} className="flex gap-2"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />{x}</li>)}</ul>
-              {i < WEIGH.length - 1 && <span className="absolute -right-2.5 top-1/2 hidden -translate-y-1/2 text-stone-300 xl:block">→</span>}
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 rounded-2xl border border-stone-200 bg-white p-2">
-          <ContainersTable editable={editable} rows={containers} />
-        </div>
-      </section>
-      </Fold>
 
 
     </div>
@@ -286,7 +284,7 @@ export function ClaimProcedure() {
 /* ---------------------------------------------------------------- Contrôler la livraison ---------------------------------------------------------------- */
 
 const CONTROLS: { icon: string; title: string; how: string; ko: string; tone: "red" | "amber" }[] = [
-  { icon: "box", title: "Quantité", how: "Compter ou peser ce qui est livré et comparer à la quantité facturée sur le BL. Pour les produits au kg, peser comme indiqué dans la partie 4, La pesée.", ko: "Noter l'écart sur le BL : l'application crée l'anomalie et la réclamation.", tone: "amber" },
+  { icon: "box", title: "Quantité", how: "Compter ou peser ce qui est livré et comparer à la quantité facturée sur le BL. Pour les produits au kg, peser comme indiqué dans « La pesée » ci-dessous.", ko: "Noter l'écart sur le BL : l'application crée l'anomalie et la réclamation.", tone: "amber" },
   { icon: "list", title: "Conformité à la commande", how: "Comparer ce qui est reçu à ce qui a été commandé : bon produit, bonne quantité.", ko: "Prévenir le chef ou le sous-chef.", tone: "amber" },
   { icon: "search", title: "Emballage et aspect", how: "Emballage intact, produit sain, étiquette lisible (n° de lot, DLC).", ko: "Refus, avec le motif et une photo.", tone: "red" },
   { icon: "thermo", title: "Température", how: "Produits frais : sonde à cœur. Surgelés : sonde glissée entre deux paquets, sans percer l'emballage.", ko: "Au-delà de la limite du tableau des seuils (ci-dessous) : refus.", tone: "red" },
@@ -413,5 +411,37 @@ export function RegulationProcedure({ retentionYears, notes }: { retentionYears:
       )}
       <p className="mt-6 text-xs text-stone-500">Repères indicatifs, à valider avec votre plan de maîtrise sanitaire et vos obligations comptables.</p>
     </div>
+  );
+}
+
+const REFUSAL: [string, string][] = [
+  ["Noter le refus", "Sur le BL ou la facture, exemplaire du livreur et le nôtre : le produit, la quantité refusée et le motif."],
+  ["Faire signer le livreur", "Sa signature à côté de la mention de refus."],
+  ["Rendre le produit", "Le produit refusé est remis au livreur, qui le remporte."],
+  ["Photographier", "Prendre le problème en photo (température, DLC, emballage abîmé…)."],
+  ["Prévenir la cuisine", "Si le produit manque pour le service, prévenir le chef ou le sous-chef."],
+];
+
+/** Carte « Refus » : ce qu'on fait quand un produit est refusé à la livraison */
+function RefusalCard() {
+  return (
+    <section className="rounded-2xl border border-red-200 bg-red-50/60 p-4 sm:p-5">
+      <h2 className="mb-1 flex items-center gap-2 text-lg font-bold text-red-900">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 text-white"><Icon name="x" className="h-4 w-4" /></span>
+        Refus d'un produit
+      </h2>
+      <p className="mb-3 text-sm text-red-900/80">Dès qu'un produit est refusé, devant le livreur :</p>
+      <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+        {REFUSAL.map(([k, v], i) => (
+          <li key={k} className="rounded-xl border border-red-100 bg-white p-3">
+            <div className="mb-1 flex items-center gap-2">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-600 text-xs font-bold text-white">{i + 1}</span>
+              <p className="font-semibold">{k}</p>
+            </div>
+            <p className="text-sm text-stone-600">{v}</p>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }

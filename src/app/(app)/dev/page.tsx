@@ -23,6 +23,10 @@ export default async function DevPage({ searchParams }: { searchParams: Promise<
   const tab = one((await searchParams).tab) ?? "pending";
   const fieldsTab = tab === "fields" ? await characteristics(locale, t) : null;
   const project = tab === "project" ? await projectData(locale) : undefined;
+  // Dev > Règles : conditions par catégorie de produits (modifiables par l'administrateur)
+  const categories = tab === "rules"
+    ? (await getDb().select().from(schema.categories).orderBy(asc(schema.categories.position))).map((c) => ({ id: c.id, name: locale === "en" ? c.nameEn : c.nameFr, conformRules: c.conformRules ?? "", reserveRules: c.reserveRules ?? "", refuseRules: c.refuseRules ?? "" }))
+    : undefined;
   return (
     <>
       <PageHeader title={t.dev.title} />
@@ -33,6 +37,8 @@ export default async function DevPage({ searchParams }: { searchParams: Promise<
         fields={fieldsTab?.fields}
         natures={fieldsTab?.natures}
         project={project}
+        categories={categories}
+        canEdit={user.role === "admin"}
         items={items.map((i) => ({ id: i.id, kind: i.kind, title: i.title, detail: i.detail ?? "", owner: i.owner ?? "", priority: i.priority ?? "", task: i.task ?? "", updated: fmtDateTime(i.updatedAt, locale), updatedSort: i.updatedAt.toISOString() }))}
       />
     </>

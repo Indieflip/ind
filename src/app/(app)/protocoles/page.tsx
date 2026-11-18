@@ -14,7 +14,6 @@ import { ProtocolNav } from "./ProtocolNav";
 import { ClaimProcedure, ConformityFlow, RECEPTION_TABS, ReceptionProcedure, RegulationProcedure, type ReceptionTab } from "./Procedures";
 import { redirect } from "next/navigation";
 import { CategoryClassSelect, ThresholdsEditor } from "./ThresholdsEditor";
-import { ConformityRow } from "../settings/SettingsClient";
 import { backupSettings } from "@/lib/server/backup";
 import { RETENTION_YEARS } from "@/lib/server/sheets";
 import { normalize } from "@/lib/search";
@@ -29,7 +28,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   // La conformité des produits est l'onglet « Le contrôle » de la procédure de réception ; ?id=conformite ne sert plus qu'à la modifier
   if ((one(sp.id) === "conformite" || one(sp.id) === "seuils") && one(sp.edit) !== "1") redirect("/protocoles?id=proc-reception&tab=livraison");
   const showConformity = one(sp.id) === "conformite" || one(sp.id) === "seuils";
-  const tabParam = ["controle", "conformite"].includes(one(sp.tab) ?? "") ? "livraison" : one(sp.tab); // anciennes parties, fusionnées dans « Contrôler la livraison »
+  const tabParam = ["controle", "conformite", "pesee"].includes(one(sp.tab) ?? "") ? "livraison" : one(sp.tab); // anciennes parties, fusionnées dans « Contrôler la livraison »
   const receptionTab = (RECEPTION_TABS.map((x) => x.key) as string[]).includes(tabParam ?? "") ? (tabParam as ReceptionTab) : undefined;
   const showProc = one(sp.id) === "proc-reception" ? "reception" : one(sp.id) === "proc-reclamation" ? "reclamation" : one(sp.id) === "proc-reglementation" ? "reglementation" : null;
   const isAdmin = user.role === "admin";
@@ -59,7 +58,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   const containers = isWeighing || showProc === "reception" ? await getDb().select().from(schema.containers).orderBy(asc(schema.containers.position), asc(schema.containers.id)) : [];
   const containerRows = containers.map((x) => ({ id: x.id, supplier: x.supplier ?? "", product: x.product ?? "", tare: num(x.tare), container: x.container ?? "" }));
 
-  // Contenu « conformité des produits » : schéma, tableau des seuils, conditions par catégorie (lecture ou modification)
+  // Contenu « conformité des produits » : schéma, tableau des seuils, classe de température des catégories (modification) ; les conditions par catégorie sont dans Dev > Règles
   const conformityBody = (
     <>
               {!editingConformity && <ConformityFlow />}
@@ -102,32 +101,20 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
                 <li>• {t.protocols.noReadingFor} {categories.filter((c) => !c.tempClassId).map((c) => (locale === "en" ? c.nameEn : c.nameFr)).join(", ") || "—"}.</li>
               </ul>
 
-              <h2 className="mb-1 mt-8 text-lg font-bold">{t.protocols.procRef2}</h2>
-              <p className="mb-3 text-sm text-stone-600">{t.protocols.byCategoryIntro2}</p>
-              <div className="space-y-2">
-                {categories.map((c) => (
-                  <details key={c.id} open={editingConformity} className="group rounded-xl border border-stone-200 bg-white">
-                    <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-2.5 group-open:rounded-b-none group-open:border-b group-open:border-stone-200">
-                      <h3 className="font-semibold"><span className="mr-1 inline-block text-stone-400 transition group-open:rotate-90">▸</span>{locale === "en" ? c.nameEn : c.nameFr}</h3>
-                      {editingConformity && <div className="w-full max-w-md"><CategoryClassSelect categoryId={c.id} value={c.tempClassId} classes={classes} /></div>}
-                    </summary>
-                    {editingConformity ? (
-                      <table className="table"><tbody><ConformityRow c={{ id: c.id, name: t.protocols.rules, conformRules: c.conformRules ?? "", reserveRules: c.reserveRules ?? "", refuseRules: c.refuseRules ?? "" }} /></tbody></table>
-                    ) : (
-                      <div className="grid gap-px bg-stone-200 sm:grid-cols-3">
-                        {([["conform", c.conformRules, "bg-emerald-50 text-emerald-900"], ["reserve", c.reserveRules, "bg-sky-50 text-sky-900"], ["refuse", c.refuseRules, "bg-red-50 text-red-900"]] as const).map(([d, rules, cls]) => (
-                          <div key={d} className={`p-3 ${cls}`}>
-                            <p className="mb-1 text-xs font-bold uppercase tracking-wide">{d === "reserve" ? t.protocols.acceptedWithGap : d === "conform" ? t.wizard.accepted : t.decision[d]}</p>
-                            <ul className="list-disc space-y-0.5 pl-4 text-sm">
-                              {(rules ?? "").split(/\r?\n/).filter((x) => x.trim()).map((x, i) => <li key={i}>{x}</li>)}
-                            </ul>
-                          </div>
-                        ))}
+              {editingConformity && (
+                <>
+                  <h2 className="mb-1 mt-8 text-lg font-bold">{t.protocols.categoryClasses}</h2>
+                  <p className="mb-3 text-sm text-stone-600">{t.protocols.categoryClassesIntro}</p>
+                  <div className="divide-y divide-stone-100 rounded-xl border border-stone-200 bg-white">
+                    {categories.map((c) => (
+                      <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
+                        <p className="font-semibold">{locale === "en" ? c.nameEn : c.nameFr}</p>
+                        <div className="w-full max-w-md"><CategoryClassSelect categoryId={c.id} value={c.tempClassId} classes={classes} /></div>
                       </div>
-                    )}
-                  </details>
-                ))}
-              </div>
+                    ))}
+                  </div>
+                </>
+              )}
     </>
   );
 

@@ -2,9 +2,12 @@
 
 import { MODES, RESOLUTIONS, STAGES, modeIcon, stageStyles } from "@/lib/anomaly";
 import { useI18n } from "@/lib/i18n/client";
+import { ConformityRow } from "../settings/SettingsClient";
+
+export interface CategoryRule { id: number; name: string; conformRules: string; reserveRules: string; refuseRules: string }
 
 /** Règles de gestion de l'application (lecture) : types de suivi et impact sur les économies, étapes, types d'anomalie */
-export function DevRules() {
+export function DevRules({ categories = [], canEdit = false }: { categories?: CategoryRule[]; canEdit?: boolean }) {
   const { t } = useI18n();
   const r = t.rules;
   const box = "card p-4";
@@ -56,6 +59,30 @@ export function DevRules() {
       <section className={box}>
         <h2 className="mb-2 font-semibold">{r.savingsTitle}</h2>
         <ul className="list-inside list-disc space-y-1 text-sm text-stone-700">{r.savingsRules.map((x) => <li key={x}>{x}</li>)}</ul>
+      </section>
+
+      <section className={box}>
+        <h2 className="mb-1 font-semibold">{r.categoriesTitle}</h2>
+        <p className="mb-3 text-sm text-stone-600">{r.categoriesIntro}</p>
+        <div className="overflow-x-auto">
+          <table className="table text-sm">
+            <thead><tr><th>{r.category}</th><th className="text-emerald-800">{t.wizard.accepted}</th><th className="text-sky-800">{t.protocols.acceptedWithGap}</th><th className="text-red-700">{t.decision.refuse}</th></tr></thead>
+            <tbody>
+              {categories.map((c) =>
+                canEdit ? (
+                  <ConformityRow key={c.id} c={c} />
+                ) : (
+                  <tr key={c.id} className="align-top">
+                    <td className="font-medium">{c.name}</td>
+                    {[c.conformRules, c.reserveRules, c.refuseRules].map((rules, i) => (
+                      <td key={i}><ul className="list-disc space-y-0.5 pl-4">{rules.split(/\r?\n/).filter((x) => x.trim()).map((x, j) => <li key={j}>{x}</li>)}</ul></td>
+                    ))}
+                  </tr>
+                ),
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className={box}>
