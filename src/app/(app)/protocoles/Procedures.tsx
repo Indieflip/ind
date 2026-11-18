@@ -100,7 +100,7 @@ const BEFORE: [string, string, string][] = [
 
 export const RECEPTION_TABS = [
   { key: "avant", label: "Avant de commencer" },
-  { key: "saisie", label: "La saisie pas à pas" },
+  { key: "saisie", label: "La saisie sur le téléphone" },
   { key: "pesee", label: "La pesée" },
   { key: "controle", label: "Le contrôle" },
 ] as const;
@@ -108,12 +108,26 @@ export type ReceptionTab = (typeof RECEPTION_TABS)[number]["key"];
 
 const WEIGH: { title: string; items: string[] }[] = [
   { title: "Préparer la balance", items: ["Balance de niveau et stable", "Affichage à zéro avant toute pesée", "Contrôle avec un poids de 5 kg"] },
-  { title: "Peser", items: ["Marchandise au centre du plateau", "Attendre que l'affichage soit stable avant de lire", "Produits préemballés : échantillonner (norme NF X 06-031-1 ou règles DGCCRF) ; la moyenne du lot doit atteindre le poids annoncé"] },
+  { title: "Peser", items: ["Marchandise au centre du plateau", "Attendre que l'affichage soit stable avant de lire", "Poissons et produits sous glace : peser sans la glace, après égouttage (on ne paie pas la glace)", "Produits préemballés : peser un échantillon ; en moyenne, le lot doit atteindre le poids annoncé"] },
   { title: "Déduire la tare", items: ["Poids net = poids pesé − tares des contenants", "Tares : liste des contenants ci-dessous (en kg)"] },
   { title: "Saisir", items: ["Q contrôlée = poids net, dans l'application", "Noter le poids sur le BL"] },
 ];
 
-export function ReceptionProcedure({ containers, editable, tab, control }: { containers: Parameters<typeof ContainersTable>[0]["rows"]; editable: boolean; tab: ReceptionTab; control: React.ReactNode }) {
+/** Partie repliable : titre + petite flèche ; le texte se déroule au clic */
+function Fold({ n, title, open, children }: { n: number; title: string; open?: boolean; children: React.ReactNode }) {
+  return (
+    <details id={`partie-${n}`} open={open} className="group scroll-mt-20 border-b border-stone-200 last:border-b-0">
+      <summary className="flex cursor-pointer list-none items-center gap-3 py-4 text-left">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white">{n}</span>
+        <span className="flex-1 text-lg font-bold">{title}</span>
+        <span className="flex h-8 w-8 items-center justify-center rounded-full text-stone-500 transition group-open:rotate-90 group-hover:bg-stone-100">▸</span>
+      </summary>
+      <div className="pb-6">{children}</div>
+    </details>
+  );
+}
+
+export function ReceptionProcedure({ containers, editable, tab, control }: { containers: Parameters<typeof ContainersTable>[0]["rows"]; editable: boolean; tab?: ReceptionTab; control: React.ReactNode }) {
   return (
     <div>
       <Header
@@ -121,20 +135,7 @@ export function ReceptionProcedure({ containers, editable, tab, control }: { con
         intro="Préparer, saisir sur le téléphone, peser, contrôler. L'application vous guide et vous bloque, avec un message, si quelque chose manque."
         meta={[["Pour qui", "toute personne qui réceptionne"], ["Où", "Réceptions › Nouvelle réception"], ["Durée", "5 à 10 min"]]}
       />
-      <nav className="no-print -mx-1 mb-6 flex gap-1 overflow-x-auto rounded-xl bg-stone-100 p-1">
-        {RECEPTION_TABS.map((t, i) => (
-          <Link
-            key={t.key}
-            href={`/protocoles?id=proc-reception&tab=${t.key}`}
-            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition ${tab === t.key ? "bg-white text-brand-700 shadow-sm" : "text-stone-600 hover:text-stone-900"}`}
-          >
-            <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${tab === t.key ? "bg-brand-600 text-white" : "bg-stone-300 text-white"}`}>{i + 1}</span>
-            {t.label}
-          </Link>
-        ))}
-      </nav>
-
-      {tab === "avant" && (
+      <Fold n={1} title={RECEPTION_TABS[0].label} open={tab === "avant"}>
         <section>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {BEFORE.map(([icon, k, v]) => (
@@ -144,12 +145,10 @@ export function ReceptionProcedure({ containers, editable, tab, control }: { con
               </div>
             ))}
           </div>
-          <Link href="/protocoles?id=proc-reception&tab=saisie" className="btn-primary mt-6">Commencer la saisie →</Link>
         </section>
-      )}
+      </Fold>
 
-      {tab === "saisie" && (
-        <>
+      <Fold n={2} title={RECEPTION_TABS[1].label} open={tab === "saisie"}>
           <Timeline steps={RECEPTION} />
       <div className="mt-6 flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
         <Icon name="cloudOff" className="mt-0.5 h-5 w-5 shrink-0" />
@@ -166,10 +165,9 @@ export function ReceptionProcedure({ containers, editable, tab, control }: { con
           ["Erreur vue après coup", "Corriger avant 23 h. Après, le bon est consolidé : prévenir le responsable."],
         ]}
       />
-        </>
-      )}
+      </Fold>
 
-      {tab === "pesee" && (
+      <Fold n={3} title={RECEPTION_TABS[2].label} open={tab === "pesee"}>
       <section>
         <h2 className="mb-1 text-lg font-bold">La pesée des produits au kg</h2>
         <p className="mb-4 text-sm text-stone-600">Pour tout produit vendu au poids. L'application compare le poids net au poids facturé : au-delà de 10 g ou 0,10 € d'écart, un écart de pesée est créé et réclamé (une anomalie par bon).</p>
@@ -189,9 +187,9 @@ export function ReceptionProcedure({ containers, editable, tab, control }: { con
           <ContainersTable editable={editable} rows={containers} />
         </div>
       </section>
-      )}
+      </Fold>
 
-      {tab === "controle" && control}
+      <Fold n={4} title={RECEPTION_TABS[3].label} open={tab === "controle"}>{control}</Fold>
     </div>
   );
 }

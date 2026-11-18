@@ -30,7 +30,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   // La conformité des produits est l'onglet « Le contrôle » de la procédure de réception ; ?id=conformite ne sert plus qu'à la modifier
   if ((one(sp.id) === "conformite" || one(sp.id) === "seuils") && one(sp.edit) !== "1") redirect("/protocoles?id=proc-reception&tab=controle");
   const showConformity = one(sp.id) === "conformite" || one(sp.id) === "seuils";
-  const receptionTab = (RECEPTION_TABS.map((x) => x.key) as string[]).includes(one(sp.tab) ?? "") ? (one(sp.tab) as ReceptionTab) : "avant";
+  const receptionTab = (RECEPTION_TABS.map((x) => x.key) as string[]).includes(one(sp.tab) ?? "") ? (one(sp.tab) as ReceptionTab) : undefined;
   const showProc = one(sp.id) === "proc-reception" ? "reception" : one(sp.id) === "proc-reclamation" ? "reclamation" : one(sp.id) === "proc-reglementation" ? "reglementation" : null;
   const isAdmin = user.role === "admin";
   const editingConformity = showConformity && isAdmin && one(sp.edit) === "1";
