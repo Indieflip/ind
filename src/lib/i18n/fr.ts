@@ -1147,6 +1147,8 @@ export const fr = {
     deleteTable: "Supprimer le tableau",
   },
   protocols: {
+    conformityTitle: "La conformité des produits",
+    decisionFlow: "La décision : Acceptée ou Refus",
     teamProcedures: "Rédigées par l'équipe",
     controlTitle: "Le contrôle de la livraison",
     editThresholds: "Modifier les seuils et conditions",

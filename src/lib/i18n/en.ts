@@ -1145,6 +1145,8 @@ export const en: Dict = {
     deleteTable: "Delete table",
   },
   protocols: {
+    conformityTitle: "Product compliance",
+    decisionFlow: "The decision: Accepted or Refused",
     teamProcedures: "Written by the team",
     controlTitle: "Checking the delivery",
     editThresholds: "Edit thresholds and conditions",
