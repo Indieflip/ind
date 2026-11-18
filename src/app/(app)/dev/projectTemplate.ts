@@ -136,35 +136,53 @@ export const PROJECT_TEMPLATE = `
 <li><p>Pas encore d'avis clients ni de références.</p></li>
 <li><p>Dépendance à une seule personne ; support et formation à organiser.</p></li>
 </ul>
+<h2>11. Proposition au restaurant et propriété de l'application (mise à jour du 18/11/2026)</h2>
+<div data-callout="" data-variant="danger"><p>Note personnelle : réserver l'onglet Dev à mon compte (bouton en haut de Dev) pour que les autres administrateurs ne la voient pas. Ceci n'est pas un avis juridique : à faire valider par un avocat en propriété intellectuelle et par l'expert-comptable.</p></div>
 
-<h2>11. Proposition au restaurant et propriété de l'application (note du 18/11/2026)</h2>
-<div data-callout="" data-variant="danger"><p>Note personnelle : réserver l'onglet Dev à mon compte (bouton en haut de Dev) pour que les autres administrateurs ne la voient pas. Ceci n'est pas un avis juridique : à faire valider par un avocat en propriété intellectuelle.</p></div>
-<h3>Coût d'une embauche à 2 000 € net</h3>
+<h3>La proposition</h3>
+<table><tbody>
+<tr><th><p>Élément</p></th><th><p>Proposition</p></th></tr>
+<tr><td><p>Contrat</p></td><td><p>CDD de 6 mois, poste « Contrôleur de coûts » (gestion de l'application + recherche d'économies)</p></td></tr>
+<tr><td><p>Fixe</p></td><td><p>31 000 € brut par an (environ 2 000 € net par mois)</p></td></tr>
+<tr><td><p>Prime</p></td><td><p>10 % des économies justifiées</p></td></tr>
+<tr><td><p>Application</p></td><td><p>Utilisation gratuite pendant le CDD ; je reste propriétaire du code</p></td></tr>
+<tr><td><p>Bilan</p></td><td><p>Point au bout de 6 mois, chiffres de l'application à l'appui</p></td></tr>
+</tbody></table>
+
+<h3>Coût pour le restaurant sur 6 mois (estimation)</h3>
 <ul>
-<li><p>Environ 3 300 à 3 700 € par mois pour l'entreprise, soit 40 à 45 k€ par an (à confirmer par l'expert-comptable).</p></li>
-<li><p>Achats estimés : 3 à 3,5 M€ par an (25 à 30 % de 12 M€ de chiffre d'affaires, hypothèse).</p></li>
-<li><p>Récupérer 1,5 % des achats (45 à 50 k€) suffit à financer le poste ; l'application mesure et justifie ces économies chaque mois.</p></li>
-<li><p>Pour l'ouverture d'autres établissements : pas de logiciel du marché à 100–200 € par mois et par site, ni d'option HACCP.</p></li>
+<li><p>Fixe : environ 15 500 € brut, soit environ 21 000 € chargé pour l'entreprise.</p></li>
+<li><p>Indemnité de fin de CDD : 10 % de la rémunération brute (environ 1 550 € et plus selon la prime), due si le CDD n'est pas suivi d'un CDI.</p></li>
+<li><p>Prime : 10 % des économies, donc payée par les économies elles-mêmes.</p></li>
+<li><p>Argument : avec environ 3 à 3,5 M€ d'achats par an (hypothèse), récupérer 1,5 % sur 6 mois (environ 25 k€) couvre le poste ; l'application justifie chaque euro.</p></li>
 </ul>
-<h3>Proposition : séparer l'emploi et l'application</h3>
-<ol>
-<li><p><strong>Contrat de travail</strong> : poste « Responsable achats et contrôle des coûts » (gestion de l'application + recherche d'économies). Fixe 2 000 € net + prime sur les économies justifiées au-delà du coût du poste.</p></li>
-<li><p><strong>Licence d'utilisation de l'application</strong> : je reste propriétaire du code ; gratuite ou peu chère pour ce restaurant tant que j'y travaille, payante par nouvel établissement.</p></li>
-<li><p><strong>S'il veut posséder l'application</strong> : cession payante, à un prix fixé par écrit, plutôt qu'un abandon gratuit.</p></li>
-</ol>
-<p>Risques si le code est donné avec l'embauche : impossible de vendre l'application à d'autres restaurants ; elle reste chez lui en cas de départ ; gain limité au salaire.</p>
+
+<h3>À faire préciser par écrit</h3>
+<ul>
+<li><p><strong>Motif du CDD</strong> : un CDD doit avoir un motif prévu par la loi. Faire vérifier lequel par l'expert-comptable ; sinon, un CDI avec période d'essai donne la même souplesse.</p></li>
+<li><p><strong>Calcul de la prime</strong> : « économies justifiées » = avoirs et régularisations obtenus + livraisons différées, comme dans Reporting &gt; Économies (hors montants en attente) ; préciser si les baisses de prix négociées comptent, et sur quelle durée ; versement mensuel ou trimestriel.</p></li>
+<li><p><strong>Application</strong> : licence d'utilisation gratuite pendant le CDD, sans cession des droits ; l'application existante reste ma propriété et hors du contrat de travail ; les améliorations faites pendant le CDD restent à moi (sinon elles reviennent à l'employeur, article L113-9 du Code de la propriété intellectuelle).</p></li>
+<li><p><strong>Données</strong> : les données du restaurant (fournisseurs, prix, anomalies, protocoles) restent à lui ; export complet remis en cas de fin de collaboration.</p></li>
+</ul>
+
+<h3>Le point à 6 mois : options à préparer</h3>
+<ul>
+<li><p>Bilan chiffré : économies obtenues, en attente, temps gagné, fiches DDPP.</p></li>
+<li><p>Suite possible : CDI avec un fixe revu à la hausse selon les résultats, prime maintenue ; licence payante pour chaque nouvel établissement (offre envisagée en section 10).</p></li>
+<li><p>Si la collaboration s'arrête : l'application reste à moi, les données sont rendues au restaurant.</p></li>
+</ul>
+
 <h3>Propriété du code : ce qui compte</h3>
 <ul>
-<li><p>Le process, les protocoles, les fournisseurs et les prix fournis par le restaurant sont des informations et des contenus : ils ne rendent pas le restaurant propriétaire du code (une idée ou un cahier des charges n'est pas protégé, le code l'est). Ces données sont à eux : à retirer avant toute vente à un autre client ; leurs textes de protocoles restent à eux.</p></li>
-<li><p>Point clé : un logiciel créé par un salarié dans le cadre de ses fonctions ou sur instruction de l'employeur appartient à l'employeur (article L113-9 du Code de la propriété intellectuelle). Temps de travail, matériel de l'entreprise et demande de l'employeur comptent beaucoup.</p></li>
-<li><p>Créé de ma propre initiative, sur mon temps personnel et hors de mon poste : il est à moi. Sans statut de salarié, je garde les droits tant que rien n'est signé (une cession de droits doit être écrite).</p></li>
+<li><p>Le process, les protocoles, les fournisseurs et les prix fournis par le restaurant sont des informations : ils ne rendent pas le restaurant propriétaire du code (seul le code est protégé, pas les idées ni le cahier des charges). Ces données sont à eux : à retirer avant toute vente à un autre client.</p></li>
+<li><p>Un logiciel créé par un salarié dans le cadre de ses fonctions ou sur instruction de l'employeur appartient à l'employeur. Créé de ma propre initiative, sur mon temps personnel et hors de mon poste, il est à moi ; une cession de droits doit toujours être écrite.</p></li>
 </ul>
+
 <h3>À faire avant de négocier</h3>
 <ul data-type="taskList">
 <li data-type="taskItem" data-checked="false"><p>Garder les preuves datées : historique GitHub ; dépôt à l'APP (Agence pour la protection des programmes) ou enveloppe Soleau (INPI)</p></li>
 <li data-type="taskItem" data-checked="false"><p>Garder à mon nom les comptes GitHub, Vercel, Neon et Anthropic</p></li>
-<li data-type="taskItem" data-checked="false"><p>Faire écrire dans le contrat que l'application existante m'appartient et reste hors contrat, et préciser à qui reviennent les améliorations faites pendant l'emploi (sinon : à l'employeur)</p></li>
-<li data-type="taskItem" data-checked="false"><p>Faire relire le contrat par un avocat en propriété intellectuelle avant de signer</p></li>
+<li data-type="taskItem" data-checked="false"><p>Faire vérifier le motif du CDD et le coût exact par l'expert-comptable</p></li>
+<li data-type="taskItem" data-checked="false"><p>Faire relire le contrat (licence gratuite, propriété, prime) par un avocat en propriété intellectuelle avant de signer</p></li>
 </ul>
-
 `.trim();
