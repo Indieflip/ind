@@ -90,4 +90,51 @@ export const PROJECT_TEMPLATE = `
 <ul data-type="taskList">
 <li data-type="taskItem" data-checked="false"><p></p></li>
 </ul>
+<h2>10. Positionnement, offre et différenciation (analyse du 18/11/2026)</h2>
+<div data-callout="" data-variant="warning"><p>Sources : tableau comparatif « Appli » (prix et fonctions des concurrents non revérifiés). Pense à réserver l'onglet Dev à ton compte si d'autres administrateurs ont accès à l'application.</p></div>
+<h3>Position sur le marché</h3>
+<ul>
+<li><p><strong>Applis HACCP (0 à 55 €/mois)</strong> : contrôle sanitaire à réception, mais ni quantités, ni prix, ni avoirs.</p></li>
+<li><p><strong>Gestion de restaurant (49 à 180 €/mois)</strong> : contrôle économique, HACCP en option payante (ex. +38 €).</p></li>
+<li><p><strong>Notre position</strong> : la réception complète, sanitaire et économique, du camion jusqu'à l'avoir encaissé.</p></li>
+</ul>
+<h3>Minimum pour une version commercialisable</h3>
+<ul data-type="taskList">
+<li data-type="taskItem" data-checked="false"><p>Plusieurs clients et plusieurs établissements (comptes séparés, paramétrage par client) : prérequis n° 1</p></li>
+<li data-type="taskItem" data-checked="false"><p>Module commandes relié à la réception : commandé / livré / facturé</p></li>
+<li data-type="taskItem" data-checked="false"><p>Abonnement et paiement en ligne, conditions générales, RGPD, hébergement des données en Europe</p></li>
+<li data-type="taskItem" data-checked="false"><p>Rapprochement BL / facture (factures électroniques)</p></li>
+</ul>
+<p>À ne pas développer pour la version de base : stocks, inventaires, fiches techniques, caisse.</p>
+<h3>Offre envisagée</h3>
+<table><tbody>
+<tr><th><p>Offre</p></th><th><p>Contenu</p></th><th><p>Prix (HT/mois/site)</p></th></tr>
+<tr><td><p>Réception</p></td><td><p>HACCP + contrôle économique + réclamations + économies + fiche DDPP</p></td><td><p>59 à 69 €</p></td></tr>
+<tr><td><p>Réception + Commandes</p></td><td><p>+ commandes reliées à la réception</p></td><td><p>89 à 99 €</p></td></tr>
+<tr><td><p>Groupe</p></td><td><p>Plusieurs sites, tableau de bord commun</p></td><td><p>Dégressif ou sur devis</p></td></tr>
+<tr><td><p>Mise en place</p></td><td><p>Import mercurial, fournisseurs, protocoles, seuils</p></td><td><p>150 à 300 € une fois</p></td></tr>
+</tbody></table>
+<p>Lecture des BL : quota inclus (150 à 200 BL/mois), au-delà facturé. Argument : l'argent récupéré, mesuré chaque mois (calcul coût / gains ci-dessus).</p>
+<h3>Ce qui nous démarque déjà</h3>
+<ul>
+<li><p>Chaîne complète : anomalie → réclamation avec relances par fournisseur → avoir vérifié → économie justifiée.</p></li>
+<li><p>HACCP inclus, sans module en supplément ; aucun matériel à acheter.</p></li>
+<li><p>Fiche de réception DDPP exportée automatiquement chaque soir, figée, archivée 5 ans.</p></li>
+<li><p>Conformité proposée automatiquement (seuils réglementaires et marges acceptables).</p></li>
+<li><p>Cas du terrain : écarts de pesée avec tares, prix bloqués, fruits et légumes au prix du mois, suivi des prix automatique.</p></li>
+<li><p>Conçue sur un vrai restaurant, par quelqu'un du métier.</p></li>
+</ul>
+<h3>Pistes pour se démarquer davantage</h3>
+<ul>
+<li><p>Commandes reliées à la réception dès l'offre de base.</p></li>
+<li><p>Rapport mensuel envoyé au gérant (économies, fournisseurs à problèmes, hausses de prix).</p></li>
+<li><p>Comparaison anonymisée des prix entre clients (cadre juridique à vérifier).</p></li>
+<li><p>Lecture et rapprochement automatiques des factures électroniques.</p></li>
+</ul>
+<h3>Points faibles à traiter</h3>
+<ul>
+<li><p>Pas encore d'avis clients ni de références.</p></li>
+<li><p>Dépendance à une seule personne ; support et formation à organiser.</p></li>
+</ul>
+
 `.trim();
