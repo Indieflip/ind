@@ -105,11 +105,11 @@ export const RECEPTION_TABS = [
 ] as const;
 export type ReceptionTab = (typeof RECEPTION_TABS)[number]["key"];
 
-const WEIGH: { title: string; items: string[] }[] = [
-  { title: "Préparer la balance", items: ["Balance de niveau et stable", "Affichage à zéro avant toute pesée", "Contrôle avec un poids de 5 kg"] },
-  { title: "Peser", items: ["Marchandise au centre du plateau", "Attendre que l'affichage soit stable avant de lire", "Poissons et produits sous glace : peser sans la glace, après égouttage (on ne paie pas la glace)", "Produits préemballés : peser un échantillon ; en moyenne, le lot doit atteindre le poids annoncé"] },
-  { title: "Déduire la tare", items: ["Poids net = poids pesé − tares des contenants", "Tares : liste des contenants ci-dessous (en kg)"] },
-  { title: "Saisir", items: ["Q contrôlée = poids net, dans l'application", "Noter le poids sur le BL"] },
+const WEIGH: { title: string; icon: string; items: string[] }[] = [
+  { title: "Préparer la balance", icon: "gear", items: ["Balance de niveau et stable", "Affichage à zéro avant toute pesée", "Contrôle avec un poids de 5 kg"] },
+  { title: "Peser", icon: "scale", items: ["Marchandise au centre du plateau", "Attendre que l'affichage soit stable avant de lire", "Poissons et produits sous glace : peser sans la glace, après égouttage (on ne paie pas la glace)", "Produits préemballés : peser un échantillon ; en moyenne, le lot doit atteindre le poids annoncé"] },
+  { title: "Déduire la tare", icon: "box", items: ["Poids net = poids pesé − tares des contenants", "Tares : liste des contenants ci-dessous (en kg)"] },
+  { title: "Saisir", icon: "edit", items: ["Q contrôlée = poids net, dans l'application", "Noter le poids sur le BL"] },
 ];
 
 /** Partie repliable : titre + petite flèche ; le texte se déroule au clic */
@@ -151,25 +151,7 @@ export function ReceptionProcedure({ containers, editable, tab, control }: { con
         <div className="space-y-8">
           <ControlChecks />
           <RefusalCard />
-      <section>
-        <h2 className="mb-1 text-lg font-bold">La pesée des produits au kg</h2>
-        <p className="mb-4 text-sm text-stone-600">Pour tout produit vendu au poids. L'application compare le poids net au poids facturé : au-delà de 10 g ou 0,10 € d'écart, un écart de pesée est créé et réclamé (une anomalie par bon).</p>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {WEIGH.map((w, i) => (
-            <div key={w.title} className="relative rounded-xl border border-stone-200 bg-white p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">{i + 1}</span>
-                <p className="font-semibold">{w.title}</p>
-              </div>
-              <ul className="space-y-1 text-sm text-stone-600">{w.items.map((x) => <li key={x} className="flex gap-2"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />{x}</li>)}</ul>
-              {i < WEIGH.length - 1 && <span className="absolute -right-2.5 top-1/2 hidden -translate-y-1/2 text-stone-300 xl:block">→</span>}
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 rounded-2xl border border-stone-200 bg-white p-2">
-          <ContainersTable editable={editable} rows={containers} />
-        </div>
-      </section>
+      <WeighSection editable={editable} containers={containers} />
           {control}
         </div>
       </Fold>
@@ -372,7 +354,7 @@ export function ConformityFlow() {
 
 /* ---------------------------------------------------------------- Réglementation ---------------------------------------------------------------- */
 
-export function RegulationProcedure({ retentionYears, notes }: { retentionYears: number; notes?: React.ReactNode }) {
+export function RegulationProcedure({ retentionYears, notes }: { retentionYears: number; notes?: { body: React.ReactNode; meta?: string; editHref?: string } }) {
   const rules: { icon: string; tag: string; title: string; text: string; inApp: string }[] = [
     { icon: "book", tag: "Règlement (CE) 852/2004", title: "Hygiène : le contrôle à réception", text: "Le contrôle des marchandises à réception fait partie du plan de maîtrise sanitaire (PMS) de l'établissement.", inApp: "Fiche de réception exportée chaque soir, contrôles guidés à chaque livraison." },
     { icon: "thermo", tag: "Arrêté du 21 décembre 2009", title: "Températures de conservation", text: "Chaque denrée a une température maximale ; au-delà, le produit ne doit pas être accepté.", inApp: "Seuils et marges dans Procédures › Réception › Contrôler la livraison ; refus proposé automatiquement." },
@@ -404,9 +386,16 @@ export function RegulationProcedure({ retentionYears, notes }: { retentionYears:
         ))}
       </div>
       {notes && (
-        <section className="mt-10">
-          <h2 className="mb-3 text-lg font-bold">Vos notes</h2>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5">{notes}</div>
+        <section className="mt-10 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+          <div className="flex flex-wrap items-center gap-3 border-b border-stone-200 bg-stone-50 px-5 py-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700"><Icon name="book" className="h-5 w-5" /></span>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-bold">Notes de l'équipe</h2>
+              <p className="text-xs text-stone-500">Ce que l'établissement ajoute aux règles ci-dessus{notes.meta ? ` · ${notes.meta}` : ""}</p>
+            </div>
+            {notes.editHref && <Link href={notes.editHref} className="btn-secondary no-print py-1.5 text-sm"><Icon name="edit" className="h-4 w-4" /> Modifier</Link>}
+          </div>
+          <div className="notes-body border-l-4 border-violet-200 px-5 py-4 sm:px-6">{notes.body}</div>
         </section>
       )}
       <p className="mt-6 text-xs text-stone-500">Repères indicatifs, à valider avec votre plan de maîtrise sanitaire et vos obligations comptables.</p>
@@ -442,6 +431,51 @@ function RefusalCard() {
           </li>
         ))}
       </ol>
+    </section>
+  );
+}
+
+/** « La pesée des produits au kg » : repères clés, 4 étapes, formule du poids net, liste des tares */
+function WeighSection({ editable, containers }: { editable: boolean; containers: Parameters<typeof ContainersTable>[0]["rows"] }) {
+  const facts: [string, string][] = [["Pour qui", "tout produit vendu au poids"], ["Tolérance", "10 g ou 0,10 €"], ["Au-delà", "écart de pesée réclamé, une anomalie par bon"]];
+  return (
+    <section className="overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50/70 to-white">
+      <div className="flex flex-wrap items-start gap-3 p-4 sm:p-5">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white"><Icon name="scale" className="h-5 w-5" /></span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold">La pesée des produits au kg</h2>
+          <p className="text-sm text-stone-600">L'application compare le poids net au poids facturé.</p>
+        </div>
+      </div>
+      <dl className="grid gap-px border-y border-amber-100 bg-amber-100 sm:grid-cols-3">
+        {facts.map(([k, v]) => (
+          <div key={k} className="bg-white/80 px-4 py-2.5">
+            <dt className="text-[11px] font-bold uppercase tracking-wider text-amber-700">{k}</dt>
+            <dd className="text-sm font-medium text-stone-800">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <ol className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-4">
+        {WEIGH.map((w, i) => (
+          <li key={w.title} className="relative flex flex-col rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700"><Icon name={w.icon} className="h-4 w-4" /></span>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Étape {i + 1}</p>
+                <p className="font-semibold leading-tight">{w.title}</p>
+              </div>
+            </div>
+            <ul className="space-y-1.5 text-sm text-stone-600">{w.items.map((x) => <li key={x} className="flex gap-2"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-amber-500" />{x}</li>)}</ul>
+            {i < WEIGH.length - 1 && <span className="absolute -right-2.5 top-7 z-10 hidden h-5 w-5 items-center justify-center rounded-full border border-stone-200 bg-white text-xs text-stone-400 xl:flex">→</span>}
+          </li>
+        ))}
+      </ol>
+      <div className="mx-4 mb-4 flex flex-wrap items-center justify-center gap-2 rounded-xl bg-stone-900 px-4 py-3 text-sm font-semibold text-white sm:mx-5 sm:mb-5">
+        <span className="rounded-md bg-amber-500 px-2 py-0.5">Poids net</span>=<span>poids pesé</span>−<span>tares des contenants</span>
+      </div>
+      <div className="border-t border-amber-100 bg-white p-2 sm:p-3">
+        <ContainersTable editable={editable} rows={containers} />
+      </div>
     </section>
   );
 }

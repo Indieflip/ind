@@ -26,6 +26,7 @@ const paths: Record<string, string> = {
   download: "M12 3v12M7 10l5 5 5-5M4 21h16",
   print: "M6 9V3h12v6M6 18H4v-7h16v7h-2M8 14h8v7H8z",
   sparkle: "M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z",
+  scale: "M12 4v16M7 20h10M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z",
   thermo: "M14 14.8V5a2 2 0 1 0-4 0v9.8a4 4 0 1 0 4 0z",
   cloudOff: "M3 3l18 18M8 8a5 5 0 0 0-1 0 4 4 0 0 0 0 8h10M19 16a3.5 3.5 0 0 0-2.4-6A6 6 0 0 0 11 6",
 };

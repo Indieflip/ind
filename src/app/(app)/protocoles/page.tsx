@@ -150,12 +150,11 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
             <article className="card p-5 sm:p-8"><ClaimProcedure /></article>
           ) : showProc === "reglementation" ? (
             <article className="card p-5 sm:p-8">
-              <RegulationProcedure retentionYears={RETENTION_YEARS} notes={regulationNotes ? (
-                <>
-                  <ProtocolView content={regulationNotes.content} />
-                  {editable && <Link href={`/protocoles?id=${regulationNotes.id}&edit=1`} className="btn-secondary no-print mt-4"><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</Link>}
-                </>
-              ) : undefined} />
+              <RegulationProcedure retentionYears={RETENTION_YEARS} notes={regulationNotes ? {
+                body: <ProtocolView content={regulationNotes.content} />,
+                meta: `mis à jour le ${fmtDateTime(regulationNotes.updatedAt, locale)}${regulationNotes.by ? ` · ${regulationNotes.by}` : ""}`,
+                editHref: editable ? `/protocoles?id=${regulationNotes.id}&edit=1` : undefined,
+              } : undefined} />
             </article>
           ) : showConformity ? (
             <article className="card p-5 sm:p-8">
