@@ -8,10 +8,10 @@ import { DataTable, type Col } from "@/components/table/DataTable";
 interface Row { id: number; date: string | null; nature: string | null; item: string | null; original: string | null; detail: string | null; supplier: string | null; supplierId: number | null; reference: string | null; claim: string | null; priceHref: string | null }
 
 /** Historique « Suivi MAJ » repris du fichier Excel, mêmes colonnes, filtres d'en-tête */
-export function MajLog({ rows, editable }: { rows: Row[]; editable: boolean }) {
+export function MajLog({ rows, editable, compact = false }: { rows: Row[]; editable: boolean; compact?: boolean }) {
   const { t, locale } = useI18n();
   const m = t.maj;
-  const cols: Col<Row>[] = [
+  const all: Col<Row>[] = [
     { key: "date", label: m.date, text: (r) => (r.date ? fmtDate(r.date, locale) : ""), sort: (r) => r.date, className: "whitespace-nowrap" },
     { key: "nature", label: m.nature, text: (r) => r.nature ?? "" },
     { key: "item", label: m.item, text: (r) => r.item ?? "", render: (r) => <>{r.item || "—"}{r.original && <span className="block text-[11px] text-stone-400" title={m.original}>{r.original}</span>}</> },
@@ -20,6 +20,8 @@ export function MajLog({ rows, editable }: { rows: Row[]; editable: boolean }) {
     { key: "reference", label: m.reference, text: (r) => r.reference ?? "", className: "whitespace-pre-wrap text-stone-600" },
     { key: "claim", label: m.claim, text: (r) => r.claim ?? "", className: "min-w-56", render: (r) => (editable ? <Claim id={r.id} initial={r.claim ?? ""} /> : r.claim || "—") },
   ];
+  const cols = compact ? all.filter((c) => c.key !== "item" && c.key !== "supplier") : all;
+  if (compact) return <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} empty={m.empty} />;
   return (
     <section>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">

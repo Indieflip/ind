@@ -8,12 +8,13 @@ import { can } from "@/lib/permissions";
 import { fmtDate, fmtMoney, fmtNum, num, sentence } from "@/lib/format";
 import { fvRange, parisMonth } from "@/lib/pricing";
 import { Icon } from "@/components/Icon";
+import { MajLog } from "../../mise-a-jour/MajLog";
 
 type Event = { at: Date; icon: string; tone: string; title: string; text: string; href?: string };
 
 /** Fiche produit du Mercurial : identité, chiffres, historique (création, prix, mises à jour, anomalies) et dernières réceptions */
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireUser(can.viewMercurial);
+  const user = await requireUser(can.viewMercurial);
   const { t, locale } = await getDict();
   const P = t.productPage;
   const id = Number((await params).id);
@@ -27,7 +28,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     product.categoryId ? db.query.categories.findFirst({ where: eq(schema.categories.id, product.categoryId) }) : Promise.resolve(undefined),
     product.fvItemId ? db.query.fvItems.findFirst({ where: eq(schema.fvItems.id, product.fvItemId) }) : Promise.resolve(undefined),
     db.select().from(schema.priceChanges).where(eq(schema.priceChanges.productId, id)).orderBy(desc(schema.priceChanges.date)),
-    db.select().from(schema.majLog).where(eq(schema.majLog.productId, id)).orderBy(desc(schema.majLog.createdAt)),
+    db.select().from(schema.majLog).where(eq(schema.majLog.productId, id)).orderBy(desc(schema.majLog.date), desc(schema.majLog.createdAt)),
     db
       .select({ id: l.id, receptionId: r.id, deliveredAt: r.deliveredAt, blNumber: r.blNumber, document: l.document, unit: l.unit, qtyOrdered: l.qtyOrdered, qtyReceived: l.qtyReceived, unitPrice: l.unitPrice, decision: l.decision })
       .from(l)
@@ -58,7 +59,6 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       text: `${num(c.oldPrice) != null ? `${money(num(c.oldPrice))} → ` : ""}${money(num(c.newPrice))}${c.pct != null ? ` (${c.pct > 0 ? "+" : ""}${fmtNum(c.pct, locale, 1)} %)` : ""} · ${P.src[c.source]}${c.invoiceRef ? ` ${c.invoiceRef}` : ""}`,
       href: c.receptionId ? `/receptions/${c.receptionId}` : undefined,
     })),
-    ...maj.map((m) => ({ at: m.createdAt, icon: "edit", tone: "bg-amber-100 text-amber-800", title: m.nature ? `${P.evMaj} · ${m.nature}` : P.evMaj, text: [m.detail, m.reference].filter(Boolean).join(" · ") })),
     ...anomalies.map((a) => ({ at: a.createdAt, icon: "alert", tone: "bg-rose-100 text-rose-700", title: `${P.evAnomaly} · ${t.anomalies.types[a.type as keyof typeof t.anomalies.types] ?? a.type}`, text: `${a.description} · ${t.stages[a.stage as keyof typeof t.stages] ?? a.stage}`, href: `/anomalies/${a.id}` })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
@@ -130,6 +130,16 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           </ol>
         </section>
       </div>
+
+      <section>
+        <h2 className="font-semibold">{t.maj.productHistory}</h2>
+        <p className="mb-2 text-xs text-stone-500">{t.maj.productHistoryHint}</p>
+        <MajLog
+          compact
+          editable={can.editPrices(user.role)}
+          rows={maj.map((r) => ({ id: r.id, date: r.date, nature: r.nature, item: product.name, original: null, detail: r.detail, supplier: null, supplierId: r.supplierId, reference: r.reference, claim: r.claim, priceHref: null }))}
+        />
+      </section>
 
       <section className="card overflow-hidden">
         <h2 className="px-4 pt-4 font-semibold">{P.lastReceptions}</h2>

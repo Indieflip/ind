@@ -36,7 +36,7 @@ export async function globalSearch(q: string) {
     db.select({ id: p.id, name: p.name, unit: p.unit, price: p.price, priceMin: p.priceMin, supplierId: p.supplierId, supplier: s.name })
       .from(p).innerJoin(s, sql`${s.id} = ${p.supplierId}`).where(and(sql`${p.active}`, where([p.name, s.name, p.nature], words))).orderBy(p.name).limit(50),
     db.select({ id: s.id, name: s.name }).from(s).where(where([s.name], words)).orderBy(s.name).limit(30),
-    db.select({ id: m.id, date: m.date, item: m.item, detail: m.detail, reference: m.reference })
+    db.select({ id: m.id, date: m.date, item: m.item, detail: m.detail, reference: m.reference, productId: m.productId })
       .from(m).where(where([m.item, m.detail, m.reference, m.nature], words)).orderBy(desc(m.date)).limit(30),
     db.select({ id: pr.id, title: pr.title }).from(pr).where(where([pr.title, pr.content], words)).limit(20),
     db.select({ id: c.id, date: c.date, supplierName: c.supplierName, subject: c.subject, status: c.status, reference: c.reference })

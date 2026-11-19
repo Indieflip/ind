@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
@@ -41,6 +42,7 @@ export default async function MercurialPage() {
   return (
     <>
       <PageHeader title={t.mercurial.title}>
+        <Link className="btn-ghost text-sm" href="/mercurial/mise-a-jour" title={t.maj.title}><Icon name="list" className="h-4 w-4" /> {t.mercurial.fullHistory}</Link>
         <a className="btn-secondary" href="/api/export/mercurial"><Icon name="download" className="h-4 w-4" /> {t.common.exportCsv}</a>
       </PageHeader>
       <p className="-mt-3 mb-4 text-sm text-stone-600">{t.mercurial.intro}</p>
