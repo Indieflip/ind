@@ -825,6 +825,8 @@ export const en: Dict = {
     sameTask: "Already in this task: check this item does not exist yet",
     title: "Dev — project tracking",
     intro: "The app's goals, what is left to do (by you or on the development side), ideas and what is done. Everything can be edited: add, tick, fix.",
+    commercial: "Business development",
+    technical: "Technical development",
     sections: { project: "Project", pending: "Pending", objective: "Goals", constraint: "Constraints", idea: "Ideas", done: "Done", rules: "Rules", fields: "Development", automations: "Automations" },
     hints: { pending: "What is left to do, by priority. Tick ✓ when done.", objective: "What the app must allow.", constraint: "Rules always to respect in the app.", idea: "Ideas for later.", done: "Done items." },
     priority: "Priority",

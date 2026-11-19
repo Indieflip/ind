@@ -103,13 +103,24 @@ export function DevBoard({ items, reserved, tab, fields = [], project }: { items
           <button type="button" className="btn-secondary py-1 text-xs" onClick={() => start(async () => { await reserveDevAction(); router.refresh(); })}>{d.reserve}</button>
         </p>
       )}
-      <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-stone-200">
-        {TABS.map((s) => (
-          <Link key={s} href={s === "pending" ? "/dev" : `/dev?tab=${s}`} className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold ${current === s ? "border-brand-600 text-brand-700" : "border-transparent text-stone-500 hover:text-stone-800"}`}>
-            {d.sections[s]}{!["rules", "fields", "automations", "project"].includes(s) && <span className="ml-1 text-xs font-normal text-stone-400">({count(s)})</span>}
-          </Link>
-        ))}
+      {/* Deux onglets : Développement commercial (Projet) et Développement technique (sous-onglets) */}
+      <nav className="mb-3 flex gap-1 overflow-x-auto border-b border-stone-200">
+        {([["commercial", "/dev?tab=project", d.commercial], ["technical", "/dev", d.technical]] as const).map(([k, href, label]) => {
+          const on = k === "commercial" ? current === "project" : current !== "project";
+          return (
+            <Link key={k} href={href} className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-semibold ${on ? "border-brand-600 text-brand-700" : "border-transparent text-stone-500 hover:text-stone-800"}`}>{label}</Link>
+          );
+        })}
       </nav>
+      {current !== "project" && (
+        <nav className="mb-4 flex gap-1 overflow-x-auto">
+          {TABS.filter((s) => s !== "project").map((s) => (
+            <Link key={s} href={s === "pending" ? "/dev" : `/dev?tab=${s}`} className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium ${current === s ? "bg-brand-50 text-brand-700" : "text-stone-500 hover:bg-stone-100 hover:text-stone-800"}`}>
+              {d.sections[s]}{!["fields"].includes(s) && <span className="ml-1 text-xs font-normal text-stone-400">({count(s)})</span>}
+            </Link>
+          ))}
+        </nav>
+      )}
 
       {current === "project" ? (
         project ? <DevProject {...project} /> : null

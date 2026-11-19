@@ -827,6 +827,8 @@ export const fr = {
     sameTask: "Déjà dans cette tâche : vérifiez que ce point n'existe pas",
     title: "Dev — suivi du projet",
     intro: "Les objectifs de l'application, ce qui reste à faire (par toi ou côté développement), les idées et ce qui est réalisé. Tout est modifiable : ajoute, coche, corrige.",
+    commercial: "Développement commercial",
+    technical: "Développement technique",
     sections: { project: "Projet", pending: "En attente", objective: "Objectifs", constraint: "Contraintes", idea: "Idées", done: "Réalisé", rules: "Règles", fields: "Développement", automations: "Automatisations" },
     hints: { pending: "Ce qui reste à faire, par priorité. Coche ✓ quand c'est fait.", objective: "Ce que l'application doit permettre.", constraint: "Les règles à toujours respecter dans l'application.", idea: "Pistes pour plus tard.", done: "Points réalisés." },
     priority: "Priorité",
