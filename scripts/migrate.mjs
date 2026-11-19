@@ -668,6 +668,13 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'regulation_no
   await db.execute(sql`insert into app_settings (key, value) values ('regulation_notes_integrated_v1', '1') on conflict (key) do nothing`);
 }
 
+// Dev : point en attente « Lecture automatique des étiquettes », une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_pending_label_reading_v1'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_items`)).rows[0].p);
+  await db.execute(sql`insert into dev_items (kind, title, detail, owner, priority, task, position) values ('pending', ${"Lecture automatique des étiquettes produits"}, ${"À partir de la photo d'étiquette prise à l'étape 1, Claude lit le n° de lot, la DLC/DDM, le poids net et l'origine, et les pré-remplit à l'étape 3 (à vérifier par l'utilisateur). Coût estimé : 1 à 3 centimes par étiquette. Prérequis : clé ANTHROPIC_API_KEY active sur Vercel."}, ${"moi"}, ${"moyenne"}, ${"Lecture automatique (BL, étiquettes)"}, ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_pending_label_reading_v1', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
