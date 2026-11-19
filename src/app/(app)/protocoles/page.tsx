@@ -11,7 +11,7 @@ import { Icon } from "@/components/Icon";
 import { ProtocolEditor, ProtocolView } from "./ProtocolClient";
 import { ContainersTable } from "./ContainersTable";
 import { ProtocolNav } from "./ProtocolNav";
-import { ClaimProcedure, ConformityFlow, RECEPTION_TABS, ReceptionProcedure, RegulationProcedure, type ReceptionTab } from "./Procedures";
+import { ClaimProcedure, ConformityFlow, RECEPTION_TABS, ReceptionProcedure, RegulationProcedure, NotesSchema, type ReceptionTab } from "./Procedures";
 import { redirect } from "next/navigation";
 import { CategoryClassSelect, ThresholdsEditor } from "./ThresholdsEditor";
 import { backupSettings } from "@/lib/server/backup";
@@ -152,7 +152,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
             <article className="card p-5 sm:p-8">
               <RegulationProcedure retentionYears={RETENTION_YEARS} notes={regulationNotes ? (
                 <>
-                  <ProtocolView content={regulationNotes.content} />
+                  <NotesSchema html={regulationNotes.content} />
                   {editable && <Link href={`/protocoles?id=${regulationNotes.id}&edit=1`} className="btn-secondary no-print mt-4"><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</Link>}
                 </>
               ) : undefined} />

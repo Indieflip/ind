@@ -386,8 +386,12 @@ export function RegulationProcedure({ retentionYears, notes }: { retentionYears:
       </div>
       {notes && (
         <section className="mt-10">
-          <h2 className="mb-3 text-lg font-bold">Vos notes</h2>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5">{notes}</div>
+          <div className="mb-4 flex items-center gap-3">
+            <span className="h-px flex-1 bg-stone-200" />
+            <h2 className="text-lg font-bold">Les règles de l'établissement</h2>
+            <span className="h-px flex-1 bg-stone-200" />
+          </div>
+          {notes}
         </section>
       )}
       <p className="mt-6 text-xs text-stone-500">Repères indicatifs, à valider avec votre plan de maîtrise sanitaire et vos obligations comptables.</p>
@@ -469,5 +473,123 @@ function WeighSection({ editable, containers }: { editable: boolean; containers:
         <ContainersTable editable={editable} rows={containers} />
       </div>
     </section>
+  );
+}
+
+/* ---------------------------------------------------------------- Notes de l'équipe, schématisées ---------------------------------------------------------------- */
+
+const decode = (s: string) =>
+  s.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/\s+/g, " ").trim();
+
+type NoteBlock = { kind: "h" | "p" | "list" | "other"; text: string; items: string[]; bold: boolean };
+type NoteSection = { title: string; texts: string[]; items: string[] };
+
+/** Découpe le texte riche (HTML) en blocs de premier niveau : titres, paragraphes, listes */
+function noteBlocks(html: string): NoteBlock[] {
+  const out: NoteBlock[] = [];
+  const re = /<(h[1-6]|p|ul|ol|blockquote|table)\b[^>]*>([\s\S]*?)<\/\1>/gi;
+  for (const m of html.matchAll(re)) {
+    const tag = m[1].toLowerCase();
+    const inner = m[2];
+    if (tag === "ul" || tag === "ol") {
+      const items = [...inner.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)].map((x) => decode(x[1])).filter(Boolean);
+      if (items.length) out.push({ kind: "list", text: "", items, bold: false });
+    } else if (tag === "table") {
+      const rows = [...inner.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map((r) => [...r[1].matchAll(/<t[hd]\b[^>]*>([\s\S]*?)<\/t[hd]>/gi)].map((c) => decode(c[1])).filter(Boolean).join(" : ")).filter(Boolean);
+      if (rows.length) out.push({ kind: "list", text: "", items: rows, bold: false });
+    } else {
+      const text = decode(inner);
+      if (!text) continue;
+      const bold = /^\s*<(strong|b)\b[^>]*>[\s\S]*<\/\1>\s*$/i.test(inner);
+      out.push({ kind: tag.startsWith("h") ? "h" : tag === "p" ? "p" : "other", text, items: [], bold });
+    }
+  }
+  return out;
+}
+
+/** Regroupe les blocs en sections : un titre (ou une ligne en gras, ou une ligne qui finit par « : » suivie d'une liste) ouvre une section */
+function noteSections(html: string): { intro: string[]; sections: NoteSection[] } {
+  const blocks = noteBlocks(html);
+  const intro: string[] = [];
+  const sections: NoteSection[] = [];
+  blocks.forEach((b, i) => {
+    const next = blocks[i + 1];
+    const opens = b.kind === "h" || (b.kind === "p" && b.text.length <= 90 && (b.bold || (/:\s*$/.test(b.text) && next?.kind === "list")));
+    if (opens) sections.push({ title: b.text.replace(/\s*:\s*$/, ""), texts: [], items: [] });
+    else if (!sections.length) {
+      if (b.kind === "list") sections.push({ title: "", texts: [], items: b.items });
+      else intro.push(b.text);
+    } else if (b.kind === "list") sections[sections.length - 1].items.push(...b.items);
+    else sections[sections.length - 1].texts.push(b.text);
+  });
+  // Aucun titre : chaque paragraphe devient une carte (début de phrase en titre)
+  if (!sections.length && intro.length > 1) {
+    return {
+      intro: [],
+      sections: intro.map((x) => {
+        const m = x.match(/^(.{3,70}?)\s*[:.–—-]\s+(.+)$/);
+        return m ? { title: m[1], texts: [m[2]], items: [] } : { title: "", texts: [x], items: [] };
+      }),
+    };
+  }
+  return { intro, sections };
+}
+
+const NOTE_ICONS: [RegExp, string][] = [
+  [/temp[ée]rature|°c|froid|cha[iî]ne du froid|surgel|r[ée]frig/i, "thermo"],
+  [/refus|interdit|danger|allerg|non[- ]conform|risque/i, "alert"],
+  [/tra[cç]abilit|lot|[ée]tiquet|dlc|ddm/i, "list"],
+  [/hygi[eè]ne|propre|nettoy|lavage|tenue|d[ée]sinfect/i, "leaf"],
+  [/document|archiv|conserv|factur|\bbl\b|registre|fiche/i, "file"],
+  [/contr[ôo]le|ddpp|inspect|audit|v[ée]rif/i, "search"],
+  [/livr|camion|transport|fournisseur/i, "truck"],
+  [/stock|rangement|stock[ée]|r[ée]serve/i, "box"],
+  [/prix|€|co[uû]t|avoir/i, "euro"],
+];
+const NOTE_TONES = [
+  "bg-brand-50 text-brand-700",
+  "bg-sky-50 text-sky-700",
+  "bg-amber-50 text-amber-700",
+  "bg-violet-50 text-violet-700",
+  "bg-rose-50 text-rose-700",
+];
+
+/** Notes de l'équipe (Réglementation) présentées en schéma : une carte par partie, avec icône et points clés */
+export function NotesSchema({ html }: { html: string }) {
+  const { intro, sections } = noteSections(html);
+  if (!sections.length && !intro.length) return <p className="text-sm text-stone-500">Aucune note pour le moment.</p>;
+  return (
+    <div className="space-y-4">
+      {intro.length > 0 && (
+        <div className="rounded-xl border border-brand-100 bg-brand-50/60 p-4 text-sm text-brand-900">
+          {intro.map((x, i) => <p key={i} className={i ? "mt-2" : ""}>{x}</p>)}
+        </div>
+      )}
+      <div className="grid gap-4 md:grid-cols-2">
+        {sections.map((s, i) => {
+          const hay = `${s.title} ${s.texts.join(" ")} ${s.items.join(" ")}`;
+          const icon = NOTE_ICONS.find(([re]) => re.test(hay))?.[1] ?? "book";
+          return (
+            <article key={i} className="flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+              <div className="flex items-start gap-3 p-4">
+                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${NOTE_TONES[i % NOTE_TONES.length]}`}><Icon name={icon} className="h-5 w-5" /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Point {i + 1}</p>
+                  {s.title && <h3 className="font-semibold leading-snug">{s.title}</h3>}
+                  {s.texts.map((x, j) => <p key={j} className="mt-1 text-sm text-stone-600">{x}</p>)}
+                </div>
+              </div>
+              {s.items.length > 0 && (
+                <ul className="mt-auto space-y-1.5 border-t border-stone-100 bg-stone-50/70 px-4 py-3 text-sm text-stone-700">
+                  {s.items.map((x, j) => (
+                    <li key={j} className="flex gap-2"><Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />{x}</li>
+                  ))}
+                </ul>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </div>
   );
 }

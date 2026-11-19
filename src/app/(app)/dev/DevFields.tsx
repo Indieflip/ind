@@ -64,6 +64,11 @@ export function DevFields({ fields }: { fields: FieldRow[] }) {
 
   return (
     <div className="space-y-6">
+      <div className="space-y-2">
+        <Fold title={t.rules.claimFold} hint={`${t.rules.modesTitle} · ${t.rules.stagesTitle}`}><ClaimRules /></Fold>
+        <Fold title={t.rules.anomalyFold} hint={`${t.rules.typesTitle} · ${t.rules.savingsTitle}`}><AnomalyRules /></Fold>
+      </div>
+
       <section>
         <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
           <div>
@@ -97,11 +102,6 @@ export function DevFields({ fields }: { fields: FieldRow[] }) {
         )}
         <DataTable rows={list} cols={cols} rowKey={(r) => r.id} dense fixed defaultSort={{ key: "form", dir: "asc" }} empty={c.empty} />
       </section>
-
-      <div className="space-y-2">
-        <Fold title={t.rules.claimFold} hint={`${t.rules.modesTitle} · ${t.rules.stagesTitle}`}><ClaimRules /></Fold>
-        <Fold title={t.rules.anomalyFold} hint={`${t.rules.typesTitle} · ${t.rules.savingsTitle}`}><AnomalyRules /></Fold>
-      </div>
 
       <DevAutomations />
     </div>
