@@ -15,6 +15,7 @@ import { ensureSupplierProcesses } from "@/lib/server/followup";
 import { stageOf } from "@/lib/anomaly";
 import { SupplierAnomalies, SupplierInfo, SupplierReceptions, SupplierSearch, DeleteSupplier } from "../SupplierClient";
 import { AddRow, MercurialTable } from "../../MercurialClient";
+import { productUpdatedAt } from "@/lib/server/productUpdates";
 
 export default async function SupplierPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SP> }) {
   await ensureSupplierProcesses();
@@ -27,7 +28,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
   const supplier = Number.isInteger(id) ? await db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, id) }) : undefined;
   if (!supplier) notFound();
   const [products, cats, recents, unitRows, supplierAnomalies, allSuppliers, fvItems] = await Promise.all([
-    db.select().from(schema.products).where(eq(schema.products.supplierId, id)).orderBy(asc(schema.products.name)),
+    db.select({ p: schema.products, updated: productUpdatedAt }).from(schema.products).where(eq(schema.products.supplierId, id)).orderBy(asc(schema.products.name)).then((r) => r.map((x) => ({ ...x.p, updated: x.updated }))),
     db.select().from(schema.categories).orderBy(asc(schema.categories.position)),
     db
       .select({
@@ -55,7 +56,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
     const range = fv ? fvRange(fv.prices, month) : { min: num(p.priceMin), max: num(p.price) };
     return {
       id: p.id, supplierId: p.supplierId, supplier: supplier.name, nature: p.nature, name: p.name, unit: p.unit,
-      priceMin: range.min, price: range.max, priceLocked: fv ? fv.locked : p.priceLocked, active: p.active, fv: !!fv,
+      priceMin: range.min, price: range.max, priceLocked: fv ? fv.locked : p.priceLocked, active: p.active, fv: !!fv, updated: p.updated,
     };
   });
   const natures = [...new Set(rows.flatMap((r) => (r.nature ?? "").split(/,\s*/).filter(Boolean)))].sort((a, b) => a.localeCompare(b, "fr"));

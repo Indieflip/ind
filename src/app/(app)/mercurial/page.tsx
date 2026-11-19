@@ -8,6 +8,7 @@ import { fvRange, parisMonth } from "@/lib/pricing";
 import { PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { AddRow, MercurialTable, UnitsPanel } from "./MercurialClient";
+import { productUpdatedAt } from "@/lib/server/productUpdates";
 
 export default async function MercurialPage() {
   const user = await requireUser(can.viewMercurial);
@@ -17,7 +18,7 @@ export default async function MercurialPage() {
   const s = schema.suppliers;
   const [all, units, supplierRows, fvItems] = await Promise.all([
     db
-      .select({ id: p.id, supplierId: p.supplierId, supplier: s.name, nature: p.nature, name: p.name, unit: p.unit, priceMin: p.priceMin, price: p.price, priceLocked: p.priceLocked, active: p.active, fvItemId: p.fvItemId })
+      .select({ id: p.id, supplierId: p.supplierId, supplier: s.name, nature: p.nature, name: p.name, unit: p.unit, priceMin: p.priceMin, price: p.price, priceLocked: p.priceLocked, active: p.active, fvItemId: p.fvItemId, updated: productUpdatedAt })
       .from(p)
       .innerJoin(s, eq(s.id, p.supplierId))
       .orderBy(asc(s.name), asc(p.name)),

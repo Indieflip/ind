@@ -698,6 +698,14 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_project_v
   await db.execute(sql`insert into app_settings (key, value) values ('dev_project_v6', '1') on conflict (key) do nothing`);
 }
 
+// Dev : point en attente « Mise en conformité RGPD », une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_pending_rgpd_v1'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_items`)).rows[0].p);
+  const detail = "Données concernées : comptes utilisateurs, signatures (livreurs, réceptionnaires), contacts fournisseurs, photos de BL. À faire : 1) clause de sous-traitance RGPD (art. 28) dans l'accord avec le restaurant (je suis sous-traitant, le restaurant responsable du traitement) ; 2) ligne « Réception des marchandises et suivi des réclamations » au registre des traitements du restaurant ; 3) informer les salariés (note interne) et les livreurs (affichette au quai) ; 4) durées de conservation : fiches et signatures 5 ans, comptes supprimés au départ, sauvegardes limitées ; 5) vérifier les DPA de Vercel, Neon, Anthropic, Resend et choisir des régions en Europe (Neon Francfort, fonctions Vercel Paris / Francfort). Pas de DPO ni d'AIPD nécessaires. Pour la vente : CGU, politique de confidentialité, DPA client. Modèles gratuits sur le site de la CNIL.";
+  await db.execute(sql`insert into dev_items (kind, title, detail, owner, priority, task, position) values ('pending', ${"Mise en conformité RGPD"}, ${detail}, ${"moi"}, ${"moyenne"}, ${"RGPD"}, ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_pending_rgpd_v1', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
