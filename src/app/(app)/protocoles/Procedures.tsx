@@ -167,8 +167,6 @@ export function ReceptionProcedure({ containers, editable, tab, control }: { con
           ["Le livreur est parti", "Cocher « Livreur parti sans signer »."],
           ["Produit trop chaud, DLC dépassée, emballage abîmé", "Refus + motif + photo. Le livreur reprend le produit, on l'écrit sur le BL."],
           ["Produit manquant ou en trop", "Saisir la quantité réellement livrée : l'écart est réclamé automatiquement."],
-          ["Pas de réseau", "Terminer quand même : la réception part dès que le réseau revient."],
-          ["Je dois m'interrompre", "« Enregistrement brouillon » : le brouillon reste dans le tableau des réceptions."],
           ["Erreur vue après coup", "Corriger avant 23 h. Après, le bon est consolidé : prévenir le responsable."],
         ]}
       />

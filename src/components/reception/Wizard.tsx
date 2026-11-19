@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n/client";
 import type { Catalog, Draft, DraftLine } from "@/lib/reception-types";
 import { clearDraft, enqueue, fetchCatalog, loadCatalogCache, loadDraft, saveDraft, saveServerDraft, sendReception } from "@/lib/client/offline";
+import { Notice } from "@/components/Notice";
 import { Icon } from "../Icon";
 import { buildReservesText, docsOf, needsDlc, lineFromProduct, newDraft, toPayload, withAutoDecision } from "./helpers";
 import { StepDelivery } from "./StepDelivery";
@@ -318,6 +319,12 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
           ))}
         </div>
       </header>
+      {draft.step === 0 && !editId && (
+        <Notice id="wizard-tips" version="1" closeLabel={t.common.close} className="border-sky-200 bg-sky-50 text-sky-900">
+          <span><strong>{t.wizard.tipPauseTitle}</strong> {t.wizard.tipPause}</span>
+          <span><strong>{t.wizard.tipOfflineTitle}</strong> {t.wizard.tipOffline}</span>
+        </Notice>
+      )}
 
       <div className="space-y-4 p-4 pb-32">
         {draft.step === 0 && (
