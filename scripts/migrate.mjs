@@ -656,6 +656,18 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'procedures_v4
   await db.execute(sql`insert into app_settings (key, value) values ('procedures_v4', '1') on conflict (key) do nothing`);
 }
 
+// Conditions par catégorie de produits (Acceptée / écart signalé / Refus) supprimées, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'category_rules_cleared_v1'`)).rows.length) {
+  await db.execute(sql`update categories set conform_rules = null, reserve_rules = null, refuse_rules = null`);
+  await db.execute(sql`insert into app_settings (key, value) values ('category_rules_cleared_v1', '1') on conflict (key) do nothing`);
+}
+
+// Réglementation : les notes de l'équipe (DDPP, textes applicables, fiche minimale) sont intégrées à la page ; la note est retirée, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'regulation_notes_integrated_v1'`)).rows.length) {
+  await db.execute(sql`delete from protocols where title ~* '^\s*r[eé]glementations?\s*$' and content ilike '%DDPP%' and content ilike '%852/2004%'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('regulation_notes_integrated_v1', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
@@ -668,22 +680,6 @@ for (const s of sups) {
     await db.execute(sql`update products set supplier_id = ${main} where supplier_id = ${s.id} and fv_item_id is not null`);
     await db.execute(sql`update suppliers set active = false where id = ${s.id} and not exists (select 1 from products p where p.supplier_id = ${s.id} and p.active)`);
   }
-}
-
-// Conditions de conformité par catégorie (préremplies une seule fois, modifiables ensuite)
-const common = {
-  conform: "DLC de plus de 2 jours\nQuantité reçue = quantité du BL\nEmballage intact, étiquette lisible (n° de lot, DLC)\nAspect et odeur normaux",
-  reserve: "DLC courte (aujourd'hui, demain ou après-demain)\nQuantité reçue différente du BL (écart noté sur le BL)\nPrix hors tranche ou prix bloqué non respecté",
-  refuse: "DLC dépassée\nEmballage abîmé ou ouvert\nÉtiquette absente ou illisible\nOdeur ou aspect anormal\nProduit non commandé ou mauvaise référence",
-};
-const temps = (await db.execute(sql`select id, code, temp_required, conform_max, reserve_max from categories where conform_rules is null and reserve_rules is null and refuse_rules is null`)).rows;
-for (const c of temps) {
-  const t = c.temp_required && c.conform_max != null && c.reserve_max != null;
-  const f = (n) => String(n).replace(".", ",");
-  const conform = (t ? `Température à cœur ≤ ${f(c.conform_max)} °C\n` : "") + common.conform;
-  const reserve = (t ? `Température entre ${f(c.conform_max)} °C et ${f(c.reserve_max)} °C\n` : "") + common.reserve;
-  const refuse = (t ? `Température > ${f(c.reserve_max)} °C\n` : "") + (c.code === "frozen" ? "Produit décongelé ou recongelé (givre, cristaux)\n" : "") + common.refuse;
-  await db.execute(sql`update categories set conform_rules = ${conform}, reserve_rules = ${reserve}, refuse_rules = ${refuse} where id = ${c.id}`);
 }
 
 // Liste des prix bloqués fruits et légumes (fichier Appli.xlsx), appliquée une seule fois

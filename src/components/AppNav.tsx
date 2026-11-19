@@ -23,10 +23,10 @@ export function AppNav(props: {
 }) {
   const path = usePathname();
   const active = (href: string) => path === href || path.startsWith(href + "/");
-  // Nom du menu en cours dans l'onglet du navigateur (ex. « Réceptions · … »)
+  // Nom du menu en cours dans l'onglet du navigateur (ex. « Anomalies »)
   const current = props.items.filter((i) => active(i.href)).sort((a, b) => b.href.length - a.href.length)[0]?.label ?? (path.startsWith("/recherche") ? props.search.label : null);
   useEffect(() => {
-    const title = current ? `${current} · ${props.appName}` : props.appName;
+    const title = current ?? props.appName;
     document.title = title;
     const t = setTimeout(() => { document.title = title; }, 50); // après la mise à jour du <head> par Next
     return () => clearTimeout(t);

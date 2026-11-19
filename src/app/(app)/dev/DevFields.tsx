@@ -10,12 +10,12 @@ import { DevAutomations } from "./DevAutomations";
 import { AnomalyRules, ClaimRules } from "./DevRules";
 
 /** Menu à flèche : titre ; le contenu se déroule au clic */
-function Fold({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+function Fold({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <details className="group card overflow-hidden">
       <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-stone-50">
         <span className="text-stone-400 transition group-open:rotate-90">▸</span>
-        <span className="flex-1"><span className="font-semibold">{title}</span><span className="ml-2 text-xs text-stone-500">{hint}</span></span>
+        <span className="flex-1 font-semibold">{title}</span>
       </summary>
       <div className="border-t border-stone-200 bg-stone-50/60 p-4">{children}</div>
     </details>
@@ -65,8 +65,8 @@ export function DevFields({ fields }: { fields: FieldRow[] }) {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <Fold title={t.rules.claimFold} hint={`${t.rules.modesTitle} · ${t.rules.stagesTitle}`}><ClaimRules /></Fold>
-        <Fold title={t.rules.anomalyFold} hint={`${t.rules.typesTitle} · ${t.rules.savingsTitle}`}><AnomalyRules /></Fold>
+        <Fold title={t.rules.claimFold}><ClaimRules /></Fold>
+        <Fold title={t.rules.anomalyFold}><AnomalyRules /></Fold>
       </div>
 
       <section>

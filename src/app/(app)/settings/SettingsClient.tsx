@@ -1,7 +1,7 @@
 "use client";
 import { appConfirm, appAlert } from "@/components/Confirm";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { addUserAction, changePasswordAction, setCompanyFieldAction, updateConformityAction, deleteUserAction, updateUserProfileAction, saveBackupSettingsAction, saveRightsAction, setRestaurantAction, updateCategoryAction, updateUserAction } from "@/lib/actions/settings";
+import { addUserAction, changePasswordAction, setCompanyFieldAction, deleteUserAction, updateUserProfileAction, saveBackupSettingsAction, saveRightsAction, setRestaurantAction, updateCategoryAction, updateUserAction } from "@/lib/actions/settings";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/client";
@@ -248,36 +248,6 @@ export function BackupSettings({ initial, emailReady }: { initial: { email: stri
         {msg && <span className="text-sm text-stone-600">{msg}</span>}
       </div>
     </div>
-  );
-}
-
-/** Conditions Conforme / Réserve / Refus d'une catégorie (une condition par ligne, enregistré en quittant le champ) */
-export function ConformityRow({ c }: { c: { id: number; name: string; conformRules: string; reserveRules: string; refuseRules: string } }) {
-  const [, start] = useTransition();
-  const [saved, setSaved] = useState(false);
-  const area = (key: "conformRules" | "reserveRules" | "refuseRules", tint: string) => (
-    <td>
-      <textarea
-        className={`input min-h-32 text-xs leading-relaxed ${tint}`}
-        defaultValue={c[key]}
-        onBlur={(e) => {
-          if (e.target.value === c[key]) return;
-          start(async () => {
-            await updateConformityAction(c.id, { [key]: e.target.value });
-            setSaved(true);
-            setTimeout(() => setSaved(false), 1500);
-          });
-        }}
-      />
-    </td>
-  );
-  return (
-    <tr className="align-top">
-      <td className="font-medium">{c.name}{saved && <Icon name="check" className="ml-1 inline h-4 w-4 text-emerald-600" />}</td>
-      {area("conformRules", "bg-emerald-50/40")}
-      {area("reserveRules", "bg-amber-50/40")}
-      {area("refuseRules", "bg-red-50/40")}
-    </tr>
   );
 }
 

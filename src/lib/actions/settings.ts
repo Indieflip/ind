@@ -114,17 +114,6 @@ export async function changePasswordAction(id: number, current: string, next: st
   return { ok: true };
 }
 
-export async function updateConformityAction(id: number, data: { conformRules?: string; reserveRules?: string; refuseRules?: string }) {
-  await assertUser((r) => r === "admin");
-  const set: Partial<typeof schema.categories.$inferInsert> = {};
-  if (data.conformRules !== undefined) set.conformRules = data.conformRules.trim() || null;
-  if (data.reserveRules !== undefined) set.reserveRules = data.reserveRules.trim() || null;
-  if (data.refuseRules !== undefined) set.refuseRules = data.refuseRules.trim() || null;
-  await getDb().update(schema.categories).set(set).where(eq(schema.categories.id, id));
-
-  revalidatePath("/protocoles");
-}
-
 const COMPANY_KEYS = ["company_legal_name", "restaurant_name", "company_address", "company_phone", "company_email", "company_siren", "company_vat"] as const;
 
 /** Champs de l'onglet Company (raison sociale, établissement, adresse, téléphone, mail) */

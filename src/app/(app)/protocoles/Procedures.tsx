@@ -354,47 +354,123 @@ export function ConformityFlow() {
 /* ---------------------------------------------------------------- Réglementation ---------------------------------------------------------------- */
 
 export function RegulationProcedure({ retentionYears, notes }: { retentionYears: number; notes?: React.ReactNode }) {
-  const rules: { icon: string; tag: string; title: string; text: string; inApp: string }[] = [
-    { icon: "book", tag: "Règlement (CE) 852/2004", title: "Hygiène : le contrôle à réception", text: "Le contrôle des marchandises à réception fait partie du plan de maîtrise sanitaire (PMS) de l'établissement.", inApp: "Fiche de réception exportée chaque soir, contrôles guidés à chaque livraison." },
-    { icon: "thermo", tag: "Arrêté du 21 décembre 2009", title: "Températures de conservation", text: "Chaque denrée a une température maximale ; au-delà, le produit ne doit pas être accepté.", inApp: "Seuils et marges dans Procédures › Réception › Contrôler la livraison ; refus proposé automatiquement." },
-    { icon: "list", tag: "Règlement (CE) 178/2002", title: "Traçabilité", text: "Conserver pour chaque produit reçu : le fournisseur, le produit, le n° de lot, la DLC et la date de réception.", inApp: "Lot, DLC, photos d'étiquettes et de BL enregistrés avec chaque réception." },
-    { icon: "alert", tag: "Bonnes pratiques", title: "Refuser ce qui n'est pas conforme", text: "Produit hors température, DLC dépassée ou emballage abîmé : refusé, avec le motif noté sur le BL avant signature.", inApp: "Bouton Refus + motif + photo ; texte des réserves à recopier sur le BL." },
-    { icon: "file", tag: "Code de commerce, art. L123-22", title: "Conservation des documents", text: "Les BL et factures sont des pièces comptables : 10 ans.", inApp: `Fiches de réception conservées ${retentionYears || 5} ans ; sauvegardes et exports PDF / Excel.` },
-    { icon: "search", tag: "Contrôle sanitaire (DDPP)", title: "En cas de contrôle", text: "Présenter les fiches de réception, les relevés de températures, les lots et DLC, les refus et leurs motifs.", inApp: "Réceptions › Fiches de réception : export PDF / Excel immédiat." },
+  // Textes applicables à la réception en restauration : ce qu'ils imposent, et ce que fait l'application
+  const texts: { ref: string; icon: string; title: string; text: string; inApp: string }[] = [
+    { ref: "Règlement (CE) 178/2002, art. 18", icon: "list", title: "Traçabilité amont", text: "Identifier chaque fournisseur.", inApp: "Fournisseur, lot, DLC et photos du BL et de l'étiquette enregistrés à chaque réception." },
+    { ref: "Règlement (CE) 852/2004", icon: "book", title: "Plan HACCP et enregistrements", text: "Enregistrements conservés « une période appropriée », durée fixée par les guides de bonnes pratiques.", inApp: `Fiche de réception exportée chaque soir et conservée ${retentionYears || 5} ans.` },
+    { ref: "Arrêté du 21 décembre 2009", icon: "thermo", title: "Températures des produits d'origine animale", text: "+4 °C denrées très périssables, +8 °C périssables, +3 °C préparations à l'avance.", inApp: "Seuils et marges dans Réception › Contrôler la livraison ; Refus proposé automatiquement." },
+    { ref: "Arrêté du 8 octobre 2013", icon: "leaf", title: "Températures des autres denrées", text: "Produits hors origine animale.", inApp: "Classe de température réglée par catégorie de produits." },
+    { ref: "Règlement (CE) 37/2005", icon: "thermo", title: "Surgelés", text: "Températures en transport et en stockage ; relevés conservés au moins un an.", inApp: "T° du camion et T° produit relevées ; relevés conservés avec la fiche." },
+    { ref: "Note DGAL 2017-425", icon: "search", title: "Contrôles officiels", text: "Contrôle des températures des denrées réfrigérées à la livraison.", inApp: "Chaque relevé est daté, signé et exportable." },
+    { ref: "GBPH restaurateur, § 2.2", icon: "file", title: "Méthode du contrôle à réception", text: "Méthode recommandée et durées d'archivage.", inApp: "Procédure de réception guidée, étape par étape." },
+  ];
+  // Fiche conforme et minimale
+  const sheet: [string, string][] = [
+    ["Date et heure", "clock"], ["Fournisseur", "truck"], ["Produit", "box"], ["Température relevée", "thermo"], ["État de l'emballage", "box"],
+    ["DLC et lot (ou photo de l'étiquette)", "camera"], ["Décision : acceptée / refusée", "check"], ["Action corrective", "alert"], ["Nom de la personne qui contrôle", "edit"],
   ];
   return (
-    <div>
+    <div className="space-y-10">
       <Header
         title="Réglementation"
-        intro="Les règles qui encadrent la réception des marchandises, et comment l'application vous aide à les respecter."
+        intro="Les règles qui encadrent la réception des marchandises en restauration, et comment l'application vous aide à les respecter."
         meta={[["Pour qui", "responsables et économes"], ["Utile", "en cas de contrôle"]]}
       />
-      <div className="grid gap-4 md:grid-cols-2">
-        {rules.map((r) => (
-          <article key={r.title} className="flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-            <div className="flex items-start gap-3 p-4">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700"><Icon name={r.icon} className="h-5 w-5" /></span>
-              <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">{r.tag}</p>
-                <h3 className="font-semibold">{r.title}</h3>
-                <p className="mt-1 text-sm text-stone-600">{r.text}</p>
-              </div>
-            </div>
-            <p className="mt-auto border-t border-sky-100 bg-sky-50/60 px-4 py-2.5 text-xs text-sky-800"><span className="font-semibold">Dans l'application :</span> {r.inApp}</p>
-          </article>
-        ))}
-      </div>
-      {notes && (
-        <section className="mt-10">
-          <div className="mb-4 flex items-center gap-3">
-            <span className="h-px flex-1 bg-stone-200" />
-            <h2 className="text-lg font-bold">Les règles de l'établissement</h2>
-            <span className="h-px flex-1 bg-stone-200" />
+
+      {/* L'organisme de contrôle */}
+      <section className="flex flex-col gap-4 rounded-2xl bg-stone-900 p-5 text-white sm:flex-row sm:items-center sm:p-6">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10"><Icon name="search" className="h-6 w-6" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">L'organisme de contrôle</p>
+          <p className="text-xl font-bold">DDPP</p>
+          <p className="text-sm text-stone-300">Direction départementale de la protection des populations : service déconcentré de l'État, placé sous l'autorité du préfet de département.</p>
+        </div>
+        <div className="rounded-xl bg-white/10 px-4 py-3 text-sm sm:max-w-xs">
+          <p className="font-semibold">Papier ou numérique : les deux sont acceptés</p>
+          <p className="text-stone-300">Aucun texte n'impose de format, du moment que le contrôle est fait, enregistré et présentable à la DDPP.</p>
+        </div>
+      </section>
+
+      {/* Ce qu'est la réception */}
+      <section>
+        <h2 className="mb-1 text-lg font-bold">La réception, un moment clé</h2>
+        <p className="mb-4 text-sm text-stone-600">C'est l'étape où le restaurant accepte ou refuse la livraison.</p>
+        <div className="grid items-stretch gap-2 md:grid-cols-[1fr_auto_1.2fr_auto_1fr]">
+          <div className="rounded-xl border border-stone-200 bg-white p-4 text-center">
+            <Icon name="truck" className="mx-auto h-6 w-6 text-stone-500" />
+            <p className="mt-1 font-semibold">Fournisseur</p>
+            <p className="text-xs text-stone-500">responsable de la marchandise jusqu'à la livraison</p>
           </div>
-          {notes}
-        </section>
-      )}
-      <p className="mt-6 text-xs text-stone-500">Repères indicatifs, à valider avec votre plan de maîtrise sanitaire et vos obligations comptables.</p>
+          <span className="self-center text-center font-bold text-stone-300">→</span>
+          <div className="rounded-xl border-2 border-brand-600 bg-brand-50 p-4 text-center">
+            <Icon name="check" className="mx-auto h-6 w-6 text-brand-700" />
+            <p className="mt-1 font-semibold text-brand-800">Réception</p>
+            <p className="text-xs text-brand-900/80">contrôle, puis <strong>acceptée</strong> ou <strong>refusée</strong></p>
+          </div>
+          <span className="self-center text-center font-bold text-stone-300">→</span>
+          <div className="rounded-xl border border-stone-200 bg-white p-4 text-center">
+            <Icon name="home" className="mx-auto h-6 w-6 text-stone-500" />
+            <p className="mt-1 font-semibold">Restaurant</p>
+            <p className="text-xs text-stone-500">devient responsable ; la traçabilité interne commence</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Textes applicables */}
+      <section>
+        <h2 className="mb-1 text-lg font-bold">Les textes applicables à la réception</h2>
+        <p className="mb-4 text-sm text-stone-600">Ce que chaque texte impose, et ce que fait l'application.</p>
+        <ol className="relative space-y-3 border-l-2 border-stone-200 pl-6">
+          {texts.map((x) => (
+            <li key={x.ref} className="relative">
+              <span className="absolute -left-[2.35rem] top-3 flex h-7 w-7 items-center justify-center rounded-full bg-brand-600 text-white ring-4 ring-white"><Icon name={x.icon} className="h-3.5 w-3.5" /></span>
+              <article className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+                <div className="grid gap-x-4 p-4 sm:grid-cols-[13rem_1fr]">
+                  <p className="text-xs font-bold uppercase tracking-wide text-brand-700">{x.ref}</p>
+                  <div>
+                    <h3 className="font-semibold">{x.title}</h3>
+                    <p className="text-sm text-stone-600">{x.text}</p>
+                  </div>
+                </div>
+                <p className="border-t border-sky-100 bg-sky-50/60 px-4 py-2 text-xs text-sky-800"><span className="font-semibold">Dans l'application :</span> {x.inApp}</p>
+              </article>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* Fiche minimale */}
+      <section className="rounded-2xl border border-stone-200 bg-stone-50 p-5 sm:p-6">
+        <h2 className="mb-1 text-lg font-bold">Une fiche de réception conforme et minimale</h2>
+        <p className="mb-4 text-sm text-stone-600">Tout est relevé par l'application à chaque réception et repris dans la fiche exportée chaque soir.</p>
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {sheet.map(([k, icon]) => (
+            <li key={k} className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm font-medium">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><Icon name={icon} className="h-4 w-4" /></span>
+              {k}
+              <Icon name="check" className="ml-auto h-4 w-4 shrink-0 text-emerald-600" />
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 flex items-start gap-2 text-sm text-stone-600"><Icon name="file" className="mt-0.5 h-4 w-4 shrink-0 text-stone-400" />Il est d'usage de conserver aussi le bon de livraison annoté (photo du BL enregistrée avec la réception).</p>
+      </section>
+
+      {/* Conservation et contrôle */}
+      <section className="grid gap-4 md:grid-cols-2">
+        <article className="rounded-2xl border border-stone-200 bg-white p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Code de commerce, art. L123-22</p>
+          <h3 className="font-semibold">Conservation des documents</h3>
+          <p className="mt-1 text-sm text-stone-600">Les BL et factures sont des pièces comptables : 10 ans.</p>
+        </article>
+        <article className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-amber-700">En cas de contrôle DDPP</p>
+          <h3 className="font-semibold">Ce qu'on présente</h3>
+          <p className="mt-1 text-sm text-amber-900">Fiches de réception, relevés de températures, lots et DLC, refus et leurs motifs : Réceptions › Fiches de réception, export PDF / Excel immédiat.</p>
+        </article>
+      </section>
+
+      {notes}
+      <p className="text-xs text-stone-500">Repères indicatifs, à valider avec votre plan de maîtrise sanitaire et vos obligations comptables.</p>
     </div>
   );
 }
@@ -559,37 +635,40 @@ export function NotesSchema({ html }: { html: string }) {
   const { intro, sections } = noteSections(html);
   if (!sections.length && !intro.length) return <p className="text-sm text-stone-500">Aucune note pour le moment.</p>;
   return (
-    <div className="space-y-4">
+    <div className="overflow-hidden rounded-2xl border border-stone-200 bg-gradient-to-b from-stone-50 to-white">
       {intro.length > 0 && (
-        <div className="rounded-xl border border-brand-100 bg-brand-50/60 p-4 text-sm text-brand-900">
-          {intro.map((x, i) => <p key={i} className={i ? "mt-2" : ""}>{x}</p>)}
+        <div className="border-b border-stone-200 bg-white px-5 py-4 text-sm text-stone-700 sm:px-6">
+          {intro.map((x, i) => <p key={i} className={i ? "mt-2" : "font-medium"}>{x}</p>)}
         </div>
       )}
-      <div className="grid gap-4 md:grid-cols-2">
+      <ol className="space-y-0 p-4 sm:p-6">
         {sections.map((s, i) => {
           const hay = `${s.title} ${s.texts.join(" ")} ${s.items.join(" ")}`;
           const icon = NOTE_ICONS.find(([re]) => re.test(hay))?.[1] ?? "book";
+          const tone = NOTE_TONES[i % NOTE_TONES.length];
           return (
-            <article key={i} className="flex flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-              <div className="flex items-start gap-3 p-4">
-                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${NOTE_TONES[i % NOTE_TONES.length]}`}><Icon name={icon} className="h-5 w-5" /></span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">Point {i + 1}</p>
-                  {s.title && <h3 className="font-semibold leading-snug">{s.title}</h3>}
-                  {s.texts.map((x, j) => <p key={j} className="mt-1 text-sm text-stone-600">{x}</p>)}
-                </div>
+            <li key={i} className="flex gap-4">
+              <div className="flex flex-col items-center">
+                <span className={`z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ring-4 ring-white ${tone}`}><Icon name={icon} className="h-5 w-5" /></span>
+                {i < sections.length - 1 && <span className="w-px flex-1 bg-stone-200" />}
               </div>
-              {s.items.length > 0 && (
-                <ul className="mt-auto space-y-1.5 border-t border-stone-100 bg-stone-50/70 px-4 py-3 text-sm text-stone-700">
-                  {s.items.map((x, j) => (
-                    <li key={j} className="flex gap-2"><Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />{x}</li>
-                  ))}
-                </ul>
-              )}
-            </article>
+              <div className={`min-w-0 flex-1 ${i < sections.length - 1 ? "pb-6" : ""}`}>
+                {s.title && <h3 className="pt-2.5 text-base font-bold leading-snug">{s.title}</h3>}
+                {s.texts.map((x, j) => <p key={j} className={`text-sm text-stone-600 ${s.title || j ? "mt-1" : "pt-2.5"}`}>{x}</p>)}
+                {s.items.length > 0 && (
+                  <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {s.items.map((x, j) => (
+                      <li key={j} className="flex items-start gap-2 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 shadow-sm">
+                        <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />{x}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </li>
           );
         })}
-      </div>
+      </ol>
     </div>
   );
 }
