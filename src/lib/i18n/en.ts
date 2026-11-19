@@ -47,6 +47,7 @@ export const en: Dict = {
     optional: "optional",
   },
   nav: {
+    claims: "Claims",
     flow: "App overview",
     home: "Home",
     dev: "Dev",
@@ -829,6 +830,10 @@ export const en: Dict = {
     sameTask: "Already in this task: check this item does not exist yet",
     title: "Dev — project tracking",
     intro: "The app's goals, what is left to do (by you or on the development side), ideas and what is done. Everything can be edited: add, tick, fix.",
+    market: "Market",
+    flowIntro: "How a delivery flows: on the phone, automatically, at the office and every night. Updated with each change.",
+    marketStudy: "Market study",
+    noMarketStudy: "No market study: create a procedure named “Étude de marché” in Procedures.",
     commercial: "Business development",
     technical: "Technical development",
     sections: { project: "Project", pending: "Pending", objective: "Goals", constraint: "Constraints", idea: "Ideas", done: "Done", rules: "Rules", fields: "Development", automations: "Automations" },
@@ -871,6 +876,7 @@ export const en: Dict = {
     devHigh: "High-priority Dev items",
   },
   devProject: {
+    toc: "Contents",
     kpisTitle: "Key figures (live)",
     since: "Since",
     months: "months of use",

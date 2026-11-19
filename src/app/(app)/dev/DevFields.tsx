@@ -8,19 +8,8 @@ import { Icon } from "@/components/Icon";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { DevAutomations } from "./DevAutomations";
 import { AnomalyRules, ClaimRules } from "./DevRules";
+import { DevFold as Fold } from "./DevFold";
 
-/** Menu à flèche : titre ; le contenu se déroule au clic */
-function Fold({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <details className="group card overflow-hidden">
-      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-stone-50">
-        <span className="text-stone-400 transition group-open:rotate-90">▸</span>
-        <span className="flex-1 font-semibold">{title}</span>
-      </summary>
-      <div className="border-t border-stone-200 bg-stone-50/60 p-4">{children}</div>
-    </details>
-  );
-}
 
 export interface FieldRow { id: number; form: string; section: string; field: string; required: boolean; rule: string; message: string; position: number }
 

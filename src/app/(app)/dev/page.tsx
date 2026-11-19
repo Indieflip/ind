@@ -12,6 +12,7 @@ import { canSeeDev } from "@/lib/server/dev";
 import { PageHeader } from "@/components/ui";
 import { DevBoard } from "./DevClient";
 import { one, type SP } from "@/lib/server/queries";
+import { isMarketStudy } from "@/lib/protocols";
 
 /** Onglet Dev : objectifs de l'application, points en attente, idées, réalisé — tout est modifiable */
 export default async function DevPage({ searchParams }: { searchParams: Promise<SP> }) {
@@ -24,6 +25,8 @@ export default async function DevPage({ searchParams }: { searchParams: Promise<
   const tab = raw === "rules" ? "fields" : raw; // l'ancien onglet Règles est réparti dans Développement
   const fieldsTab = tab === "fields" ? await characteristics() : null;
   const project = tab === "project" ? await projectData(locale) : undefined;
+  // Développement commercial > Marché : la procédure « Étude de marché » (rédigée par l'équipe) s'affiche ici
+  const study = tab === "project" ? (await getDb().select({ id: schema.protocols.id, title: schema.protocols.title, content: schema.protocols.content }).from(schema.protocols)).find((p) => isMarketStudy(p.title)) ?? null : undefined;
   return (
     <>
       <PageHeader title={t.dev.title} />
@@ -33,6 +36,7 @@ export default async function DevPage({ searchParams }: { searchParams: Promise<
         tab={tab}
         fields={fieldsTab?.fields}
         project={project}
+        study={study}
         items={items.map((i) => ({ id: i.id, kind: i.kind, title: i.title, detail: i.detail ?? "", owner: i.owner ?? "", priority: i.priority ?? "", task: i.task ?? "", updated: fmtDateTime(i.updatedAt, locale), updatedSort: i.updatedAt.toISOString() }))}
       />
     </>

@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { saveProjectDocAction, saveProjectRoiAction } from "@/lib/actions/dev";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtMoney } from "@/lib/format";
@@ -29,13 +29,18 @@ export function DevProject({ doc, kpis, roi }: { doc: string; kpis: ProjectKpis;
   const gains = savingsPerMonth + timePerMonth;
   const result = gains - r.monthlyCost;
 
-  const kpi = (label: string, value: string, hint?: string) => (
-    <div className="card p-3">
-      <div className="text-xs font-medium uppercase tracking-wide text-stone-500">{label}</div>
-      <div className="mt-0.5 text-xl font-bold tabular-nums">{value}</div>
+  const kpi = (label: string, value: string, hint?: string, accent = false) => (
+    <div className={`rounded-xl border p-3 ${accent ? "border-brand-200 bg-brand-50" : "border-stone-200 bg-white"}`}>
+      <div className="text-[11px] font-bold uppercase tracking-wider text-stone-500">{label}</div>
+      <div className={`mt-0.5 text-xl font-bold tabular-nums ${accent ? "text-brand-800" : ""}`}>{value}</div>
       {hint && <div className="text-xs text-stone-500">{hint}</div>}
     </div>
   );
+  // Sommaire du document : titres de niveau 2 ; un clic fait défiler jusqu'au titre
+  const docRef = useRef<HTMLDivElement>(null);
+  const toc = useMemo(() => [...doc.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)].map((m) => m[1].replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").trim()).filter(Boolean), [doc]);
+  const title = doc.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1].replace(/<[^>]+>/g, "").trim();
+  const goTo = (i: number) => docRef.current?.querySelectorAll("h2")[i]?.scrollIntoView({ behavior: "smooth", block: "start" });
   const field = (k: keyof Roi, label: string, suffix: string) => (
     <label className="block">
       <span className="label">{label}</span>
@@ -48,11 +53,21 @@ export function DevProject({ doc, kpis, roi }: { doc: string; kpis: ProjectKpis;
 
   return (
     <div className="space-y-6">
+      {/* En-tête : titre du projet et résultat du mois */}
+      <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-stone-900 to-stone-800 p-5 text-white sm:p-6">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">{p.kpisTitle}</p>
+        <h2 className="mt-1 text-2xl font-bold tracking-tight">{title ?? p.docTitle}</h2>
+        <p className="mt-1 text-sm text-stone-300">{kpis.since ? `${p.since} ${kpis.since} · ${kpis.months} ${p.months}` : p.noData}</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl bg-white/10 p-3"><p className="text-xs text-stone-300">{p.obtained}</p><p className="text-2xl font-bold tabular-nums">{money(kpis.obtained)}</p></div>
+          <div className="rounded-xl bg-white/10 p-3"><p className="text-xs text-stone-300">{p.gainsMonth}</p><p className="text-2xl font-bold tabular-nums">{money(gains)}</p></div>
+          <div className={`rounded-xl p-3 ${result >= 0 ? "bg-emerald-500/20" : "bg-red-500/20"}`}><p className="text-xs text-stone-300">{p.resultMonth}</p><p className={`text-2xl font-bold tabular-nums ${result >= 0 ? "text-emerald-300" : "text-red-300"}`}>{money(result)}</p></div>
+        </div>
+      </section>
+
       <section>
-        <h2 className="font-semibold">{p.kpisTitle}</h2>
-        <p className="mb-2 text-xs text-stone-500">{kpis.since ? `${p.since} ${kpis.since} · ${kpis.months} ${p.months}` : p.noData}</p>
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-6">
-          {kpi(p.obtained, money(kpis.obtained), `${money(savingsPerMonth)} / ${p.month}`)}
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+          {kpi(p.obtained, money(kpis.obtained), `${money(savingsPerMonth)} / ${p.month}`, true)}
           {kpi(p.pending, money(kpis.pending))}
           {kpi(p.rate, kpis.rate == null ? "—" : `${Math.round(kpis.rate * 100)} %`)}
           {kpi(p.receptions, String(kpis.receptions), `${kpis.lines} ${p.lines}`)}
@@ -102,7 +117,21 @@ export function DevProject({ doc, kpis, roi }: { doc: string; kpis: ProjectKpis;
             <button type="button" className="btn-secondary py-1.5" onClick={() => setEditing(true)}><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</button>
           )}
         </div>
-        {editing ? <RichEditor value={html} onChange={setHtml} /> : <div className="card p-5 sm:p-6"><RichView html={doc} /></div>}
+        {editing ? (
+          <RichEditor value={html} onChange={setHtml} />
+        ) : (
+          <div className="grid gap-4 lg:grid-cols-[14rem_1fr]">
+            {toc.length > 0 && (
+              <nav className="h-fit rounded-2xl border border-stone-200 bg-white p-2 lg:sticky lg:top-4">
+                <p className="px-2 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wider text-stone-400">{p.toc}</p>
+                {toc.map((x, i) => (
+                  <button key={i} type="button" onClick={() => goTo(i)} className="block w-full truncate rounded-lg px-2 py-1.5 text-left text-sm text-stone-700 hover:bg-stone-100">{x}</button>
+                ))}
+              </nav>
+            )}
+            <div ref={docRef} className="card p-5 sm:p-8 [&_h2]:scroll-mt-4"><RichView html={doc} /></div>
+          </div>
+        )}
       </section>
     </div>
   );

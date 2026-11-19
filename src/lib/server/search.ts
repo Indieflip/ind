@@ -1,4 +1,5 @@
 import "server-only";
+import { isMarketStudy } from "@/lib/protocols";
 import { and, desc, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { getDb, schema } from "@/db";
@@ -41,5 +42,5 @@ export async function globalSearch(q: string) {
     db.select({ id: c.id, date: c.date, supplierName: c.supplierName, subject: c.subject, status: c.status, reference: c.reference })
       .from(c).where(where([c.supplierName, c.reference, c.product, c.subject, c.notes], words)).orderBy(desc(c.date)).limit(30),
   ]);
-  return { receptions, anomalies, gaps, products, suppliers, maj, protocols, claims };
+  return { receptions, anomalies, gaps, products, suppliers, maj, protocols: protocols.filter((x) => !isMarketStudy(x.title)), claims };
 }

@@ -60,7 +60,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
     <div className="space-y-4">
       <div className="no-print flex flex-wrap items-center justify-between gap-2">
         <Link href="/anomalies" className="btn-ghost -ml-2 px-2"><Icon name="chevronLeft" className="h-4 w-4" /> {t.anomalies.title}</Link>
-        <Link href="/anomalies/reclamations" className="btn-secondary"><Icon name="alert" className="h-4 w-4" /> {t.claims.title}</Link>
+        <Link href="/reclamations" className="btn-secondary"><Icon name="alert" className="h-4 w-4" /> {t.claims.title}</Link>
       </div>
 
       <section className="card overflow-hidden">

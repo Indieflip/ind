@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Icon } from "./Icon";
 import { GlobalSearch } from "./GlobalSearch";
-import { AppFlowButton } from "./AppFlow";
 import { LocaleSwitch } from "./LocaleSwitch";
 import { logoutAction } from "@/lib/actions/auth";
 
@@ -15,7 +14,7 @@ export function AppNav(props: {
   userName: string;
   roleLabel: string;
   logoutLabel: string;
-  flowLabel: string;
+  dev: { href: string; label: string } | null;
   restaurant: string;
   appName: string;
   moreLabel: string;
@@ -24,7 +23,7 @@ export function AppNav(props: {
   const path = usePathname();
   const active = (href: string) => path === href || path.startsWith(href + "/");
   // Nom du menu en cours dans l'onglet du navigateur (ex. « Anomalies »)
-  const current = props.items.filter((i) => active(i.href)).sort((a, b) => b.href.length - a.href.length)[0]?.label ?? (path.startsWith("/recherche") ? props.search.label : null);
+  const current = props.items.filter((i) => active(i.href)).sort((a, b) => b.href.length - a.href.length)[0]?.label ?? (props.dev && active(props.dev.href) ? props.dev.label : path.startsWith("/recherche") ? props.search.label : null);
   useEffect(() => {
     const title = current ?? props.appName;
     document.title = title;
@@ -55,7 +54,13 @@ export function AppNav(props: {
               {!!i.badge && <span className="ml-auto rounded-full bg-red-600 px-1.5 text-[11px] font-bold text-white">{i.badge}</span>}
             </Link>
           ))}
-          <div className="border-t border-stone-100 pt-1"><AppFlowButton label={props.flowLabel} /></div>
+          {props.dev && (
+            <div className="border-t border-stone-100 pt-1">
+              <Link href={props.dev.href} className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${active(props.dev.href) ? "bg-violet-50 text-violet-700" : "text-stone-700 hover:bg-stone-100"}`}>
+                <Icon name="sparkle" /> {props.dev.label}
+              </Link>
+            </div>
+          )}
         </nav>
         <div className="border-t border-stone-200 p-4">
           <div className="text-sm font-semibold">{props.userName}</div>
@@ -81,7 +86,7 @@ export function AppNav(props: {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <AppFlowButton label={props.flowLabel} compact />
+          {props.dev && <Link href={props.dev.href} className="btn-ghost p-2" aria-label={props.dev.label} title={props.dev.label}><Icon name="sparkle" className="h-4 w-4" /></Link>}
           <LocaleSwitch />
           <form action={logoutAction}>
             <button className="btn-ghost p-2" aria-label={props.logoutLabel}><Icon name="logout" className="h-4 w-4" /></button>

@@ -44,7 +44,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         can.viewAnomalies(r) && res.claims.length > 0 && (
           <Section key="claims" title={t.claims.title} count={res.claims.length}>
             {res.claims.map((x) => (
-              <Item key={x.id} href="/anomalies/reclamations" title={`${t.claims.number} ${x.id} · ${x.supplierName ?? ""}`} meta={`${fmtDate(x.date, locale)}${x.reference ? ` · ${x.reference}` : ""} · ${t.claims.statuses[x.status as "en_cours"] ?? x.status} — ${x.subject}`} />
+              <Item key={x.id} href="/reclamations" title={`${t.claims.number} ${x.id} · ${x.supplierName ?? ""}`} meta={`${fmtDate(x.date, locale)}${x.reference ? ` · ${x.reference}` : ""} · ${t.claims.statuses[x.status as "en_cours"] ?? x.status} — ${x.subject}`} />
             ))}
           </Section>
         ),

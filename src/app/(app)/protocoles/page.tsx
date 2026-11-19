@@ -17,6 +17,7 @@ import { CategoryClassSelect, ThresholdsEditor } from "./ThresholdsEditor";
 import { backupSettings } from "@/lib/server/backup";
 import { RETENTION_YEARS } from "@/lib/server/sheets";
 import { normalize } from "@/lib/search";
+import { isMarketStudy } from "@/lib/protocols";
 import { num } from "@/lib/format";
 
 export default async function ProtocolsPage({ searchParams }: { searchParams: Promise<SP> }) {
@@ -47,7 +48,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   // Un protocole « Réglementation(s) » rédigé à la main s'affiche dans la procédure Réglementation (« Vos notes »)
   const isRegulation = (title: string) => /^r[eé]glementations?$/i.test(title.trim());
   const regulationNotes = list.find((x) => isRegulation(x.title));
-  const ownList = list.filter((x) => !isRegulation(x.title));
+  const ownList = list.filter((x) => !isRegulation(x.title) && !isMarketStudy(x.title));
   const creating = one(sp.new) === "1" && editable;
   const editing = one(sp.edit) === "1" && editable;
   // ?titre=… : ouvre un protocole par son titre (liens « Procédure » des pages Réceptions et Anomalies)

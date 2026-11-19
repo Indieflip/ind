@@ -675,6 +675,16 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_pending_l
   await db.execute(sql`insert into app_settings (key, value) values ('dev_pending_label_reading_v1', '1') on conflict (key) do nothing`);
 }
 
+// Dev > Projet : document réécrit (plus court, tableaux) ; l'ancienne version est gardée dans dev_project_doc_backup_v5, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_project_v5'`)).rows.length) {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../src/app/(app)/dev/projectTemplate.ts", import.meta.url), "utf8");
+  const doc = src.slice(src.indexOf("`") + 1, src.lastIndexOf("`")).trim();
+  await db.execute(sql`insert into app_settings (key, value) select 'dev_project_doc_backup_v5', value from app_settings where key = 'dev_project_doc' on conflict (key) do nothing`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_project_doc', ${doc}) on conflict (key) do update set value = excluded.value`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_project_v5', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

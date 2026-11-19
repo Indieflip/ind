@@ -1,10 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
 import { Icon } from "./Icon";
 
 /**
- * Schéma des étapes de l'application (bouton du menu + fenêtre).
+ * Schéma des étapes de l'application (Dev > Développement commercial > Marché).
  * Mis à jour à chaque évolution de l'application, comme Dev > Développement (voir CLAUDE.md).
  */
 const PHONE_STEPS: { title: string; items: string[]; gate?: string; auto?: string }[] = [
@@ -151,44 +149,5 @@ export function AppFlowContent() {
         </div>
       </Section>
     </div>
-  );
-}
-
-/** Bouton du menu + fenêtre du schéma */
-export function AppFlowButton({ label, compact = false }: { label: string; compact?: boolean }) {
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
-  }, [open]);
-  return (
-    <>
-      {compact ? (
-        <button type="button" className="btn-ghost p-2" aria-label={label} title={label} onClick={() => setOpen(true)}><Icon name="layers" className="h-4 w-4" /></button>
-      ) : (
-        <button type="button" onClick={() => setOpen(true)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-stone-700 hover:bg-stone-100">
-          <Icon name="layers" /> {label}
-        </button>
-      )}
-      {open && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/40 p-3 sm:p-6" onClick={() => setOpen(false)} role="dialog" aria-modal="true" aria-label={label}>
-          <div className="relative my-auto w-full max-w-6xl rounded-2xl bg-stone-50 p-5 shadow-xl sm:p-7" style={{ marginTop: "max(0px, env(safe-area-inset-top))" }} onClick={(e) => e.stopPropagation()}>
-            <div className="mb-5 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-2xl font-bold">Le parcours d'une livraison</h2>
-                <p className="text-sm text-stone-600">Du camion jusqu'à l'avoir encaissé : ce qui se fait sur le téléphone, automatiquement, au bureau et chaque soir.</p>
-                <p className="mt-1 text-xs font-medium text-brand-700">Mise à jour automatiquement</p>
-              </div>
-              <button type="button" className="btn-ghost p-2" aria-label="Fermer" onClick={() => setOpen(false)}><Icon name="x" className="h-5 w-5" /></button>
-            </div>
-            <AppFlowContent />
-          </div>
-        </div>,
-        document.body,
-      )}
-    </>
   );
 }

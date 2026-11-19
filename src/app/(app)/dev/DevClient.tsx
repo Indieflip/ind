@@ -9,6 +9,9 @@ import { Icon } from "@/components/Icon";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { DevProject, type ProjectKpis, type Roi } from "./DevProject";
 import { DevFields, type FieldRow } from "./DevFields";
+import { DevFold } from "./DevFold";
+import { AppFlowContent } from "@/components/AppFlow";
+import { RichView } from "../protocoles/RichEditor";
 
 interface Item { id: number; kind: string; title: string; detail: string; owner: string; priority: string; task: string; updated: string; updatedSort: string }
 const TABS = ["project", "pending", "constraint", "idea", "done", "fields"] as const;
@@ -16,7 +19,7 @@ const prioStyle: Record<string, string> = { haute: "bg-red-100 text-red-800", mo
 const prioRank: Record<string, number> = { haute: 0, moyenne: 1, basse: 2, "": 3 };
 
 /** Onglet Dev : sous-onglets (en attente, objectifs, contraintes, idées, réalisé, règles) ; tout est modifiable */
-export function DevBoard({ items, reserved, tab, fields = [], project }: { items: Item[]; reserved: boolean; tab: string; fields?: FieldRow[]; project?: { doc: string; kpis: ProjectKpis; roi: Roi } }) {
+export function DevBoard({ items, reserved, tab, fields = [], project, study }: { study?: { id: number; title: string; content: string } | null; items: Item[]; reserved: boolean; tab: string; fields?: FieldRow[]; project?: { doc: string; kpis: ProjectKpis; roi: Roi } }) {
   const { t } = useI18n();
   const d = t.dev;
   const router = useRouter();
@@ -123,7 +126,26 @@ export function DevBoard({ items, reserved, tab, fields = [], project }: { items
       )}
 
       {current === "project" ? (
-        project ? <DevProject {...project} /> : null
+        <div className="space-y-6">
+          {/* Menu « Marché » : schéma de l'application et étude de marché */}
+          <DevFold title={d.market}>
+            <div className="space-y-8">
+              <section>
+                <h3 className="mb-1 text-lg font-bold">{t.nav.flow}</h3>
+                <p className="mb-4 text-sm text-stone-600">{d.flowIntro}</p>
+                <AppFlowContent />
+              </section>
+              <section>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-lg font-bold">{study?.title ?? d.marketStudy}</h3>
+                  {study && <Link href={`/protocoles?id=${study.id}&edit=1`} className="btn-secondary py-1.5 text-sm"><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</Link>}
+                </div>
+                {study ? <div className="card p-5 sm:p-6"><RichView html={study.content} /></div> : <p className="text-sm text-stone-500">{d.noMarketStudy}</p>}
+              </section>
+            </div>
+          </DevFold>
+          {project ? <DevProject {...project} /> : null}
+        </div>
       ) : current === "fields" ? (
         <DevFields fields={fields} />
       ) : (

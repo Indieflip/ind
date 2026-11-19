@@ -120,7 +120,7 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
           <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{e.rate}</p>
           <p className="mt-1 text-2xl font-bold tabular-nums">{s.rate == null ? "—" : `${Math.round(s.rate * 100)} %`}</p>
           <p className="mt-0.5 text-xs opacity-80">{e.rateHint}</p>
-          {s.pending.withoutAmount + s.toProcess.count > 0 && <Link href="/anomalies/reclamations?f=sans-montant" className="mt-1 block text-[11px] font-semibold text-red-700 underline">{e.fillMissing}</Link>}
+          {s.pending.withoutAmount + s.toProcess.count > 0 && <Link href="/reclamations?f=sans-montant" className="mt-1 block text-[11px] font-semibold text-red-700 underline">{e.fillMissing}</Link>}
         </div>
       </div>
 

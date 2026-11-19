@@ -45,6 +45,7 @@ export const fr = {
     optional: "facultatif",
   },
   nav: {
+    claims: "Réclamations",
     flow: "Schéma de l'application",
     home: "Accueil",
     dev: "Dev",
@@ -831,6 +832,10 @@ export const fr = {
     sameTask: "Déjà dans cette tâche : vérifiez que ce point n'existe pas",
     title: "Dev — suivi du projet",
     intro: "Les objectifs de l'application, ce qui reste à faire (par toi ou côté développement), les idées et ce qui est réalisé. Tout est modifiable : ajoute, coche, corrige.",
+    market: "Marché",
+    flowIntro: "Le parcours d'une livraison : ce qui se fait sur le téléphone, automatiquement, au bureau et chaque soir. Mis à jour à chaque évolution.",
+    marketStudy: "Étude de marché",
+    noMarketStudy: "Aucune étude de marché : créez une procédure nommée « Étude de marché » dans Procédures.",
     commercial: "Développement commercial",
     technical: "Développement technique",
     sections: { project: "Projet", pending: "En attente", objective: "Objectifs", constraint: "Contraintes", idea: "Idées", done: "Réalisé", rules: "Règles", fields: "Développement", automations: "Automatisations" },
@@ -873,6 +878,7 @@ export const fr = {
     devHigh: "Points Dev en priorité haute",
   },
   devProject: {
+    toc: "Sommaire",
     kpisTitle: "Chiffres clés (calculés en direct)",
     since: "Depuis le",
     months: "mois d'utilisation",
