@@ -21,11 +21,18 @@ export default async function MercurialUpdatesPage() {
     .leftJoin(schema.suppliers, eq(schema.suppliers.id, m.supplierId))
     .leftJoin(schema.products, eq(schema.products.id, m.productId))
     .orderBy(asc(m.position));
+  const products = await getDb()
+    .select({ id: schema.products.id, name: schema.products.name, supplierId: schema.products.supplierId, supplier: schema.suppliers.name })
+    .from(schema.products)
+    .innerJoin(schema.suppliers, eq(schema.suppliers.id, schema.products.supplierId))
+    .where(eq(schema.products.active, true))
+    .orderBy(asc(schema.products.name));
   return (
     <MajLog
+      products={products}
       rows={rows.map(({ r, supplier, product }) => ({
         id: r.id, date: r.date, nature: r.nature, item: product ?? r.item, original: product && product !== r.item ? r.item : null,
-        detail: r.detail, supplier: supplier ?? null, supplierId: r.supplierId, reference: r.reference, claim: r.claim,
+        detail: r.detail, supplier: supplier ?? null, supplierId: r.supplierId, productId: r.productId, reference: r.reference, claim: r.claim,
         priceHref: price.has(r.id) ? `/reporting/prix?${new URLSearchParams({ from: day(price.get(r.id)!.date), to: day(price.get(r.id)!.date), ...(price.get(r.id)!.supplierId ? { supplier: String(price.get(r.id)!.supplierId) } : {}) })}` : null,
       }))}
       editable={can.editPrices(user.role)}

@@ -165,14 +165,12 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
   const money = (n: number | null) => (n != null ? fmtMoney(n, locale) : "");
   const cols: ColumnDef<Row>[] = useMemo(
     () => [
-      { key: "id", text: (r) => String(r.id), sort: (r) => r.id },
       { key: "supplier", text: (r) => r.supplier, options: suppliers.map((s) => s.name) },
       { key: "nature", text: (r) => r.nature ?? "", options: natures },
       { key: "name", text: (r) => r.name },
       { key: "unit", text: (r) => r.unit, options: [...new Set([...units, ...rows.map((r) => r.unit).filter(Boolean)])].sort((a, b) => a.localeCompare(b, "fr")) },
       { key: "priceMin", text: (r) => money(r.priceMin), sort: (r) => r.priceMin },
       { key: "price", text: (r) => money(r.price), sort: (r) => r.price },
-      { key: "updated", text: (r) => (r.updated ? fmtDate(r.updated, locale) : ""), sort: (r) => r.updated ?? "" },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [suppliers, natures, units, locale, rows],
@@ -198,7 +196,7 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
         <div className="max-h-[75vh] overflow-y-auto">
           <table className="table">
             <colgroup>
-              <col className="w-[4.5rem]" /><col className="w-[14%]" /><col className="w-[11%]" /><col /><col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[8%]" /><col className="w-[9%]" />
+              <col className="w-[15%]" /><col className="w-[12%]" /><col /><col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[9%]" />
             </colgroup>
             <thead className="sticky top-0 z-10">
               <tr>
@@ -242,17 +240,15 @@ function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; supp
   if (!edit) {
     return (
       <tr className={r.active ? "" : "opacity-50"}>
-        <td className="text-right text-xs tabular-nums text-stone-400">{r.id}</td>
         <td className="text-stone-600"><Link href={`/mercurial/fournisseurs/${r.supplierId}`} className="hover:text-brand-700 hover:underline">{sentence(r.supplier)}</Link></td>
         <td className="text-stone-600">{r.fv ? <span className="badge bg-lime-100 text-lime-800">{r.nature ?? m.fvTag}</span> : r.nature ?? ""}</td>
         <td className="font-medium">
-          {r.name}
+          <Link href={`/mercurial/produits/${r.id}`} className="hover:text-brand-700 hover:underline" title={m.productAccount}>{r.name}</Link>
           {r.priceLocked && <span className="ml-1.5 badge bg-sky-100 text-sky-800" title={m.lockedHint}>🔒 {m.locked}</span>}
         </td>
         <td>{r.unit}</td>
         <td className="whitespace-nowrap text-right tabular-nums">{r.priceMin != null ? fmtMoney(r.priceMin, locale) : ""}</td>
         <td className="whitespace-nowrap text-right tabular-nums">{r.price != null ? fmtMoney(r.price, locale) : ""}</td>
-        <td className="whitespace-nowrap"><Link href={`/mercurial/produits/${r.id}`} className="inline-flex items-center gap-1 text-brand-700 hover:underline" title={m.productAccount}>{r.updated ? fmtDate(r.updated, locale) : m.productAccount} <Icon name="chevronRight" className="h-3.5 w-3.5" /></Link></td>
         <td className="text-right">
           {editable && !r.fv && <button className="btn-ghost px-1.5 py-1 text-xs" onClick={() => setEdit(true)} title={t.common.edit}><Icon name="edit" className="h-3.5 w-3.5" /> <span className="hidden xl:inline">{t.common.edit}</span></button>}
           {editable && r.fv && <Link href="/mercurial/fruits-legumes" className="btn-ghost px-1.5 py-1 text-xs" title={m.fvEdit}><Icon name="leaf" className="h-3.5 w-3.5" /> <span className="hidden xl:inline">{t.common.edit}</span></Link>}
@@ -262,7 +258,6 @@ function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; supp
   }
   return (
     <tr className="bg-brand-50/40 align-top">
-      <td className="text-right text-xs tabular-nums text-stone-400">{r.id}</td>
       <td>
         <select className="input py-1.5" defaultValue={r.supplierId} onChange={(e) => save({ supplierId: Number(e.target.value) })}>
           {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -278,7 +273,6 @@ function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; supp
       <td><UnitSelect className="input py-1.5" value={unit} units={units} onChange={(u) => { setUnit(u); save({ unit: u }); }} /></td>
       <td><MoneyInput className="input py-1.5 text-right" defaultValue={str(r.priceMin)} onBlur={(e) => e.target.value !== str(r.priceMin) && save({ priceMin: e.target.value })} /></td>
       <td><MoneyInput className="input py-1.5 text-right" defaultValue={str(r.price)} onBlur={(e) => e.target.value !== str(r.price) && save({ price: e.target.value })} /></td>
-      <td className="text-xs text-stone-500">{r.updated ? fmtDate(r.updated, locale) : ""}</td>
       <td className="text-right">
         <button
           type="button"

@@ -13,3 +13,17 @@ export async function updateMajClaimAction(id: number, claim: string) {
   revalidatePath("/reporting/prix");
   revalidatePath("/reporting");
 }
+
+/** Historique complet : rattacher une ligne sans correspondance à un produit du Mercurial (null pour la détacher) */
+export async function linkMajProductAction(id: number, productId: number | null) {
+  await assertUser(can.editPrices);
+  const db = getDb();
+  const product = productId ? await db.query.products.findFirst({ where: eq(schema.products.id, productId) }) : undefined;
+  if (productId && !product) return { ok: false };
+  await db.update(schema.majLog).set({ productId: product?.id ?? null, ...(product ? { supplierId: product.supplierId } : {}) }).where(eq(schema.majLog.id, id));
+  // La variation de prix générée par cette ligne suit le même produit
+  if (product) await db.update(schema.priceChanges).set({ productId: product.id, productName: product.name, supplierId: product.supplierId }).where(eq(schema.priceChanges.majId, id));
+  revalidatePath("/mercurial/mise-a-jour");
+  revalidatePath("/mercurial");
+  return { ok: true };
+}
