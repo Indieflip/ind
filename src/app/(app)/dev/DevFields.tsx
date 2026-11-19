@@ -7,14 +7,27 @@ import { appConfirm } from "@/components/Confirm";
 import { Icon } from "@/components/Icon";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { DevAutomations } from "./DevAutomations";
+import { AnomalyRules, ClaimRules } from "./DevRules";
+
+/** Menu à flèche : titre ; le contenu se déroule au clic */
+function Fold({ title, hint, children }: { title: string; hint: string; children: React.ReactNode }) {
+  return (
+    <details className="group card overflow-hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-stone-50">
+        <span className="text-stone-400 transition group-open:rotate-90">▸</span>
+        <span className="flex-1"><span className="font-semibold">{title}</span><span className="ml-2 text-xs text-stone-500">{hint}</span></span>
+      </summary>
+      <div className="border-t border-stone-200 bg-stone-50/60 p-4">{children}</div>
+    </details>
+  );
+}
 
 export interface FieldRow { id: number; form: string; section: string; field: string; required: boolean; rule: string; message: string; position: number }
-export interface NatureRow { category: string; natures: { name: string; count: number }[]; products: number; threshold: string }
 
 const FORMS = ["reception", "anomaly", "claim", "weigh", "product", "supplier", "sheet", "credit"] as const;
 
-/** Dev > Caractéristiques : récapitulatif Catégorie / Nature des produits + champs des fiches (obligatoire, règle de saisie, message) */
-export function DevFields({ fields, natures }: { fields: FieldRow[]; natures: NatureRow[] }) {
+/** Dev > Développement : champs des fiches (obligatoire, règle de saisie, message), règles Réclamation / Anomalie, automatisations */
+export function DevFields({ fields }: { fields: FieldRow[] }) {
   const { t } = useI18n();
   const c = t.devFields;
   const router = useRouter();
@@ -51,24 +64,6 @@ export function DevFields({ fields, natures }: { fields: FieldRow[]; natures: Na
 
   return (
     <div className="space-y-6">
-      <section className="card overflow-x-auto">
-        <h2 className="px-4 pt-4 font-semibold">{c.naturesTitle}</h2>
-        <p className="px-4 text-xs text-stone-500">{c.naturesHint}</p>
-        <table className="table mt-2">
-          <thead><tr><th>{c.category}</th><th>{c.natures}</th><th className="text-right">{c.products}</th><th>{c.threshold}</th></tr></thead>
-          <tbody>
-            {natures.map((n) => (
-              <tr key={n.category} className="align-top">
-                <td className="font-medium">{n.category}</td>
-                <td><div className="flex flex-wrap gap-1">{n.natures.map((x) => <span key={x.name} className="badge bg-stone-100 text-stone-700">{x.name} <span className="ml-1 text-stone-400">{x.count}</span></span>)}</div></td>
-                <td className="text-right tabular-nums">{n.products}</td>
-                <td className="text-sm text-stone-600">{n.threshold}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
       <section>
         <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
           <div>
@@ -102,6 +97,11 @@ export function DevFields({ fields, natures }: { fields: FieldRow[]; natures: Na
         )}
         <DataTable rows={list} cols={cols} rowKey={(r) => r.id} dense fixed defaultSort={{ key: "form", dir: "asc" }} empty={c.empty} />
       </section>
+
+      <div className="space-y-2">
+        <Fold title={t.rules.claimFold} hint={`${t.rules.modesTitle} · ${t.rules.stagesTitle}`}><ClaimRules /></Fold>
+        <Fold title={t.rules.anomalyFold} hint={`${t.rules.typesTitle} · ${t.rules.savingsTitle}`}><AnomalyRules /></Fold>
+      </div>
 
       <DevAutomations />
     </div>

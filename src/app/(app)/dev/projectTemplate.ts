@@ -67,7 +67,7 @@ export const PROJECT_TEMPLATE = `
 <p>Voir Dev &gt; Réalisé.</p>
 <h3>Prochaines étapes</h3>
 <ul data-type="taskList">
-<li data-type="taskItem" data-checked="false"><p>Paramétrer les champs obligatoires et les messages (Dev &gt; Caractéristiques)</p></li>
+<li data-type="taskItem" data-checked="false"><p>Paramétrer les champs obligatoires et les messages (Dev &gt; Développement)</p></li>
 <li data-type="taskItem" data-checked="false"><p>Photo d'étiquette obligatoire pour les produits à DLC</p></li>
 <li data-type="taskItem" data-checked="false"><p>Fiche d'organisation à réception et fiche de suivi d'anomalie</p></li>
 <li data-type="taskItem" data-checked="false"><p>Mesurer le coût réel (hébergement, lecture des BL) pendant 3 mois</p></li>

@@ -58,7 +58,7 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
   const containers = isWeighing || showProc === "reception" ? await getDb().select().from(schema.containers).orderBy(asc(schema.containers.position), asc(schema.containers.id)) : [];
   const containerRows = containers.map((x) => ({ id: x.id, supplier: x.supplier ?? "", product: x.product ?? "", tare: num(x.tare), container: x.container ?? "" }));
 
-  // Contenu « conformité des produits » : schéma, tableau des seuils, classe de température des catégories (modification) ; les conditions par catégorie sont dans Dev > Règles
+  // Contenu « conformité des produits » : schéma, tableau des seuils, classe de température des catégories (modification)
   const conformityBody = (
     <>
               {!editingConformity && <ConformityFlow />}
@@ -150,11 +150,12 @@ export default async function ProtocolsPage({ searchParams }: { searchParams: Pr
             <article className="card p-5 sm:p-8"><ClaimProcedure /></article>
           ) : showProc === "reglementation" ? (
             <article className="card p-5 sm:p-8">
-              <RegulationProcedure retentionYears={RETENTION_YEARS} notes={regulationNotes ? {
-                body: <ProtocolView content={regulationNotes.content} />,
-                meta: `mis à jour le ${fmtDateTime(regulationNotes.updatedAt, locale)}${regulationNotes.by ? ` · ${regulationNotes.by}` : ""}`,
-                editHref: editable ? `/protocoles?id=${regulationNotes.id}&edit=1` : undefined,
-              } : undefined} />
+              <RegulationProcedure retentionYears={RETENTION_YEARS} notes={regulationNotes ? (
+                <>
+                  <ProtocolView content={regulationNotes.content} />
+                  {editable && <Link href={`/protocoles?id=${regulationNotes.id}&edit=1`} className="btn-secondary no-print mt-4"><Icon name="edit" className="h-4 w-4" /> {t.common.edit}</Link>}
+                </>
+              ) : undefined} />
             </article>
           ) : showConformity ? (
             <article className="card p-5 sm:p-8">

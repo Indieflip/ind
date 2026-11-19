@@ -7,17 +7,16 @@ import { useI18n } from "@/lib/i18n/client";
 import { appConfirm } from "@/components/Confirm";
 import { Icon } from "@/components/Icon";
 import { DataTable, type Col } from "@/components/table/DataTable";
-import { DevRules, type CategoryRule } from "./DevRules";
 import { DevProject, type ProjectKpis, type Roi } from "./DevProject";
-import { DevFields, type FieldRow, type NatureRow } from "./DevFields";
+import { DevFields, type FieldRow } from "./DevFields";
 
 interface Item { id: number; kind: string; title: string; detail: string; owner: string; priority: string; task: string; updated: string; updatedSort: string }
-const TABS = ["project", "pending", "constraint", "idea", "done", "rules", "fields"] as const;
+const TABS = ["project", "pending", "constraint", "idea", "done", "fields"] as const;
 const prioStyle: Record<string, string> = { haute: "bg-red-100 text-red-800", moyenne: "bg-amber-100 text-amber-900", basse: "bg-stone-100 text-stone-600" };
 const prioRank: Record<string, number> = { haute: 0, moyenne: 1, basse: 2, "": 3 };
 
 /** Onglet Dev : sous-onglets (en attente, objectifs, contraintes, idées, réalisé, règles) ; tout est modifiable */
-export function DevBoard({ items, reserved, tab, fields = [], natures = [], project, categories, canEdit = false }: { categories?: CategoryRule[]; canEdit?: boolean; items: Item[]; reserved: boolean; tab: string; fields?: FieldRow[]; natures?: NatureRow[]; project?: { doc: string; kpis: ProjectKpis; roi: Roi } }) {
+export function DevBoard({ items, reserved, tab, fields = [], project }: { items: Item[]; reserved: boolean; tab: string; fields?: FieldRow[]; project?: { doc: string; kpis: ProjectKpis; roi: Roi } }) {
   const { t } = useI18n();
   const d = t.dev;
   const router = useRouter();
@@ -42,7 +41,7 @@ export function DevBoard({ items, reserved, tab, fields = [], natures = [], proj
       <div className="grid gap-2 sm:grid-cols-[1fr_9rem_9rem_9rem]">
         <input className="input" autoFocus placeholder={d.titlePh} value={edit?.title ?? ""} onChange={(e) => setEdit({ ...edit, title: e.target.value })} />
         <select className="input" value={edit?.kind ?? current} onChange={(e) => setEdit({ ...edit, kind: e.target.value })}>
-          {TABS.filter((s) => s !== "rules").map((s) => <option key={s} value={s}>{d.sections[s as "pending"]}</option>)}
+          {TABS.filter((s) => s !== "fields" && s !== "project").map((s) => <option key={s} value={s}>{d.sections[s as "pending"]}</option>)}
         </select>
         <select className="input" value={edit?.priority ?? ""} onChange={(e) => setEdit({ ...edit, priority: e.target.value })}>
           <option value="">{d.priority} —</option>
@@ -112,12 +111,10 @@ export function DevBoard({ items, reserved, tab, fields = [], natures = [], proj
         ))}
       </nav>
 
-      {current === "rules" ? (
-        <DevRules categories={categories} canEdit={canEdit} />
-      ) : current === "project" ? (
+      {current === "project" ? (
         project ? <DevProject {...project} /> : null
       ) : current === "fields" ? (
-        <DevFields fields={fields} natures={natures} />
+        <DevFields fields={fields} />
       ) : (
         <>
           <div className="mb-3 flex items-center justify-between gap-2">

@@ -641,7 +641,7 @@ export const receptionExports = pgTable(
   (t) => [uniqueIndex("reception_exports_year_seq_idx").on(t.year, t.seq), index("reception_exports_day_idx").on(t.day)],
 );
 
-/** Onglet Dev > Caractéristiques : champs des fiches, obligatoires ou non, et règles de saisie */
+/** Onglet Dev > Développement : champs des fiches, obligatoires ou non, et règles de saisie */
 export const devFields = pgTable("dev_fields", {
   id: serial("id").primaryKey(),
   /** reception | anomaly | claim | weigh | product | supplier | sheet */

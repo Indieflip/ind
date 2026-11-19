@@ -5,7 +5,7 @@ import { Icon } from "./Icon";
 
 /**
  * Schéma des étapes de l'application (bouton du menu + fenêtre).
- * Mis à jour à chaque évolution de l'application, comme Dev > Caractéristiques (voir CLAUDE.md).
+ * Mis à jour à chaque évolution de l'application, comme Dev > Développement (voir CLAUDE.md).
  */
 const PHONE_STEPS: { title: string; items: string[]; gate?: string; auto?: string }[] = [
   {
@@ -51,7 +51,7 @@ const NIGHT: { when: string; title: string; text: string }[] = [
 
 const PILOT: { title: string; items: string[]; planned?: boolean }[] = [
   { title: "Reporting", items: ["Économies obtenues et en attente", "Par fournisseur, mois, type", "Suivi des prix et évolution par mois"] },
-  { title: "Mercurial et protocoles", items: ["Produits, prix min / max, prix bloqués", "Procédures : réception (avant, contrôle avec refus et pesée, saisie), réclamation, réglementation (avec notes de l'équipe)", "Conditions par catégorie dans Dev › Règles", "Procédures rédigées par l'équipe"] },
+  { title: "Mercurial et protocoles", items: ["Produits, prix min / max, prix bloqués", "Procédures : réception (avant, contrôle avec refus et pesée, saisie), réclamation, réglementation", "Procédures rédigées par l'équipe"] },
   { title: "Commandes fournisseurs", items: ["Commande depuis le mercurial", "Lignes pré-remplies à la réception", "Commandé / livré / facturé"], planned: true },
 ];
 

@@ -40,7 +40,7 @@ export async function reserveDevAction() {
 
 const FORMS = ["reception", "anomaly", "claim", "weigh", "product", "supplier", "sheet", "credit"];
 
-/** Dev > Caractéristiques : champ d'une fiche (obligatoire, règle de saisie, message affiché) */
+/** Dev > Développement : champ d'une fiche (obligatoire, règle de saisie, message affiché) */
 export async function saveDevFieldAction(id: number | null, data: { form: string; section: string; field: string; required: boolean; rule: string; message: string }) {
   await guard();
   if (!data.field.trim() || !FORMS.includes(data.form)) return { error: "invalid" };

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { ContainersTable } from "./ContainersTable";
 
@@ -354,7 +353,7 @@ export function ConformityFlow() {
 
 /* ---------------------------------------------------------------- Réglementation ---------------------------------------------------------------- */
 
-export function RegulationProcedure({ retentionYears, notes }: { retentionYears: number; notes?: { body: React.ReactNode; meta?: string; editHref?: string } }) {
+export function RegulationProcedure({ retentionYears, notes }: { retentionYears: number; notes?: React.ReactNode }) {
   const rules: { icon: string; tag: string; title: string; text: string; inApp: string }[] = [
     { icon: "book", tag: "Règlement (CE) 852/2004", title: "Hygiène : le contrôle à réception", text: "Le contrôle des marchandises à réception fait partie du plan de maîtrise sanitaire (PMS) de l'établissement.", inApp: "Fiche de réception exportée chaque soir, contrôles guidés à chaque livraison." },
     { icon: "thermo", tag: "Arrêté du 21 décembre 2009", title: "Températures de conservation", text: "Chaque denrée a une température maximale ; au-delà, le produit ne doit pas être accepté.", inApp: "Seuils et marges dans Procédures › Réception › Contrôler la livraison ; refus proposé automatiquement." },
@@ -386,16 +385,9 @@ export function RegulationProcedure({ retentionYears, notes }: { retentionYears:
         ))}
       </div>
       {notes && (
-        <section className="mt-10 overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-          <div className="flex flex-wrap items-center gap-3 border-b border-stone-200 bg-stone-50 px-5 py-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700"><Icon name="book" className="h-5 w-5" /></span>
-            <div className="min-w-0 flex-1">
-              <h2 className="font-bold">Notes de l'équipe</h2>
-              <p className="text-xs text-stone-500">Ce que l'établissement ajoute aux règles ci-dessus{notes.meta ? ` · ${notes.meta}` : ""}</p>
-            </div>
-            {notes.editHref && <Link href={notes.editHref} className="btn-secondary no-print py-1.5 text-sm"><Icon name="edit" className="h-4 w-4" /> Modifier</Link>}
-          </div>
-          <div className="notes-body border-l-4 border-violet-200 px-5 py-4 sm:px-6">{notes.body}</div>
+        <section className="mt-10">
+          <h2 className="mb-3 text-lg font-bold">Vos notes</h2>
+          <div className="rounded-2xl border border-stone-200 bg-white p-5">{notes}</div>
         </section>
       )}
       <p className="mt-6 text-xs text-stone-500">Repères indicatifs, à valider avec votre plan de maîtrise sanitaire et vos obligations comptables.</p>
