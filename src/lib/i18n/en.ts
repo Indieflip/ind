@@ -262,7 +262,7 @@ export const en: Dict = {
     readDone: "lines found. Check every line in the next step.",
     readNone: "No lines found: retake a sharper photo or enter products manually.",
     tipPauseTitle: "Interrupted?",
-    tipPause: "“Save draft”: the reception stays in the receptions table.",
+    tipPause: "First complete step 1 (photos and signatures), then “Save draft”: the reception stays in the receptions table.",
     tipOfflineTitle: "No network?",
     tipOffline: "Finish anyway: it is sent as soon as the network is back.",
     readUnavailable: "Automatic reading is not enabled yet: enter products manually in the next step.",

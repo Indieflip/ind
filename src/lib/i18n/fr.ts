@@ -262,7 +262,7 @@ export const fr = {
     readDone: "lignes trouvées. Vérifiez chaque ligne à l'étape suivante.",
     readNone: "Aucune ligne trouvée : reprenez la photo plus nette ou saisissez les produits à la main.",
     tipPauseTitle: "Interrompu ?",
-    tipPause: "« Enregistrement brouillon » : la réception reste dans le tableau des réceptions.",
+    tipPause: "Terminez d'abord l'étape 1 (photos et signatures), puis « Enregistrement brouillon » : la réception reste dans le tableau des réceptions.",
     tipOfflineTitle: "Pas de réseau ?",
     tipOffline: "Terminez quand même : elle part dès que le réseau revient.",
     readUnavailable: "Lecture automatique pas encore activée : saisissez les produits à la main à l'étape suivante.",
