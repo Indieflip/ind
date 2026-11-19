@@ -685,6 +685,19 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_project_v
   await db.execute(sql`insert into app_settings (key, value) values ('dev_project_v5', '1') on conflict (key) do nothing`);
 }
 
+// Photo d'étiquette obligatoire pour les produits à DLC (viandes, poissons, surgelés) : Dev > Développement et point en attente réalisé, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v5'`)).rows.length) {
+  await db.execute(sql`update dev_fields set required = true, rule = ${"Obligatoire (au moins une photo) dès que la livraison contient un produit accepté à DLC obligatoire : viandes, poissons, surgelés. Vérifié à l'enregistrement des nouvelles réceptions."}, message = ${"Photo d'étiquette obligatoire : la livraison contient des viandes, poissons ou surgelés. Ajoutez au moins une photo d'étiquette à l'étape 1."}, updated_at = now() where form = 'reception' and field like 'Photo de l''étiquette%'`);
+  await db.execute(sql`update dev_items set kind = 'done', updated_at = now() where kind = 'pending' and title like 'Photo de l''étiquette%obligatoire%'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v5', '1') on conflict (key) do nothing`);
+}
+
+// Dev > Projet, partie 11 : intitulé du poste (Cost controller), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_project_v6'`)).rows.length) {
+  await db.execute(sql`update app_settings set value = replace(value, ${"<tr><td><p>Contrat</p></td><td><p>CDD de 6 mois, « Contrôleur de coûts » (application + recherche d'économies)</p></td></tr>"}, ${"<tr><td><p>Intitulé du poste</p></td><td><p>Cost controller (contrôleur de coûts)</p></td></tr><tr><td><p>Contrat</p></td><td><p>CDD de 6 mois : gestion de l'application et recherche d'économies</p></td></tr>"}) where key = 'dev_project_doc'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_project_v6', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

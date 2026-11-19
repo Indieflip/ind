@@ -112,7 +112,8 @@ export const PROJECT_TEMPLATE = `
 <div data-callout="" data-variant="danger"><p>Note personnelle, pas un avis juridique : à faire valider par un avocat en propriété intellectuelle et par l'expert-comptable.</p></div>
 <table><tbody>
 <tr><th><p>Élément</p></th><th><p>Proposition</p></th></tr>
-<tr><td><p>Contrat</p></td><td><p>CDD de 6 mois, « Contrôleur de coûts » (application + recherche d'économies)</p></td></tr>
+<tr><td><p>Intitulé du poste</p></td><td><p>Cost controller (contrôleur de coûts)</p></td></tr>
+<tr><td><p>Contrat</p></td><td><p>CDD de 6 mois : gestion de l'application et recherche d'économies</p></td></tr>
 <tr><td><p>Fixe</p></td><td><p>31 000 € brut par an (environ 2 000 € net par mois)</p></td></tr>
 <tr><td><p>Prime</p></td><td><p>10 % des économies justifiées</p></td></tr>
 <tr><td><p>Application</p></td><td><p>Utilisation gratuite pendant le CDD ; je reste propriétaire du code</p></td></tr>

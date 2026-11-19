@@ -8,7 +8,7 @@ import { Icon } from "./Icon";
 const PHONE_STEPS: { title: string; items: string[]; gate?: string; auto?: string }[] = [
   {
     title: "Photos et signatures",
-    items: ["Photo du BL / facture (ou « Pas de BL »)", "Photo de l'étiquette (lot / DLC)", "Signature du livreur ou « parti sans signer »", "Signature du réceptionnaire"],
+    items: ["Photo du BL / facture (ou « Pas de BL »)", "Photo de l'étiquette (lot / DLC), obligatoire pour viandes, poissons, surgelés", "Signature du livreur ou « parti sans signer »", "Signature du réceptionnaire"],
     gate: "Pas d'étape 2 sans signature du livreur (ou case cochée)",
   },
   {
@@ -23,7 +23,7 @@ const PHONE_STEPS: { title: string; items: string[]; gate?: string; auto?: strin
   {
     title: "Validation",
     items: ["Récapitulatif", "Texte des réserves à recopier sur le BL", "Enregistrement (hors ligne possible)"],
-    gate: "Pas d'enregistrement sans prix, décision, DLC obligatoire ou signature du réceptionnaire",
+    gate: "Pas d'enregistrement sans prix, décision, DLC obligatoire, photo d'étiquette (viandes, poissons, surgelés) ou signature du réceptionnaire",
   },
 ];
 
@@ -48,7 +48,7 @@ const NIGHT: { when: string; title: string; text: string }[] = [
 ];
 
 const PILOT: { title: string; items: string[]; planned?: boolean }[] = [
-  { title: "Reporting", items: ["Économies obtenues et en attente", "Par fournisseur, mois, type", "Suivi des prix et évolution par mois"] },
+  { title: "Reporting", items: ["Économies obtenues et en attente", "Par fournisseur, mois, type", "Suivi des prix et évolution par mois", "Viandes et poissons"] },
   { title: "Mercurial et protocoles", items: ["Produits, prix min / max, prix bloqués", "Procédures : réception (avant, contrôle avec refus et pesée, saisie), réclamation, réglementation", "Procédures rédigées par l'équipe"] },
   { title: "Commandes fournisseurs", items: ["Commande depuis le mercurial", "Lignes pré-remplies à la réception", "Commandé / livré / facturé"], planned: true },
 ];

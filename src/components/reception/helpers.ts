@@ -145,6 +145,11 @@ export function needsDlc(line: DraftLine, catalog: Catalog | undefined) {
   return dlcRequired(line, catalog) && !line.dlc && line.decision !== "refuse";
 }
 
+/** Photo d'étiquette obligatoire dès qu'un produit à DLC obligatoire (viandes, poissons, surgelés) est accepté */
+export function labelPhotoRequired(lines: DraftLine[], catalog: Catalog | undefined) {
+  return lines.some((l) => l.productName.trim() && l.decision !== "refuse" && dlcRequired(l, catalog));
+}
+
 export function needsTemp(line: DraftLine, catalog: Catalog | undefined) {
   const cat = catalog?.categories.find((c) => c.id === line.categoryId);
   return !!cat?.tempRequired && num(line.temperature) == null && line.decision !== "refuse";

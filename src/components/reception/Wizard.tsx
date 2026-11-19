@@ -8,7 +8,7 @@ import type { Catalog, Draft, DraftLine } from "@/lib/reception-types";
 import { clearDraft, enqueue, fetchCatalog, loadCatalogCache, loadDraft, saveDraft, saveServerDraft, sendReception } from "@/lib/client/offline";
 import { Notice } from "@/components/Notice";
 import { Icon } from "../Icon";
-import { buildReservesText, docsOf, needsDlc, lineFromProduct, newDraft, toPayload, withAutoDecision } from "./helpers";
+import { buildReservesText, docsOf, labelPhotoRequired, needsDlc, lineFromProduct, newDraft, toPayload, withAutoDecision } from "./helpers";
 import { StepDelivery } from "./StepDelivery";
 import { StepPhoto } from "./StepPhoto";
 import { ReadingBanner } from "./ReadingBanner";
@@ -240,6 +240,13 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
       setTimeout(() => document.getElementById(`line-${noDlc[0].key}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
       return;
     }
+    // Photo d'étiquette obligatoire pour les produits à DLC (nouvelles réceptions)
+    if (!editId && !(draft.labelPhotos ?? []).length && labelPhotoRequired(draft.lines, catalog)) {
+      setError(t.wizard.missingLabelPhoto);
+      go(0);
+      setTimeout(() => document.getElementById("label-photos")?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+      return;
+    }
     setSaving(true);
     setError("");
     const payload = toPayload(draft);
@@ -351,7 +358,7 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
         {draft.step > 0 && draft.step < 3 && <ReadingBanner draft={draft} count={readCount || draft.lines.filter((l) => l.fromBl).length} onRetry={() => readBl(draft)} />}
         {draft.step === 1 && <StepDelivery draft={draft} setDraft={setDraft} catalog={catalog} editId={editId} />}
         {draft.step === 2 && <StepCheck draft={draft} setDraft={setDraft} updateLine={updateLine} catalog={catalog} />}
-        {draft.step === 3 && <StepValidate draft={draft} setDraft={setDraft} catalog={catalog} autoReserves={autoReserves} />}
+        {draft.step === 3 && <StepValidate draft={draft} setDraft={setDraft} catalog={catalog} autoReserves={autoReserves} editing={!!editId} />}
         {(info || error) && (
           <div className="pointer-events-none fixed inset-x-0 bottom-24 z-30 mx-auto max-w-2xl px-3">
             {info && <p className="pointer-events-auto rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 shadow-lg">{info}</p>}

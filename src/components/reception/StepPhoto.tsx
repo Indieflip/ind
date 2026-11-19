@@ -79,8 +79,8 @@ export function StepPhoto({
       )}
       {draft.noBl && <p className="flex items-center gap-2 rounded-lg bg-stone-100 p-3 text-sm text-stone-700"><Icon name="check" className="h-4 w-4" /> {w.skipNoBl}</p>}
 
-      <section className="card space-y-3 p-4">
-        <h2 className="font-semibold">2. {w.photoLabelTitle} <span className="text-xs font-normal text-stone-400">({t.common.optional})</span></h2>
+      <section id="label-photos" className="card space-y-3 p-4">
+        <h2 className="font-semibold">2. {w.photoLabelTitle} <span className="text-xs font-normal text-stone-500">({w.labelRequiredFor})</span></h2>
         <p className="text-sm text-stone-600">{w.photoLabelHint}</p>
         <Thumbs
           photos={draft.labelPhotos ?? []}

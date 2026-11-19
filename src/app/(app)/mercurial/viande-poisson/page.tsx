@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
-export default function Page() {
-  redirect("/mercurial/viande-poisson/viande");
+
+/** Ancienne adresse : Viandes et poissons est maintenant dans Reporting */
+export default function OldMeatFish() {
+  redirect("/reporting/viande-poisson");
 }

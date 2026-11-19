@@ -3,18 +3,20 @@ import { useI18n } from "@/lib/i18n/client";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 import type { Catalog, Draft } from "@/lib/reception-types";
 import { decisionStyles } from "../DecisionBadge";
-import { docNumbers, docsOf, lineDoc, needsDlc, needsTemp, priceGap } from "./helpers";
+import { docNumbers, docsOf, labelPhotoRequired, lineDoc, needsDlc, needsTemp, priceGap } from "./helpers";
 
 export function StepValidate({
   draft,
   setDraft,
   catalog,
   autoReserves,
+  editing = false,
 }: {
   draft: Draft;
   setDraft: (fn: (d: Draft) => Draft) => void;
   catalog?: Catalog;
   autoReserves: string;
+  editing?: boolean;
 }) {
   const { t } = useI18n();
   const count = (d: "conform" | "reserve" | "refuse") => draft.lines.filter((l) => l.decision === d).length;
@@ -24,6 +26,7 @@ export function StepValidate({
   }).length;
   const missingTemps = draft.lines.filter((l) => needsTemp(l, catalog));
   const missingDlc = draft.lines.filter((l) => needsDlc(l, catalog));
+  const missingLabel = !editing && !(draft.labelPhotos ?? []).length && labelPhotoRequired(draft.lines, catalog);
   const undecided = draft.lines.filter((l) => !l.decision);
 
   const w = t.wizard;
@@ -91,6 +94,13 @@ export function StepValidate({
           <strong>{undecided.length}</strong> {w.undecided} :
           <ul className="mt-1 list-inside list-disc">{undecided.map((l) => <li key={l.key}>{l.productName}</li>)}</ul>
           <button type="button" className="btn-secondary mt-2" onClick={() => setDraft((d) => ({ ...d, step: 2 }))}>{t.common.back}</button>
+        </section>
+      )}
+
+      {missingLabel && (
+        <section className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900">
+          {w.missingLabelPhoto}
+          <button type="button" className="btn-secondary mt-2 block" onClick={() => setDraft((d) => ({ ...d, step: 0 }))}>{w.goLabelPhoto}</button>
         </section>
       )}
 
