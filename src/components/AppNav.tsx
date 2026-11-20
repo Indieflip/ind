@@ -26,9 +26,12 @@ export function AppNav(props: {
   const current = props.items.filter((i) => active(i.href)).sort((a, b) => b.href.length - a.href.length)[0]?.label ?? (props.dev && active(props.dev.href) ? props.dev.label : path.startsWith("/recherche") ? props.search.label : null);
   useEffect(() => {
     const title = current ?? props.appName;
-    document.title = title;
-    const t = setTimeout(() => { document.title = title; }, 50); // après la mise à jour du <head> par Next
-    return () => clearTimeout(t);
+    const apply = () => { if (document.title !== title) document.title = title; };
+    apply();
+    // Next remet son titre par défaut quand la page finit de charger (parfois après plusieurs secondes) : on le surveille
+    const obs = new MutationObserver(apply);
+    obs.observe(document.head, { subtree: true, childList: true, characterData: true });
+    return () => obs.disconnect();
   }, [current, path, props.appName]);
   return (
     <>
