@@ -94,6 +94,7 @@ export function RichEditor({ value, onChange }: { value: string; onChange: (html
   const [slash, setSlash] = useState<{ from: number; query: string; top: number; left: number } | null>(null);
   const [active, setActive] = useState(0);
   const wrap = useRef<HTMLDivElement>(null);
+  const [link, setLink] = useState<string | null>(null);
 
   const commands: Cmd[] = useMemo(() => [
     { key: "p", label: r.text, hint: r.textHint, icon: "¶", run: (e) => e.chain().focus().setParagraph().run() },
@@ -115,6 +116,8 @@ export function RichEditor({ value, onChange }: { value: string; onChange: (html
     extensions: extensions(r.placeholder),
     content: legacyToHtml(value),
     immediatelyRender: false,
+    // Barre « tableau » et état des boutons : se mettent à jour quand le curseur bouge (clic dans un tableau, sur un lien…)
+    shouldRerenderOnTransaction: true,
     editorProps: { attributes: { class: "min-h-[24rem] outline-none" } },
     onUpdate: ({ editor: e }) => {
       onChange(e.getHTML());
@@ -192,22 +195,47 @@ export function RichEditor({ value, onChange }: { value: string; onChange: (html
         <button type="button" className={b(false)} title={r.divider} onClick={() => editor.chain().focus().setHorizontalRule().run()}>—</button>
         <button
           type="button"
-          className={b(editor.isActive("link"))}
+          className={b(editor.isActive("link") || link !== null)}
           title={r.link}
           onClick={() => {
-            if (editor.isActive("link")) return editor.chain().focus().unsetLink().run();
-            const url = window.prompt(r.linkPrompt, "https://");
-            if (url && url !== "https://") editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+            if (link !== null) return setLink(null);
+            const href = editor.getAttributes("link").href as string | undefined;
+            if (href) { editor.chain().focus().extendMarkRange("link").run(); return setLink(href); }
+            setLink("https://");
           }}
         >🔗</button>
         <span className="mx-1 h-5 w-px bg-stone-200" />
         <button type="button" className={b(false)} title={`${r.undo} (Ctrl+Z)`} disabled={!editor.can().undo()} onClick={() => editor.chain().focus().undo().run()}>↶</button>
         <button type="button" className={b(false)} title={`${r.redo} (Ctrl+Y)`} disabled={!editor.can().redo()} onClick={() => editor.chain().focus().redo().run()}>↷</button>
       </div>
+      {link !== null && (
+        <form
+          className="flex flex-wrap items-center gap-2 border-b border-stone-100 bg-sky-50 px-2 py-1.5 text-sm"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const url = link.trim();
+            if (!url || url === "https://") return;
+            const href = /^(https?:|mailto:|tel:|\/)/i.test(url) ? url : `https://${url}`;
+            if (editor.state.selection.empty && !editor.isActive("link")) editor.chain().focus().insertContent({ type: "text", text: href, marks: [{ type: "link", attrs: { href } }] }).run();
+            else editor.chain().focus().extendMarkRange("link").setLink({ href }).run();
+            setLink(null);
+          }}
+        >
+          <span className="text-xs font-semibold text-sky-800">🔗 {r.link}</span>
+          <input autoFocus className="input min-w-0 flex-1 py-1 text-sm" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://…" onKeyDown={(e) => e.key === "Escape" && setLink(null)} />
+          <button type="submit" className="btn-primary px-2.5 py-1 text-xs">{r.linkApply}</button>
+          {editor.isActive("link") && <button type="button" className="btn-ghost px-2 py-1 text-xs text-red-600" onClick={() => { editor.chain().focus().extendMarkRange("link").unsetLink().run(); setLink(null); }}>{r.linkRemove}</button>}
+          <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={() => setLink(null)}>✕</button>
+          <span className="w-full text-[11px] text-sky-800/80">{r.linkHint}</span>
+        </form>
+      )}
       {inTable && (
-        <div className="flex flex-wrap gap-1 border-b border-stone-100 bg-stone-50 px-2 py-1 text-xs">
-          <button type="button" className="btn-ghost px-2 py-0.5 text-xs" onClick={() => editor.chain().focus().addRowAfter().run()}>+ {r.row}</button>
-          <button type="button" className="btn-ghost px-2 py-0.5 text-xs" onClick={() => editor.chain().focus().addColumnAfter().run()}>+ {r.column}</button>
+        <div className="flex flex-wrap items-center gap-1 border-b border-stone-100 bg-stone-50 px-2 py-1 text-xs">
+          <span className="mr-1 font-semibold text-stone-600">▦ {r.table} :</span>
+          <button type="button" className="btn-ghost px-2 py-0.5 text-xs" onClick={() => editor.chain().focus().addRowBefore().run()}>+ {r.row} {r.above}</button>
+          <button type="button" className="btn-ghost px-2 py-0.5 text-xs" onClick={() => editor.chain().focus().addRowAfter().run()}>+ {r.row} {r.below}</button>
+          <button type="button" className="btn-ghost px-2 py-0.5 text-xs" onClick={() => editor.chain().focus().addColumnBefore().run()}>+ {r.column} {r.left}</button>
+          <button type="button" className="btn-ghost px-2 py-0.5 text-xs" onClick={() => editor.chain().focus().addColumnAfter().run()}>+ {r.column} {r.right}</button>
           <button type="button" className="btn-ghost px-2 py-0.5 text-xs" onClick={() => editor.chain().focus().deleteRow().run()}>− {r.row}</button>
           <button type="button" className="btn-ghost px-2 py-0.5 text-xs" onClick={() => editor.chain().focus().deleteColumn().run()}>− {r.column}</button>
           <button type="button" className="btn-ghost px-2 py-0.5 text-xs text-red-600" onClick={() => editor.chain().focus().deleteTable().run()}>{r.deleteTable}</button>

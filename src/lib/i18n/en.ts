@@ -1172,6 +1172,13 @@ export const en: Dict = {
     daysAgo: "days ago",
   },
   richEditor: {
+    linkApply: "Apply",
+    linkRemove: "Remove link",
+    linkHint: "First select the words to turn into a link, then paste the address. Enter to apply, Esc to cancel.",
+    above: "above",
+    below: "below",
+    left: "left",
+    right: "right",
     placeholder: "Write, or type “/” to insert a heading, list, callout, table…",
     tip: "Tip: type “/” at the start of a line to pick a block. Ctrl+B bold, Ctrl+I italic, Ctrl+U underline. “- ” = list, “1. ” = numbered list, “## ” = heading.",
     blocks: "Blocks",

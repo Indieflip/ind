@@ -1174,6 +1174,13 @@ export const fr = {
     daysAgo: "jours",
   },
   richEditor: {
+    linkApply: "Appliquer",
+    linkRemove: "Retirer le lien",
+    linkHint: "Sélectionnez d'abord les mots à transformer en lien, puis collez l'adresse. Entrée pour valider, Échap pour annuler.",
+    above: "au-dessus",
+    below: "en dessous",
+    left: "à gauche",
+    right: "à droite",
     placeholder: "Écrivez, ou tapez « / » pour insérer un titre, une liste, un encadré, un tableau…",
     tip: "Astuce : tapez « / » en début de ligne pour choisir un bloc. Ctrl+B gras, Ctrl+I italique, Ctrl+U souligné. « - » + espace = liste, « 1. » + espace = liste numérotée, « ## » + espace = titre.",
     blocks: "Blocs",
