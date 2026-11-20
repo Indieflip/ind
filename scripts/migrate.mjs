@@ -735,7 +735,7 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'anomaly_produ
 
 // Dev > Développement : fiche d'anomalie réorganisée (Détail du problème, Suivi), une fois
 if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v6'`)).rows.length) {
-  await db.execute(sql`update dev_fields set section = 'Détail du problème', field = 'Type de problème', rule = ${"Choisi dans une liste modifiable (Gérer les types : ajouter, renommer, supprimer). Titre de la fiche : Fournisseur - Type de problème."}, updated_at = now() where form = 'anomaly' and field = 'Type d''anomalie'`);
+  await db.execute(sql`update dev_fields set section = 'Détail du problème', field = 'Type d''anomalie', rule = ${"Choisi dans une liste modifiable (Gérer les types : ajouter, renommer, supprimer). Titre de la fiche : Fournisseur - Type d'anomalie."}, updated_at = now() where form = 'anomaly' and field = 'Type d''anomalie'`);
   await db.execute(sql`update dev_fields set section = 'Détail du problème', rule = ${"Rattaché au produit du Mercurial (liste des produits du fournisseur), lien vers sa fiche produit."}, updated_at = now() where form = 'anomaly' and field = 'Produit'`);
   await db.execute(sql`update dev_fields set section = 'Détail du problème', field = 'Problème', updated_at = now() where form = 'anomaly' and field = 'Description'`);
   await db.execute(sql`update dev_fields set section = 'Détail du problème', updated_at = now() where form = 'anomaly' and field = 'Montant réclamé'`);
@@ -746,6 +746,21 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v6
     ('anomaly', 'Suivi', 'Action utilisateur', false, ${"Ce qui a été fait (mail, appel…) ; « Relancé aujourd'hui » ajoute une ligne datée."}, '', ${pos + 1}),
     ('anomaly', 'Suivi', 'Dernière action', false, ${"Date de la dernière action ; sert au rappel de relance."}, '', ${pos + 2})`);
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v6', '1') on conflict (key) do nothing`);
+}
+
+// Fiches d'anomalie : type d'anomalie enregistré dans chaque fiche (libellé du type d'origine), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'anomaly_problem_type_v1'`)).rows.length) {
+  const labels = { missing: "Produit manquant", damaged: "Produit abîmé", temperature: "Température", dlc: "DLC", wrong_product: "Mauvais produit", quantity: "Quantité", price: "Prix", hygiene: "Hygiène / véhicule", locked_price: "Prix bloqué non respecté", missing_bl: "Bon de livraison manquant", other: "Autre" };
+  for (const [k, v] of Object.entries(labels)) await db.execute(sql`update anomalies set problem_type = ${v} where problem_type is null and type = ${k}`);
+  await db.execute(sql`insert into app_settings (key, value) values ('anomaly_problem_type_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev > Développement : « Type de problème » renommé « Type d'anomalie » + champ « Actions Assistant », une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v7'`)).rows.length) {
+  await db.execute(sql`update dev_fields set field = 'Type d''anomalie', rule = ${"Choisi dans une liste modifiable (Gérer les types : ajouter, renommer, supprimer). Titre de la fiche : Fournisseur - Type d'anomalie."}, updated_at = now() where form = 'anomaly' and field = 'Type de problème'`);
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('anomaly', 'Suivi', 'Actions Assistant', false, ${"Rempli automatiquement par l'application (création, réclamation, relances, rappels, consolidation, économie) ; non modifiable."}, '', ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v7', '1') on conflict (key) do nothing`);
 }
 
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom

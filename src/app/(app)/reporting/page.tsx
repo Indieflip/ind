@@ -50,7 +50,7 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
   const rate = k.receptions ? Math.round((k.conform / k.receptions) * 100) : null;
   // Achats par fournisseur (fréquence choisie)
   const af: PurchaseFreq = (one(sp.af) ?? "") in PURCHASE_FREQS ? (one(sp.af) as PurchaseFreq) : "mois";
-  const purchases = can.viewMercurial(user.role) ? await loadPurchases(af, locale, { weekOf: t.purchases.weekOf, noSupplier: t.purchases.noSupplier }) : null;
+  const purchases = can.viewMercurial(user.role) ? await loadPurchases(af, locale, { weekOf: t.purchases.weekOf, noSupplier: t.purchases.noSupplier }, { from: one(sp.pfrom), to: one(sp.pto) }) : null;
 
   return (
     <>
@@ -74,7 +74,7 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
         )}
       </div>
 
-      {purchases && <PurchasesTable rows={purchases.rows} periods={purchases.periods} freq={af} freqs={Object.keys(PURCHASE_FREQS)} />}
+      {purchases && <PurchasesTable rows={purchases.rows} periods={purchases.periods} freq={af} freqs={Object.keys(PURCHASE_FREQS)} from={purchases.from} to={purchases.to} />}
     </>
   );
 }

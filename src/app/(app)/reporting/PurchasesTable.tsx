@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtMoney } from "@/lib/format";
 import { DataTable, type Col } from "@/components/table/DataTable";
@@ -9,7 +10,9 @@ interface Row { supplierId: number | null; supplier: string; product: string; na
 type Agg = { key: string; supplierId: number | null; supplier: string; product: string; nature: string; cells: Record<string, number>; total: number };
 
 /** Reporting > Achats par fournisseur : colonnes Produit et Nature produit à afficher ou masquer, filtres et tri en en-tête */
-export function PurchasesTable({ rows, periods, freq, freqs }: { rows: Row[]; periods: { key: string; label: string }[]; freq: string; freqs: string[] }) {
+export function PurchasesTable({ rows, periods, freq, freqs, from, to }: { rows: Row[]; periods: { key: string; label: string }[]; freq: string; freqs: string[]; from: string; to: string }) {
+  const router = useRouter();
+  const go = (q: { af?: string; pfrom?: string; pto?: string }) => router.push(`/reporting?${new URLSearchParams({ af: q.af ?? freq, pfrom: q.pfrom ?? from, pto: q.pto ?? to })}#achats`, { scroll: false });
   const { t, locale } = useI18n();
   const A = t.purchases;
   const [showProduct, setShowProduct] = useState(false);
@@ -58,8 +61,13 @@ export function PurchasesTable({ rows, periods, freq, freqs }: { rows: Row[]; pe
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium text-stone-600">{A.frequency} :</span>
         {freqs.map((f) => (
-          <Link key={f} scroll={false} href={`/reporting?af=${f}#achats`} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${f === freq ? "bg-brand-600 text-white" : "bg-white text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50"}`}>{A.freqs[f as "mois"]}</Link>
+          <Link key={f} scroll={false} href={`/reporting?${new URLSearchParams({ af: f, pfrom: from, pto: to })}#achats`} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${f === freq ? "bg-brand-600 text-white" : "bg-white text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50"}`}>{A.freqs[f as "mois"]}</Link>
         ))}
+        <span className="mx-1 h-5 w-px bg-stone-200" />
+        <span className="text-sm font-medium text-stone-600">{A.period} :</span>
+        <input type="month" className="input w-auto py-1 text-sm" value={from} max={to} onChange={(e) => e.target.value && go({ pfrom: e.target.value })} aria-label={A.periodFrom} />
+        <span className="text-sm text-stone-500">→</span>
+        <input type="month" className="input w-auto py-1 text-sm" value={to} min={from} onChange={(e) => e.target.value && go({ pto: e.target.value })} aria-label={A.periodTo} />
       </div>
 
       <div className="mb-3 grid gap-3 sm:grid-cols-3">
@@ -79,7 +87,7 @@ export function PurchasesTable({ rows, periods, freq, freqs }: { rows: Row[]; pe
         <div className="mt-1 flex gap-1.5">{periods.map((p) => <span key={p.key} className="flex-1 truncate text-center text-[10px] text-stone-500">{p.label}</span>)}</div>
       </div>
 
-      <DataTable rows={data} cols={cols} rowKey={(r) => r.key} dense defaultSort={{ key: "total", dir: "desc" }} empty={A.empty} />
+      <DataTable rows={data} cols={cols} rowKey={(r) => r.key} dense mergedHeader defaultSort={{ key: "total", dir: "desc" }} empty={A.empty} />
       <p className="mt-2 text-xs text-stone-500">{A.note}</p>
     </section>
   );

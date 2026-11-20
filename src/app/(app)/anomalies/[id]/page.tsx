@@ -47,9 +47,33 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
     a.supplierId ? db.select({ id: schema.products.id, name: schema.products.name }).from(schema.products).where(and(eq(schema.products.supplierId, a.supplierId), eq(schema.products.active, true))).orderBy(asc(schema.products.name)) : Promise.resolve([] as { id: number; name: string }[]),
   ]);
   const productId = a.productId ?? line?.productId ?? null;
+
+  const process = (await supplierProcesses()).find(a.supplierId, a.supplierName);
+  // Actions Assistant : ce que l'application a fait ou prévoit pour cette fiche (calculé, non modifiable)
+  const S = t.sheet.assistant;
+  const addDays = (d: string | Date, n: number) => { const x = new Date(typeof d === "string" ? `${d}T12:00:00` : d); x.setDate(x.getDate() + n); return x; };
+  const assistant: { date: string | null; text: string }[] = [];
+  if (a.imported) assistant.push({ date: fmtDate(a.createdAt, locale), text: S.imported });
+  else if (rec) assistant.push({ date: fmtDate(a.createdAt, locale), text: `${S.createdFrom} ${numbers.get(rec.id) ?? rec.id}` });
+  else assistant.push({ date: fmtDate(a.createdAt, locale), text: `${S.createdBy}${author ? ` ${author.name}` : ""}` });
+  if (a.claimNo) assistant.push({ date: null, text: `${S.claimNumber} ${a.claimNo}` });
+  if (isInformative(a)) assistant.push({ date: null, text: S.informative });
+  if (a.lastActionAt) assistant.push({ date: fmtDate(a.lastActionAt, locale), text: S.lastAction });
+  const open = !a.consolidatedAt && ["a_traiter", "reclamee", "a_verifier"].includes(a.stage);
+  if (open) {
+    const from = a.lastActionAt ?? a.createdAt;
+    if (a.mode === "verification") {
+      const due = addDays(from, a.stage === "a_verifier" ? 15 : 7);
+      assistant.push({ date: fmtDate(due, locale), text: due < new Date() ? S.verifyLate : S.verifyPlanned });
+    } else if (a.stage !== "a_traiter") {
+      const due = addDays(from, process?.delay ?? 3);
+      assistant.push({ date: fmtDate(due, locale), text: due < new Date() ? S.followLate : S.followPlanned });
+    } else assistant.push({ date: null, text: S.toProcess });
+  }
+  if (a.resolution === "avoir" && a.creditAmount) assistant.push({ date: a.creditDate ? fmtDate(a.creditDate, locale) : null, text: `${S.saving} ${fmtMoney(num(a.creditAmount), locale)}` });
+  if (a.consolidatedAt) assistant.push({ date: fmtDate(a.consolidatedAt, locale), text: S.consolidated });
   void claims;
   // Procédure de réclamation du fournisseur (protocole) et délai de relance
-  const process = (await supplierProcesses()).find(a.supplierId, a.supplierName);
   // Coordonnées « Réclamation » du fournisseur en priorité, sinon celles de la société
   // Adresse de réclamation (sinon société) + les mails ajoutés avec le « + » du même bloc
   const mailsOf = (c?: { email?: string; extra?: { label: string; value: string }[] }) => [c?.email, ...(c?.extra ?? []).filter((x) => x.label === "email").map((x) => x.value)].filter(Boolean) as string[];
@@ -178,6 +202,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
         id={a.id}
         editable={editable}
         types={types}
+        assistant={assistant}
         products={supplierProducts}
         initial={{
           problemType,

@@ -14,7 +14,7 @@ interface Values {
   creditAmount: string; claimedAmount: string; stage: string; resolution: string; mode: string; creditNumber: string; creditDate: string; creditKind: string;
 }
 
-export function AnomalySheetForm({ id, initial, editable, informative, types, products }: { id: number; initial: Values; editable: boolean; informative?: boolean; types: string[]; products: { id: number; name: string }[] }) {
+export function AnomalySheetForm({ id, initial, editable, informative, types, products, assistant = [] }: { id: number; initial: Values; editable: boolean; informative?: boolean; types: string[]; products: { id: number; name: string }[]; assistant?: { date: string | null; text: string }[] }) {
   const { t } = useI18n();
   const a = t.anomalies;
   const s = t.sheet;
@@ -174,6 +174,17 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
             </button>
           </div>
         )}
+      </div>
+
+      {/* Actions Assistant : remplies par l'application, non modifiables */}
+      <div>
+        <span className="label">🤖 {s.assistantTitle}</span>
+        <ul className="space-y-1 rounded-lg border border-violet-200 bg-violet-50/60 p-3 text-sm text-violet-950">
+          {assistant.map((x, i) => (
+            <li key={i} className="flex gap-2">{x.date && <span className="w-16 shrink-0 tabular-nums text-violet-700">{x.date}</span>}<span>{x.text}</span></li>
+          ))}
+        </ul>
+        <p className="mt-1 text-[11px] text-stone-500">{s.assistantHint}</p>
       </div>
 
       <label className="block max-w-xs">

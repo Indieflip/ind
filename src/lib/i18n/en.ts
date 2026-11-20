@@ -358,6 +358,8 @@ export const en: Dict = {
     },
   },
   suppliers: {
+    duplicatesTitle: "Possible duplicate supplier accounts",
+    duplicatesHint: "Nearly identical names. To merge: open the extra account, Delete, then transfer to the right account (receptions, anomalies and history follow).",
     natureCount: "Product types",
     editInfo: "Edit details",
     contacts: "Contact details",
@@ -706,8 +708,11 @@ export const en: Dict = {
     create: "Create a claim",
   },
   sheet: {
+    assistantTitle: "Assistant actions",
+    assistantHint: "Filled in automatically by the app, read-only.",
+    assistant: { imported: "Sheet imported from the follow-up file", createdFrom: "Sheet created automatically when saving reception No.", createdBy: "Sheet created by", claimNumber: "Claim number assigned:", informative: "Amount for information only: not counted in savings", lastAction: "Last action recorded", followPlanned: "Follow-up planned (supplier delay)", followLate: "Follow-up overdue: reminder shown on Home", verifyPlanned: "Credit check planned", verifyLate: "Credit check overdue: reminder shown on Home", toProcess: "To process: listed in the Home tasks", saving: "Saving counted in Reporting › Savings:", consolidated: "Sheet consolidated: read-only" },
     problemDetail: "Problem details",
-    problemType: "Problem type",
+    problemType: "Anomaly type",
     manageTypes: "Manage types",
     addType: "Add a type",
     productLinked: "Product",
@@ -950,6 +955,9 @@ export const en: Dict = {
     src: { reception: "reception", invoice: "invoice", manual: "manual", import: "import", mercurial: "Mercurial" },
   },
   purchases: {
+    period: "Period",
+    periodFrom: "From month",
+    periodTo: "To month",
     showColumn: "Show column",
     hideColumn: "Hide column",
     nature: "Product type",

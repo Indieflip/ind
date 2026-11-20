@@ -11,13 +11,19 @@ export interface PurchaseRow { supplierId: number | null; supplier: string; prod
  * Achats des réceptions saisies dans l'application, par période, fournisseur, produit et nature :
  * Q facturée (ou contrôlée à défaut) × prix unitaire, produits refusés exclus.
  */
-export async function loadPurchases(freq: PurchaseFreq, locale: string, labels: { weekOf: string; noSupplier: string }) {
-  const { unit, count } = PURCHASE_FREQS[freq];
-  const step = sql.raw(`interval '${unit === "quarter" ? "3 months" : `1 ${unit}`}'`);
+export async function loadPurchases(freq: PurchaseFreq, locale: string, labels: { weekOf: string; noSupplier: string }, range?: { from?: string; to?: string }) {
+  const { unit } = PURCHASE_FREQS[freq];
+  // Période : du mois « from » au mois « to » (AAAA-MM) ; par défaut les 6 derniers mois
+  const nowP = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
+  const ym = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const ok = (v?: string) => (v && /^\d{4}-\d{2}$/.test(v) ? v : undefined);
+  let to = ok(range?.to) ?? ym(nowP);
+  let from = ok(range?.from) ?? ym(new Date(nowP.getFullYear(), nowP.getMonth() - 5, 1));
+  if (from > to) [from, to] = [to, from];
+  const fromDate = `${from}-01`;
+  const [ty, tm] = to.split("-").map(Number);
+  const endDate = `${tm === 12 ? ty + 1 : ty}-${String(tm === 12 ? 1 : tm + 1).padStart(2, "0")}-01`;
   const res = await getDb().execute<{ period: string; supplier_id: number | null; supplier: string | null; product: string; nature: string | null; amount: string }>(sql`
-    with periods as (
-      select generate_series(date_trunc(${unit}, (now() at time zone 'Europe/Paris')) - (${count - 1}::int * ${step}), date_trunc(${unit}, (now() at time zone 'Europe/Paris')), ${step}) as p
-    )
     select to_char(date_trunc(${unit}, r.delivered_at at time zone 'Europe/Paris'), 'YYYY-MM-DD') as period, r.supplier_id, s.name as supplier,
            coalesce(p.name, l.product_name) as product, p.nature,
            sum(coalesce(l.qty_ordered, l.qty_received, 0) * coalesce(l.unit_price, 0))::text as amount
@@ -26,24 +32,22 @@ export async function loadPurchases(freq: PurchaseFreq, locale: string, labels: 
     left join suppliers s on s.id = r.supplier_id
     left join products p on p.id = l.product_id
     where l.decision <> 'refuse'
-      and r.delivered_at at time zone 'Europe/Paris' >= (select min(p) from periods)
+      and r.delivered_at at time zone 'Europe/Paris' >= ${fromDate}::date and r.delivered_at at time zone 'Europe/Paris' < ${endDate}::date
     group by 1, 2, 3, 4, 5
   `);
 
-  // Les périodes affichées, de la plus ancienne à la plus récente
+  // Les périodes affichées, de la plus ancienne à la plus récente, dans l'intervalle choisi
   const periods: { key: string; label: string }[] = [];
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Paris" }));
-  const cur = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (unit === "week") cur.setDate(cur.getDate() - ((cur.getDay() + 6) % 7));
-  if (unit === "month") cur.setDate(1);
-  if (unit === "quarter") { cur.setDate(1); cur.setMonth(Math.floor(cur.getMonth() / 3) * 3); }
-  if (unit === "year") { cur.setDate(1); cur.setMonth(0); }
-  for (let i = count - 1; i >= 0; i--) {
-    const d = new Date(cur);
-    if (unit === "week") d.setDate(d.getDate() - 7 * i);
-    if (unit === "month") d.setMonth(d.getMonth() - i);
-    if (unit === "quarter") d.setMonth(d.getMonth() - 3 * i);
-    if (unit === "year") d.setFullYear(d.getFullYear() - i);
+  const startOf = (d: Date) => {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    if (unit === "week") x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+    if (unit === "month") x.setDate(1);
+    if (unit === "quarter") { x.setDate(1); x.setMonth(Math.floor(x.getMonth() / 3) * 3); }
+    if (unit === "year") { x.setDate(1); x.setMonth(0); }
+    return x;
+  };
+  const last = new Date(`${endDate}T12:00:00`); last.setDate(last.getDate() - 1);
+  for (let d = startOf(new Date(`${fromDate}T12:00:00`)); d <= last && periods.length < 200;) {
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const label =
       unit === "week" ? `${labels.weekOf} ${d.toLocaleDateString(locale, { day: "2-digit", month: "2-digit" })}`
@@ -51,9 +55,13 @@ export async function loadPurchases(freq: PurchaseFreq, locale: string, labels: 
       : unit === "quarter" ? `T${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()}`
       : String(d.getFullYear());
     periods.push({ key, label });
+    if (unit === "week") d.setDate(d.getDate() + 7);
+    else if (unit === "month") d.setMonth(d.getMonth() + 1);
+    else if (unit === "quarter") d.setMonth(d.getMonth() + 3);
+    else d.setFullYear(d.getFullYear() + 1);
   }
   const rows: PurchaseRow[] = res.rows
     .map((r) => ({ supplierId: r.supplier_id, supplier: r.supplier ? sentence(r.supplier) : labels.noSupplier, product: r.product, nature: r.nature ?? "", period: r.period, amount: Number(r.amount) || 0 }))
     .filter((r) => r.amount);
-  return { periods, rows };
+  return { periods, rows, from, to };
 }
