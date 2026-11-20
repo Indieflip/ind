@@ -50,7 +50,10 @@ export default async function SupplierPage({ params, searchParams }: { params: P
   // Date de création du compte : la plus ancienne entre l'ajout dans l'application et une ligne « Rajout fournisseur / prestataire » de l'historique du Mercurial
   const majRows = await db.select({ date: schema.majLog.date, nature: schema.majLog.nature, item: schema.majLog.item, detail: schema.majLog.detail }).from(schema.majLog).where(eq(schema.majLog.supplierId, id));
   const creations = majRows.filter((r) => r.date && isSupplierCreation(r.nature, r.item, r.detail)).map((r) => new Date(`${r.date}T12:00:00`));
-  const createdOn = [supplier.createdAt, ...creations].sort((a, b) => a.getTime() - b.getTime())[0];
+  // Sans ligne d'historique, la date d'ajout ne compte que pour un compte créé après l'import initial des fournisseurs
+  const [{ first }] = (await db.execute<{ first: string }>(sql`select min(created_at)::text as first from suppliers`)).rows;
+  const createdInApp = first && supplier.createdAt.getTime() - new Date(first).getTime() > 86_400_000 ? [supplier.createdAt] : [];
+  const createdOn: Date | undefined = [...creations, ...createdInApp].sort((a, b) => a.getTime() - b.getTime())[0];
   const units = unitRows.map((u) => u.name);
   const categories = cats.map((c) => ({ id: c.id, name: locale === "en" ? c.nameEn : c.nameFr }));
   const editable = can.editSuppliers(user.role);
@@ -91,7 +94,6 @@ export default async function SupplierPage({ params, searchParams }: { params: P
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-white/60">N° {supplier.id}{!supplier.active ? ` · ${t.suppliers.inactive}` : ""}</p>
               <h1 className="text-2xl font-bold leading-tight">{sentence(supplier.name)}</h1>
-              <p className="text-sm text-white/75">{t.maj.accountCreated} {fmtDate(createdOn, locale)}</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -116,14 +118,14 @@ export default async function SupplierPage({ params, searchParams }: { params: P
           <div className="bg-white p-4">
             <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-stone-400">{t.suppliers.natures}</p>
             {natureCounts.length ? (
-              <div className="flex flex-wrap gap-1.5">{natureCounts.map(([n, c]) => <span key={n} className="badge bg-brand-50 text-brand-800">{n} <span className="ml-1 text-brand-600/70">{c}</span></span>)}</div>
+              <div className="flex flex-wrap gap-1.5">{natureCounts.map(([n]) => <span key={n} className="badge bg-brand-50 text-brand-800">{n}</span>)}</div>
             ) : <p className="text-sm text-stone-400">—</p>}
           </div>
-          <div className="grid grid-cols-2 gap-px bg-stone-200">
-            {([[t.mercurial.tabProducts, String(rows.filter((r) => r.active).length)], [t.nav.receptions, String(recents.length)], [t.suppliers.lastReception, recents[0] ? fmtDate(recents[0].deliveredAt, locale) : "—"], [t.suppliers.openAnomalies, String(openAnomalies)]] as const).map(([k, v]) => (
+          <div className="grid grid-cols-2 content-start gap-px bg-stone-200">
+            {([[t.maj.accountCreated, createdOn ? fmtDate(createdOn, locale) : ""], [t.mercurial.tabProducts, String(rows.filter((r) => r.active).length)], [t.nav.receptions, String(recents.length)], [t.suppliers.lastReception, recents[0] ? fmtDate(recents[0].deliveredAt, locale) : "—"], [t.suppliers.openAnomalies, String(openAnomalies)], [t.suppliers.natureCount, String(natureCounts.length)]] as const).map(([k, v]) => (
               <div key={k} className="bg-white p-3">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">{k}</p>
-                <p className="text-lg font-bold tabular-nums">{v}</p>
+                <p className="min-h-7 text-lg font-bold tabular-nums">{v}</p>
               </div>
             ))}
           </div>

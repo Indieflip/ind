@@ -10,6 +10,7 @@ import { DataTable, type Col } from "@/components/table/DataTable";
 import { DevProject, type ProjectKpis, type Roi } from "./DevProject";
 import { DevFields, type FieldRow } from "./DevFields";
 import { DevFold } from "./DevFold";
+import { CompetitorsTable } from "./CompetitorsTable";
 import { AppFlowContent } from "@/components/AppFlow";
 import { RichView } from "../protocoles/RichEditor";
 
@@ -134,6 +135,11 @@ export function DevBoard({ items, reserved, tab, fields = [], project, study }: 
                 <h3 className="mb-1 text-lg font-bold">{t.nav.flow}</h3>
                 <p className="mb-4 text-sm text-stone-600">{d.flowIntro}</p>
                 <AppFlowContent />
+              </section>
+              <section>
+                <h3 className="mb-1 text-lg font-bold">{d.competitors}</h3>
+                <p className="mb-3 text-sm text-stone-600">{d.competitorsIntro}</p>
+                <CompetitorsTable />
               </section>
               <section>
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

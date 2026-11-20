@@ -372,13 +372,7 @@ async function writeContent(
     });
   }
 
-  // Température du camion trop élevée (au-delà de 4 °C)
-  if (p.truckTemp != null && p.truckTemp > 4 && !keep.truck) {
-    await tx.insert(schema.anomalies).values({
-      receptionId: recId, supplierId, supplierName, type: "temperature", reference: docRef,
-      description: `${t.wizard.truckTemp} : ${String(p.truckTemp).replace(".", ",")} °C`, createdBy: user.id, createdAt: date,
-    });
-  }
+  // Température du camion : sert à proposer la décision des produits frais, sans fiche d'anomalie à part
 
   if (p.vehicleClean === false && !keep.hygiene) {
     await tx.insert(schema.anomalies).values({

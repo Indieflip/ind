@@ -8,6 +8,8 @@ import { one, type SP } from "@/lib/server/queries";
 import { Field, FilterBar, PageHeader, Stat, qs } from "@/components/ui";
 import Link from "next/link";
 import { syncMajPrices } from "@/lib/server/priceSync";
+import { loadPurchases, PURCHASE_FREQS, type PurchaseFreq } from "@/lib/server/purchases";
+import { PurchasesTable } from "./PurchasesTable";
 
 function defaultFrom() {
   const d = new Date();
@@ -46,6 +48,9 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
   const ak = anomalyKpi.rows[0];
   const pk = priceKpi.rows[0];
   const rate = k.receptions ? Math.round((k.conform / k.receptions) * 100) : null;
+  // Achats par fournisseur (fréquence choisie)
+  const af: PurchaseFreq = (one(sp.af) ?? "") in PURCHASE_FREQS ? (one(sp.af) as PurchaseFreq) : "mois";
+  const purchases = can.viewMercurial(user.role) ? await loadPurchases(af, locale, { weekOf: t.purchases.weekOf, noSupplier: t.purchases.noSupplier }) : null;
 
   return (
     <>
@@ -69,6 +74,7 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
         )}
       </div>
 
+      {purchases && <PurchasesTable rows={purchases.rows} periods={purchases.periods} freq={af} freqs={Object.keys(PURCHASE_FREQS)} />}
     </>
   );
 }

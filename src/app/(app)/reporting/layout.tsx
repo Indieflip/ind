@@ -10,7 +10,6 @@ export default async function ReportingLayout({ children }: { children: React.Re
     { href: "/reporting", label: t.reporting.title, exact: true },
     ...(can.viewAnomalies(user.role) ? [{ href: "/reporting/economies", label: t.savings.title }] : []),
     ...(can.viewPrices(user.role) ? [{ href: "/reporting/prix", label: t.prices.title }] : []),
-    ...(can.viewMercurial(user.role) ? [{ href: "/reporting/achats", label: t.purchases.tab }] : []),
     ...(can.viewMercurial(user.role) ? [{ href: "/reporting/viande-poisson", label: t.meatFish.tab }] : []),
   ];
   return (
