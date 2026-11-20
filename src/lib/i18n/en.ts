@@ -409,6 +409,13 @@ export const en: Dict = {
     empty: "No suppliers yet. Import your price list or add a supplier.",
   },
   anomalies: {
+    sheetsLabel: "sheets",
+    frequency: "Frequency",
+    periods: { mois: "Month", trimestre: "Quarter", annee: "Year", perso: "Custom" },
+    amount: "Amount",
+    noneInPeriod: "No anomaly sheet over the period.",
+    recapHint: "Sheets created over the period (open and consolidated); amount = claimed amount. Click a type to show its open sheets.",
+    goToNumber: "Sheet No.…",
     typeRecap: "Recap by anomaly type",
     sheetsCount: "open sheets",
     filteredOn: "filtered on",
@@ -713,6 +720,7 @@ export const en: Dict = {
     create: "Create a claim",
   },
   sheet: {
+    unitMismatch: "Unit differs from the Mercurial: enter the price",
     reviewLabel: "Check",
     reviews: { a_verifier: "To check", verifiee: "Checked", a_voir: "To review" },
     card: { nextStep: "Next step", nextClaim: "send the claim to", nextClaimMail: "The email is ready with the delivery note, products and amount.", nextWait: "wait for the supplier credit", nextFollowOn: "; follow-up planned on", nextVerify: "check the credit or the corrected invoice.", closed: "Sheet closed", cancelled: "Sheet cancelled.", sendClaim: "Send the claim", iCalled: "I called", iFollowed: "I followed up", creditReceived: "Credit received", closeWithCredit: "Close with this credit", reopen: "Reopen the sheet", confirmReopen: "Reopen this sheet?", confirmNoFollow: "Close this sheet with no further action?", confirmDelivery: "Close: product delivered later?", mailSent: "claim sent by email", called: "call to the supplier", followed: "follow-up", history: "What happened", details: "Details", detailsHint: "type, products, amount, note, full follow-up" },

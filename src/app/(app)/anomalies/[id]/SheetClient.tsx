@@ -39,10 +39,24 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
   const typeOptions = v.problemType && !typeList.includes(v.problemType) ? [v.problemType, ...typeList] : typeList;
   // Produits de la fiche : quantité et prix par produit
   const setItem = (i: number, patch: Partial<Item>) => { setV({ ...v, items: v.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) }); setSaved(false); };
+  // Prix du Mercurial repris seulement si l'unité de la ligne est celle du produit (ex. dorade au Kg ≠ à la Pièce)
+  const productOf = (it: Item) => (it.productId ? products.find((x) => x.id === it.productId) : undefined);
+  const priceStr = (p?: { price?: number | null }) => (p?.price != null ? String(p.price).replace(".", ",") : "");
   const pickItem = (i: number, text: string) => {
     const p = products.find((x) => x.name === text);
-    setItem(i, { name: text, productId: p?.id ?? null, ...(p && !v.items[i].unit ? { unit: canonUnit(p.unit ?? "") } : {}), ...(p && !v.items[i].price && p.price != null ? { price: String(p.price).replace(".", ",") } : {}) });
+    const cur = v.items[i];
+    const unit = cur.unit || canonUnit(p?.unit ?? "");
+    const sameUnit = !!p && key(unit) === key(p.unit ?? "");
+    setItem(i, { name: text, productId: p?.id ?? null, unit, ...(p && !cur.price && sameUnit ? { price: priceStr(p) } : {}) });
   };
+  const changeUnit = (i: number, u: string) => {
+    const it = v.items[i];
+    const p = productOf(it);
+    if (p && key(u) !== key(p.unit ?? "") && it.price === priceStr(p)) return setItem(i, { unit: u, price: "" });
+    if (p && key(u) === key(p.unit ?? "") && !it.price) return setItem(i, { unit: u, price: priceStr(p) });
+    setItem(i, { unit: u });
+  };
+  const unitMismatch = (it: Item) => { const p = productOf(it); return !!p && !!it.unit && !!p.unit && key(it.unit) !== key(p.unit); };
   const n = (x: string) => { const r = parseFloat(x.replace(",", ".").replace(/[^\d.-]/g, "")); return Number.isFinite(r) ? r : null; };
   // Unité tapée à la main (« kg », « Pièce ») rattachée à l'unité existante de même nom
   const key = (u: string) => u.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -78,8 +92,11 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
                     {x.productId ? <Link href={`/mercurial/produits/${x.productId}`} className="mt-0.5 block text-[11px] text-brand-700 underline">{s.seeProduct} →</Link> : x.name ? <span className="mt-0.5 block text-[11px] text-amber-700">{s.productNotLinked}</span> : null}
                   </td>
                   <td><input className="input py-1.5 text-right text-sm" inputMode="decimal" value={x.qty} onChange={(e) => setItem(i, { qty: e.target.value })} disabled={!editable} /></td>
-                  <td>{editable ? <UnitSelect className="input py-1.5 text-sm" value={canonUnit(x.unit)} units={units} onChange={(u) => setItem(i, { unit: u })} /> : <span>{x.unit}</span>}</td>
-                  <td><MoneyInput className="input py-1.5 text-right text-sm" value={x.price} onChange={(e) => setItem(i, { price: e.target.value })} disabled={!editable} /></td>
+                  <td>{editable ? <UnitSelect className="input py-1.5 text-sm" value={canonUnit(x.unit)} units={units} onChange={(u) => changeUnit(i, u)} /> : <span>{x.unit}</span>}</td>
+                  <td>
+                    <MoneyInput className="input py-1.5 text-right text-sm" value={x.price} onChange={(e) => setItem(i, { price: e.target.value })} disabled={!editable} />
+                    {unitMismatch(x) && <span className="mt-0.5 block text-[11px] leading-tight text-amber-700">{s.unitMismatch} ({productOf(x)?.unit})</span>}
+                  </td>
                   <td className="text-right tabular-nums">{n(x.qty) != null && n(x.price) != null ? `${((n(x.qty) ?? 0) * (n(x.price) ?? 0)).toFixed(2).replace(".", ",")} €` : "—"}</td>
                   <td>{editable && <button type="button" className="btn-ghost p-1 text-stone-400 hover:text-red-600" aria-label={t.common.delete} onClick={() => { setV({ ...v, items: v.items.filter((_, j) => j !== i) }); setSaved(false); }}><Icon name="trash" className="h-4 w-4" /></button>}</td>
                 </tr>

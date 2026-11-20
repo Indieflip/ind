@@ -411,6 +411,13 @@ export const fr = {
     empty: "Aucun fournisseur. Importez votre mercurial ou ajoutez un fournisseur.",
   },
   anomalies: {
+    sheetsLabel: "fiches",
+    frequency: "Fréquence",
+    periods: { mois: "Mois", trimestre: "Trimestre", annee: "Année", perso: "Personnalisé" },
+    amount: "Montant",
+    noneInPeriod: "Aucune fiche d'anomalie sur la période.",
+    recapHint: "Fiches créées sur la période (en cours et consolidées) ; montant = montant réclamé. Un clic sur un type affiche ses fiches en cours.",
+    goToNumber: "Fiche N°…",
     typeRecap: "Récap par type d'anomalie",
     sheetsCount: "fiches en cours",
     filteredOn: "filtré sur",
@@ -715,6 +722,7 @@ export const fr = {
     create: "Créer une réclamation",
   },
   sheet: {
+    unitMismatch: "Unité différente du Mercurial : prix à saisir",
     reviewLabel: "Contrôle",
     reviews: { a_verifier: "À vérifier", verifiee: "Vérifiée", a_voir: "À voir" },
     card: { nextStep: "Prochaine étape", nextClaim: "envoyer la réclamation à", nextClaimMail: "Le mail est déjà rédigé avec le BL, les produits et le montant.", nextWait: "attendre l'avoir du fournisseur", nextFollowOn: "; relance prévue le", nextVerify: "vérifier l'avoir ou la régularisation sur la facture.", closed: "Fiche clôturée", cancelled: "Fiche annulée.", sendClaim: "Envoyer la réclamation", iCalled: "J'ai appelé", iFollowed: "J'ai relancé", creditReceived: "Avoir reçu", closeWithCredit: "Clôturer avec cet avoir", reopen: "Rouvrir la fiche", confirmReopen: "Rouvrir cette fiche ?", confirmNoFollow: "Clôturer cette fiche sans suite ?", confirmDelivery: "Clôturer : produit livré plus tard ?", mailSent: "réclamation envoyée par mail", called: "appel au fournisseur", followed: "relance", history: "Ce qui s'est passé", details: "Détails", detailsHint: "type, produits, montant, note, suivi complet" },
