@@ -595,6 +595,9 @@ export const en: Dict = {
     blocked: "Locked prices",
   },
   maj: {
+    supplierCreated: "Supplier account created",
+    detach: "Detach from product",
+    accountCreated: "Account created on",
     match: "Product record",
     matched: "Identified",
     unmatched: "Unidentified product",

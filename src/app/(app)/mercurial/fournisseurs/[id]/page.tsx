@@ -5,7 +5,8 @@ import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
-import { fmtDateTime, num, sentence } from "@/lib/format";
+import { fmtDate, fmtDateTime, num, sentence } from "@/lib/format";
+import { isSupplierCreation } from "@/lib/majKinds";
 import { fvRange, parisMonth } from "@/lib/pricing";
 import { one, type SP } from "@/lib/server/queries";
 import { Icon } from "@/components/Icon";
@@ -45,6 +46,10 @@ export default async function SupplierPage({ params, searchParams }: { params: P
     db.select({ id: schema.suppliers.id, name: schema.suppliers.name }).from(schema.suppliers).where(eq(schema.suppliers.active, true)).orderBy(asc(schema.suppliers.name)),
     db.select().from(schema.fvItems),
   ]);
+  // Date de création du compte : la plus ancienne entre l'ajout dans l'application et une ligne « Rajout fournisseur / prestataire » de l'historique du Mercurial
+  const majRows = await db.select({ date: schema.majLog.date, nature: schema.majLog.nature, item: schema.majLog.item, detail: schema.majLog.detail }).from(schema.majLog).where(eq(schema.majLog.supplierId, id));
+  const creations = majRows.filter((r) => r.date && isSupplierCreation(r.nature, r.item, r.detail)).map((r) => new Date(`${r.date}T12:00:00`));
+  const createdOn = [supplier.createdAt, ...creations].sort((a, b) => a.getTime() - b.getTime())[0];
   const units = unitRows.map((u) => u.name);
   const categories = cats.map((c) => ({ id: c.id, name: locale === "en" ? c.nameEn : c.nameFr }));
   const editable = can.editSuppliers(user.role);
@@ -71,7 +76,10 @@ export default async function SupplierPage({ params, searchParams }: { params: P
         <div className="w-full max-w-xs"><SupplierSearch suppliers={allSuppliers} /></div>
       </div>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h1 className="text-2xl font-bold"><span className="mr-2 align-middle text-sm font-semibold text-stone-400">N° {supplier.id}</span>{sentence(supplier.name)}</h1>
+        <div>
+          <h1 className="text-2xl font-bold"><span className="mr-2 align-middle text-sm font-semibold text-stone-400">N° {supplier.id}</span>{sentence(supplier.name)}</h1>
+          <p className="text-sm text-stone-500">{t.maj.accountCreated} {fmtDate(createdOn, locale)}</p>
+        </div>
         {can.deleteSupplier(user.role) ? (
           <DeleteSupplier id={supplier.id} name={supplier.name} others={allSuppliers} />
         ) : (

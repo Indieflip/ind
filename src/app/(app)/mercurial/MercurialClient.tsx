@@ -39,6 +39,7 @@ export function AddRow({ suppliers, units, natures, fixedSupplier, existing = []
   const [natureKey, setNatureKey] = useState(0);
   const [supplierKey] = useState(0);
   const [name, setName] = useState("");
+  const [hideSimilar, setHideSimilar] = useState(false);
   // Produits proches chez ce fournisseur : avertit avant de créer un doublon
   const similar = useMemo(
     () =>
@@ -83,9 +84,10 @@ export function AddRow({ suppliers, units, natures, fixedSupplier, existing = []
         </div>
         <label className="relative">
           <span className="label">{m.products} *</span>
-          <input name="name" className="input" required value={name} onChange={(e) => setName(e.target.value)} />
-          {similar.length > 0 && (
-            <div className="absolute left-0 right-0 z-20 mt-1 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs shadow">
+          <input name="name" className="input" required value={name} onChange={(e) => { setName(e.target.value); setHideSimilar(false); }} />
+          {similar.length > 0 && !hideSimilar && (
+            <div className="absolute left-0 right-0 z-20 mt-1 rounded-lg border border-amber-300 bg-amber-50 p-2 pr-8 text-xs shadow">
+              <button type="button" className="absolute right-1.5 top-1.5 rounded px-1.5 text-sm leading-none text-amber-800 hover:bg-amber-100" aria-label={t.common.close} title={t.common.close} onClick={(e) => { e.preventDefault(); setHideSimilar(true); }}>✕</button>
               <p className="mb-1 font-semibold text-amber-900">{m.similarTitle}</p>
               <ul className="list-disc pl-4 text-stone-700">{similar.map((x) => <li key={x.name}>{x.name}</li>)}</ul>
             </div>

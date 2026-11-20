@@ -597,6 +597,9 @@ export const fr = {
     blocked: "Prix bloqués",
   },
   maj: {
+    supplierCreated: "Création du compte fournisseur",
+    detach: "Détacher du produit",
+    accountCreated: "Compte créé le",
     match: "Fiche produit",
     matched: "Identifié",
     unmatched: "Produit non identifié",
