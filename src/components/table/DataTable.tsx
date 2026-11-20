@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/client";
-import { ActiveFilters, FilterInput, Pager, ResetFilters } from "./FilterInput";
+import { FilterInput, Pager, ResetFilters } from "./FilterInput";
 import { useTable, type ColumnDef } from "./useTable";
 import { RowMenu, type RowAction } from "./RowMenu";
 import { sentence } from "@/lib/format";
@@ -80,7 +80,6 @@ export function DataTable<R>({
   const allOn = tb.filtered.length > 0 && tb.filtered.every((r) => sel.has(rowKey(r)));
   return (
     <div className="card overflow-hidden">
-      <ActiveFilters filters={tb.filters} labels={Object.fromEntries(cols.map((c) => [c.key, c.label]))} onChange={tb.setFilter} onReset={tb.reset} count={tb.filtered.length} total={rows.length} />
       <div className={`${maxHeight} min-h-48 overflow-auto`}>
         <table className={`table ${dense ? "text-xs [&_th]:text-xs" : ""} ${fixed ? "table-fixed [&_td]:break-words [&_td]:px-1.5 [&_th]:px-1.5 [&_thead_tr:first-child_th]:whitespace-normal [&_thead_tr:first-child_th]:text-left [&_thead_tr:first-child_th]:align-top [&_thead_tr:first-child_th]:font-bold [&_thead_tr:first-child_th]:text-stone-800" : ""}`}>
           {(fixed || cols.some((c) => c.width)) && (

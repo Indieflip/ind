@@ -15,7 +15,7 @@ import { NatureSelect } from "@/components/NatureSelect";
 import { matches } from "@/lib/search";
 import { similarity } from "@/lib/fuzzy";
 import { SupplierCombo } from "@/components/SupplierCombo";
-import { ActiveFilters, FilterInput, Pager, ResetFilters } from "@/components/table/FilterInput";
+import { FilterInput, Pager, ResetFilters } from "@/components/table/FilterInput";
 import { useTable, type ColumnDef } from "@/components/table/useTable";
 import { SortTh } from "@/components/table/DataTable";
 

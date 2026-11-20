@@ -930,6 +930,12 @@ export const en: Dict = {
     src: { reception: "reception", invoice: "invoice", manual: "manual", import: "import", mercurial: "Mercurial" },
   },
   devProject: {
+    modulesLive: "Modules in place",
+    autoUpdated: "Updated automatically",
+    modulesTodo: "Key modules to add",
+    modulesTodoHint: "By priority, with the reason and estimated effort.",
+    effort: "Effort",
+    effortLabels: { S: "a few days", M: "2 to 4 weeks", L: "over a month" },
     toc: "Contents",
     kpisTitle: "Key figures (live)",
     since: "Since",

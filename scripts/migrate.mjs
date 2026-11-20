@@ -706,6 +706,12 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_pending_r
   await db.execute(sql`insert into app_settings (key, value) values ('dev_pending_rgpd_v1', '1') on conflict (key) do nothing`);
 }
 
+// Dev > Projet : la partie « 2. La solution » renvoie aux modules en place (mis à jour automatiquement), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_project_v7'`)).rows.length) {
+  await db.execute(sql`update app_settings set value = regexp_replace(value, '<h2>2\. La solution</h2>.*?(<h2>3\.)', ${"<h2>2. La solution</h2>\n<p>Voir « Modules en place » en haut de la page : la liste est mise à jour automatiquement à chaque évolution de l'application. Les modules à venir sont dans « Modules importants à ajouter ».</p>\n\n\\1"}) where key = 'dev_project_doc'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_project_v7', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

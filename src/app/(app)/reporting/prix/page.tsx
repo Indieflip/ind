@@ -85,7 +85,7 @@ export default async function PricesPage({ searchParams }: { searchParams: Promi
               product: r.productName,
               unit: r.unit ?? "",
               document: r.document ?? "",
-              documentHref: r.receptionId ? `/receptions/${r.receptionId}` : r.majId ? (r.productId ? `/mercurial/produits/${r.productId}` : "/mercurial/mise-a-jour") : null,
+              documentHref: r.receptionId ? `/receptions/${r.receptionId}` : r.majId && r.productId ? `/mercurial/produits/${r.productId}` : null,
               origin: pr.sources[r.source],
               old: fmtMoney(r.oldPrice, locale),
               oldN: o,

@@ -4,7 +4,7 @@ import { sentence } from "@/lib/format";
 import { MoneyInput } from "@/components/MoneyInput";
 import { appConfirm } from "@/components/Confirm";
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ActiveFilters, FilterInput, Pager, ResetFilters } from "@/components/table/FilterInput";
+import { FilterInput, Pager, ResetFilters } from "@/components/table/FilterInput";
 import { useTable, type ColumnDef } from "@/components/table/useTable";
 import { addFvAction, deleteFvAction, updateFvAction } from "@/lib/actions/fv";
 import { useI18n } from "@/lib/i18n/client";
@@ -58,7 +58,6 @@ export function FvTable({ rows, months, currentMonth, editable, units }: { rows:
         <span className="text-stone-500">{tb.filtered.length} / {rows.length} {t.mercurial.count}</span>
       </div>
       <div className="card overflow-hidden">
-        <ActiveFilters filters={tb.filters} labels={{ supplier: t.fv.supplier, product: t.common.product, unit: t.common.unit }} onChange={tb.setFilter} onReset={tb.reset} count={tb.filtered.length} total={base.length} unit={t.mercurial.count} />
         <div className={`max-h-[75vh] ${view === -1 ? "overflow-auto" : "overflow-y-auto"}`}>
           <table className={`w-full border-separate border-spacing-0 text-left ${view === -1 ? "text-xs" : "text-sm"}`}>
             <thead className="sticky top-0 z-10 bg-stone-50">

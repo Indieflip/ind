@@ -62,7 +62,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         ),
         can.viewMercurial(r) && res.maj.length > 0 && (
           <Section key="maj" title={t.maj.title} count={res.maj.length}>
-            {res.maj.map((x) => <Item key={x.id} href={x.productId ? `/mercurial/produits/${x.productId}` : "/mercurial/mise-a-jour"} title={x.item ?? "—"} meta={`${x.date ? fmtDate(x.date, locale) : ""} · ${x.detail ?? ""}${x.reference ? ` · ${x.reference}` : ""}`} />)}
+            {res.maj.map((x) => <Item key={x.id} href={x.productId ? `/mercurial/produits/${x.productId}` : "/mercurial"} title={x.item ?? "—"} meta={`${x.date ? fmtDate(x.date, locale) : ""} · ${x.detail ?? ""}${x.reference ? ` · ${x.reference}` : ""}`} />)}
           </Section>
         ),
         can.viewProtocols(r) && res.protocols.length > 0 && (

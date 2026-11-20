@@ -932,6 +932,12 @@ export const fr = {
     src: { reception: "réception", invoice: "facture", manual: "saisie manuelle", import: "import", mercurial: "Mercurial" },
   },
   devProject: {
+    modulesLive: "Modules en place",
+    autoUpdated: "Mis à jour automatiquement",
+    modulesTodo: "Modules importants à ajouter",
+    modulesTodoHint: "Par priorité, avec la raison et l'effort estimé.",
+    effort: "Effort",
+    effortLabels: { S: "quelques jours", M: "2 à 4 semaines", L: "plus d'un mois" },
     toc: "Sommaire",
     kpisTitle: "Chiffres clés (calculés en direct)",
     since: "Depuis le",

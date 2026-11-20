@@ -6,6 +6,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { fmtMoney } from "@/lib/format";
 import { Icon } from "@/components/Icon";
 import { RichEditor, RichView } from "../protocoles/RichEditor";
+import { MODULES_LIVE, MODULES_TODO } from "./projectModules";
 
 export interface ProjectKpis {
   since: string | null; months: number; receptions: number; lines: number; anomalies: number; claims: number;
@@ -62,6 +63,45 @@ export function DevProject({ doc, kpis, roi }: { doc: string; kpis: ProjectKpis;
           <div className="rounded-xl bg-white/10 p-3"><p className="text-xs text-stone-300">{p.obtained}</p><p className="text-2xl font-bold tabular-nums">{money(kpis.obtained)}</p></div>
           <div className="rounded-xl bg-white/10 p-3"><p className="text-xs text-stone-300">{p.gainsMonth}</p><p className="text-2xl font-bold tabular-nums">{money(gains)}</p></div>
           <div className={`rounded-xl p-3 ${result >= 0 ? "bg-emerald-500/20" : "bg-red-500/20"}`}><p className="text-xs text-stone-300">{p.resultMonth}</p><p className={`text-2xl font-bold tabular-nums ${result >= 0 ? "text-emerald-300" : "text-red-300"}`}>{money(result)}</p></div>
+        </div>
+      </section>
+
+      {/* Modules en place : mis à jour à chaque évolution de l'application */}
+      <section>
+        <div className="mb-2 flex flex-wrap items-baseline gap-2">
+          <h2 className="text-lg font-bold">{p.modulesLive}</h2>
+          <span className="text-xs font-medium text-brand-700">{p.autoUpdated}</span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {MODULES_LIVE.map((m) => (
+            <div key={m.title} className="rounded-xl border border-stone-200 bg-white p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><Icon name={m.icon} className="h-4 w-4" /></span>
+                <h3 className="font-semibold leading-tight">{m.title}</h3>
+              </div>
+              <ul className="space-y-1 text-sm text-stone-600">{m.items.map((x) => <li key={x} className="flex gap-2"><Icon name="check" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />{x}</li>)}</ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Modules importants à ajouter */}
+      <section>
+        <h2 className="text-lg font-bold">{p.modulesTodo}</h2>
+        <p className="mb-2 text-sm text-stone-600">{p.modulesTodoHint}</p>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {MODULES_TODO.map((m) => (
+            <div key={m.title} className={`flex flex-col rounded-xl border p-4 ${m.priority === "haute" ? "border-violet-300 bg-violet-50/60" : "border-dashed border-stone-300 bg-white"}`}>
+              <div className="mb-1 flex items-start gap-2">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700"><Icon name={m.icon} className="h-4 w-4" /></span>
+                <h3 className="flex-1 font-semibold leading-tight">{m.title}</h3>
+                <span className={`badge ${m.priority === "haute" ? "bg-red-100 text-red-800" : m.priority === "moyenne" ? "bg-amber-100 text-amber-900" : "bg-stone-100 text-stone-600"}`}>{t.dev.priorities[m.priority]}</span>
+              </div>
+              <p className="text-sm text-stone-700">{m.why}</p>
+              <ul className="mt-2 list-inside list-disc text-sm text-stone-600">{m.what.map((x) => <li key={x}>{x}</li>)}</ul>
+              <p className="mt-auto pt-2 text-xs text-stone-500">{p.effort} : <strong>{p.effortLabels[m.effort]}</strong></p>
+            </div>
+          ))}
         </div>
       </section>
 
