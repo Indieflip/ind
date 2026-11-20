@@ -159,6 +159,17 @@ export function RichEditor({ value, onChange }: { value: string; onChange: (html
   if (!editor) return <div className="min-h-[24rem] rounded-lg border border-stone-200 p-4 text-stone-400">…</div>;
   const b = (on: boolean) => `rounded px-2 py-1 text-sm ${on ? "bg-brand-100 text-brand-800" : "text-stone-700 hover:bg-stone-100"}`;
   const inTable = editor.isActive("table");
+  // Barre du tableau posée juste sous le tableau où se trouve le curseur (espace réservé sous les tableaux pendant l'édition)
+  let tablePos: { top: number; left: number } | null = null;
+  if (inTable && wrap.current) {
+    const at = editor.view.domAtPos(editor.state.selection.from).node;
+    const el = (at instanceof HTMLElement ? at : at.parentElement)?.closest("table");
+    if (el) {
+      const t = el.getBoundingClientRect();
+      const w = wrap.current.getBoundingClientRect();
+      tablePos = { top: t.bottom - w.top + 6, left: Math.max(8, t.left - w.left) };
+    }
+  }
   return (
     <div ref={wrap} className="relative rounded-xl border border-stone-200 bg-white">
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 rounded-t-xl border-b border-stone-200 bg-white/95 p-1.5 backdrop-blur">
@@ -229,8 +240,8 @@ export function RichEditor({ value, onChange }: { value: string; onChange: (html
           <span className="w-full text-[11px] text-sky-800/80">{r.linkHint}</span>
         </form>
       )}
-      {inTable && (
-        <div className="flex flex-wrap items-center gap-1 border-b border-stone-100 bg-stone-50 px-2 py-1 text-xs">
+      {inTable && tablePos && (
+        <div className="absolute z-20 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-0.5 rounded-lg border border-stone-200 bg-white px-1.5 py-1 text-xs shadow-lg" style={{ top: tablePos.top, left: tablePos.left }} onMouseDown={(e) => e.preventDefault()}>
           <span className="mr-1 font-semibold text-stone-600">▦ {r.table} :</span>
           <button type="button" className="btn-ghost px-2 py-0.5 text-xs" onClick={() => editor.chain().focus().addRowBefore().run()}>+ {r.row} {r.above}</button>
           <button type="button" className="btn-ghost px-2 py-0.5 text-xs" onClick={() => editor.chain().focus().addRowAfter().run()}>+ {r.row} {r.below}</button>
@@ -242,7 +253,7 @@ export function RichEditor({ value, onChange }: { value: string; onChange: (html
         </div>
       )}
       <div className="p-4 sm:p-6">
-        <EditorContent editor={editor} className={proseClass} />
+        <EditorContent editor={editor} className={`${proseClass} [&_table]:!mb-14`} />
       </div>
       {slash && list.length > 0 && (
         <div className="absolute z-20 max-h-80 w-72 overflow-y-auto rounded-xl border border-stone-200 bg-white p-1 shadow-lg" style={{ top: slash.top, left: Math.max(8, Math.min(slash.left, (wrap.current?.clientWidth ?? 400) - 296)) }}>
