@@ -48,6 +48,7 @@ export async function updateAnomalyAction(
   data: {
     status?: string; creditAmount?: string; followUp?: string; description?: string; nature?: string; result?: string; lastActionAt?: string; nextActionAt?: string;
     stage?: string; resolution?: string; mode?: string; claimedAmount?: string; creditNumber?: string; creditDate?: string; creditKind?: string;
+    problemType?: string; productId?: number | null; note?: string;
   },
 ) {
   await assertUser(can.manageAnomalies);
@@ -64,6 +65,13 @@ export async function updateAnomalyAction(
   if (data.description !== undefined && data.description.trim()) set.description = data.description.trim();
   if (data.nature !== undefined) set.nature = data.nature.trim() || null;
   if (data.result !== undefined) set.result = outcomeOf(data.result);
+  if (data.problemType !== undefined) set.problemType = data.problemType.trim() || null;
+  if (data.note !== undefined) set.note = data.note.trim() || null;
+  if (data.productId !== undefined) {
+    const p = data.productId ? await getDb().query.products.findFirst({ where: eq(schema.products.id, data.productId), columns: { id: true, name: true } }) : undefined;
+    set.productId = p?.id ?? null;
+    if (p) set.productName = p.name;
+  }
   // Suivi unique : l'étape pilote aussi les anciens champs statut / résultat
   if (data.stage !== undefined && STAGES.includes(data.stage as Stage)) {
     const stage = stageOf(data.stage);

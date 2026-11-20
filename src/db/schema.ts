@@ -261,6 +261,12 @@ export const anomalies = pgTable(
     supplierName: text("supplier_name").notNull(),
     productName: text("product_name"),
     type: anomalyTypeEnum("type").notNull().default("other"),
+    /** Type de problème choisi dans la liste modifiable (Fiche d'anomalie > Détail du problème) ; à défaut, le libellé du type */
+    problemType: text("problem_type"),
+    /** Produit du Mercurial rattaché à l'anomalie */
+    productId: integer("product_id").references(() => products.id, { onDelete: "set null" }),
+    /** Note libre de l'utilisateur */
+    note: text("note"),
     description: text("description").notNull(),
     status: anomalyStatusEnum("status").notNull().default("open"),
     creditAmount: numeric("credit_amount", { precision: 12, scale: 2 }),

@@ -35,9 +35,17 @@ export function PurchasesTable({ rows, periods, freq, freqs }: { rows: Row[]; pe
   const suppliers = new Set(data.map((x) => x.supplier)).size;
 
   const cols: Col<Agg>[] = [
-    { key: "supplier", label: t.common.supplier, text: (r) => r.supplier, keepCase: true, render: (r) => (r.supplierId ? <Link href={`/mercurial/fournisseurs/${r.supplierId}`} className="font-medium hover:text-brand-700 hover:underline">{r.supplier}</Link> : r.supplier) },
-    ...(showProduct ? [{ key: "product", label: t.common.product, text: (r: Agg) => r.product, keepCase: true } as Col<Agg>] : []),
-    ...(showNature ? [{ key: "nature", label: A.nature, text: (r: Agg) => r.nature || "—" } as Col<Agg>] : []),
+    {
+      key: "supplier", label: t.common.supplier, text: (r) => r.supplier, keepCase: true,
+      headerAction: (
+        <span className="inline-flex">
+          {!showProduct && <button type="button" className="ml-1.5 rounded border border-stone-300 px-1 text-[10px] font-normal text-stone-500 hover:border-brand-500 hover:text-brand-700" title={A.showColumn} onClick={() => setShowProduct(true)}>+ {t.common.product}</button>}
+          {!showNature && <button type="button" className="ml-1.5 rounded border border-stone-300 px-1 text-[10px] font-normal text-stone-500 hover:border-brand-500 hover:text-brand-700" title={A.showColumn} onClick={() => setShowNature(true)}>+ {A.nature}</button>}
+        </span>
+      ),
+      render: (r) => (r.supplierId ? <Link href={`/mercurial/fournisseurs/${r.supplierId}`} className="font-medium hover:text-brand-700 hover:underline">{r.supplier}</Link> : r.supplier) },
+    ...(showProduct ? [{ key: "product", label: t.common.product, text: (r: Agg) => r.product, keepCase: true, headerAction: <button type="button" className="ml-1 text-xs text-stone-400 hover:text-red-600" title={A.hideColumn} onClick={() => setShowProduct(false)}>✕</button> } as Col<Agg>] : []),
+    ...(showNature ? [{ key: "nature", label: A.nature, text: (r: Agg) => r.nature || "—", headerAction: <button type="button" className="ml-1 text-xs text-stone-400 hover:text-red-600" title={A.hideColumn} onClick={() => setShowNature(false)}>✕</button> } as Col<Agg>] : []),
     ...periods.map((p) => ({ key: `p${p.key}`, label: p.label, align: "right", className: "whitespace-nowrap tabular-nums", text: (r: Agg) => (r.cells[p.key] ? money(r.cells[p.key]) : ""), sort: (r: Agg) => r.cells[p.key] ?? 0, render: (r: Agg) => (r.cells[p.key] ? money(r.cells[p.key]) : <span className="text-stone-300">—</span>) }) as Col<Agg>),
     { key: "total", label: A.total, align: "right", className: "whitespace-nowrap font-semibold tabular-nums", text: (r) => money(r.total), sort: (r) => r.total },
     { key: "share", label: "%", align: "right", className: "tabular-nums text-stone-500", text: (r) => `${grand ? Math.round((r.total / grand) * 100) : 0} %`, sort: (r) => r.total },
@@ -52,10 +60,6 @@ export function PurchasesTable({ rows, periods, freq, freqs }: { rows: Row[]; pe
         {freqs.map((f) => (
           <Link key={f} scroll={false} href={`/reporting?af=${f}#achats`} className={`rounded-lg px-3 py-1.5 text-sm font-medium ${f === freq ? "bg-brand-600 text-white" : "bg-white text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50"}`}>{A.freqs[f as "mois"]}</Link>
         ))}
-        <span className="mx-2 h-5 w-px bg-stone-200" />
-        <span className="text-sm font-medium text-stone-600">{A.columns} :</span>
-        <label className="flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-sm ring-1 ring-stone-200"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={showProduct} onChange={(e) => setShowProduct(e.target.checked)} /> {t.common.product}</label>
-        <label className="flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-sm ring-1 ring-stone-200"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={showNature} onChange={(e) => setShowNature(e.target.checked)} /> {A.nature}</label>
       </div>
 
       <div className="mb-3 grid gap-3 sm:grid-cols-3">

@@ -14,6 +14,7 @@ import { claimStyles, isInformative } from "@/lib/anomaly";
 import { AnomalySheetForm } from "./SheetClient";
 import { ensureClaimNumbers } from "@/lib/server/claimNumbers";
 import { supplierProcesses } from "@/lib/server/followup";
+import { problemTypes } from "@/lib/server/problemTypes";
 
 /** Fiche d'anomalie : la réception d'origine et tout le suivi (problème, action, résultat, économie, statut) */
 export default async function AnomalySheet({ params }: { params: Promise<{ id: string }> }) {
@@ -38,6 +39,14 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
     a.createdBy ? db.query.users.findFirst({ where: eq(schema.users.id, a.createdBy), columns: { name: true } }) : undefined,
   ]);
   const number = a.number ?? (maxNum[0]?.m ?? 0) + (rank[0]?.n ?? 0) + 1;
+  // Type de problème (liste modifiable) et produits du fournisseur pour le rattachement
+  const typeLabel = t.anomalies.types[a.type];
+  const problemType = a.problemType || typeLabel;
+  const [types, supplierProducts] = await Promise.all([
+    problemTypes(Object.values(t.anomalies.types)),
+    a.supplierId ? db.select({ id: schema.products.id, name: schema.products.name }).from(schema.products).where(and(eq(schema.products.supplierId, a.supplierId), eq(schema.products.active, true))).orderBy(asc(schema.products.name)) : Promise.resolve([] as { id: number; name: string }[]),
+  ]);
+  const productId = a.productId ?? line?.productId ?? null;
   void claims;
   // Procédure de réclamation du fournisseur (protocole) et délai de relance
   const process = (await supplierProcesses()).find(a.supplierId, a.supplierName);
@@ -68,16 +77,15 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
           <div className="min-w-0">
             {/* FICHE D'ANOMALIE · N° … (provisoire) du <date de réception> / Fournisseur - Produit / Numéro et date du document */}
             <p className="text-xs font-semibold uppercase tracking-wider text-white/75">
-              {s.title} · {t.anomalies.number} {number}{!a.number && <span className="ml-1 normal-case italic">({s.provisional})</span>}
+              {s.title} · {t.anomalies.number} {number}
               <span className="normal-case"> {s.of} {fmtDate(rec?.deliveredAt ?? a.createdAt, locale)}</span>
             </p>
-            <h1 className="mt-0.5 text-2xl font-bold leading-tight">{sentence(supplier?.name ?? a.supplierName)} - {a.productName || t.anomalies.types[a.type]}</h1>
+            <h1 className="mt-0.5 text-2xl font-bold leading-tight">{sentence(supplier?.name ?? a.supplierName)} - {problemType}</h1>
             <p className="mt-1 text-sm text-white/85">{reference || s.noDocument}</p>
           </div>
           <div className="flex flex-col items-end gap-1.5">
             {a.claimNo && <span className="badge bg-white text-red-800">{t.claims.title} N° {a.claimNo}</span>}
-            <span className="badge bg-white/20 text-white">{t.anomalies.types[a.type]}</span>
-            {a.nature && <span className="badge bg-white/20 text-white">{a.nature}</span>}
+            {a.productName && <span className="badge bg-white/20 text-white">{a.productName}</span>}
             {locked && <span className="badge bg-emerald-100 text-emerald-800">✓ {s.consolidated} {fmtDate(a.consolidatedAt, locale)}</span>}
           </div>
         </div>
@@ -169,8 +177,13 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
         informative={isInformative(a)}
         id={a.id}
         editable={editable}
+        types={types}
+        products={supplierProducts}
         initial={{
-          nature: a.nature ?? "",
+          problemType,
+          productId,
+          productName: a.productName ?? line?.productName ?? "",
+          note: a.note ?? "",
           description: a.description,
           followUp: a.followUp ?? "",
           lastActionAt: a.lastActionAt ?? "",

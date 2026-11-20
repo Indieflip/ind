@@ -1,5 +1,5 @@
 /** Comparatif des solutions de réception (tableau « Appli », prix et fonctions non revérifiés) : Dev > Développement commercial > Marché */
-export interface Competitor { cat: string; name: string; price: string; reception: string; haccp: string; cmp: string; stock: string; ddpp: string; offline: string; other: string; pros: string; cons: string; target: string }
+export interface Competitor { cat: string; name: string; url?: string; price: string; reception: string; haccp: string; cmp: string; stock: string; ddpp: string; offline: string; other: string; pros: string; cons: string; target: string }
 
 export const COMPETITORS: Competitor[] = [
   {

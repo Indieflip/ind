@@ -11,6 +11,7 @@ import { DevProject, type ProjectKpis, type Roi } from "./DevProject";
 import { DevFields, type FieldRow } from "./DevFields";
 import { DevFold } from "./DevFold";
 import { CompetitorsTable } from "./CompetitorsTable";
+import type { Competitor } from "./competitors";
 import { AppFlowContent } from "@/components/AppFlow";
 import { RichView } from "../protocoles/RichEditor";
 
@@ -20,7 +21,7 @@ const prioStyle: Record<string, string> = { haute: "bg-red-100 text-red-800", mo
 const prioRank: Record<string, number> = { haute: 0, moyenne: 1, basse: 2, "": 3 };
 
 /** Onglet Dev : sous-onglets (en attente, objectifs, contraintes, idées, réalisé, règles) ; tout est modifiable */
-export function DevBoard({ items, reserved, tab, fields = [], project, study }: { study?: { id: number; title: string; content: string } | null; items: Item[]; reserved: boolean; tab: string; fields?: FieldRow[]; project?: { doc: string; kpis: ProjectKpis; roi: Roi } }) {
+export function DevBoard({ items, reserved, tab, fields = [], project, study, competitors }: { competitors?: Competitor[]; study?: { id: number; title: string; content: string } | null; items: Item[]; reserved: boolean; tab: string; fields?: FieldRow[]; project?: { doc: string; kpis: ProjectKpis; roi: Roi } }) {
   const { t } = useI18n();
   const d = t.dev;
   const router = useRouter();
@@ -139,7 +140,7 @@ export function DevBoard({ items, reserved, tab, fields = [], project, study }: 
               <section>
                 <h3 className="mb-1 text-lg font-bold">{d.competitors}</h3>
                 <p className="mb-3 text-sm text-stone-600">{d.competitorsIntro}</p>
-                <CompetitorsTable />
+                <CompetitorsTable rows={competitors ?? []} />
               </section>
               <section>
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

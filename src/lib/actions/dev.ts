@@ -81,3 +81,16 @@ export async function setDevTaskAction(id: number, task: string) {
   revalidatePath("/dev");
   return { ok: true };
 }
+
+/** Dev > Marché : comparatif des concurrents (lignes modifiables, ajoutées ou supprimées) */
+export async function saveCompetitorsAction(rows: Record<string, string>[]) {
+  await guard();
+  const keys = ["cat", "name", "url", "price", "reception", "haccp", "cmp", "stock", "ddpp", "offline", "other", "pros", "cons", "target"];
+  const clean = rows
+    .map((r) => Object.fromEntries(keys.map((k) => [k, String(r[k] ?? "").trim().slice(0, 2000)])))
+    .filter((r) => r.name)
+    .slice(0, 200);
+  await setSetting("dev_competitors", JSON.stringify(clean));
+  revalidatePath("/dev");
+  return { ok: true };
+}

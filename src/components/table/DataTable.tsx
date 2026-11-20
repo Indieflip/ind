@@ -21,10 +21,12 @@ export interface Col<R> extends ColumnDef<R> {
   keepCase?: boolean;
   /** Largeur de la colonne (tableau à largeur fixe), ex. "8%" */
   width?: string;
+  /** Petit bouton dans l'en-tête de la colonne (ex. afficher / masquer une colonne voisine) */
+  headerAction?: React.ReactNode;
 }
 
 /** En-tête triable (▲ A→Z / ▼ Z→A) */
-export function SortTh({ label, active, dir, onClick, align }: { label: string; active: boolean; dir?: "asc" | "desc"; onClick: () => void; align?: "right" | "center" }) {
+export function SortTh({ label, active, dir, onClick, align, action }: { label: string; active: boolean; dir?: "asc" | "desc"; onClick: () => void; align?: "right" | "center"; action?: React.ReactNode }) {
   const { t } = useI18n();
   return (
     <th className={align === "right" ? "text-right" : align === "center" ? "text-center" : ""}>
@@ -32,6 +34,7 @@ export function SortTh({ label, active, dir, onClick, align }: { label: string; 
         {label}
         <span className={`text-[10px] ${active ? "text-brand-600" : "text-stone-300"}`}>{active ? (dir === "asc" ? "▲" : "▼") : "▲▼"}</span>
       </button>
+      {action}
     </th>
   );
 }
@@ -106,7 +109,7 @@ export function DataTable<R>({
                 c.sortable === false ? (
                   <th key={c.key} className={c.align === "right" && !fixed ? "text-right" : ""}>{c.label}</th>
                 ) : (
-                  <SortTh key={c.key} label={c.label} align={fixed ? undefined : c.align} active={tb.sort?.key === c.key} dir={tb.sort?.dir} onClick={() => tb.toggleSort(c.key)} />
+                  <SortTh key={c.key} label={c.label} align={fixed ? undefined : c.align} active={tb.sort?.key === c.key} dir={tb.sort?.dir} onClick={() => tb.toggleSort(c.key)} action={c.headerAction} />
                 ),
               )}
               <th className="w-px" />

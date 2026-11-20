@@ -720,6 +720,34 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_pending_p
   await db.execute(sql`insert into app_settings (key, value) values ('dev_pending_purchases_v1', '1') on conflict (key) do nothing`);
 }
 
+// Anomalies « Température du camion » (plus créées) : les anciennes fiches encore « À traiter », sans avoir ni résultat, sont supprimées (accord de l'utilisateur), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'truck_anomalies_removed_v1'`)).rows.length) {
+  const r = await db.execute(sql`delete from anomalies where type = 'temperature' and product_name is null and reception_id is not null and stage = 'a_traiter' and credit_amount is null and result is null`);
+  console.log(`[migrate] anomalies température camion supprimées : ${r.rowCount ?? 0}`);
+  await db.execute(sql`insert into app_settings (key, value) values ('truck_anomalies_removed_v1', '1') on conflict (key) do nothing`);
+}
+
+// Fiches d'anomalie : produit du Mercurial rattaché à partir de la ligne du bon, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'anomaly_product_link_v1'`)).rows.length) {
+  await db.execute(sql`update anomalies a set product_id = l.product_id from reception_lines l where a.line_id = l.id and a.product_id is null and l.product_id is not null`);
+  await db.execute(sql`insert into app_settings (key, value) values ('anomaly_product_link_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev > Développement : fiche d'anomalie réorganisée (Détail du problème, Suivi), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v6'`)).rows.length) {
+  await db.execute(sql`update dev_fields set section = 'Détail du problème', field = 'Type de problème', rule = ${"Choisi dans une liste modifiable (Gérer les types : ajouter, renommer, supprimer). Titre de la fiche : Fournisseur - Type de problème."}, updated_at = now() where form = 'anomaly' and field = 'Type d''anomalie'`);
+  await db.execute(sql`update dev_fields set section = 'Détail du problème', rule = ${"Rattaché au produit du Mercurial (liste des produits du fournisseur), lien vers sa fiche produit."}, updated_at = now() where form = 'anomaly' and field = 'Produit'`);
+  await db.execute(sql`update dev_fields set section = 'Détail du problème', field = 'Problème', updated_at = now() where form = 'anomaly' and field = 'Description'`);
+  await db.execute(sql`update dev_fields set section = 'Détail du problème', updated_at = now() where form = 'anomaly' and field = 'Montant réclamé'`);
+  await db.execute(sql`update dev_fields set section = 'Suivi', updated_at = now() where form = 'anomaly' and field in ('Fournisseur', 'Type de suivi')`);
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values
+    ('anomaly', 'Détail du problème', 'Note', false, ${"Texte libre de l'utilisateur."}, '', ${pos}),
+    ('anomaly', 'Suivi', 'Action utilisateur', false, ${"Ce qui a été fait (mail, appel…) ; « Relancé aujourd'hui » ajoute une ligne datée."}, '', ${pos + 1}),
+    ('anomaly', 'Suivi', 'Dernière action', false, ${"Date de la dernière action ; sert au rappel de relance."}, '', ${pos + 2})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v6', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
