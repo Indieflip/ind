@@ -55,7 +55,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       const open = await getDb()
         .select({ id: a.id, stage: a.stage, mode: a.mode, supplierId: a.supplierId, supplierName: a.supplierName, lastActionAt: a.lastActionAt, createdAt: a.createdAt })
         .from(a)
-        .where(and(isNull(a.consolidatedAt), inArray(a.stage, ["a_traiter", "reclamee", "a_verifier"])));
+        .where(and(inArray(a.stage, ["a_traiter", "reclamee", "a_verifier"])));
       if (open.length) {
         const processes = await supplierProcesses();
         const now = new Date();

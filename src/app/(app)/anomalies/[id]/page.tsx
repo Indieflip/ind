@@ -35,8 +35,8 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
     a.lineId ? db.select().from(schema.receptionPhotos).where(eq(schema.receptionPhotos.lineId, a.lineId)) : Promise.resolve([]),
     receptionNumbers(),
     db.select({ m: max(schema.anomalies.number) }).from(schema.anomalies),
-    // N° provisoire : rang parmi les anomalies non consolidées
-    a.number ? Promise.resolve([{ n: 0 }]) : db.select({ n: sql<number>`count(*)::int` }).from(schema.anomalies).where(and(isNull(schema.anomalies.consolidatedAt), lt(schema.anomalies.createdAt, a.createdAt))),
+    // N° : rang parmi les anomalies sans numéro
+    a.number ? Promise.resolve([{ n: 0 }]) : db.select({ n: sql<number>`count(*)::int` }).from(schema.anomalies).where(and(isNull(schema.anomalies.number), lt(schema.anomalies.createdAt, a.createdAt))),
     a.createdBy ? db.query.users.findFirst({ where: eq(schema.users.id, a.createdBy), columns: { name: true } }) : undefined,
   ]);
   const number = a.number ?? (maxNum[0]?.m ?? 0) + (rank[0]?.n ?? 0) + 1;
@@ -68,7 +68,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   if (a.claimNo) assistant.push({ date: null, text: `${S.claimNumber} ${a.claimNo}` });
   if (isInformative(a)) assistant.push({ date: null, text: S.informative });
   if (a.lastActionAt) assistant.push({ date: fmtDate(a.lastActionAt, locale), text: S.lastAction });
-  const open = !a.consolidatedAt && ["a_traiter", "reclamee", "a_verifier"].includes(a.stage);
+  const open = ["a_traiter", "reclamee", "a_verifier"].includes(a.stage);
   if (open) {
     const from = a.lastActionAt ?? a.createdAt;
     if (a.mode === "verification") {
@@ -82,7 +82,6 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
     } else assistant.push({ date: null, text: S.toProcess });
   }
   if (a.resolution === "avoir" && a.creditAmount) assistant.push({ date: a.creditDate ? fmtDate(a.creditDate, locale) : null, text: `${S.saving} ${fmtMoney(num(a.creditAmount), locale)}` });
-  if (a.consolidatedAt) assistant.push({ date: fmtDate(a.consolidatedAt, locale), text: S.consolidated });
   void claims;
   // Procédure de réclamation du fournisseur (protocole) et délai de relance
   // Coordonnées « Réclamation » du fournisseur en priorité, sinon celles de la société
@@ -93,7 +92,8 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   const claimPhone = supplier?.contacts?.reclamation?.phone || supplier?.contacts?.societe?.phone || supplier?.phone || "";
   const docs = (rec?.documents as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[] | null) ?? (rec?.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : []);
   const reference = rec ? lineDocLabel(docs, line?.document, rec.blNumber) : a.reference;
-  const locked = !!a.consolidatedAt;
+  // Les fiches d'anomalie ne sont jamais figées (seules les fiches de réception le sont)
+  const locked = false;
   const editable = can.manageAnomalies(user.role) && !locked;
   const s = t.sheet;
   const info = (label: string, value: React.ReactNode) => (
@@ -135,7 +135,6 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
             <span className={`rounded-full px-3 py-1 text-sm font-semibold ${stageCls[a.stage] ?? "bg-stone-100"}`}>{t.stages[a.stage as "a_traiter"] ?? a.stage}</span>
             <p className="text-3xl font-bold tabular-nums">{a.claimedAmount ? fmtMoney(num(a.claimedAmount), locale) : "—"}</p>
             <p className="text-xs text-stone-500">{s.claimed}</p>
-            {locked && <span className="badge bg-emerald-100 text-emerald-800">✓ {s.consolidated} {fmtDate(a.consolidatedAt, locale)}</span>}
           </div>
         </div>
         <div className="border-t border-stone-100 p-6 pt-4">

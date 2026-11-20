@@ -42,7 +42,7 @@ const STAGES: { label: string; text: string; color: string }[] = [
 
 const NIGHT: { when: string; title: string; text: string }[] = [
   { when: "23 h", title: "Export automatique de la fiche de réception", text: "Fiche des bons du jour, N° annuel, contenu figé, PDF et Excel." },
-  { when: "23 h", title: "Consolidation des bons du jour", text: "Ils ne sont plus modifiables ; une non-conformité se suit par son anomalie." },
+  { when: "23 h", title: "Consolidation des bons du jour", text: "Seules les fiches de réception sont figées (preuve pour un contrôle sanitaire) ; les fiches d'anomalie restent modifiables." },
   { when: "À la demande", title: "Export manuel", text: "Bons choisis librement, mention « Export manuel », ajouté à l'historique." },
   { when: "5 ans", title: "Archivage", text: "Exports supprimés après 5 ans ; avant, uniquement après export par l'administrateur." },
 ];

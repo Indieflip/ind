@@ -100,8 +100,6 @@ export async function updateAnomalyAction(
   if (data.lastActionAt !== undefined) set.lastActionAt = day(data.lastActionAt);
   if (data.nextActionAt !== undefined) set.nextActionAt = day(data.nextActionAt);
   const db = getDb();
-  const cur = await db.query.anomalies.findFirst({ where: eq(schema.anomalies.id, id), columns: { consolidatedAt: true } });
-  if (cur?.consolidatedAt) return { error: "consolidated" };
   await db.update(schema.anomalies).set(set).where(eq(schema.anomalies.id, id));
   revalidatePath("/anomalies", "layout");
   return { ok: true };
@@ -190,7 +188,7 @@ export async function moveAnomalyAction(id: number, stage: string, resolution?: 
   await assertUser(can.manageAnomalies);
   const db = getDb();
   const cur = await db.query.anomalies.findFirst({ where: eq(schema.anomalies.id, id), columns: { consolidatedAt: true, stage: true } });
-  if (!cur || cur.consolidatedAt) return { error: "consolidated" };
+  if (!cur) return { error: "not_found" };
   const st = stageOf(stage);
   const res = st === "cloturee" && RESOLUTIONS.includes(resolution as (typeof RESOLUTIONS)[number]) ? resolution! : null;
   const today = new Date().toISOString().slice(0, 10);
@@ -204,7 +202,7 @@ export async function followUpTodayAction(id: number, note: string) {
   await assertUser(can.manageAnomalies);
   const db = getDb();
   const cur = await db.query.anomalies.findFirst({ where: eq(schema.anomalies.id, id) });
-  if (!cur || cur.consolidatedAt) return { error: "consolidated" };
+  if (!cur) return { error: "not_found" };
   const d = new Date();
   const label = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`;
   const line = `${label} : ${note.trim() || "relance"}`;

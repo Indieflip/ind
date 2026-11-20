@@ -33,7 +33,7 @@ export default async function HomePage() {
 
   // Anomalies et réclamations
   if (can.viewAnomalies(r)) {
-    const open = await db.select().from(a).where(and(isNull(a.consolidatedAt), or(eq(a.stage, "a_traiter"), eq(a.stage, "reclamee"), eq(a.stage, "a_verifier"))));
+    const open = await db.select().from(a).where(and(or(eq(a.stage, "a_traiter"), eq(a.stage, "reclamee"), eq(a.stage, "a_verifier"))));
     const processes = await supplierProcesses();
     const now = new Date();
     const todo = open.filter((x) => stageOf(x.stage) === "a_traiter");
