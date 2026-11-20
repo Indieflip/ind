@@ -27,3 +27,12 @@ export async function linkMajProductAction(id: number, productId: number | null)
   revalidatePath("/mercurial");
   return { ok: true };
 }
+
+/** Historique complet : supprimer une ligne (la variation de prix qu'elle a générée est supprimée avec elle) */
+export async function deleteMajAction(id: number) {
+  await assertUser(can.editPrices);
+  await getDb().delete(schema.majLog).where(eq(schema.majLog.id, id));
+  revalidatePath("/mercurial/mise-a-jour");
+  revalidatePath("/reporting/prix");
+  return { ok: true };
+}

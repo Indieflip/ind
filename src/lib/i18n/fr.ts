@@ -597,6 +597,7 @@ export const fr = {
     blocked: "Prix bloqués",
   },
   maj: {
+    deleteConfirm: "Supprimer cette ligne de l'historique ? La variation de prix qu'elle a créée dans le Suivi des prix sera aussi supprimée.",
     supplierCreated: "Création du compte fournisseur",
     detach: "Détacher du produit",
     accountCreated: "Compte créé le",

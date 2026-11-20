@@ -25,7 +25,6 @@ export default async function MercurialUpdatesPage() {
     .select({ id: schema.products.id, name: schema.products.name, supplierId: schema.products.supplierId, supplier: schema.suppliers.name })
     .from(schema.products)
     .innerJoin(schema.suppliers, eq(schema.suppliers.id, schema.products.supplierId))
-    .where(eq(schema.products.active, true))
     .orderBy(asc(schema.products.name));
   return (
     <MajLog

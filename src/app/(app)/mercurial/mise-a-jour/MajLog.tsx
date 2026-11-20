@@ -2,7 +2,9 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { linkMajProductAction, updateMajClaimAction } from "@/lib/actions/maj";
+import { deleteMajAction, linkMajProductAction, updateMajClaimAction } from "@/lib/actions/maj";
+import { appConfirm } from "@/components/Confirm";
+import { Icon } from "@/components/Icon";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtDate } from "@/lib/format";
 import { isSupplierCreation } from "@/lib/majKinds";
@@ -37,6 +39,7 @@ export function MajLog({ rows, editable, compact = false, products = [] }: { row
         ),
     },
     { key: "claim", label: m.claim, text: (r) => r.claim ?? "", className: "min-w-56", render: (r) => (editable ? <Claim id={r.id} initial={r.claim ?? ""} /> : r.claim || "—") },
+    ...(editable && !compact ? [{ key: "del", label: "", sortable: false, text: () => "", render: (r: Row) => <DeleteMaj id={r.id} /> } as Col<Row>] : []),
   ];
   const cols = compact ? all.filter((c) => c.key !== "item" && c.key !== "supplier" && c.key !== "match") : all;
   if (compact) return <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} empty={m.empty} />;
@@ -50,6 +53,7 @@ export function MajLog({ rows, editable, compact = false, products = [] }: { row
         <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={unmatchedOnly} onChange={(e) => setUnmatchedOnly(e.target.checked)} disabled={!unmatched} />
         ⚠ {m.unmatchedOnly} <strong>({unmatched})</strong>
       </label>
+      {editable && <datalist id="maj-products">{products.map((p) => <option key={p.id} value={productLabel(p)} />)}</datalist>}
       <DataTable
         rows={unmatchedOnly ? rows.filter(isUnmatched) : rows}
         cols={cols}
@@ -72,10 +76,8 @@ function ProductPicker({ id, supplierId, item, products, onDone, hideBadge = fal
   const router = useRouter();
   const [v, setV] = useState("");
   const [pending, start] = useTransition();
-  const list = supplierId ? [...products.filter((p) => p.supplierId === supplierId), ...products.filter((p) => p.supplierId !== supplierId)] : products;
-  const label = (p: Product) => `${p.name} — ${p.supplier} (n° ${p.id})`;
   const pick = (text: string) => {
-    const p = list.find((x) => label(x) === text);
+    const p = products.find((x) => productLabel(x) === text);
     if (!p) return;
     start(async () => { await linkMajProductAction(id, p.id); setV(""); onDone?.(); router.refresh(); });
   };
@@ -84,13 +86,12 @@ function ProductPicker({ id, supplierId, item, products, onDone, hideBadge = fal
       {!hideBadge && <span className="badge mb-1 bg-amber-100 text-amber-800">⚠ {t.maj.unmatched}</span>}
       <input
         className="input py-1.5 text-sm"
-        list={`maj-products-${id}`}
+        list="maj-products"
         placeholder={item ? `${t.maj.pickProduct} (${item})` : t.maj.pickProduct}
         value={v}
         disabled={pending}
         onChange={(e) => { setV(e.target.value); pick(e.target.value); }}
       />
-      <datalist id={`maj-products-${id}`}>{list.slice(0, 400).map((p) => <option key={p.id} value={label(p)} />)}</datalist>
     </div>
   );
 }
@@ -115,5 +116,20 @@ function ProductLink({ row, products, editable }: { row: Row; products: Product[
         </>
       )}
     </div>
+  );
+}
+
+const productLabel = (p: Product) => `${p.name} — ${p.supplier} (n° ${p.id})`;
+
+/** Supprimer une ligne de l'historique, après confirmation */
+function DeleteMaj({ id }: { id: number }) {
+  const { t } = useI18n();
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  return (
+    <button type="button" className="btn-ghost p-1.5 text-stone-400 hover:text-red-600" disabled={pending} aria-label={t.common.delete} title={t.common.delete}
+      onClick={async () => { if (await appConfirm(t.maj.deleteConfirm)) start(async () => { await deleteMajAction(id); router.refresh(); }); }}>
+      <Icon name="trash" className="h-4 w-4" />
+    </button>
   );
 }

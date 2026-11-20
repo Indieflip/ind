@@ -281,6 +281,7 @@ function AddProduct({ draft, setDraft, catalog, doc }: { draft: Draft; setDraft:
   const [browse, setBrowse] = useState(false);
   const add = (line: DraftLine) => setDraft((d) => ({ ...d, lines: [...d.lines, { ...line, doc }] }));
   const [custom, setCustom] = useState<null | { name: string; unit: string; categoryId: string }>(null);
+  const [hideSimilar, setHideSimilar] = useState(false);
 
   // Produits proches déjà au mercurial du fournisseur : évite de créer un doublon
   const similar = useMemo(() => {
@@ -344,7 +345,7 @@ function AddProduct({ draft, setDraft, catalog, doc }: { draft: Draft; setDraft:
       ) : (
         <div className="space-y-2">
           <p className="text-xs text-stone-500">{t.wizard.outOfListHint}</p>
-          <input className="input" placeholder={`${t.wizard.productName} *`} value={custom.name} onChange={(e) => setCustom({ ...custom, name: e.target.value })} />
+          <input className="input" placeholder={`${t.wizard.productName} *`} value={custom.name} onChange={(e) => { setCustom({ ...custom, name: e.target.value }); setHideSimilar(false); }} />
           <div className="grid grid-cols-2 gap-2">
             <UnitSelect value={custom.unit} units={catalog?.units ?? DEFAULT_UNITS} onChange={(unit) => setCustom({ ...custom, unit })} />
             <select className="input" value={custom.categoryId} onChange={(e) => setCustom({ ...custom, categoryId: e.target.value })}>
@@ -355,8 +356,9 @@ function AddProduct({ draft, setDraft, catalog, doc }: { draft: Draft; setDraft:
             </select>
           </div>
           <p className="text-xs text-stone-500">{t.common.supplier} : <strong>{draft.supplierName}</strong></p>
-          {similar.length > 0 && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-sm">
+          {similar.length > 0 && !hideSimilar && (
+            <div className="relative rounded-lg border border-amber-300 bg-amber-50 p-2 pr-8 text-sm">
+              <button type="button" className="absolute right-1.5 top-1.5 rounded px-1.5 text-base leading-none text-amber-800 hover:bg-amber-100" aria-label={t.common.close} title={t.common.close} onClick={() => setHideSimilar(true)}>✕</button>
               <p className="mb-1 text-xs font-semibold text-amber-900">{t.mercurial.similarTitle}</p>
               <ul className="space-y-1">
                 {similar.map((p) => (
