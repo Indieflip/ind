@@ -411,6 +411,11 @@ export const fr = {
     empty: "Aucun fournisseur. Importez votre mercurial ou ajoutez un fournisseur.",
   },
   anomalies: {
+    typeRecap: "Récap par type d'anomalie",
+    sheetsCount: "fiches en cours",
+    filteredOn: "filtré sur",
+    count: "Nombre",
+    clearType: "Afficher tous les types",
     outcomes: { en_cours: "En cours", cloture: "Clôturé", annule: "Annulé" },
     texts: { missing: "manque", extra: "en trop", invoiced: "facturé", checked: "contrôlé", temperature: "température", maximum: "maximum", dlcExpired: "DLC dépassée", dlcShort: "DLC trop courte", insteadOf: "au lieu de" },
     number: "N°",

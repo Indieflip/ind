@@ -409,6 +409,11 @@ export const en: Dict = {
     empty: "No suppliers yet. Import your price list or add a supplier.",
   },
   anomalies: {
+    typeRecap: "Recap by anomaly type",
+    sheetsCount: "open sheets",
+    filteredOn: "filtered on",
+    count: "Count",
+    clearType: "Show all types",
     outcomes: { en_cours: "In progress", cloture: "Closed", annule: "Cancelled" },
     texts: { missing: "missing", extra: "extra", invoiced: "invoiced", checked: "checked", temperature: "temperature", maximum: "maximum", dlcExpired: "use-by date passed", dlcShort: "use-by date too short", insteadOf: "instead of" },
     number: "No.",

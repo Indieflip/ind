@@ -88,6 +88,7 @@ export interface AnomalyRow {
   type: string; nextActionAt: string; due: boolean; verify?: "a_traiter" | "a_verifier" | null; receptionId: number | null; photoUrl: string | null; consolidated?: string;
   stage: string; resolution: string | null; mode: string; claimed: number | null; days: number; delay: number; closedAt: string | null;
   review?: string;
+  problemType?: string;
 }
 
 /** Anomalies : à suivre aujourd'hui, suivi (colonnes du fichier), consolidation */
@@ -156,6 +157,8 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
   });
   // Contrôle de la fiche (À vérifier / Vérifiée / À voir), modifiable dans la liste
   const reviewLabel = (v?: string) => (v ? t.sheet.reviews[v as "a_verifier"] ?? "" : "");
+  // Type d'anomalie : pour traiter les fiches type par type (filtre et tri en en-tête)
+  shownCols.splice(1, 0, { key: "problemType", width: "8rem", label: t.sheet.problemType, text: (r) => r.problemType ?? "", options: [...new Set(rows.map((r) => r.problemType ?? "").filter(Boolean))].sort((x, y) => x.localeCompare(y, "fr")), keepCase: true });
   shownCols.splice(1, 0, {
     key: "review", width: "6.5rem", label: t.sheet.reviewLabel, text: (r) => reviewLabel(r.review), options: Object.values(t.sheet.reviews),
     render: (r) => <ReviewSelect id={r.id} value={r.review ?? ""} disabled={!canManage} />,

@@ -70,6 +70,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     dateSort: x.createdAt.toISOString(),
     nature: x.nature ?? "",
     review: x.review ?? "",
+    problemType: x.problemType || t.anomalies.types[x.type],
     supplier: extra.get(x.id)?.supplier ?? x.supplierName,
     supplierId: x.supplierId,
     reference: (x.receptionId ? lineDocLabel(extra.get(x.id)?.documents, extra.get(x.id)?.lineDoc, extra.get(x.id)?.blNumber) : null) ?? x.reference ?? "",
@@ -97,6 +98,12 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     photoUrl: x.photoUrl,
   });
   const preselect = Number(one(sp.reception)) || null;
+  // Récap par type d'anomalie (fiches en cours) ; un clic filtre les fiches de ce type
+  const typeOf = (x: (typeof active)[number]) => x.problemType || t.anomalies.types[x.type];
+  const typeCounts = [...active.reduce((m, x) => m.set(typeOf(x), (m.get(typeOf(x)) ?? 0) + 1), new Map<string, number>())].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "fr"));
+  const typeFilter = one(sp.type) ?? "";
+  const shown = typeFilter ? active.filter((x) => typeOf(x) === typeFilter) : active;
+  const typeHref = (ty: string) => `/anomalies?${new URLSearchParams({ ...(view === "list" ? { view: "liste" } : {}), ...(ty ? { type: ty } : {}) })}`;
   return (
     <>
       <PageHeader title={t.anomalies.title}>
@@ -113,12 +120,33 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
         />
       )}
       <DueBox rows={active.map(toRow)} />
+      <details open={!!typeFilter} className="group mb-4 rounded-xl border border-stone-200 bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-sm">
+          <span><strong>{t.anomalies.typeRecap}</strong> · {active.length} {t.anomalies.sheetsCount}{typeFilter ? ` · ${t.anomalies.filteredOn} « ${typeFilter} »` : ""}</span>
+          <span className="text-stone-400 transition group-open:rotate-90">▸</span>
+        </summary>
+        <div className="border-t border-stone-100 p-3">
+          <table className="table max-w-xl text-sm">
+            <thead><tr><th>{t.sheet.problemType}</th><th className="text-right">{t.anomalies.count}</th></tr></thead>
+            <tbody>
+              {typeCounts.map(([ty, n]) => (
+                <tr key={ty} className={ty === typeFilter ? "bg-brand-50" : ""}>
+                  <td><Link href={typeHref(ty === typeFilter ? "" : ty)} className="font-medium text-brand-700 hover:underline">{ty}</Link></td>
+                  <td className="text-right tabular-nums">{n}</td>
+                </tr>
+              ))}
+              <tr className="font-semibold"><td>{t.common.total}</td><td className="text-right tabular-nums">{active.length}</td></tr>
+            </tbody>
+          </table>
+          {typeFilter && <Link href={typeHref("")} className="btn-ghost mt-2 text-sm">✕ {t.anomalies.clearType}</Link>}
+        </div>
+      </details>
       {view === "board" ? (
-        <Kanban rows={active.map(toRow)} canManage={can.manageAnomalies(user.role)} />
+        <Kanban rows={shown.map(toRow)} canManage={can.manageAnomalies(user.role)} />
       ) : (
       <AnomaliesBoard
-        rows={active.map(toRow)}
-        consolidated={consolidated.map(({ a: x, byName }) => ({ ...toRow(x), consolidated: `${fmtDateTime(x.consolidatedAt, locale)}${byName ? ` ${t.consolidation.by} ${byName}` : ""}` }))}
+        rows={shown.map(toRow)}
+        consolidated={consolidated.filter(({ a: x }) => !typeFilter || (x.problemType || t.anomalies.types[x.type]) === typeFilter).map(({ a: x, byName }) => ({ ...toRow(x), consolidated: `${fmtDateTime(x.consolidatedAt, locale)}${byName ? ` ${t.consolidation.by} ${byName}` : ""}` }))}
         canManage={can.manageAnomalies(user.role)}
         canConsolidate={can.consolidate(user.role)}
         today={day}
