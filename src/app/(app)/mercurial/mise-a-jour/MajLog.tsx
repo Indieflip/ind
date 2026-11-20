@@ -7,7 +7,7 @@ import { appConfirm } from "@/components/Confirm";
 import { Icon } from "@/components/Icon";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtDate } from "@/lib/format";
-import { isSupplierCreation } from "@/lib/majKinds";
+import { isSupplierCreation, isSupplierInfo } from "@/lib/majKinds";
 import { DataTable, type Col } from "@/components/table/DataTable";
 
 interface Row { id: number; date: string | null; nature: string | null; item: string | null; original: string | null; detail: string | null; supplier: string | null; supplierId: number | null; reference: string | null; claim: string | null; priceHref: string | null; productId?: number | null }
@@ -18,7 +18,8 @@ export function MajLog({ rows, editable, compact = false, products = [] }: { row
   const [unmatchedOnly, setUnmatchedOnly] = useState(false);
   // Création d'un compte fournisseur : pas un produit, elle date le compte du fournisseur
   const supplierEvent = (r: Row) => isSupplierCreation(r.nature, r.item, r.detail);
-  const isUnmatched = (r: Row) => !r.productId && !supplierEvent(r);
+  const supplierInfo = (r: Row) => isSupplierInfo(r.nature, r.item, r.detail);
+  const isUnmatched = (r: Row) => !r.productId && !supplierEvent(r) && !supplierInfo(r);
   const unmatched = rows.filter(isUnmatched).length;
   const { t, locale } = useI18n();
   const m = t.maj;
@@ -30,9 +31,11 @@ export function MajLog({ rows, editable, compact = false, products = [] }: { row
     { key: "supplier", label: m.supplier, text: (r) => r.supplier ?? "", href: (r) => (r.supplierId ? `/mercurial/fournisseurs/${r.supplierId}` : null) },
     { key: "reference", label: m.reference, text: (r) => r.reference ?? "", className: "whitespace-pre-wrap text-stone-600" },
     {
-      key: "match", label: m.match, text: (r) => (r.productId ? m.matched : supplierEvent(r) ? m.supplierCreated : m.unmatched), className: "min-w-56",
+      key: "match", label: m.match, text: (r) => (r.productId ? m.matched : supplierEvent(r) ? m.supplierCreated : supplierInfo(r) ? m.supplierInfo : m.unmatched), className: "min-w-56",
       render: (r) =>
-        supplierEvent(r) && !r.productId ? (
+        supplierInfo(r) && !r.productId ? (
+          r.supplierId ? <Link href={`/mercurial/fournisseurs/${r.supplierId}`} className="text-sm font-medium text-sky-700 hover:underline">ℹ️ {m.supplierInfo}</Link> : <span className="text-sm text-sky-700">ℹ️ {m.supplierInfo}</span>
+        ) : supplierEvent(r) && !r.productId ? (
           r.supplierId ? <Link href={`/mercurial/fournisseurs/${r.supplierId}`} className="text-sm font-medium text-sky-700 hover:underline">🏢 {m.supplierCreated}</Link> : <span className="text-sm text-sky-700">🏢 {m.supplierCreated}</span>
         ) : (
           <ProductLink row={r} products={products} editable={editable} />

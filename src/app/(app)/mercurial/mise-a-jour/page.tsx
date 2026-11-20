@@ -1,6 +1,6 @@
 import { asc, eq, isNotNull } from "drizzle-orm";
 import { syncMajPrices } from "@/lib/server/priceSync";
-import { ensureMajNormalized } from "@/lib/server/maj";
+import { ensureMajCleanup, ensureMajNormalized } from "@/lib/server/maj";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -10,6 +10,7 @@ import { MajLog } from "./MajLog";
 export default async function MercurialUpdatesPage() {
   const user = await requireUser(can.viewMercurial);
   await ensureMajNormalized();
+  await ensureMajCleanup();
   await syncMajPrices();
   const m = schema.majLog;
   const linked = await getDb().select({ majId: schema.priceChanges.majId, supplierId: schema.priceChanges.supplierId, date: schema.priceChanges.date }).from(schema.priceChanges).where(isNotNull(schema.priceChanges.majId));

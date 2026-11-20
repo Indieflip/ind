@@ -5,6 +5,7 @@ import { bestMatch } from "@/lib/fuzzy";
 import { nameKey, normalize } from "@/lib/search";
 import { shortDates } from "@/lib/format";
 import { getSetting, setSetting } from "@/lib/settings";
+import { isSupplierCreation, isSupplierInfo } from "@/lib/majKinds";
 
 type Row = typeof schema.majLog.$inferSelect;
 
@@ -287,4 +288,60 @@ function levenshtein(a: string, b: string) {
     }
   }
   return prev[b.length];
+}
+
+/**
+ * Historique du Mercurial, nettoyage (une fois) :
+ * 1. une modification découpée en lignes « produit : … » / « presta : … » / « tarif : … » est regroupée en une seule ligne ;
+ * 2. les lignes sans produit sont rattachées au produit du Mercurial quand la correspondance est sûre.
+ * Il ne reste à traiter à la main que les vrais cas sans correspondance.
+ */
+export async function ensureMajCleanup() {
+  if (await getSetting("maj_cleanup_v1")) return;
+  const db = getDb();
+  const m = schema.majLog;
+  const rows = await db.select().from(m).orderBy(asc(m.position), asc(m.id));
+  const products = await db.select({ id: schema.products.id, name: schema.products.name, supplierId: schema.products.supplierId }).from(schema.products).where(eq(schema.products.active, true));
+  const suppliers = await supplierMatcher();
+  const isProd = /^\s*produit\s*:?\s*/i, isPresta = /^\s*presta\b\s*:?\s*/i, isTarif = /^\s*tari[fd]\b\s*:?\s*/i;
+  const gone = new Set<number>();
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (gone.has(r.id) || !isProd.test(r.item ?? "")) continue;
+    let supplierId = r.supplierId;
+    let tarif: string | null = null;
+    const merged: typeof rows = [];
+    for (let j = i + 1; j < rows.length && j <= i + 3; j++) {
+      const x = rows[j];
+      if (x.date !== r.date || (x.reference ?? "") !== (r.reference ?? "")) break;
+      if (isPresta.test(x.item ?? "")) {
+        supplierId = x.supplierId ?? suppliers.find((x.item ?? "").replace(isPresta, "")) ?? supplierId;
+        merged.push(x);
+      } else if (isTarif.test(x.item ?? "")) {
+        tarif = (x.item ?? "").replace(isTarif, "").trim();
+        merged.push(x);
+      } else break;
+    }
+    const item = (r.item ?? "").replace(isProd, "").trim();
+    const detail = tarif ? `${tarif.charAt(0).toUpperCase()}${tarif.slice(1)}` : r.detail;
+    await db.update(m).set({ item, supplierId, detail }).where(eq(m.id, r.id));
+    for (const x of merged) {
+      // La variation de prix déjà créée par la ligne « tarif » passe sur la ligne regroupée
+      await db.update(schema.priceChanges).set({ majId: r.id }).where(eq(schema.priceChanges.majId, x.id));
+      await db.delete(m).where(eq(m.id, x.id));
+      gone.add(x.id);
+    }
+    r.item = item; r.supplierId = supplierId; r.detail = detail;
+  }
+
+  // Rattachement aux produits du Mercurial (correspondance sûre uniquement)
+  for (const r of rows) {
+    if (gone.has(r.id) || r.productId || !r.item || isSupplierCreation(r.nature, r.item, r.detail) || isSupplierInfo(r.nature, r.item, r.detail)) continue;
+    const p = matchProduct(r.item, r.supplierId, products);
+    if (!p) continue;
+    await db.update(m).set({ productId: p.id, supplierId: r.supplierId ?? p.supplierId }).where(eq(m.id, r.id));
+    await db.update(schema.priceChanges).set({ productId: p.id, productName: p.name, supplierId: p.supplierId }).where(eq(schema.priceChanges.majId, r.id));
+  }
+  await setSetting("maj_cleanup_v1", "1");
 }

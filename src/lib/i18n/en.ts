@@ -595,6 +595,7 @@ export const en: Dict = {
     blocked: "Locked prices",
   },
   maj: {
+    supplierInfo: "Supplier information",
     deleteConfirm: "Delete this history line? The price change it created in Price tracking will also be deleted.",
     supplierCreated: "Supplier account created",
     detach: "Detach from product",
