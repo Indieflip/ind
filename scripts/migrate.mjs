@@ -763,6 +763,14 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v7
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v7', '1') on conflict (key) do nothing`);
 }
 
+// Dev > Développement : fiche d'anomalie en carte (produits avec quantité et prix, contrôle), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v8'`)).rows.length) {
+  await db.execute(sql`update dev_fields set field = 'Produits', rule = ${"Un ou plusieurs produits (ajout possible, ex. BL manquant), chacun avec quantité, unité et prix ; total reportable dans le montant réclamé. Le premier est le produit principal."}, updated_at = now() where form = 'anomaly' and field = 'Produit'`);
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('anomaly', 'Fiche', 'Contrôle', false, ${"À vérifier / Vérifiée / À voir : en haut de la fiche et dans la colonne Contrôle de la liste des anomalies."}, '', ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v8', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

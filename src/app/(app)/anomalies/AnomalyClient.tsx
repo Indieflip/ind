@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { consolidateAnomaliesAction, createAnomalyAction, updateAnomalyAction } from "@/lib/actions/anomalies";
+import { consolidateAnomaliesAction, createAnomalyAction, setAnomalyReviewAction, updateAnomalyAction } from "@/lib/actions/anomalies";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtDate, fmtMoney, sentence } from "@/lib/format";
 import { Icon } from "@/components/Icon";
@@ -87,6 +87,7 @@ export interface AnomalyRow {
   action: string; lastActionAt: string; result: string; saving: number | null; status: string; statusLabel: string;
   type: string; nextActionAt: string; due: boolean; verify?: "a_traiter" | "a_verifier" | null; receptionId: number | null; photoUrl: string | null; consolidated?: string;
   stage: string; resolution: string | null; mode: string; claimed: number | null; days: number; delay: number; closedAt: string | null;
+  review?: string;
 }
 
 /** Anomalies : à suivre aujourd'hui, suivi (colonnes du fichier), consolidation */
@@ -153,6 +154,12 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
       </div>
     ),
   });
+  // Contrôle de la fiche (À vérifier / Vérifiée / À voir), modifiable dans la liste
+  const reviewLabel = (v?: string) => (v ? t.sheet.reviews[v as "a_verifier"] ?? "" : "");
+  shownCols.splice(1, 0, {
+    key: "review", width: "6.5rem", label: t.sheet.reviewLabel, text: (r) => reviewLabel(r.review), options: Object.values(t.sheet.reviews),
+    render: (r) => <ReviewSelect id={r.id} value={r.review ?? ""} disabled={!canManage} />,
+  });
   return (
     <>
 
@@ -196,5 +203,27 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
       )}
 
     </>
+  );
+}
+
+const REVIEW_STYLE: Record<string, string> = { a_verifier: "border-amber-300 bg-amber-50 text-amber-900", verifiee: "border-emerald-300 bg-emerald-50 text-emerald-800", a_voir: "border-sky-300 bg-sky-50 text-sky-900" };
+
+/** Contrôle d'une fiche depuis la liste */
+function ReviewSelect({ id, value, disabled }: { id: number; value: string; disabled?: boolean }) {
+  const { t } = useI18n();
+  const router = useRouter();
+  const [v, setV] = useState(value);
+  const [, start] = useTransition();
+  return (
+    <select
+      aria-label={t.sheet.reviewLabel}
+      disabled={disabled}
+      value={v}
+      onChange={(e) => { const next = e.target.value; setV(next); start(async () => { await setAnomalyReviewAction(id, next); router.refresh(); }); }}
+      className={`w-full rounded-md border px-1 py-1 text-xs ${REVIEW_STYLE[v] ?? "border-stone-200 bg-white text-stone-500"}`}
+    >
+      <option value="">—</option>
+      {(["a_verifier", "verifiee", "a_voir"] as const).map((k) => <option key={k} value={k}>{t.sheet.reviews[k]}</option>)}
+    </select>
   );
 }

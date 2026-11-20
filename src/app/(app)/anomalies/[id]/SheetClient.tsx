@@ -9,12 +9,14 @@ import { useI18n } from "@/lib/i18n/client";
 import { Icon } from "@/components/Icon";
 import { MoneyInput } from "@/components/MoneyInput";
 
+export interface Item { productId: number | null; name: string; qty: string; unit: string; price: string }
 interface Values {
+  items: Item[];
   problemType: string; productId: number | null; productName: string; note: string; description: string; followUp: string; lastActionAt: string; nextActionAt: string;
   creditAmount: string; claimedAmount: string; stage: string; resolution: string; mode: string; creditNumber: string; creditDate: string; creditKind: string;
 }
 
-export function AnomalySheetForm({ id, initial, editable, informative, types, products, assistant = [] }: { id: number; initial: Values; editable: boolean; informative?: boolean; types: string[]; products: { id: number; name: string }[]; assistant?: { date: string | null; text: string }[] }) {
+export function AnomalySheetForm({ id, initial, editable, informative, types, products, assistant = [], showAssistant = true }: { id: number; initial: Values; editable: boolean; informative?: boolean; types: string[]; products: { id: number; name: string; unit?: string; price?: number | null }[]; assistant?: { date: string | null; text: string }[]; showAssistant?: boolean }) {
   const { t } = useI18n();
   const a = t.anomalies;
   const s = t.sheet;
@@ -34,11 +36,14 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
   const [typeList, setTypeList] = useState(types);
   const [managing, setManaging] = useState(false);
   const typeOptions = v.problemType && !typeList.includes(v.problemType) ? [v.problemType, ...typeList] : typeList;
-  const pickProduct = (text: string) => {
+  // Produits de la fiche : quantité et prix par produit
+  const setItem = (i: number, patch: Partial<Item>) => { setV({ ...v, items: v.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) }); setSaved(false); };
+  const pickItem = (i: number, text: string) => {
     const p = products.find((x) => x.name === text);
-    setV({ ...v, productName: text, productId: p?.id ?? null });
-    setSaved(false);
+    setItem(i, { name: text, productId: p?.id ?? null, ...(p && !v.items[i].unit ? { unit: p.unit ?? "" } : {}), ...(p && !v.items[i].price && p.price != null ? { price: String(p.price).replace(".", ",") } : {}) });
   };
+  const n = (x: string) => { const r = parseFloat(x.replace(",", ".").replace(/[^\d.-]/g, "")); return Number.isFinite(r) ? r : null; };
+  const itemsTotal = v.items.reduce((sum, x) => sum + (n(x.qty) ?? 0) * (n(x.price) ?? 0), 0);
   return (
     <>
     {/* Détail du problème */}
@@ -55,11 +60,34 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
           </select>
           {managing && <TypesManager list={typeList} onSaved={(l) => { setTypeList(l); if (!l.includes(v.problemType) && l.length) setV({ ...v, problemType: l[0] }); }} />}
         </div>
-        <div>
-          <span className="label flex items-center justify-between">{s.productLinked}{v.productId && <Link href={`/mercurial/produits/${v.productId}`} className="text-xs font-normal text-brand-700 underline">{s.seeProduct} →</Link>}</span>
-          <input className="input" list={`sheet-products-${id}`} value={v.productName} onChange={(e) => pickProduct(e.target.value)} disabled={!editable} placeholder={s.productPlaceholder} />
-          <datalist id={`sheet-products-${id}`}>{products.map((p) => <option key={p.id} value={p.name} />)}</datalist>
-          {v.productName && !v.productId && <span className="mt-1 block text-xs text-amber-700">{s.productNotLinked}</span>}
+      </div>
+      <div>
+        <span className="label">{s.items}</span>
+        <div className="overflow-x-auto rounded-lg border border-stone-200">
+          <table className="table text-sm">
+            <thead><tr><th>{s.productLinked}</th><th className="w-24 text-right">{s.qty}</th><th className="w-20">{s.unit}</th><th className="w-28 text-right">{s.unitPrice}</th><th className="w-24 text-right">{s.lineTotal}</th><th className="w-10" /></tr></thead>
+            <tbody>
+              {v.items.map((x, i) => (
+                <tr key={i}>
+                  <td>
+                    <input className="input py-1.5 text-sm" list={`sheet-products-${id}`} value={x.name} onChange={(e) => pickItem(i, e.target.value)} disabled={!editable} placeholder={s.productPlaceholder} />
+                    {x.productId ? <Link href={`/mercurial/produits/${x.productId}`} className="mt-0.5 block text-[11px] text-brand-700 underline">{s.seeProduct} →</Link> : x.name ? <span className="mt-0.5 block text-[11px] text-amber-700">{s.productNotLinked}</span> : null}
+                  </td>
+                  <td><input className="input py-1.5 text-right text-sm" inputMode="decimal" value={x.qty} onChange={(e) => setItem(i, { qty: e.target.value })} disabled={!editable} /></td>
+                  <td><input className="input py-1.5 text-sm" value={x.unit} onChange={(e) => setItem(i, { unit: e.target.value })} disabled={!editable} /></td>
+                  <td><MoneyInput className="input py-1.5 text-right text-sm" value={x.price} onChange={(e) => setItem(i, { price: e.target.value })} disabled={!editable} /></td>
+                  <td className="text-right tabular-nums">{n(x.qty) != null && n(x.price) != null ? `${((n(x.qty) ?? 0) * (n(x.price) ?? 0)).toFixed(2).replace(".", ",")} €` : "—"}</td>
+                  <td>{editable && <button type="button" className="btn-ghost p-1 text-stone-400 hover:text-red-600" aria-label={t.common.delete} onClick={() => { setV({ ...v, items: v.items.filter((_, j) => j !== i) }); setSaved(false); }}><Icon name="trash" className="h-4 w-4" /></button>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <datalist id={`sheet-products-${id}`}>{products.map((p) => <option key={p.id} value={p.name} />)}</datalist>
+        <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+          {editable && <button type="button" className="btn-secondary py-1.5 text-sm" onClick={() => { setV({ ...v, items: [...v.items, { productId: null, name: "", qty: "", unit: "", price: "" }] }); setSaved(false); }}><Icon name="plus" className="h-4 w-4" /> {s.addItem}</button>}
+          {itemsTotal > 0 && <span className="font-semibold">{s.itemsTotal} : {itemsTotal.toFixed(2).replace(".", ",")} €</span>}
+          {editable && itemsTotal > 0 && <button type="button" className="text-xs text-brand-700 underline" onClick={() => { setV({ ...v, claimedAmount: itemsTotal.toFixed(2).replace(".", ",") }); setSaved(false); }}>{s.useAsClaimed}</button>}
         </div>
       </div>
       <label className="block">
@@ -177,7 +205,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
       </div>
 
       {/* Actions Assistant : remplies par l'application, non modifiables */}
-      <div>
+      {showAssistant && <div>
         <span className="label">🤖 {s.assistantTitle}</span>
         <ul className="space-y-1 rounded-lg border border-violet-200 bg-violet-50/60 p-3 text-sm text-violet-950">
           {assistant.map((x, i) => (
@@ -185,7 +213,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
           ))}
         </ul>
         <p className="mt-1 text-[11px] text-stone-500">{s.assistantHint}</p>
-      </div>
+      </div>}
 
       <label className="block max-w-xs">
         <span className="label">{a.lastAction}</span>
@@ -202,9 +230,9 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
             className="btn-primary"
             disabled={pending || !dirty || !v.description.trim() || closedWithout}
             onClick={() => start(async () => {
-              const { productName: _n, ...rest } = v;
-              void _n;
-              const res = await updateAnomalyAction(id, { ...rest, ...(v.productId ? {} : { productId: null }) });
+              const { productName: _n, productId: _p, items, ...rest } = v;
+              void _n; void _p;
+              const res = await updateAnomalyAction(id, { ...rest, items: items.map((x) => ({ productId: x.productId, name: x.name, qty: n(x.qty), unit: x.unit, price: n(x.price) })) });
               if (res?.ok) { setSaved(true); router.refresh(); }
             })}
           >

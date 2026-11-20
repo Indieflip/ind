@@ -69,6 +69,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     date: fmtDate(x.createdAt, locale),
     dateSort: x.createdAt.toISOString(),
     nature: x.nature ?? "",
+    review: x.review ?? "",
     supplier: extra.get(x.id)?.supplier ?? x.supplierName,
     supplierId: x.supplierId,
     reference: (x.receptionId ? lineDocLabel(extra.get(x.id)?.documents, extra.get(x.id)?.lineDoc, extra.get(x.id)?.blNumber) : null) ?? x.reference ?? "",

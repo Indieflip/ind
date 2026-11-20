@@ -100,12 +100,13 @@ export function DataTable<R>({
               <tr>
                 {selectable && <th className="w-8 bg-white" />}
                 {cols.map((c) => (
-                  <th key={c.key} className="bg-white py-1.5 align-middle">
+                  <th key={c.key} className="bg-white py-1.5 align-bottom">
+                    <div className={`mb-0.5 truncate text-[11px] font-semibold text-stone-600 ${c.align === "right" ? "text-right" : ""}`}>{c.label}</div>
                     <div className={`flex items-center gap-1 ${c.align === "right" ? "flex-row-reverse" : ""}`}>
                       <div className="min-w-[5.5rem] flex-1">
                         {c.filterable !== false ? (
-                          <FilterInput value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} placeholder={c.label} options={c.keepCase || KEEP.has(c.key) ? tb.options[c.key] : [...new Set((tb.options[c.key] ?? []).map(sentence))]} />
-                        ) : <span className="text-xs font-semibold">{c.label}</span>}
+                          <FilterInput value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} options={c.keepCase || KEEP.has(c.key) ? tb.options[c.key] : [...new Set((tb.options[c.key] ?? []).map(sentence))]} />
+                        ) : null}
                       </div>
                       {c.sortable !== false && (
                         <button type="button" onClick={() => tb.toggleSort(c.key)} className={`text-[10px] ${tb.sort?.key === c.key ? "text-brand-600" : "text-stone-300 hover:text-stone-500"}`} title={tb.sort?.key === c.key && tb.sort?.dir === "asc" ? t.receptions.sortDesc : t.receptions.sortAsc}>

@@ -12,6 +12,7 @@ import { decisionStyles } from "@/components/DecisionBadge";
 import { Icon } from "@/components/Icon";
 import { claimStyles, isInformative } from "@/lib/anomaly";
 import { AnomalySheetForm } from "./SheetClient";
+import { ActionCard, ReviewButtons } from "./CardClient";
 import { ensureClaimNumbers } from "@/lib/server/claimNumbers";
 import { supplierProcesses } from "@/lib/server/followup";
 import { problemTypes } from "@/lib/server/problemTypes";
@@ -44,15 +45,19 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   const problemType = a.problemType || typeLabel;
   const [types, supplierProducts] = await Promise.all([
     problemTypes(Object.values(t.anomalies.types)),
-    a.supplierId ? db.select({ id: schema.products.id, name: schema.products.name }).from(schema.products).where(and(eq(schema.products.supplierId, a.supplierId), eq(schema.products.active, true))).orderBy(asc(schema.products.name)) : Promise.resolve([] as { id: number; name: string }[]),
+    a.supplierId ? db.select({ id: schema.products.id, name: schema.products.name, unit: schema.products.unit, price: sql<number | null>`${schema.products.price}::float` }).from(schema.products).where(and(eq(schema.products.supplierId, a.supplierId), eq(schema.products.active, true))).orderBy(asc(schema.products.name)) : Promise.resolve([] as { id: number; name: string; unit: string; price: number | null }[]),
   ]);
   const productId = a.productId ?? line?.productId ?? null;
+  // Produits de la fiche par défaut : celui de la ligne du bon (quantité manquante si on la connaît)
+  const gap = line && line.qtyOrdered != null && line.qtyReceived != null ? Math.round((num(line.qtyOrdered)! - num(line.qtyReceived)!) * 1000) / 1000 : null;
+  const itemsDefault = (a.productName || line?.productName) ? [{ productId, name: a.productName ?? line?.productName ?? "", qty: gap != null && gap > 0 ? gap : null, unit: line?.unit ?? "", price: line?.unitPrice != null ? num(line.unitPrice) : null }] : [];
 
   const process = (await supplierProcesses()).find(a.supplierId, a.supplierName);
   // Actions Assistant : ce que l'application a fait ou prévoit pour cette fiche (calculé, non modifiable)
   const S = t.sheet.assistant;
   const addDays = (d: string | Date, n: number) => { const x = new Date(typeof d === "string" ? `${d}T12:00:00` : d); x.setDate(x.getDate() + n); return x; };
   const assistant: { date: string | null; text: string }[] = [];
+  let nextDue: string | null = null;
   if (a.imported) assistant.push({ date: fmtDate(a.createdAt, locale), text: S.imported });
   else if (rec) assistant.push({ date: fmtDate(a.createdAt, locale), text: `${S.createdFrom} ${numbers.get(rec.id) ?? rec.id}` });
   else assistant.push({ date: fmtDate(a.createdAt, locale), text: `${S.createdBy}${author ? ` ${author.name}` : ""}` });
@@ -64,9 +69,11 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
     const from = a.lastActionAt ?? a.createdAt;
     if (a.mode === "verification") {
       const due = addDays(from, a.stage === "a_verifier" ? 15 : 7);
+      nextDue = fmtDate(due, locale);
       assistant.push({ date: fmtDate(due, locale), text: due < new Date() ? S.verifyLate : S.verifyPlanned });
     } else if (a.stage !== "a_traiter") {
       const due = addDays(from, process?.delay ?? 3);
+      nextDue = fmtDate(due, locale);
       assistant.push({ date: fmtDate(due, locale), text: due < new Date() ? S.followLate : S.followPlanned });
     } else assistant.push({ date: null, text: S.toProcess });
   }
@@ -89,32 +96,103 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
     <div className="flex justify-between gap-3 py-1 text-sm"><dt className="text-stone-500">{label}</dt><dd className="text-right font-medium">{value ?? "—"}</dd></div>
   );
 
+  // Ce qui s'est passé : actions de l'Assistant et actions de l'utilisateur (« JJ/MM/AA : … »), dans l'ordre
+  const userLines = (a.followUp ?? "").split("\n").map((l) => l.trim()).filter(Boolean).map((l) => {
+    const m = /^(\d{2}\/\d{2}\/\d{2})\s*:\s*(.*)$/.exec(l);
+    return { date: m ? m[1] : null, text: m ? m[2] : l, user: true };
+  });
+  const sortKey = (d: string | null) => (d ? d.split("/").reverse().join("") : "99");
+  const timeline = [...assistant.map((x) => ({ ...x, user: false })), ...userLines].map((x, i) => ({ ...x, i })).sort((x, y) => sortKey(x.date).localeCompare(sortKey(y.date)) || x.i - y.i);
+  const mailHref = `mailto:${claimEmail}?subject=${encodeURIComponent(`${s.mailSubject} — ${reference ?? ""} ${a.productName ?? ""}`.trim())}&body=${encodeURIComponent(
+    `${s.mailHello}\n\n${s.mailIntro} ${rec ? fmtDate(rec.deliveredAt, locale) : fmtDate(a.createdAt, locale)}${reference ? ` (${reference})` : ""} :\n${(a.items?.length ? a.items.map((x) => `- ${x.name}${x.qty != null ? ` : ${x.qty} ${x.unit}` : ""}`).join("\n") : `- ${a.productName ?? ""} : ${a.description}`)}${a.claimedAmount ? `\n- ${s.mailAmount} : ${fmtMoney(num(a.claimedAmount), locale)}` : ""}\n\n${s.mailAsk}\n\n${s.mailBye}`,
+  )}`;
+  const itemsLabel = a.items?.length ? a.items.map((x) => x.name).join(" · ") : a.productName ?? line?.productName ?? "";
+  const stageCls: Record<string, string> = { a_traiter: "bg-red-100 text-red-800", reclamee: "bg-amber-100 text-amber-900", a_verifier: "bg-sky-100 text-sky-800", cloturee: "bg-emerald-100 text-emerald-800", annulee: "bg-stone-200 text-stone-700" };
+  const fold = "group rounded-xl border border-stone-200 bg-white";
+  const summary = "flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3.5 text-[15px] hover:bg-stone-50";
+
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-4xl space-y-4">
       <div className="no-print flex flex-wrap items-center justify-between gap-2">
         <Link href="/anomalies" className="btn-ghost -ml-2 px-2"><Icon name="chevronLeft" className="h-4 w-4" /> {t.anomalies.title}</Link>
-        <Link href="/reclamations" className="btn-secondary"><Icon name="alert" className="h-4 w-4" /> {t.claims.title}</Link>
+        <ReviewButtons id={a.id} value={a.review ?? null} editable={can.manageAnomalies(user.role)} />
       </div>
 
-      <section className="card overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-3 bg-gradient-to-r from-red-700 to-red-600 px-5 py-4 text-white">
-          <div className="min-w-0">
-            {/* FICHE D'ANOMALIE · N° … (provisoire) du <date de réception> / Fournisseur - Produit / Numéro et date du document */}
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/75">
-              {s.title} · {t.anomalies.number} {number}
-              <span className="normal-case"> {s.of} {fmtDate(rec?.deliveredAt ?? a.createdAt, locale)}</span>
-            </p>
-            <h1 className="mt-0.5 text-2xl font-bold leading-tight">{sentence(supplier?.name ?? a.supplierName)} - {problemType}</h1>
-            <p className="mt-1 text-sm text-white/85">{reference || s.noDocument}</p>
+      {/* La carte : l'essentiel, la prochaine étape et les actions */}
+      <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4 p-6">
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm text-stone-500">{s.title} · {t.anomalies.number} {number} · {fmtDate(rec?.deliveredAt ?? a.createdAt, locale)}{reference ? ` · ${reference}` : ""}</p>
+            <h1 className="text-2xl font-bold leading-tight sm:text-3xl">{sentence(supplier?.name ?? a.supplierName)} — {problemType}</h1>
+            {itemsLabel && <p className="text-base text-stone-700">{itemsLabel}</p>}
+            {a.claimNo && <p className="text-xs text-stone-500">{t.claims.title} N° {a.claimNo}</p>}
           </div>
-          <div className="flex flex-col items-end gap-1.5">
-            {a.claimNo && <span className="badge bg-white text-red-800">{t.claims.title} N° {a.claimNo}</span>}
-            {a.productName && <span className="badge bg-white/20 text-white">{a.productName}</span>}
+          <div className="flex flex-col items-end gap-1.5 text-right">
+            <span className={`rounded-full px-3 py-1 text-sm font-semibold ${stageCls[a.stage] ?? "bg-stone-100"}`}>{t.stages[a.stage as "a_traiter"] ?? a.stage}</span>
+            <p className="text-3xl font-bold tabular-nums">{a.claimedAmount ? fmtMoney(num(a.claimedAmount), locale) : "—"}</p>
+            <p className="text-xs text-stone-500">{s.claimed}</p>
             {locked && <span className="badge bg-emerald-100 text-emerald-800">✓ {s.consolidated} {fmtDate(a.consolidatedAt, locale)}</span>}
           </div>
         </div>
+        <div className="border-t border-stone-100 p-6 pt-4">
+          <ActionCard id={a.id} stage={a.stage} resolution={a.resolution} editable={editable} claimed={a.claimedAmount != null ? String(num(a.claimedAmount)).replace(".", ",") : ""} mailHref={mailHref} phone={claimPhone} supplier={sentence(supplier?.name ?? a.supplierName)} nextDate={nextDue} />
+        </div>
+      </section>
 
-        <div className="grid gap-px bg-stone-200 md:grid-cols-2">
+      {/* Ce qui s'est passé */}
+      <section className="rounded-2xl border border-stone-200 bg-white p-6">
+        <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-stone-500">{s.card.history}</h2>
+        <ol className="space-y-2">
+          {timeline.map((x) => (
+            <li key={x.i} className="grid grid-cols-[5.5rem_1.5rem_minmax(0,1fr)] items-start gap-1 text-[15px]">
+              <span className="tabular-nums text-stone-500">{x.date ?? ""}</span>
+              <span aria-hidden="true">{x.user ? "👤" : "🤖"}</span>
+              <span className={x.user ? "text-stone-900" : "text-stone-700"}>{x.text}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* Le reste, replié */}
+      <details className={fold}>
+        <summary className={summary}><span><strong>{s.card.details}</strong> · {s.card.detailsHint}</span><span className="text-stone-400 transition group-open:rotate-90">▸</span></summary>
+        <div className="space-y-4 border-t border-stone-100 bg-stone-50/60 p-4">
+      <AnomalySheetForm
+        informative={isInformative(a)}
+        id={a.id}
+        editable={editable}
+        types={types}
+        assistant={assistant}
+        showAssistant={false}
+        products={supplierProducts}
+        initial={{
+          items: (a.items?.length ? a.items : itemsDefault).map((x) => ({ productId: x.productId, name: x.name, qty: x.qty != null ? String(x.qty).replace(".", ",") : "", unit: x.unit ?? "", price: x.price != null ? String(x.price).replace(".", ",") : "" })),
+          problemType,
+          productId,
+          productName: a.productName ?? line?.productName ?? "",
+          note: a.note ?? "",
+          description: a.description,
+          followUp: a.followUp ?? "",
+          lastActionAt: a.lastActionAt ?? "",
+          nextActionAt: a.nextActionAt ?? "",
+          creditAmount: a.creditAmount != null ? String(num(a.creditAmount)).replace(".", ",") : "",
+          claimedAmount: a.claimedAmount != null ? String(num(a.claimedAmount)).replace(".", ",") : "",
+          stage: a.stage,
+          resolution: a.resolution ?? "",
+          mode: a.mode,
+          creditNumber: a.creditNumber ?? "",
+          creditDate: a.creditDate ?? "",
+          creditKind: a.creditKind ?? "avoir",
+        }}
+      />
+
+
+        </div>
+      </details>
+
+      <details className={fold}>
+        <summary className={summary}><span><strong>{s.reception}</strong>{rec ? ` · N° ${numbers.get(rec.id) ?? rec.id}, ${fmtDateTime(rec.deliveredAt, locale)}` : ""}</span><span className="text-stone-400 transition group-open:rotate-90">▸</span></summary>
+        <div className="grid gap-px border-t border-stone-100 bg-stone-200 md:grid-cols-2">
           {/* Réception d'origine */}
           <div className="bg-white p-4">
             <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-stone-500"><Icon name="truck" className="h-4 w-4" /> {s.reception}</h2>
@@ -167,9 +245,11 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
             {a.photoUrl && !photos.length && <a href={a.photoUrl} target="_blank" rel="noreferrer"><img src={a.photoUrl} alt="" className="mt-2 h-24 rounded-lg border border-stone-200 object-cover" /></a>}
           </div>
         </div>
-      </section>
+      </details>
 
-      {/* Suivi : Problème, Action, Dernière action, Résultat, Économie HT, Statut */}
+      <details className={fold}>
+        <summary className={summary}><span><strong>{s.procedure}</strong> · {sentence(supplier?.name ?? a.supplierName)} · {s.delay} {process?.delay ?? 3} {t.kanban.days}</span><span className="text-stone-400 transition group-open:rotate-90">▸</span></summary>
+        <div className="border-t border-stone-100 p-1">
       {/* Procédure du fournisseur + mail pré-rempli */}
       <section className="card border-l-4 border-l-sky-400 p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -197,33 +277,8 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
         {!claimEmail && <p className="mt-1 text-xs text-stone-500">{s.noEmail}</p>}
       </section>
 
-      <AnomalySheetForm
-        informative={isInformative(a)}
-        id={a.id}
-        editable={editable}
-        types={types}
-        assistant={assistant}
-        products={supplierProducts}
-        initial={{
-          problemType,
-          productId,
-          productName: a.productName ?? line?.productName ?? "",
-          note: a.note ?? "",
-          description: a.description,
-          followUp: a.followUp ?? "",
-          lastActionAt: a.lastActionAt ?? "",
-          nextActionAt: a.nextActionAt ?? "",
-          creditAmount: a.creditAmount != null ? String(num(a.creditAmount)).replace(".", ",") : "",
-          claimedAmount: a.claimedAmount != null ? String(num(a.claimedAmount)).replace(".", ",") : "",
-          stage: a.stage,
-          resolution: a.resolution ?? "",
-          mode: a.mode,
-          creditNumber: a.creditNumber ?? "",
-          creditDate: a.creditDate ?? "",
-          creditKind: a.creditKind ?? "avoir",
-        }}
-      />
-
+        </div>
+      </details>
 
       <p className="text-xs text-stone-500">{s.created} {fmtDateTime(a.createdAt, locale)}{author ? ` · ${author.name}` : ""}{a.imported ? ` · ${s.fromFile}` : ""}</p>
     </div>

@@ -49,6 +49,7 @@ export async function updateAnomalyAction(
     status?: string; creditAmount?: string; followUp?: string; description?: string; nature?: string; result?: string; lastActionAt?: string; nextActionAt?: string;
     stage?: string; resolution?: string; mode?: string; claimedAmount?: string; creditNumber?: string; creditDate?: string; creditKind?: string;
     problemType?: string; productId?: number | null; note?: string;
+    items?: { productId: number | null; name: string; qty: number | null; unit: string; price: number | null }[];
   },
 ) {
   await assertUser(can.manageAnomalies);
@@ -67,6 +68,15 @@ export async function updateAnomalyAction(
   if (data.result !== undefined) set.result = outcomeOf(data.result);
   if (data.problemType !== undefined) set.problemType = data.problemType.trim() || null;
   if (data.note !== undefined) set.note = data.note.trim() || null;
+  if (data.items !== undefined) {
+    const items = data.items
+      .map((x) => ({ productId: x.productId ?? null, name: String(x.name ?? "").trim().slice(0, 300), qty: x.qty != null && Number.isFinite(x.qty) ? x.qty : null, unit: String(x.unit ?? "").trim().slice(0, 30), price: x.price != null && Number.isFinite(x.price) ? x.price : null }))
+      .filter((x) => x.name)
+      .slice(0, 100);
+    set.items = items.length ? items : null;
+    // Le premier produit reste le produit principal de la fiche
+    if (items[0]) { set.productName = items[0].name; set.productId = items[0].productId; }
+  }
   if (data.productId !== undefined) {
     const p = data.productId ? await getDb().query.products.findFirst({ where: eq(schema.products.id, data.productId), columns: { id: true, name: true } }) : undefined;
     set.productId = p?.id ?? null;
@@ -250,3 +260,12 @@ export async function ungroupClaimAction(id: number) {
   return { ok: true };
 }
 
+
+/** Contrôle d'une fiche par l'utilisateur : « À vérifier », « Vérifiée », « À voir » (vide pour effacer) */
+export async function setAnomalyReviewAction(id: number, review: string) {
+  await assertUser(can.manageAnomalies);
+  const value = ["a_verifier", "verifiee", "a_voir"].includes(review) ? review : null;
+  await getDb().update(schema.anomalies).set({ review: value }).where(eq(schema.anomalies.id, id));
+  revalidatePath("/anomalies", "layout");
+  return { ok: true };
+}

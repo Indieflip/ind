@@ -112,6 +112,7 @@ export function Kanban({ rows, canManage }: { rows: AnomalyRow[]; canManage: boo
                     </div>
                     <p className="mt-0.5 font-semibold leading-tight">{sentence(r.supplier)}</p>
                     <p className="text-xs text-stone-600">{r.product || r.type}</p>
+                    {r.review && <span className={`mt-1 inline-block rounded-full border px-1.5 text-[10px] font-semibold ${r.review === "verifiee" ? "border-emerald-300 bg-emerald-50 text-emerald-800" : r.review === "a_voir" ? "border-sky-300 bg-sky-50 text-sky-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}>{t.sheet.reviews[r.review as "a_verifier"]}</span>}
                     <p className="mt-1 line-clamp-2 text-xs text-stone-500">{r.problem}</p>
                     <div className="mt-1 flex items-center justify-between text-xs">
                       <span title={t.modes[r.mode as "reclamation"]}>{modeIcon(r.mode)} {t.modes[r.mode as "reclamation"]}</span>

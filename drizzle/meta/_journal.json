@@ -197,6 +197,13 @@
       "when": 1795206024912,
       "tag": "0027_anomaly_detail",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1795208931969,
+      "tag": "0028_anomaly_items_review",
+      "breakpoints": true
     }
   ]
 }
