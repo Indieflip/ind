@@ -25,6 +25,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
   const id = Number((await params).id);
   const tabParam = one((await searchParams).tab);
   const tab = tabParam === "anomalies" ? "anomalies" : tabParam === "receptions" ? "receptions" : "products";
+  const editInfo = one((await searchParams).edit) === "1";
   const db = getDb();
   const supplier = Number.isInteger(id) ? await db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, id) }) : undefined;
   if (!supplier) notFound();
@@ -66,6 +67,13 @@ export default async function SupplierPage({ params, searchParams }: { params: P
   });
   const natures = [...new Set(rows.flatMap((r) => (r.nature ?? "").split(/,\s*/).filter(Boolean)))].sort((a, b) => a.localeCompare(b, "fr"));
   const numbers = await anomalyNumbers();
+  const contactCards = (["societe", "commande", "reclamation"] as const).map((kind) => {
+    const c = supplier.contacts?.[kind] ?? (kind === "societe" ? { email: supplier.email ?? "", phone: supplier.phone ?? "", notes: supplier.notes ?? "" } : {});
+    return { kind, email: c.email ?? "", phone: c.phone ?? "", notes: c.notes ?? "", extra: (("extra" in c && c.extra) || []).filter((x) => x.value) };
+  }).filter((c) => c.email || c.phone || c.notes || c.extra.length);
+  const natureMap = new Map<string, number>();
+  for (const r of rows) if (r.active) for (const n of (r.nature ?? "").split(/,\s*/).filter(Boolean)) natureMap.set(n, (natureMap.get(n) ?? 0) + 1);
+  const natureCounts = [...natureMap.entries()].sort((a, b) => b[1] - a[1]);
   const openAnomalies = supplierAnomalies.filter((a) => a.stage === "a_traiter" || a.stage === "reclamee" || a.stage === "a_verifier").length;
   const tabCls = (on: boolean) => `-mb-px border-b-2 px-3 py-2 text-sm font-semibold ${on ? "border-brand-600 text-brand-700" : "border-transparent text-stone-500 hover:text-stone-800"}`;
 
@@ -75,11 +83,53 @@ export default async function SupplierPage({ params, searchParams }: { params: P
         <Link href="/mercurial/fournisseurs" className="btn-ghost -ml-2 px-2"><Icon name="chevronLeft" className="h-4 w-4" /> {t.suppliers.title}</Link>
         <div className="w-full max-w-xs"><SupplierSearch suppliers={allSuppliers} /></div>
       </div>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-bold"><span className="mr-2 align-middle text-sm font-semibold text-stone-400">N° {supplier.id}</span>{sentence(supplier.name)}</h1>
-          <p className="text-sm text-stone-500">{t.maj.accountCreated} {fmtDate(createdOn, locale)}</p>
+      {/* Récap du fournisseur : identité, coordonnées, natures des produits, chiffres */}
+      <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3 bg-gradient-to-br from-brand-600 to-brand-800 p-5 text-white">
+          <div className="flex items-center gap-4">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-2xl font-bold">{sentence(supplier.name).charAt(0)}</span>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-white/60">N° {supplier.id}{!supplier.active ? ` · ${t.suppliers.inactive}` : ""}</p>
+              <h1 className="text-2xl font-bold leading-tight">{sentence(supplier.name)}</h1>
+              <p className="text-sm text-white/75">{t.maj.accountCreated} {fmtDate(createdOn, locale)}</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {editable && <Link href={editInfo ? `/mercurial/fournisseurs/${id}` : `/mercurial/fournisseurs/${id}?edit=1#infos`} className="btn bg-white/15 text-white hover:bg-white/25"><Icon name="edit" className="h-4 w-4" /> {editInfo ? t.common.close : t.suppliers.editInfo}</Link>}
+          </div>
         </div>
+        <div className="grid gap-px bg-stone-200 md:grid-cols-[1.4fr_1fr_1fr]">
+          <div className="bg-white p-4">
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-stone-400">{t.suppliers.contacts}</p>
+            <div className="space-y-2.5">
+              {contactCards.length ? contactCards.map((c) => (
+                <div key={c.kind} className="text-sm">
+                  <p className="font-semibold text-stone-700">{t.suppliers.contactKinds[c.kind]}</p>
+                  {c.email && <a href={`mailto:${c.email}`} className="block truncate text-brand-700 hover:underline">✉ {c.email}</a>}
+                  {c.phone && <a href={`tel:${c.phone.replace(/\s/g, "")}`} className="block text-brand-700 hover:underline">☎ {c.phone}</a>}
+                  {c.extra.map((x, i) => <p key={i} className="text-stone-600">{x.label} : {x.value}</p>)}
+                  {c.notes && <p className="text-xs text-stone-500">{c.notes}</p>}
+                </div>
+              )) : <p className="text-sm text-stone-400">{t.suppliers.noContact}</p>}
+            </div>
+          </div>
+          <div className="bg-white p-4">
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-stone-400">{t.suppliers.natures}</p>
+            {natureCounts.length ? (
+              <div className="flex flex-wrap gap-1.5">{natureCounts.map(([n, c]) => <span key={n} className="badge bg-brand-50 text-brand-800">{n} <span className="ml-1 text-brand-600/70">{c}</span></span>)}</div>
+            ) : <p className="text-sm text-stone-400">—</p>}
+          </div>
+          <div className="grid grid-cols-2 gap-px bg-stone-200">
+            {([[t.mercurial.tabProducts, String(rows.filter((r) => r.active).length)], [t.nav.receptions, String(recents.length)], [t.suppliers.lastReception, recents[0] ? fmtDate(recents[0].deliveredAt, locale) : "—"], [t.suppliers.openAnomalies, String(openAnomalies)]] as const).map(([k, v]) => (
+              <div key={k} className="bg-white p-3">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-stone-400">{k}</p>
+                <p className="text-lg font-bold tabular-nums">{v}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+      <div className="-mt-2 flex justify-end">
         {can.deleteSupplier(user.role) ? (
           <DeleteSupplier id={supplier.id} name={supplier.name} others={allSuppliers} />
         ) : (
@@ -105,8 +155,8 @@ export default async function SupplierPage({ params, searchParams }: { params: P
 
       {tab === "products" ? (
         <>
-          {editable && (
-            <SupplierInfo
+          {editable && editInfo && (
+            <div id="infos" className="scroll-mt-4"><SupplierInfo
               id={supplier.id}
               name={supplier.name}
               active={supplier.active}
@@ -115,7 +165,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
                 const c = supplier.contacts?.[k] ?? (k === "societe" ? { email: supplier.email ?? "", phone: supplier.phone ?? "", notes: supplier.notes ?? "" } : {});
                 return [k, { email: c.email ?? "", phone: c.phone ?? "", notes: c.notes ?? "", extra: ("extra" in c && c.extra) || [] }];
               })) as Record<"societe" | "reclamation" | "commande", { email: string; phone: string; notes: string; extra: { label: string; value: string }[] }>}
-            />
+            /></div>
           )}
           {editable && <AddRow suppliers={allSuppliers} units={units} natures={natures} fixedSupplier={{ id: supplier.id, name: supplier.name }} existing={rows.filter((r) => r.active).map((r) => ({ supplierId: r.supplierId, name: r.name }))} />}
           <h2 className="pt-2 text-lg font-semibold">{t.suppliers.productList}</h2>

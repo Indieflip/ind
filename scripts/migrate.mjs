@@ -712,6 +712,14 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_project_v
   await db.execute(sql`insert into app_settings (key, value) values ('dev_project_v7', '1') on conflict (key) do nothing`);
 }
 
+// Dev : point en attente « Faille analyse achat », une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_pending_purchases_v1'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_items`)).rows[0].p);
+  const detail = "Reporting > Achats ne compte que les livraisons saisies dans l'application : certaines factures sont envoyées directement à la comptabilité et n'y figurent pas. Pistes : 1) import mensuel du grand livre fournisseurs ou de l'export achats du logiciel comptable (Excel / CSV) ; 2) réception des factures électroniques (plateforme agréée, obligatoire depuis septembre 2026) ; 3) adresse mail dédiée où la compta transfère les factures, lues automatiquement ; 4) rapprochement factures / réceptions pour repérer les achats sans réception. À voir avec l'expert-comptable : format d'export disponible et fréquence.";
+  await db.execute(sql`insert into dev_items (kind, title, detail, owner, priority, task, position) values ('pending', ${"Faille analyse achat"}, ${detail}, ${"moi"}, ${"moyenne"}, ${"Développement"}, ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_pending_purchases_v1', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
