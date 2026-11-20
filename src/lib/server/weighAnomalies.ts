@@ -1,4 +1,5 @@
 import "server-only";
+import { WEIGH_TYPE } from "@/lib/anomaly";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { num } from "@/lib/format";
@@ -64,7 +65,7 @@ export async function syncWeighAnomalies() {
     else if (claimDates.length) stage = "reclamee";
     const last = claimDates.sort().pop() ?? null;
     await db.insert(schema.anomalies).values({
-      ...values, type: "quantity", source: "weigh", groupKey: key, mode: "reclamation", stage, ...legacyOf(stage, null),
+      ...values, type: "quantity", problemType: WEIGH_TYPE, source: "weigh", groupKey: key, mode: "reclamation", stage, ...legacyOf(stage, null),
       lastActionAt: last, followUp: last ? `Réclamation le ${last.split("-").reverse().map((p, i) => (i === 2 ? p.slice(2) : p)).join("/")}` : null,
       createdAt: new Date(`${lines.map((g) => g.date).sort()[0]}T12:00:00Z`), closedAt: stage === "cloturee" ? new Date(`${last}T12:00:00Z`) : null,
     });

@@ -777,6 +777,27 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'anomaly_revie
   await db.execute(sql`insert into app_settings (key, value) values ('anomaly_review_default_v1', '1') on conflict (key) do nothing`);
 }
 
+// Type d'anomalie « Écart de pesée » pour les fiches venues de l'onglet Écarts pesées, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'weigh_problem_type_v1'`)).rows.length) {
+  await db.execute(sql`update anomalies set problem_type = ${"Écart de pesée"} where source = 'weigh'`);
+  const saved = (await db.execute(sql`select value from app_settings where key = 'anomaly_problem_types'`)).rows[0]?.value;
+  try {
+    const list = JSON.parse(saved ?? "null");
+    if (Array.isArray(list) && list.length && !list.includes("Écart de pesée")) await db.execute(sql`update app_settings set value = ${JSON.stringify([...list, "Écart de pesée"])} where key = 'anomaly_problem_types'`);
+  } catch { /* liste par défaut */ }
+  await db.execute(sql`insert into app_settings (key, value) values ('weigh_problem_type_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev > Développement : fiche d'anomalie (fournisseur et document dans Détails, liste des produits du fournisseur, « Montant » pour un BL manquant), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v9'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('anomaly', 'Détail du problème', 'Fournisseur et document', false, ${"Affichés en haut de Détails : fournisseur (lien vers son compte) et BL / Facture avec sa date (ex. 383395 du 06/08/26). Ne figurent plus dans l'en-tête de la fiche."}, '', ${pos})`);
+  await db.execute(sql`update dev_fields set rule = rule || ${" Produit choisi dans la liste déroulante des produits du fournisseur (comme dans son compte) ; « Autre produit » pour une saisie libre."}, updated_at = now() where form = 'anomaly' and field = 'Produits'`);
+  await db.execute(sql`update dev_fields set rule = rule || ${" Pour le type « Bon de livraison manquant », le champ s'appelle « Montant »."}, updated_at = now() where form = 'anomaly' and field = 'Montant réclamé'`);
+  await db.execute(sql`update dev_fields set rule = rule || ${" Les fiches venues de l'onglet Écarts pesées ont le type « Écart de pesée »."}, updated_at = now() where form = 'anomaly' and field = 'Type d''anomalie'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v9', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

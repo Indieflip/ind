@@ -7,7 +7,7 @@ import { appConfirm } from "@/components/Confirm";
 import { Icon } from "@/components/Icon";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { DevAutomations } from "./DevAutomations";
-import { AnomalyRules, ClaimRules } from "./DevRules";
+import { AnomalyRules, ClaimRules, FollowUpCharacteristics } from "./DevRules";
 import { DevFold as Fold } from "./DevFold";
 
 
@@ -57,6 +57,8 @@ export function DevFields({ fields }: { fields: FieldRow[] }) {
         <Fold title={t.rules.claimFold}><ClaimRules /></Fold>
         <Fold title={t.rules.anomalyFold}><AnomalyRules /></Fold>
       </div>
+
+      <FollowUpCharacteristics />
 
       <section>
         <div className="mb-2 flex flex-wrap items-end justify-between gap-2">

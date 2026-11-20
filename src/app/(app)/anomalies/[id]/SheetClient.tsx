@@ -17,7 +17,7 @@ interface Values {
   creditAmount: string; claimedAmount: string; stage: string; resolution: string; mode: string; creditNumber: string; creditDate: string; creditKind: string;
 }
 
-export function AnomalySheetForm({ id, initial, editable, informative, types, products, assistant = [], showAssistant = true, units = [] }: { units?: string[]; id: number; initial: Values; editable: boolean; informative?: boolean; types: string[]; products: { id: number; name: string; unit?: string; price?: number | null }[]; assistant?: { date: string | null; text: string }[]; showAssistant?: boolean }) {
+export function AnomalySheetForm({ id, initial, editable, informative, types, products, assistant = [], showAssistant = true, units = [], supplier, reference, missingBlType }: { supplier?: { id: number | null; name: string }; reference?: string | null; missingBlType?: string; units?: string[]; id: number; initial: Values; editable: boolean; informative?: boolean; types: string[]; products: { id: number; name: string; unit?: string; price?: number | null }[]; assistant?: { date: string | null; text: string }[]; showAssistant?: boolean }) {
   const { t } = useI18n();
   const a = t.anomalies;
   const s = t.sheet;
@@ -36,6 +36,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
   const closedWithout = stage === "cloturee" && !v.resolution;
   const [typeList, setTypeList] = useState(types);
   const [managing, setManaging] = useState(false);
+  const [free, setFree] = useState<number[]>([]);
   const typeOptions = v.problemType && !typeList.includes(v.problemType) ? [v.problemType, ...typeList] : typeList;
   // Produits de la fiche : quantité et prix par produit
   const setItem = (i: number, patch: Partial<Item>) => { setV({ ...v, items: v.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) }); setSaved(false); };
@@ -70,6 +71,12 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
         <h2 className="text-lg font-semibold">{s.problemDetail}</h2>
         {!editable && <span className="text-xs text-stone-500">{s.readOnly}</span>}
       </div>
+      {supplier && (
+        <dl className="grid gap-3 rounded-lg bg-stone-50 p-3 text-sm sm:grid-cols-2">
+          <div><dt className="label">{t.common.supplier}</dt><dd className="font-medium">{supplier.id ? <Link href={`/mercurial/fournisseurs/${supplier.id}`} className="text-brand-700 hover:underline">{supplier.name} →</Link> : supplier.name}</dd></div>
+          <div><dt className="label">{a.blInvoice}</dt><dd className="font-medium">{reference || "—"}</dd></div>
+        </dl>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <span className="label flex items-center justify-between">{s.problemType}{editable && <button type="button" className="text-xs font-normal text-brand-700 underline" onClick={() => setManaging((m) => !m)}>{managing ? t.common.close : `⚙ ${s.manageTypes}`}</button>}</span>
@@ -88,7 +95,23 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
               {v.items.map((x, i) => (
                 <tr key={i}>
                   <td>
-                    <input className="input py-1.5 text-sm" list={`sheet-products-${id}`} value={x.name} onChange={(e) => pickItem(i, e.target.value)} disabled={!editable} placeholder={s.productPlaceholder} />
+                    {/* Liste déroulante : les produits du fournisseur (comme dans son compte) ; « Autre produit » pour une saisie libre */}
+                    {products.length > 0 && !free.includes(i) && (x.productId || !x.name) ? (
+                      <select className="input py-1.5 text-sm" value={x.productId ?? ""} disabled={!editable} onChange={(e) => {
+                        if (e.target.value === "__free") { setFree([...free, i]); setItem(i, { productId: null, name: "" }); return; }
+                        const p = products.find((y) => String(y.id) === e.target.value);
+                        pickItem(i, p?.name ?? "");
+                      }}>
+                        <option value="">{s.productPlaceholder}</option>
+                        {products.map((p) => <option key={p.id} value={p.id}>{p.name}{p.unit ? ` (${p.unit})` : ""}</option>)}
+                        <option value="__free">✎ {s.otherProduct}</option>
+                      </select>
+                    ) : (
+                      <span className="flex gap-1">
+                        <input className="input py-1.5 text-sm" list={`sheet-products-${id}`} value={x.name} onChange={(e) => pickItem(i, e.target.value)} disabled={!editable} placeholder={s.productPlaceholder} />
+                        {editable && products.length > 0 && <button type="button" className="btn-ghost shrink-0 px-1.5 text-xs" title={s.supplierList} onClick={() => { setFree(free.filter((j) => j !== i)); setItem(i, { productId: null, name: "" }); }}>☰</button>}
+                      </span>
+                    )}
                     {x.productId ? <Link href={`/mercurial/produits/${x.productId}`} className="mt-0.5 block text-[11px] text-brand-700 underline">{s.seeProduct} →</Link> : x.name ? <span className="mt-0.5 block text-[11px] text-amber-700">{s.productNotLinked}</span> : null}
                   </td>
                   <td><input className="input py-1.5 text-right text-sm" inputMode="decimal" value={x.qty} onChange={(e) => setItem(i, { qty: e.target.value })} disabled={!editable} /></td>
@@ -117,7 +140,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
       </label>
       <div className="grid gap-3 sm:grid-cols-[14rem_1fr]">
         <label>
-          <span className="label">{s.claimed}</span>
+          <span className="label">{missingBlType && v.problemType === missingBlType ? s.amountOnly : s.claimed}</span>
           <MoneyInput value={v.claimedAmount} onChange={set("claimedAmount")} disabled={!editable} />
           {informative && <span className="mt-1 block text-xs text-sky-700">ℹ {s.informative}</span>}
         </label>

@@ -72,3 +72,40 @@ export function AnomalyRules() {
     </div>
   );
 }
+
+/** Dev > Développement technique > Développement : « Caractéristiques : Suivi » (un type de suivi par ligne) */
+export function FollowUpCharacteristics() {
+  const { t } = useI18n();
+  const r = t.rules;
+  return (
+    <section>
+      <h2 className="font-semibold">{r.followTitle}</h2>
+      <p className="mb-2 max-w-3xl text-xs text-stone-500">{r.followIntro}</p>
+      <div className="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+        <table className="table text-sm">
+          <thead><tr><th className="w-[18%]">{r.characteristic}</th><th className="w-[22%]">{r.detail}</th><th>{r.steps}</th><th className="w-[20%]">{r.reminderRule}</th></tr></thead>
+          <tbody>
+            {MODES.map((m) => (
+              <tr key={m} className="align-top">
+                <td className="font-medium">{modeIcon(m)} {t.modes[m]}</td>
+                <td className="text-stone-700">{t.sheet.modeHints[m]}</td>
+                <td>
+                  <ol className="space-y-1.5">
+                    {r.followSteps[m].map(([st, cond], i) => (
+                      <li key={i} className="flex flex-wrap items-baseline gap-1.5">
+                        <span className="text-xs tabular-nums text-stone-400">{i + 1}.</span>
+                        <span className={`badge ${stageStyles[st as "a_traiter"] ?? "bg-stone-100"}`}>{t.stages[st as "a_traiter"] ?? st}</span>
+                        <span className="text-stone-700">{cond}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </td>
+                <td className="text-stone-700">{r.modeReminder[m]}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}

@@ -21,7 +21,7 @@ function rangeOf(p: Period, today: string, from: string, to: string): [string, s
  * Récap par type d'anomalie : le changement de fréquence est calculé dans le navigateur (instantané),
  * le clic sur un type filtre le tableau / la liste en dessous.
  */
-export function TypeRecap({ items, today, typeFilter, baseQs, initialOpen }: { items: RecapItem[]; today: string; typeFilter: string; baseQs: Record<string, string>; initialOpen: boolean }) {
+export function TypeRecap({ items, types, today, typeFilter, baseQs, initialOpen }: { items: RecapItem[]; types: string[]; today: string; typeFilter: string; baseQs: Record<string, string>; initialOpen: boolean }) {
   const { t, locale } = useI18n();
   const A = t.anomalies;
   const [p, setP] = useState<Period>("mois");
@@ -30,7 +30,8 @@ export function TypeRecap({ items, today, typeFilter, baseQs, initialOpen }: { i
   const [to, setTo] = useState(today);
   const [rFrom, rTo] = rangeOf(p, today, from, to);
   const { rows, total } = useMemo(() => {
-    const map = new Map<string, { n: number; amount: number }>();
+    // Tous les types d'anomalie, même sans fiche sur la période
+    const map = new Map<string, { n: number; amount: number }>(types.map((k) => [k, { n: 0, amount: 0 }]));
     for (const it of items) {
       if (it.d < rFrom || it.d > rTo) continue;
       const e = map.get(it.k) ?? { n: 0, amount: 0 };
@@ -38,8 +39,10 @@ export function TypeRecap({ items, today, typeFilter, baseQs, initialOpen }: { i
     }
     const rows = [...map].sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0], "fr"));
     return { rows, total: rows.reduce((acc, [, v]) => ({ n: acc.n + v.n, amount: acc.amount + v.amount }), { n: 0, amount: 0 }) };
-  }, [items, rFrom, rTo]);
+  }, [items, types, rFrom, rTo]);
   const typeHref = (ty: string) => `/anomalies?${new URLSearchParams({ ...baseQs, ...(ty ? { type: ty } : {}) })}`;
+  // « Détail » : la liste des fiches d'anomalie de ce type
+  const detailHref = (ty: string) => `/anomalies?${new URLSearchParams({ view: "liste", type: ty })}`;
 
   return (
     <details open={initialOpen} className="group mb-4 rounded-xl border border-stone-200 bg-white">
@@ -63,17 +66,18 @@ export function TypeRecap({ items, today, typeFilter, baseQs, initialOpen }: { i
           <span className="text-xs text-stone-500">{fmtDate(rFrom, locale)} → {fmtDate(rTo, locale)}</span>
         </div>
         <table className="table max-w-2xl text-sm">
-          <thead><tr><th>{t.sheet.problemType}</th><th className="text-right">{A.count}</th><th className="text-right">{A.amount}</th></tr></thead>
+          <thead><tr><th>{t.sheet.problemType}</th><th className="text-right">{A.count}</th><th className="text-right">{A.amount}</th><th className="text-right">{A.detail}</th></tr></thead>
           <tbody>
             {rows.map(([ty, v]) => (
-              <tr key={ty} className={ty === typeFilter ? "bg-brand-50" : ""}>
-                <td><Link href={typeHref(ty === typeFilter ? "" : ty)} className="font-medium text-brand-700 hover:underline">{ty}</Link></td>
+              <tr key={ty} className={ty === typeFilter ? "bg-brand-50" : v.n ? "" : "text-stone-400"}>
+                <td><Link href={typeHref(ty === typeFilter ? "" : ty)} className={`font-medium hover:underline ${v.n ? "text-brand-700" : "text-stone-500"}`}>{ty}</Link></td>
                 <td className="text-right tabular-nums">{v.n}</td>
                 <td className="text-right tabular-nums">{fmtMoney(v.amount, locale)}</td>
+                <td className="text-right"><Link href={detailHref(ty)} className="text-sm text-brand-700 hover:underline">{A.seeSheets} →</Link></td>
               </tr>
             ))}
-            {!rows.length && <tr><td colSpan={3} className="py-4 text-center text-stone-500">{A.noneInPeriod}</td></tr>}
-            <tr className="font-semibold"><td>{t.common.total}</td><td className="text-right tabular-nums">{total.n}</td><td className="text-right tabular-nums">{fmtMoney(total.amount, locale)}</td></tr>
+            {!rows.length && <tr><td colSpan={4} className="py-4 text-center text-stone-500">{A.noneInPeriod}</td></tr>}
+            <tr className="font-semibold"><td>{t.common.total}</td><td className="text-right tabular-nums">{total.n}</td><td className="text-right tabular-nums">{fmtMoney(total.amount, locale)}</td><td /></tr>
           </tbody>
         </table>
         <p className="text-xs text-stone-500">{A.recapHint}</p>

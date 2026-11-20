@@ -89,3 +89,6 @@ export function daysSince(lastActionAt: string | null, createdAt: Date | string,
 export function isInformative(a: { type: string; source?: string | null; description: string }) {
   return a.type === "quantity" && a.source !== "weigh" && /en trop/i.test(a.description);
 }
+
+/** Type d'anomalie des fiches venues de l'onglet « Écarts pesées » */
+export const WEIGH_TYPE = "Écart de pesée";

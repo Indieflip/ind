@@ -17,6 +17,7 @@ import { supplierProcesses } from "@/lib/server/followup";
 import { daysSince, stageOf, isClaimMode, verificationDue } from "@/lib/anomaly";
 import { DueBox, Kanban } from "./Kanban";
 import { TypeRecap } from "./TypeRecap";
+import { problemTypes } from "@/lib/server/problemTypes";
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
 
@@ -102,6 +103,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
   // Récap par type d'anomalie sur une période (mois, trimestre, année en cours ou dates choisies) : nombre de fiches et montant réclamé
   const typeOf = (x: (typeof active)[number]) => x.problemType || t.anomalies.types[x.type];
   const parisDay = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
+  const allTypes = await problemTypes(Object.values(t.anomalies.types));
   const recapItems = active.map((x) => ({ d: parisDay(x.createdAt), k: typeOf(x), amt: num(x.claimedAmount) ?? 0 }));
   const typeFilter = one(sp.type) ?? "";
   const shown = typeFilter ? active.filter((x) => typeOf(x) === typeFilter) : active;
@@ -124,7 +126,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
         />
       )}
       <DueBox rows={active.map(toRow)} />
-      <TypeRecap items={recapItems} today={parisDay(new Date())} typeFilter={typeFilter} baseQs={view === "list" ? { view: "liste" } : {}} initialOpen={!!typeFilter} />
+      <TypeRecap items={recapItems} types={allTypes} today={parisDay(new Date())} typeFilter={typeFilter} baseQs={view === "list" ? { view: "liste" } : {}} initialOpen={!!typeFilter} />
       {view === "board" ? (
         <Kanban rows={shown.map(toRow)} canManage={can.manageAnomalies(user.role)} />
       ) : (
