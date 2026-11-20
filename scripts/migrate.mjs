@@ -771,6 +771,12 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v8
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v8', '1') on conflict (key) do nothing`);
 }
 
+// Contrôle des fiches d'anomalie : « À vérifier » par défaut pour les fiches sans contrôle, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'anomaly_review_default_v1'`)).rows.length) {
+  await db.execute(sql`update anomalies set review = 'a_verifier' where review is null`);
+  await db.execute(sql`insert into app_settings (key, value) values ('anomaly_review_default_v1', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

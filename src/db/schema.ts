@@ -270,7 +270,7 @@ export const anomalies = pgTable(
     /** Produits de la fiche : quantité et prix par produit (ajout possible, ex. BL manquant) */
     items: jsonb("items").$type<{ productId: number | null; name: string; qty: number | null; unit: string; price: number | null }[]>(),
     /** Contrôle de la fiche par l'utilisateur : a_verifier | verifiee | a_voir */
-    review: text("review"),
+    review: text("review").default("a_verifier"),
     description: text("description").notNull(),
     status: anomalyStatusEnum("status").notNull().default("open"),
     creditAmount: numeric("credit_amount", { precision: 12, scale: 2 }),

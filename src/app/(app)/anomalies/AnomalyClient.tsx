@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
-import { consolidateAnomaliesAction, createAnomalyAction, setAnomalyReviewAction, updateAnomalyAction } from "@/lib/actions/anomalies";
+import { consolidateAnomaliesAction, createAnomalyAction, setAnomaliesReviewAction, setAnomalyReviewAction, updateAnomalyAction } from "@/lib/actions/anomalies";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtDate, fmtMoney, sentence } from "@/lib/format";
 import { Icon } from "@/components/Icon";
@@ -180,10 +180,26 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
             <Icon name="layers" className="h-4 w-4" /> {a.consolidate} {sel.size > 0 && `(${sel.size})`}
           </button>
         )}
+        {canManage && (
+          <span className="flex flex-wrap items-center gap-1.5">
+            <span className="text-stone-500">{t.sheet.reviewLabel}{sel.size > 0 ? ` (${sel.size})` : ""} :</span>
+            {(["a_verifier", "verifiee", "a_voir"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                disabled={!sel.size || pending}
+                className={`rounded-full border px-2.5 py-1 text-xs font-semibold disabled:opacity-40 ${REVIEW_STYLE[k]}`}
+                onClick={() => start(async () => { await setAnomaliesReviewAction([...sel].map(Number), k); setSel(new Set()); router.refresh(); })}
+              >
+                {t.sheet.reviews[k]}
+              </button>
+            ))}
+          </span>
+        )}
         <span className="text-xs italic text-stone-400">{a.provisional}</span>
         <span className="text-stone-500">{rows.length} {a.openCount} · {a.saving} : {fmtMoney(totalSaving, locale)}</span>
       </div>
-      <DataTable copy={copySpec} rows={rows} cols={shownCols} rowKey={(r) => r.id} empty={a.empty} selectable={canConsolidate} selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} dense fixed rowClassName={(r) => (r.due ? "bg-red-50/60" : "")} />
+      <DataTable copy={copySpec} rows={rows} cols={shownCols} rowKey={(r) => r.id} empty={a.empty} selectable={canConsolidate || canManage} selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} dense fixed rowClassName={(r) => (r.due ? "bg-red-50/60" : "")} />
 
       <button className="btn-ghost mt-4 px-0 text-sm text-brand-700" onClick={() => setShowDone((v) => !v)}>
         {showDone ? "▾" : "▸"} {a.consolidatedList} ({consolidated.length})
@@ -213,6 +229,7 @@ function ReviewSelect({ id, value, disabled }: { id: number; value: string; disa
   const { t } = useI18n();
   const router = useRouter();
   const [v, setV] = useState(value);
+  useEffect(() => { setV(value); }, [value]);
   const [, start] = useTransition();
   return (
     <select

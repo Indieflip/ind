@@ -269,3 +269,13 @@ export async function setAnomalyReviewAction(id: number, review: string) {
   revalidatePath("/anomalies", "layout");
   return { ok: true };
 }
+
+/** Liste des anomalies : même contrôle pour plusieurs fiches d'un coup */
+export async function setAnomaliesReviewAction(ids: number[], review: string) {
+  await assertUser(can.manageAnomalies);
+  const value = ["a_verifier", "verifiee", "a_voir"].includes(review) ? review : null;
+  const list = ids.filter((x) => Number.isInteger(x)).slice(0, 2000);
+  if (list.length) await getDb().update(schema.anomalies).set({ review: value }).where(inArray(schema.anomalies.id, list));
+  revalidatePath("/anomalies", "layout");
+  return { ok: true, count: list.length };
+}

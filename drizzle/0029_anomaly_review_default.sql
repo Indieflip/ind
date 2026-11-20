@@ -1,0 +1,1 @@
+ALTER TABLE "anomalies" ALTER COLUMN "review" SET DEFAULT 'a_verifier';
