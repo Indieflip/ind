@@ -8,6 +8,7 @@ import { MODES, RESOLUTIONS, STAGES, stageOf, stageStyles, modeIcon } from "@/li
 import { useI18n } from "@/lib/i18n/client";
 import { Icon } from "@/components/Icon";
 import { MoneyInput } from "@/components/MoneyInput";
+import { UnitSelect } from "@/components/UnitSelect";
 
 export interface Item { productId: number | null; name: string; qty: string; unit: string; price: string }
 interface Values {
@@ -16,7 +17,7 @@ interface Values {
   creditAmount: string; claimedAmount: string; stage: string; resolution: string; mode: string; creditNumber: string; creditDate: string; creditKind: string;
 }
 
-export function AnomalySheetForm({ id, initial, editable, informative, types, products, assistant = [], showAssistant = true }: { id: number; initial: Values; editable: boolean; informative?: boolean; types: string[]; products: { id: number; name: string; unit?: string; price?: number | null }[]; assistant?: { date: string | null; text: string }[]; showAssistant?: boolean }) {
+export function AnomalySheetForm({ id, initial, editable, informative, types, products, assistant = [], showAssistant = true, units = [] }: { units?: string[]; id: number; initial: Values; editable: boolean; informative?: boolean; types: string[]; products: { id: number; name: string; unit?: string; price?: number | null }[]; assistant?: { date: string | null; text: string }[]; showAssistant?: boolean }) {
   const { t } = useI18n();
   const a = t.anomalies;
   const s = t.sheet;
@@ -40,9 +41,12 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
   const setItem = (i: number, patch: Partial<Item>) => { setV({ ...v, items: v.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) }); setSaved(false); };
   const pickItem = (i: number, text: string) => {
     const p = products.find((x) => x.name === text);
-    setItem(i, { name: text, productId: p?.id ?? null, ...(p && !v.items[i].unit ? { unit: p.unit ?? "" } : {}), ...(p && !v.items[i].price && p.price != null ? { price: String(p.price).replace(".", ",") } : {}) });
+    setItem(i, { name: text, productId: p?.id ?? null, ...(p && !v.items[i].unit ? { unit: canonUnit(p.unit ?? "") } : {}), ...(p && !v.items[i].price && p.price != null ? { price: String(p.price).replace(".", ",") } : {}) });
   };
   const n = (x: string) => { const r = parseFloat(x.replace(",", ".").replace(/[^\d.-]/g, "")); return Number.isFinite(r) ? r : null; };
+  // Unité tapée à la main (« kg », « Pièce ») rattachée à l'unité existante de même nom
+  const key = (u: string) => u.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const canonUnit = (u: string) => units.find((x) => key(x) === key(u)) ?? u;
   const itemsTotal = v.items.reduce((sum, x) => sum + (n(x.qty) ?? 0) * (n(x.price) ?? 0), 0);
   return (
     <>
@@ -74,7 +78,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
                     {x.productId ? <Link href={`/mercurial/produits/${x.productId}`} className="mt-0.5 block text-[11px] text-brand-700 underline">{s.seeProduct} →</Link> : x.name ? <span className="mt-0.5 block text-[11px] text-amber-700">{s.productNotLinked}</span> : null}
                   </td>
                   <td><input className="input py-1.5 text-right text-sm" inputMode="decimal" value={x.qty} onChange={(e) => setItem(i, { qty: e.target.value })} disabled={!editable} /></td>
-                  <td><input className="input py-1.5 text-sm" value={x.unit} onChange={(e) => setItem(i, { unit: e.target.value })} disabled={!editable} /></td>
+                  <td>{editable ? <UnitSelect className="input py-1.5 text-sm" value={canonUnit(x.unit)} units={units} onChange={(u) => setItem(i, { unit: u })} /> : <span>{x.unit}</span>}</td>
                   <td><MoneyInput className="input py-1.5 text-right text-sm" value={x.price} onChange={(e) => setItem(i, { price: e.target.value })} disabled={!editable} /></td>
                   <td className="text-right tabular-nums">{n(x.qty) != null && n(x.price) != null ? `${((n(x.qty) ?? 0) * (n(x.price) ?? 0)).toFixed(2).replace(".", ",")} €` : "—"}</td>
                   <td>{editable && <button type="button" className="btn-ghost p-1 text-stone-400 hover:text-red-600" aria-label={t.common.delete} onClick={() => { setV({ ...v, items: v.items.filter((_, j) => j !== i) }); setSaved(false); }}><Icon name="trash" className="h-4 w-4" /></button>}</td>

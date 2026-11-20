@@ -43,9 +43,10 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   // Type de problème (liste modifiable) et produits du fournisseur pour le rattachement
   const typeLabel = t.anomalies.types[a.type];
   const problemType = a.problemType || typeLabel;
-  const [types, supplierProducts] = await Promise.all([
+  const [types, supplierProducts, unitRows] = await Promise.all([
     problemTypes(Object.values(t.anomalies.types)),
     a.supplierId ? db.select({ id: schema.products.id, name: schema.products.name, unit: schema.products.unit, price: sql<number | null>`${schema.products.price}::float` }).from(schema.products).where(and(eq(schema.products.supplierId, a.supplierId), eq(schema.products.active, true))).orderBy(asc(schema.products.name)) : Promise.resolve([] as { id: number; name: string; unit: string; price: number | null }[]),
+    db.select({ name: schema.units.name }).from(schema.units).orderBy(asc(schema.units.position), asc(schema.units.name)),
   ]);
   const productId = a.productId ?? line?.productId ?? null;
   // Produits de la fiche par défaut : celui de la ligne du bon (quantité manquante si on la connaît)
@@ -53,6 +54,9 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   const itemsDefault = (a.productName || line?.productName) ? [{ productId, name: a.productName ?? line?.productName ?? "", qty: gap != null && gap > 0 ? gap : null, unit: line?.unit ?? "", price: line?.unitPrice != null ? num(line.unitPrice) : null }] : [];
 
   const process = (await supplierProcesses()).find(a.supplierId, a.supplierName);
+  // Unité tapée à la main rattachée à l'unité existante de même nom (« kg » = « Kg »)
+  const unitKey = (u: string) => u.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const canonUnit = (u: string) => unitRows.find((x) => unitKey(x.name) === unitKey(u))?.name ?? u;
   // Actions Assistant : ce que l'application a fait ou prévoit pour cette fiche (calculé, non modifiable)
   const S = t.sheet.assistant;
   const addDays = (d: string | Date, n: number) => { const x = new Date(typeof d === "string" ? `${d}T12:00:00` : d); x.setDate(x.getDate() + n); return x; };
@@ -162,11 +166,12 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
         id={a.id}
         editable={editable}
         types={types}
+        units={unitRows.map((u) => u.name)}
         assistant={assistant}
         showAssistant={false}
         products={supplierProducts}
         initial={{
-          items: (a.items?.length ? a.items : itemsDefault).map((x) => ({ productId: x.productId, name: x.name, qty: x.qty != null ? String(x.qty).replace(".", ",") : "", unit: x.unit ?? "", price: x.price != null ? String(x.price).replace(".", ",") : "" })),
+          items: (a.items?.length ? a.items : itemsDefault).map((x) => ({ productId: x.productId, name: x.name, qty: x.qty != null ? String(x.qty).replace(".", ",") : "", unit: canonUnit(x.unit ?? ""), price: x.price != null ? String(x.price).replace(".", ",") : "" })),
           problemType,
           productId,
           productName: a.productName ?? line?.productName ?? "",
