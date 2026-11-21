@@ -842,6 +842,43 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v1
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v13', '1') on conflict (key) do nothing`);
 }
 
+// Réclamation fruits et légumes du 12/10/26 (Producteurs Réunis) : envoyée par mail et avoir reçu le même jour → fiches clôturées, une fois
+// (liste du fichier « Réclamation - Producteurs Réunis » ; une facture qui a aussi des lignes réclamées le 28/10 n'est pas concernée)
+if (!(await db.execute(sql`select 1 from app_settings where key = 'fl_claim_20261012_v1'`)).rows.length) {
+  const { readFileSync: readFl } = await import("node:fs");
+  const fl = JSON.parse(readFl(new URL("./data/fl-claim-2026-10-12.json", import.meta.url), "utf8"));
+  // Date de réclamation reportée sur les écarts de pesée du fichier
+  for (const [day, product, ref] of fl.rows) {
+    await db.execute(sql`update weigh_gaps set claim_date = '2026-10-12' where claim_date is null and date = ${day}::date
+      and lower(regexp_replace(trim(product), '\s+', ' ', 'g')) = ${product} and lower(regexp_replace(trim(coalesce(supplier_ref, '')), '\s+', ' ', 'g')) = ${ref}`);
+  }
+  const keys = fl.refs.map((r) => `ref:${r}`);
+  const refsOnly = fl.refs.map((r) => r.replace(/^.*?:\s*/, ""));
+  const res = await db.execute(sql`update anomalies set
+      stage = 'cloturee', resolution = 'avoir', status = 'credit_received', result = 'cloture', mode = 'reclamation',
+      credit_amount = coalesce(credit_amount, claimed_amount), credit_kind = 'avoir', credit_date = '2026-10-12',
+      last_action_at = '2026-10-12', closed_at = '2026-10-12T12:00:00Z',
+      follow_up = ${"12/10/26 : réclamation envoyée par mail\n12/10/26 : avoir reçu"}
+    where source = 'weigh' and (lower(regexp_replace(coalesce(group_key, ''), '\s+', ' ', 'g')) in (select jsonb_array_elements_text(${JSON.stringify(keys)}::jsonb)) or lower(regexp_replace(trim(coalesce(reference, '')), '\s+', ' ', 'g')) in (select jsonb_array_elements_text(${JSON.stringify(refsOnly)}::jsonb)))`);
+  console.log(`[migrate] réclamation F&L du 12/10/26 : ${res.rowCount ?? 0} fiche(s) clôturée(s)`);
+  await db.execute(sql`insert into app_settings (key, value) values ('fl_claim_20261012_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev > Développement : prix « Non indiqué sur le bon », Mercurial (doublon, modifier / supprimer depuis le compte produit), Réclamations, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v14'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  const rows = [
+    ["reception", "Étape 3 - Contrôle", "Prix unitaire / Non indiqué sur le bon", true, "Soit un prix, soit la case « Non indiqué sur le bon » cochée (l'un ou l'autre, pas les deux) pour valider le bon. Simple information, sans impact.", "Prix manquant : saisir le prix ou cocher « Non indiqué sur le bon »."],
+    ["product", "Mercurial", "Doublon", false, "Colonne « Doublon » = Oui quand le même produit (même nom, même unité) est enregistré plusieurs fois chez le même fournisseur.", ""],
+    ["product", "Compte produit", "Modifier / Supprimer", false, "Depuis le compte produit : modifier (nom, unité, nature, prix min / max, prix bloqué, actif) ou supprimer. La suppression garde l'historique (réceptions, prix, anomalies) avec le nom du produit, sans lien.", ""],
+    ["claim", "Réclamations", "Filtre", false, "À l'ouverture, « Toutes » est sélectionné ; le bouton choisi est encadré d'un trait rouge fin.", ""],
+  ];
+  for (const [i, r] of rows.entries()) {
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values (${r[0]}, ${r[1]}, ${r[2]}, ${r[3]}, ${r[4]}, ${r[5]}, ${pos + i})`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v14', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { WEIGH_TYPE } from "@/lib/anomaly";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
@@ -91,7 +92,13 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
             <p className="mt-1 flex items-center gap-1.5 text-sm text-white/85"><Icon name="truck" className="h-4 w-4" /> {fmtDateTime(rec.deliveredAt, locale)}</p>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <span className="rounded-full bg-white px-1 py-0.5"><StatusBadge status={rec.status} label={t.receptionStatus[rec.status]} /></span>
+            <div className="flex items-center gap-1.5">
+              <span className="rounded-full bg-white px-1 py-0.5"><StatusBadge status={rec.status} label={t.receptionStatus[rec.status]} /></span>
+              {/* Modifier : tant que la fiche de réception n'est pas consolidée */}
+              {!locked && can.editReception(user.role) && (
+                <Link href={`/receptions/${rec.id}/edit`} className="no-print rounded-full bg-white p-1.5 text-brand-700 hover:bg-brand-50" title={t.receptions.edit} aria-label={t.receptions.edit}><Icon name="edit" className="h-4 w-4" /></Link>
+              )}
+            </div>
             {showPrices && total > 0 && (
               <div className="text-right">
                 <p className="text-[11px] uppercase tracking-wide text-white/70">{t.receptions.total}</p>
@@ -292,7 +299,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
           )}
           <div className="no-print flex gap-3 border-t border-stone-100 px-5 py-2 text-sm">
             <Link href="/anomalies" className="font-medium text-brand-700 hover:underline">{t.receptions.seeAnomalies} →</Link>
-            {recGaps.length > 0 && <Link href="/anomalies/ecarts-pesee" className="font-medium text-brand-700 hover:underline">{t.weigh.title} →</Link>}
+            {recGaps.length > 0 && <Link href={`/anomalies?${new URLSearchParams({ view: "liste", type: WEIGH_TYPE })}`} className="font-medium text-brand-700 hover:underline">{WEIGH_TYPE} →</Link>}
           </div>
         </section>
       )}

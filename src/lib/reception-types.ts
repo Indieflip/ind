@@ -57,6 +57,8 @@ export interface DraftLine {
   dlc: string;
   lot: string;
   unitPrice: string;
+  /** Prix non indiqué sur le bon (soit un prix, soit cette case) */
+  priceNotShown?: boolean;
   mercurialPrice: number | null;
   mercurialMin?: number | null;
   priceLocked?: boolean;
@@ -142,6 +144,7 @@ export interface ReceptionPayload {
     dlc: string | null;
     lot: string | null;
     unitPrice: number | null;
+    priceNotShown?: boolean;
     decision: Decision;
     reason: string | null;
     photos: string[];

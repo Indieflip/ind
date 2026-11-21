@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
@@ -9,6 +9,7 @@ import { fmtDate, fmtMoney, fmtNum, num, sentence } from "@/lib/format";
 import { fvRange, parisMonth } from "@/lib/pricing";
 import { Icon } from "@/components/Icon";
 import { MajLog } from "../../mise-a-jour/MajLog";
+import { ProductEditor } from "./ProductEditor";
 
 type Event = { at: Date; icon: string; tone: string; title: string; text: string; href?: string };
 
@@ -43,6 +44,11 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       .orderBy(desc(schema.anomalies.createdAt)),
   ]);
 
+  const [unitRows, natureRows] = await Promise.all([
+    db.select({ name: schema.units.name }).from(schema.units).orderBy(asc(schema.units.position), asc(schema.units.name)),
+    db.selectDistinct({ nature: schema.products.nature }).from(schema.products),
+  ]);
+  const natureList = [...new Set(natureRows.flatMap((x) => (x.nature ?? "").split(/,\s*/).filter(Boolean)))].sort((a, b) => a.localeCompare(b, "fr"));
   const money = (n: number | null) => (n != null ? fmtMoney(n, locale) : "—");
   const range = fv ? fvRange(fv.prices, parisMonth(new Date())) : { min: num(product.priceMin), max: num(product.price) };
   const locked = fv ? fv.locked : product.priceLocked;
@@ -89,6 +95,14 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             {!product.active && <span className="badge bg-stone-200 text-stone-700">{P.inactive}</span>}
           </div>
         </div>
+        {can.editMercurial(user.role) && (
+          <ProductEditor
+            fv={!!fv}
+            units={unitRows.map((u) => u.name)}
+            natures={natureList}
+            product={{ id: product.id, name: product.name, unit: product.unit, nature: product.nature, priceMin: num(product.priceMin), price: num(product.price), priceLocked: product.priceLocked, active: product.active }}
+          />
+        )}
       </header>
 
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">

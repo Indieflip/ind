@@ -11,7 +11,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { Icon } from "@/components/Icon";
 import { UnitSelect } from "@/components/UnitSelect";
 
-interface Row { id: number; supplierId?: number | null; supplier: string; product: string; unit: string | null; prices: (number | null)[]; blocked: string | null; locked: boolean }
+interface Row { id: number; supplierId?: number | null; supplier: string; product: string; unit: string | null; prices: (number | null)[]; blocked: string | null; locked: boolean; productId?: number | null }
 
 const cell = (n: number | null | undefined) => (n == null ? "" : n.toFixed(2).replace(".", ","));
 const money = (n: number | null | undefined) => (n == null ? "" : `${cell(n)} €`);
@@ -121,7 +121,7 @@ function FvRow({ r, currentMonth, editable, shownMonths, units }: { r: Row; curr
     return (
       <tr className={r.locked ? "bg-sky-50 hover:bg-sky-100" : "hover:bg-stone-50"} title={r.locked ? t.fv.lockedHint : undefined}>
         <td className={`${td} whitespace-nowrap text-stone-500`}>{r.supplierId ? <Link href={`/mercurial/fournisseurs/${r.supplierId}`} className="hover:text-brand-700 hover:underline">{sentence(r.supplier)}</Link> : sentence(r.supplier)}</td>
-        <td className={`${td} sticky left-0 font-medium ${r.locked ? "bg-sky-50 text-sky-900" : "bg-white"}`}>{r.locked && "🔒 "}{r.product}</td>
+        <td className={`${td} sticky left-0 font-medium ${r.locked ? "bg-sky-50 text-sky-900" : "bg-white"}`}>{r.locked && "🔒 "}{r.productId ? <Link href={`/mercurial/produits/${r.productId}`} className="hover:text-brand-700 hover:underline">{r.product}</Link> : r.product}</td>
         <td className={td}>{r.unit}</td>
         {cells.map((i) => (
           <td key={i} className={`${td} whitespace-nowrap text-right tabular-nums ${i % 2 === 0 ? "border-l border-stone-100 text-stone-500" : ""} ${Math.floor(i / 2) === currentMonth ? "bg-brand-50/60" : ""}`}>{money(r.prices[i])}</td>

@@ -226,7 +226,7 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
       setTimeout(() => document.getElementById(`line-${undecided[0].key}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
       return;
     }
-    const noPrice = draft.lines.filter((l) => l.productName.trim() && !l.unitPrice.trim());
+    const noPrice = draft.lines.filter((l) => l.productName.trim() && !l.unitPrice.trim() && !l.priceNotShown);
     if (noPrice.length) {
       setError(`${noPrice.length} ${t.wizard.missingPrice}`);
       if (draft.step !== 2) go(2);

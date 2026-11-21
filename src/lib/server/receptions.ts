@@ -24,6 +24,7 @@ const lineSchema = z.object({
   dlc: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   lot: z.string().max(120).nullable(),
   unitPrice: z.number().nullable(),
+  priceNotShown: z.boolean().optional(),
   decision: z.enum(["conform", "reserve", "refuse"]),
   reason: z.string().max(60).nullable(),
   photos: z.array(z.string().max(2000)).max(10),
@@ -162,7 +163,7 @@ async function writeContent(
   }
 
   // Écarts de pesée : produit au kg dont le poids contrôlé diffère du poids facturé (en moins ou en plus),
-  // au-delà de la marge acceptée (10 g ou 0,10 €). Ces écarts vont uniquement dans Anomalies > Écarts pesées.
+  // au-delà de la marge acceptée (10 g ou 0,10 €). Ces écarts sont regroupés en une fiche d'anomalie « Écart de pesée » par bon.
   // Le détail, la réclamation et la perte acceptable déjà saisis sont conservés si le bon est modifié.
   const oldGaps = await tx.select().from(schema.weighGaps).where(eq(schema.weighGaps.receptionId, recId));
   await tx.delete(schema.weighGaps).where(eq(schema.weighGaps.receptionId, recId));
@@ -311,6 +312,7 @@ async function writeContent(
         reason: l.reason,
         document: l.document || null,
         note: l.note || null,
+        priceNotShown: l.unitPrice == null && !!l.priceNotShown,
         position: position++,
       })
       .returning();
@@ -328,7 +330,7 @@ async function writeContent(
       date,
     ).issues.filter((i) => i !== "temp_missing" && i !== "temp_limit" && i !== "dlc_short" && !(unitName(l.unit) === "Kg" && (i === "qty_less" || i === "qty_more")));
     // (T° dans la marge acceptable et DLC courte : tolérées, pas d'anomalie)
-    // (au kg, un écart de poids va seulement dans Écarts pesées)
+    // (au kg, un écart de poids va dans la fiche « Écart de pesée » du bon)
     // Texte clair : « manque 50 pièces (facturé 100, contrôlé 50) », « température 8 °C (maximum 4 °C) »…
     const facts = describeLine(l, detected, cat, t);
     if (l.decision === "conform" && detected.length && !keep.products.has(l.productName.toLowerCase())) {

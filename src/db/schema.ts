@@ -206,6 +206,8 @@ export const receptionLines = pgTable(
     document: text("document"),
     /** Note libre saisie sur le produit */
     note: text("note"),
+    /** Prix unitaire non indiqué sur le bon (case cochée à la saisie, simple information) */
+    priceNotShown: boolean("price_not_shown").notNull().default(false),
     position: integer("position").notNull().default(0),
   },
   (t) => [index("lines_reception_idx").on(t.receptionId), index("lines_product_idx").on(t.productId)],

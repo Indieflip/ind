@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { WEIGH_TYPE } from "@/lib/anomaly";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
@@ -37,7 +38,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
         can.viewAnomalies(r) && res.gaps.length > 0 && (
           <Section key="gap" title={t.weigh.title} count={res.gaps.length}>
             {res.gaps.map((x) => (
-              <Item key={x.id} href={x.receptionId ? `/receptions/${x.receptionId}` : "/anomalies/ecarts-pesee"} title={x.product} meta={`${fmtDate(x.date, locale)} · ${x.supplierRef ?? ""}${x.gapAmount ? ` · ${fmtMoney(num(x.gapAmount), locale)}` : ""}`} />
+              <Item key={x.id} href={x.receptionId ? `/receptions/${x.receptionId}` : `/anomalies?${new URLSearchParams({ view: "liste", type: WEIGH_TYPE })}`} title={x.product} meta={`${fmtDate(x.date, locale)} · ${x.supplierRef ?? ""}${x.gapAmount ? ` · ${fmtMoney(num(x.gapAmount), locale)}` : ""}`} />
             ))}
           </Section>
         ),

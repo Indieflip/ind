@@ -243,6 +243,7 @@ export function toPayload(d: Draft): ReceptionPayload {
         dlc: l.dlc || null,
         lot: l.lot.trim() || null,
         unitPrice: num(l.unitPrice),
+        priceNotShown: !l.unitPrice.trim() && !!l.priceNotShown,
         decision: l.decision ?? "conform",
         reason: l.reason || null,
         photos: l.photos,

@@ -46,14 +46,18 @@ export async function syncWeighAnomalies() {
       nature: first.nature,
       claimedAmount: total > 0 ? String(Math.round(total * 100) / 100) : null,
       receptionId: first.receptionId,
+      // Détail par produit (comme l'ancien onglet Écarts pesées) : poids manquant (kg) × prix unitaire
+      items: lines.filter((g) => (num(g.gapQty) ?? 0) > 0).map((g) => ({ productId: g.productId ?? null, name: g.product, qty: Math.round((num(g.gapQty) ?? 0) * 1000) / 1000, unit: "Kg", price: num(g.unitPrice) })),
     };
     const cur = byKey.get(key);
     if (cur) {
       if (cur.consolidatedAt) continue;
       // Sans prix sur les lignes, le montant saisi à la main est gardé
       if (values.claimedAmount == null) values.claimedAmount = cur.claimedAmount;
-      if (cur.description !== values.description || cur.claimedAmount !== values.claimedAmount || cur.supplierId !== values.supplierId || cur.reference !== values.reference) {
-        await db.update(schema.anomalies).set(values).where(eq(schema.anomalies.id, cur.id));
+      // Produits saisis à la main sur la fiche : gardés ; sinon le détail des écarts est repris
+      const keepItems = !!cur.items?.length;
+      if (cur.description !== values.description || cur.claimedAmount !== values.claimedAmount || cur.supplierId !== values.supplierId || cur.reference !== values.reference || !keepItems) {
+        await db.update(schema.anomalies).set(keepItems ? { ...values, items: cur.items } : values).where(eq(schema.anomalies.id, cur.id));
       }
       continue;
     }

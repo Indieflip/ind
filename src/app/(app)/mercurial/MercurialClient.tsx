@@ -12,7 +12,7 @@ import { fmtDate, fmtMoney, sentence } from "@/lib/format";
 import { Icon } from "@/components/Icon";
 import { UnitSelect } from "@/components/UnitSelect";
 import { NatureSelect } from "@/components/NatureSelect";
-import { matches } from "@/lib/search";
+import { matches, normalize } from "@/lib/search";
 import { similarity } from "@/lib/fuzzy";
 import { SupplierCombo } from "@/components/SupplierCombo";
 import { FilterInput, Pager, ResetFilters } from "@/components/table/FilterInput";
@@ -163,6 +163,14 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
   const [lockedOnly, setLockedOnly] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
   const money = (n: number | null) => (n != null ? fmtMoney(n, locale) : "");
+  // Doublon : même produit (même nom et même unité) enregistré plusieurs fois chez le même fournisseur
+  const dupKey = (r: Row) => `${r.supplierId}|${normalize(r.name)}|${r.unit.trim().toLowerCase()}`;
+  const dups = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const r of rows) if (r.active) n.set(dupKey(r), (n.get(dupKey(r)) ?? 0) + 1);
+    return new Set([...n].filter(([, c]) => c > 1).map(([k]) => k));
+  }, [rows]);
+  const isDup = (r: Row) => r.active && dups.has(dupKey(r));
   const cols: ColumnDef<Row>[] = useMemo(
     () => [
       { key: "supplier", text: (r) => r.supplier, options: suppliers.map((s) => s.name) },
@@ -171,15 +179,16 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
       { key: "unit", text: (r) => r.unit, options: [...new Set([...units, ...rows.map((r) => r.unit).filter(Boolean)])].sort((a, b) => a.localeCompare(b, "fr")) },
       { key: "priceMin", text: (r) => money(r.priceMin), sort: (r) => r.priceMin },
       { key: "price", text: (r) => money(r.price), sort: (r) => r.price },
+      { key: "dup", text: (r) => (isDup(r) ? m.dupYes : ""), options: [m.dupYes] },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [suppliers, natures, units, locale, rows],
+    [suppliers, natures, units, locale, rows, dups],
   );
   const base = useMemo(() => rows.filter((r) => (showInactive || r.active) && (!lockedOnly || r.priceLocked)), [rows, showInactive, lockedOnly]);
   const tb = useTable(base, cols, { pageSize: 1000 });
   const labels: Record<string, [string, "right" | undefined]> = {
     id: ["N°", "right"], supplier: [t.common.supplier, undefined], nature: [m.nature, undefined], name: [m.products, undefined], unit: [t.common.unit, undefined],
-    priceMin: [m.priceMin, "right"], price: [m.priceMax, "right"], updated: [m.updated, undefined],
+    priceMin: [m.priceMin, "right"], price: [m.priceMax, "right"], updated: [m.updated, undefined], dup: [m.duplicate, undefined],
   };
   return (
     <>
@@ -196,7 +205,7 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
         <div className="max-h-[75vh] overflow-y-auto">
           <table className="table">
             <colgroup>
-              <col className="w-[15%]" /><col className="w-[12%]" /><col /><col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[9%]" />
+              <col className="w-[15%]" /><col className="w-[12%]" /><col /><col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[7%]" /><col className="w-[9%]" />
             </colgroup>
             <thead className="sticky top-0 z-10">
               <tr>
@@ -213,7 +222,7 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
               </tr>
             </thead>
             <tbody>
-              {tb.pageRows.map((r) => <MercurialRow key={r.id} r={r} suppliers={suppliers} units={units} natures={natures} editable={editable} />)}
+              {tb.pageRows.map((r) => <MercurialRow key={r.id} r={r} dup={isDup(r)} suppliers={suppliers} units={units} natures={natures} editable={editable} />)}
             </tbody>
           </table>
         </div>
@@ -223,7 +232,7 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
   );
 }
 
-function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; suppliers: Opt[]; units: string[]; natures: string[]; editable: boolean }) {
+function MercurialRow({ r, dup = false, suppliers, units, natures, editable }: { r: Row; dup?: boolean; suppliers: Opt[]; units: string[]; natures: string[]; editable: boolean }) {
   const { t, locale } = useI18n();
   const m = t.mercurial;
   const [edit, setEdit] = useState(false);
@@ -249,6 +258,7 @@ function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; supp
         <td>{r.unit}</td>
         <td className="whitespace-nowrap text-right tabular-nums">{r.priceMin != null ? fmtMoney(r.priceMin, locale) : ""}</td>
         <td className="whitespace-nowrap text-right tabular-nums">{r.price != null ? fmtMoney(r.price, locale) : ""}</td>
+        <td>{dup && <span className="badge bg-amber-100 text-amber-900">{m.dupYes}</span>}</td>
         <td className="text-right">
           {editable && !r.fv && <button className="btn-ghost px-1.5 py-1 text-xs" onClick={() => setEdit(true)} title={t.common.edit}><Icon name="edit" className="h-3.5 w-3.5" /> <span className="hidden xl:inline">{t.common.edit}</span></button>}
           {editable && r.fv && <Link href="/mercurial/fruits-legumes" className="btn-ghost px-1.5 py-1 text-xs" title={m.fvEdit}><Icon name="leaf" className="h-3.5 w-3.5" /> <span className="hidden xl:inline">{t.common.edit}</span></Link>}
@@ -273,6 +283,7 @@ function MercurialRow({ r, suppliers, units, natures, editable }: { r: Row; supp
       <td><UnitSelect className="input py-1.5" value={unit} units={units} onChange={(u) => { setUnit(u); save({ unit: u }); }} /></td>
       <td><MoneyInput className="input py-1.5 text-right" defaultValue={str(r.priceMin)} onBlur={(e) => e.target.value !== str(r.priceMin) && save({ priceMin: e.target.value })} /></td>
       <td><MoneyInput className="input py-1.5 text-right" defaultValue={str(r.price)} onBlur={(e) => e.target.value !== str(r.price) && save({ price: e.target.value })} /></td>
+      <td>{dup && <span className="badge bg-amber-100 text-amber-900">{m.dupYes}</span>}</td>
       <td className="text-right">
         <button
           type="button"

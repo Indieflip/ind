@@ -1,0 +1,1 @@
+ALTER TABLE "reception_lines" ADD COLUMN "price_not_shown" boolean DEFAULT false NOT NULL;

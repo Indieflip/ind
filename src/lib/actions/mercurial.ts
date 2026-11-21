@@ -156,3 +156,22 @@ export async function deleteUnitAction(id: number): Promise<{ error?: string }> 
   refresh();
   return {};
 }
+
+/**
+ * Suppression définitive d'un produit (ex. doublon) depuis son compte produit.
+ * L'historique est gardé : réceptions, suivi des prix, anomalies et mises à jour conservent le nom du produit, sans lien.
+ */
+export async function deleteProductAction(id: number) {
+  await assertUser(can.editMercurial);
+  const db = getDb();
+  await db.transaction(async (tx) => {
+    await tx.update(schema.receptionLines).set({ productId: null }).where(eq(schema.receptionLines.productId, id));
+    await tx.update(schema.priceChanges).set({ productId: null }).where(eq(schema.priceChanges.productId, id));
+    await tx.update(schema.anomalies).set({ productId: null }).where(eq(schema.anomalies.productId, id));
+    await tx.update(schema.majLog).set({ productId: null }).where(eq(schema.majLog.productId, id));
+    await tx.update(schema.weighGaps).set({ productId: null }).where(eq(schema.weighGaps.productId, id));
+    await tx.delete(schema.products).where(eq(schema.products.id, id));
+  });
+  refresh();
+  return { ok: true };
+}

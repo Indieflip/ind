@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { isNotNull, asc, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
@@ -20,6 +20,9 @@ export default async function FruitsLegumesPage({ searchParams }: { searchParams
   const units = (await db.select({ name: schema.units.name }).from(schema.units).orderBy(asc(schema.units.position), asc(schema.units.name))).map((u) => u.name);
   const all = await db.select().from(schema.fvItems).where(eq(schema.fvItems.year, year)).orderBy(asc(schema.fvItems.position), asc(schema.fvItems.id));
   const rows = all;
+  // Compte produit (Mercurial) de chaque ligne de fruits et légumes
+  const linked = await db.select({ id: schema.products.id, fv: schema.products.fvItemId }).from(schema.products).where(isNotNull(schema.products.fvItemId));
+  const productOf = new Map(linked.map((x) => [x.fv!, x.id]));
   const suppliers = [...new Set(all.map((r) => r.supplier))].sort((a, b) => a.localeCompare(b, "fr"));
   const months = Array.from({ length: 12 }, (_, i) => new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "fr-FR", { month: "long" }).format(new Date(2026, i, 15)));
   const currentMonth = year === thisYear ? new Date().getMonth() : -1;
@@ -39,7 +42,7 @@ export default async function FruitsLegumesPage({ searchParams }: { searchParams
         <button className="btn-secondary py-2">{t.common.apply}</button>
       </form>
       <p className="mb-2 text-xs text-stone-500">🔒 {t.fv.lockedHint} {t.fv.monthHint}</p>
-      <FvTable rows={rows.map((r) => ({ id: r.id, supplierId: matcher.find(r.supplier), supplier: r.supplier, product: r.product, unit: r.unit, prices: r.prices, blocked: r.blocked, locked: r.locked }))} months={months} currentMonth={currentMonth} editable={can.editFv(user.role)} units={units} />
+      <FvTable rows={rows.map((r) => ({ id: r.id, supplierId: matcher.find(r.supplier), supplier: r.supplier, product: r.product, unit: r.unit, prices: r.prices, blocked: r.blocked, locked: r.locked, productId: productOf.get(r.id) ?? null }))} months={months} currentMonth={currentMonth} editable={can.editFv(user.role)} units={units} />
     </>
   );
 }

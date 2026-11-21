@@ -215,7 +215,12 @@ function LineCard({
             <span className="ml-1 font-normal text-stone-400">{rangeLabel}</span>
             {line.priceLocked && <span className="ml-1 badge bg-sky-100 text-sky-800">🔒 {t.wizard.lockedBadge}</span>}
           </label>
-          <MoneyInput className={`input py-2 ${!line.unitPrice.trim() ? "border-amber-400 bg-amber-50" : ""}`} value={line.unitPrice} onChange={(e) => onChange({ unitPrice: e.target.value })} />
+          <MoneyInput className={`input py-2 ${!line.unitPrice.trim() && !line.priceNotShown ? "border-amber-400 bg-amber-50" : ""}`} value={line.unitPrice} disabled={!!line.priceNotShown} onChange={(e) => onChange({ unitPrice: e.target.value, ...(e.target.value.trim() ? { priceNotShown: false } : {}) })} />
+          {/* Soit un prix, soit « Non indiqué sur le bon » (l'un ou l'autre pour valider le bon) */}
+          <label className="mt-1 flex items-center gap-1.5 text-xs text-stone-600">
+            <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={!!line.priceNotShown} onChange={(e) => onChange({ priceNotShown: e.target.checked, ...(e.target.checked ? { unitPrice: "" } : {}) })} />
+            {t.wizard.priceNotShown}
+          </label>
           {pc.kind === "locked" && <p className="mt-0.5 text-xs font-semibold text-red-700">{fmtPct(pc.pct)} · {t.wizard.lockedWarn}</p>}
           {(pc.kind === "increase" || pc.kind === "decrease") && (
             <p className={`mt-0.5 text-xs font-semibold ${pc.kind === "increase" ? "text-red-600" : "text-emerald-600"}`}>{fmtPct(pc.pct)}</p>

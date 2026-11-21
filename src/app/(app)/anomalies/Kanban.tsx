@@ -73,6 +73,9 @@ export function Kanban({ rows, canManage }: { rows: AnomalyRow[]; canManage: boo
   const router = useRouter();
   const [pending, start] = useTransition();
   const [closing, setClosing] = useState<number | null>(null);
+  // Tri de chaque colonne : par ancienneté (défaut), puis fournisseur A → Z, puis Z → A
+  const [order, setOrder] = useState<Record<string, "days" | "az" | "za">>({});
+  const nextOrder = { days: "az", az: "za", za: "days" } as const;
   // Clôture « Avoir reçu » : on ouvre la fiche pour saisir le montant, le n° et la date de l'avoir
   const move = (id: number, stage: Stage, resolution?: string) =>
     start(async () => {
@@ -86,7 +89,11 @@ export function Kanban({ rows, canManage }: { rows: AnomalyRow[]; canManage: boo
   const inCol = (s: Stage) =>
     rows
       .filter((r) => stageOf(r.stage) === s && (s !== "cloturee" || (r.closedAt ? new Date(r.closedAt).getTime() >= weekAgo : false)))
-      .sort((x, y) => (s === "cloturee" ? 0 : y.days - x.days));
+      .sort((x, y) => {
+        const o = order[s] ?? "days";
+        if (o !== "days") return (o === "az" ? 1 : -1) * sentence(x.supplier).localeCompare(sentence(y.supplier), "fr", { sensitivity: "base" });
+        return s === "cloturee" ? 0 : y.days - x.days;
+      });
   return (
     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
       {COLUMNS.map((s) => {
@@ -96,7 +103,12 @@ export function Kanban({ rows, canManage }: { rows: AnomalyRow[]; canManage: boo
           <section key={s} className="flex min-h-40 flex-col rounded-xl border border-stone-200 bg-stone-100/70">
             <header className="flex items-center justify-between gap-2 rounded-t-xl px-3 py-2">
               <span className={`badge ${stageStyles[s]}`}>{t.stages[s]}</span>
-              <span className="text-xs text-stone-600">{list.length} · {fmtMoney(total, locale)}</span>
+              <span className="flex items-center gap-1.5 text-xs text-stone-600">
+                {list.length} · {fmtMoney(total, locale)}
+                <button type="button" className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${(order[s] ?? "days") === "days" ? "text-stone-400 hover:bg-white" : "bg-white text-brand-700"}`} title={k.sortHint} onClick={() => setOrder({ ...order, [s]: nextOrder[order[s] ?? "days"] })}>
+                  {(order[s] ?? "days") === "za" ? "Z→A" : "A→Z"}
+                </button>
+              </span>
             </header>
             <ul className="max-h-[70vh] flex-1 space-y-2 overflow-y-auto px-2 pb-2">
               {list.length === 0 && <li className="px-2 py-6 text-center text-xs text-stone-400">{k.empty}</li>}

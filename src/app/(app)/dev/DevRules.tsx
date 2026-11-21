@@ -1,6 +1,6 @@
 "use client";
 
-import { MODES, RESOLUTIONS, STAGES, modeIcon, stageStyles } from "@/lib/anomaly";
+import { MODES, RESOLUTIONS, STAGES, WEIGH_TYPE, modeIcon, stageStyles } from "@/lib/anomaly";
 import { useI18n } from "@/lib/i18n/client";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { useRouter } from "next/navigation";
@@ -83,8 +83,11 @@ export function FollowUpCharacteristics({ points }: { points: Record<string, str
   const { t } = useI18n();
   const r = t.rules;
   const rows: CharRow[] = [
-    ...MODES.map((m) => ({ id: `mode-${m}`, characteristic: r.charMode, post: `${modeIcon(m)} ${t.modes[m]}`, detail: t.sheet.modeHints[m], steps: r.followSteps[m] as unknown as [string, string][], reminder: r.modeReminder[m] })),
+    ...MODES.map((m) => ({ id: `mode-${m}`, characteristic: r.charMode, post: t.modes[m], detail: `${t.sheet.modeHints[m]}. ${r.modeSavings[m]}`, steps: r.followSteps[m] as unknown as [string, string][], reminder: r.modeReminder[m] })),
     ...STAGES.map((st) => ({ id: `stage-${st}`, characteristic: r.charStage, post: t.stages[st], detail: r.stageText[st], steps: [] as [string, string][], reminder: r.stageReminder[st] })),
+    // Types d'anomalie : quand la fiche est créée automatiquement, et le rappel qui s'applique
+    ...(Object.keys(t.anomalies.types) as (keyof typeof t.anomalies.types)[]).map((k) => ({ id: `type-${k}`, characteristic: r.charType, post: t.anomalies.types[k], detail: `${r.createdWhen} ${(r.typeText as Record<string, string>)[k] ?? "—"}`, steps: [] as [string, string][], reminder: (r.typeReminder as Record<string, string>)[k] ?? r.typeReminderDefault })),
+    { id: "type-weigh", characteristic: r.charType, post: WEIGH_TYPE, detail: `${r.createdWhen} ${r.weighTypeText}`, steps: [], reminder: r.typeReminderDefault },
   ];
   const cols: Col<CharRow>[] = [
     { key: "point", label: r.point, text: (x) => points[x.id] ?? "", keepCase: true, width: "16%", render: (x) => <PointCell id={x.id} value={points[x.id] ?? ""} placeholder={r.pointPlaceholder} /> },

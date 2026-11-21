@@ -66,7 +66,7 @@ export function StepValidate({
                     <td className="px-1 text-right tabular-nums">{dash(l.qtyReceived)}{l.qtyOrdered && l.qtyOrdered !== l.qtyReceived ? ` / ${l.qtyOrdered}` : ""} {l.unit}</td>
                     <td className="px-1 text-right tabular-nums">{dash(l.temperature)}</td>
                     <td className="px-1 whitespace-nowrap">{l.dlc ? fmtDate(l.dlc) : "—"}</td>
-                    <td className="px-1 text-right tabular-nums">{dash(l.unitPrice)}</td>
+                    <td className="px-1 text-right tabular-nums">{l.priceNotShown && !l.unitPrice.trim() ? <span className="text-xs text-stone-500">{t.wizard.priceNotShown}</span> : dash(l.unitPrice)}</td>
                     <td className="pl-1">{l.decision ? <span className={`badge ${decisionStyles[l.decision].badge}`}>{t.decision[l.decision]}</span> : <span className="badge bg-amber-100 text-amber-900">{w.toDecide}</span>}</td>
                   </tr>
                 ))}

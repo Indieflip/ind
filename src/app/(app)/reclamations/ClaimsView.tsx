@@ -19,7 +19,7 @@ export function ClaimsView({ rows, canManage, initialFilter }: { rows: ClaimView
   const { t, locale } = useI18n();
   const c = t.claims;
   const tiles: Stage[] = ["reclamee", "a_verifier", "cloturee", "annulee"];
-  const [filter, setFilter] = useState<Stage | "open" | "missing" | "all">(initialFilter ?? "open");
+  const [filter, setFilter] = useState<Stage | "open" | "missing" | "all">(initialFilter ?? "all");
   const isOpen = (r: ClaimViewRow) => r.stage === "reclamee" || r.stage === "a_verifier" || r.stage === "a_traiter";
   const missing = rows.filter((r) => isOpen(r) && r.claimed == null);
   const counts = Object.fromEntries(tiles.map((s) => [s, rows.filter((r) => r.stage === s).length])) as Record<Stage, number>;
@@ -70,20 +70,20 @@ export function ClaimsView({ rows, canManage, initialFilter }: { rows: ClaimView
   return (
     <>
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-        <button type="button" onClick={() => setFilter("all")} className={`rounded-xl border-2 bg-brand-700 p-3 text-left text-white ${filter === "all" ? "border-brand-900 ring-2 ring-brand-300" : "border-transparent opacity-90 hover:opacity-100"}`}>
+        <button type="button" onClick={() => setFilter("all")} className={`rounded-xl border bg-brand-700 p-3 text-left text-white ${filter === "all" ? "border-red-500" : "border-transparent opacity-90 hover:opacity-100"}`}>
           <p className="text-2xl font-bold leading-none">{rows.length}</p>
           <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-white/80">{c.all}</p>
         </button>
-        <button type="button" onClick={() => setFilter("open")} className={`rounded-xl border-2 bg-white p-3 text-left ${filter === "open" ? "border-brand-600" : "border-stone-200"}`}>
+        <button type="button" onClick={() => setFilter("open")} className={`rounded-xl border bg-white p-3 text-left ${filter === "open" ? "border-red-500" : "border-stone-200"}`}>
           <p className="text-2xl font-bold leading-none">{counts.reclamee + counts.a_verifier}</p>
           <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{c.inProgress}</p>
         </button>
-        <button type="button" onClick={() => setFilter(filter === "missing" ? "open" : "missing")} className={`rounded-xl border-2 bg-white p-3 text-left ${filter === "missing" ? "border-red-500" : "border-stone-200"}`}>
+        <button type="button" onClick={() => setFilter(filter === "missing" ? "all" : "missing")} className={`rounded-xl border bg-white p-3 text-left ${filter === "missing" ? "border-red-500" : "border-stone-200"}`}>
           <p className="text-2xl font-bold leading-none text-red-700">{missing.length}</p>
           <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{c.missingAmount}</p>
         </button>
         {tiles.map((s) => (
-          <button key={s} type="button" onClick={() => setFilter(filter === s ? "open" : s)} className={`rounded-xl border-2 p-3 text-left transition ${stageStyles[s]} ${filter === s ? "border-current" : "border-transparent opacity-80 hover:opacity-100"}`}>
+          <button key={s} type="button" onClick={() => setFilter(filter === s ? "all" : s)} className={`rounded-xl border p-3 text-left transition ${stageStyles[s]} ${filter === s ? "border-red-500" : "border-transparent opacity-80 hover:opacity-100"}`}>
             <p className="text-2xl font-bold leading-none">{counts[s]}</p>
             <p className="mt-1 text-xs font-semibold uppercase tracking-wide">{t.stages[s]}</p>
           </button>

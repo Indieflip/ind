@@ -218,6 +218,13 @@
       "when": 1795219135176,
       "tag": "0030_anomaly_doc_date",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1795226256596,
+      "tag": "0031_line_price_not_shown",
+      "breakpoints": true
     }
   ]
 }
