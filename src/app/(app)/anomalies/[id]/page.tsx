@@ -134,7 +134,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
             <p className="text-sm text-stone-500">{s.title} · {t.anomalies.number} {number} - {fmtDate(a.createdAt ?? rec?.deliveredAt, locale)}</p>
             <h1 className="text-2xl font-bold leading-tight sm:text-3xl">{sentence(supplier?.name ?? a.supplierName)} — {problemType}</h1>
             {itemsLabel && problemType !== t.anomalies.types.missing_bl && <p className="text-base text-stone-700">{itemsLabel}</p>}
-            {a.claimNo && <p className="text-xs text-stone-500">{t.claims.title} N° {a.claimNo}</p>}
+            {a.claimNo && <p className="text-xs"><Link href={`/reclamations?n=${a.claimNo}`} className="font-medium text-brand-700 hover:underline">{t.claims.title} N° {a.claimNo}</Link></p>}
           </div>
           <div className="flex flex-col items-end gap-1.5 text-right">
             <span className={`rounded-full px-3 py-1 text-sm font-semibold ${stageCls[a.stage] ?? "bg-stone-100"}`}>{t.stages[a.stage as "a_traiter"] ?? a.stage}</span>
@@ -164,7 +164,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
       </section>
 
       {/* Le reste, replié */}
-      <details className={fold}>
+      <details open className={fold}>
         <summary className={summary}><span><strong>{s.problemDetail}</strong></span><span className="text-stone-400 transition group-open:rotate-90">▸</span></summary>
         <div className="space-y-4 border-t border-stone-100 bg-stone-50/60 p-4">
       <AnomalySheetForm

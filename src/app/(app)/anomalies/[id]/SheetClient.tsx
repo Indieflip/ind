@@ -25,13 +25,14 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
   const router = useRouter();
   const [v, setV] = useState(initial);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [pending, start] = useTransition();
   // Après enregistrement, la fiche reprend les valeurs enregistrées (montants remis en forme…)
   const initialKey = JSON.stringify(initial);
   useEffect(() => { setV(JSON.parse(initialKey)); }, [initialKey]);
   const dirty = JSON.stringify(v) !== initialKey;
-  const set = (k: keyof Values) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => { setV({ ...v, [k]: e.target.value }); setSaved(false); };
+  const set = (k: keyof Values) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => { setV({ ...v, [k]: e.target.value }); setSaved(false); setError(""); };
   const today = new Date().toISOString().slice(0, 10);
   const stage = stageOf(v.stage);
   const closedWithout = stage === "cloturee" && !v.resolution;
@@ -63,6 +64,29 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
   const key = (u: string) => u.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const canonUnit = (u: string) => units.find((x) => key(x) === key(u)) ?? u;
   const itemsTotal = v.items.reduce((sum, x) => sum + (n(x.qty) ?? 0) * (n(x.price) ?? 0), 0);
+  // Bon de livraison manquant : le montant est le total des produits (calculé, non saisi)
+  const isMissingBl = !!missingBlType && v.problemType === missingBlType;
+  // Enregistrer : on dit toujours ce qui se passe (champ manquant, erreur, ou fiche enregistrée)
+  const save = () => {
+    setError("");
+    if (!v.description.trim()) return setError(s.problemRequired);
+    if (closedWithout) return setError(s.resolutionNeeded);
+    start(async () => {
+      try {
+        const { productName: _n, productId: _p, items, ...rest } = v;
+        void _n; void _p;
+        const res = await updateAnomalyAction(id, {
+          ...rest,
+          ...(isMissingBl ? { claimedAmount: itemsTotal ? itemsTotal.toFixed(2) : "" } : {}),
+          items: items.map((x) => ({ productId: x.productId, name: x.name, qty: n(x.qty), unit: x.unit, price: n(x.price) })),
+        });
+        if (res?.ok) { setSaved(true); router.refresh(); }
+        else setError(s.saveFailed);
+      } catch {
+        setError(s.saveFailed);
+      }
+    });
+  };
   return (
     <>
     {/* Détail du problème */}
@@ -116,7 +140,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
         <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
           {editable && <button type="button" className="btn-secondary py-1.5 text-sm" onClick={() => { setV({ ...v, items: [...v.items, { productId: null, name: "", qty: "", unit: "", price: "" }] }); setSaved(false); }}><Icon name="plus" className="h-4 w-4" /> {s.addItem}</button>}
           {itemsTotal > 0 && <span className="font-semibold">{s.itemsTotal} : {itemsTotal.toFixed(2).replace(".", ",")} €</span>}
-          {editable && itemsTotal > 0 && <button type="button" className="text-xs text-brand-700 underline" onClick={() => { setV({ ...v, claimedAmount: itemsTotal.toFixed(2).replace(".", ",") }); setSaved(false); }}>{s.useAsClaimed}</button>}
+          {editable && itemsTotal > 0 && !isMissingBl && <button type="button" className="text-xs text-brand-700 underline" onClick={() => { setV({ ...v, claimedAmount: itemsTotal.toFixed(2).replace(".", ",") }); setSaved(false); }}>{s.useAsClaimed}</button>}
         </div>
       </div>
       <label className="block">
@@ -126,7 +150,12 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
       <div className="grid gap-3 sm:grid-cols-[14rem_1fr]">
         <label>
           <span className="label">{missingBlType && v.problemType === missingBlType ? s.amountOnly : s.claimed}</span>
-          <MoneyInput value={v.claimedAmount} onChange={set("claimedAmount")} disabled={!editable} />
+          {isMissingBl ? (
+            <div className="input bg-stone-50 text-right font-semibold tabular-nums" title={s.amountFromItems}>{itemsTotal.toFixed(2).replace(".", ",")} €</div>
+          ) : (
+            <MoneyInput value={v.claimedAmount} onChange={set("claimedAmount")} disabled={!editable} />
+          )}
+          {isMissingBl && <span className="mt-1 block text-xs text-stone-500">{s.amountFromItems}</span>}
           {informative && <span className="mt-1 block text-xs text-sky-700">ℹ {s.informative}</span>}
         </label>
         <label className="block">
@@ -252,26 +281,23 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
         </div>
       </label>
 
-      {editable && (
-        <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={pending || !dirty || !v.description.trim() || closedWithout}
-            onClick={() => start(async () => {
-              const { productName: _n, productId: _p, items, ...rest } = v;
-              void _n; void _p;
-              const res = await updateAnomalyAction(id, { ...rest, items: items.map((x) => ({ productId: x.productId, name: x.name, qty: n(x.qty), unit: x.unit, price: n(x.price) })) });
-              if (res?.ok) { setSaved(true); router.refresh(); }
-            })}
-          >
-            <Icon name="check" className="h-4 w-4" /> {t.common.save}
-          </button>
-          {dirty && <button type="button" className="btn-ghost" onClick={() => setV(initial)}>{t.common.cancel}</button>}
-          {saved && !dirty && <span className="text-sm text-emerald-700">{s.saved}</span>}
+    </section>
+      {/* Barre d'enregistrement : toujours visible en bas de l'écran dès qu'une modification est en cours */}
+      {editable && (dirty || saved || error) && (
+        <div className="sticky bottom-2 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+          {dirty && (
+            <>
+              <button type="button" className="btn-primary" disabled={pending} onClick={save}>
+                <Icon name="check" className="h-4 w-4" /> {pending ? s.saving : t.common.save}
+              </button>
+              <button type="button" className="btn-ghost" disabled={pending} onClick={() => { setV(initial); setError(""); }}>{t.common.cancel}</button>
+              {!error && <span className="text-sm text-amber-700">{s.unsaved}</span>}
+            </>
+          )}
+          {error && <span className="text-sm font-medium text-red-700">⚠ {error}</span>}
+          {saved && !dirty && !error && <span className="text-sm font-semibold text-emerald-700">✓ {s.saved}</span>}
         </div>
       )}
-    </section>
     </>
   );
 }

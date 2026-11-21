@@ -15,7 +15,8 @@ export interface ClaimViewRow {
 }
 
 /** Vignettes Réclamée / À vérifier sur facture / Clôturée / Annulée + tableau (clic → fiche d'anomalie) */
-export function ClaimsView({ rows, canManage, initialFilter }: { rows: ClaimViewRow[]; canManage: boolean; initialFilter?: "missing" }) {
+export function ClaimsView({ rows: allRows, canManage, initialFilter, claimNo = null }: { rows: ClaimViewRow[]; canManage: boolean; initialFilter?: "missing"; claimNo?: number | null }) {
+  const rows = claimNo ? allRows.filter((r) => r.claimNo === claimNo) : allRows;
   const { t, locale } = useI18n();
   const c = t.claims;
   const tiles: Stage[] = ["reclamee", "a_verifier", "cloturee", "annulee"];
@@ -69,6 +70,12 @@ export function ClaimsView({ rows, canManage, initialFilter }: { rows: ClaimView
   ];
   return (
     <>
+      {claimNo && (
+        <p className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-900">
+          <strong>{c.number} {claimNo}</strong> · {rows.length} {t.anomalies.sheetsLabel}
+          <Link href="/reclamations" className="ml-auto text-brand-700 underline">✕ {c.all}</Link>
+        </p>
+      )}
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
         <button type="button" onClick={() => setFilter("all")} className={`rounded-xl border bg-brand-700 p-3 text-left text-white ${filter === "all" ? "border-red-500" : "border-transparent opacity-90 hover:opacity-100"}`}>
           <p className="text-2xl font-bold leading-none">{rows.length}</p>

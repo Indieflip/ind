@@ -16,7 +16,10 @@ import { ClaimsView } from "./ClaimsView";
 /** Anomalies > Réclamations : les anomalies réclamées au fournisseur ou à vérifier sur facture (même suivi que le tableau de bord) */
 export default async function ClaimsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser(can.viewAnomalies);
-  const f = one((await searchParams).f);
+  const sp = await searchParams;
+  const f = one(sp.f);
+  // Lien depuis une fiche d'anomalie : « Réclamation N° 258 » → les fiches de cette réclamation
+  const claimNo = Number(one(sp.n)) || null;
   const { t, locale } = await getDict();
   await syncWeighAnomalies();
   await ensureClaimNumbers();
@@ -40,6 +43,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
       <ClaimsView
         canManage={can.manageAnomalies(user.role)}
         initialFilter={f === "sans-montant" ? "missing" : undefined}
+        claimNo={claimNo}
         rows={rows.map(({ a: x, supplier, documents, blNumber, lineDoc }) => {
           const delay = processes.find(x.supplierId, x.supplierName)?.delay ?? 3;
           const days = daysSince(x.lastActionAt, x.createdAt, now);

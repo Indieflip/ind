@@ -879,6 +879,20 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v1
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v14', '1') on conflict (key) do nothing`);
 }
 
+// Dev > Développement : fiche d'anomalie (lien réclamation, montant BL manquant, Détail ouvert, barre d'enregistrement), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v15'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  const rows = [
+    ["anomaly", "Fiche", "Réclamation N°", false, "Lien sous le titre vers les fiches de cette réclamation (menu Réclamations filtré sur le N°).", ""],
+    ["anomaly", "Détail du problème", "Montant (Bon de livraison manquant)", false, "Calculé : total des produits (quantité × prix), non saisi ; enregistré comme montant de la fiche.", ""],
+    ["anomaly", "Fiche", "Enregistrer", false, "Partie « Détail du problème » ouverte d'office. Dès qu'une modification est en cours, une barre reste visible en bas de l'écran (Enregistrer / Annuler) ; elle affiche toujours le résultat : « Fiche enregistrée », champ manquant (Problème, résolution) ou erreur. La date de clôture n'est plus remise à jour à chaque enregistrement.", "Le champ « Problème » est obligatoire pour enregistrer. / Indiquez comment l'anomalie a été résolue."],
+  ];
+  for (const [i, r] of rows.entries()) {
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values (${r[0]}, ${r[1]}, ${r[2]}, ${r[3]}, ${r[4]}, ${r[5]}, ${pos + i})`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v15', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

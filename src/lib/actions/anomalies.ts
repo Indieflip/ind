@@ -86,7 +86,11 @@ export async function updateAnomalyAction(
   if (data.stage !== undefined && STAGES.includes(data.stage as Stage)) {
     const stage = stageOf(data.stage);
     const resolution = stage === "cloturee" && RESOLUTIONS.includes(data.resolution as (typeof RESOLUTIONS)[number]) ? data.resolution! : null;
-    Object.assign(set, { stage, resolution, ...legacyOf(stage, resolution), closedAt: stage === "cloturee" || stage === "annulee" ? new Date() : null });
+    // Date de clôture : posée quand la fiche est clôturée / annulée, gardée tant qu'elle le reste (pas remise à jour à chaque enregistrement)
+    const cur = await getDb().query.anomalies.findFirst({ where: eq(schema.anomalies.id, id), columns: { stage: true, closedAt: true } });
+    const closed = stage === "cloturee" || stage === "annulee";
+    const closedAt = !closed ? null : cur && cur.stage === stage && cur.closedAt ? cur.closedAt : new Date();
+    Object.assign(set, { stage, resolution, ...legacyOf(stage, resolution), closedAt });
   }
   if (data.creditNumber !== undefined) set.creditNumber = data.creditNumber.trim() || null;
   if (data.creditKind !== undefined) set.creditKind = data.creditKind === "facture" ? "facture" : data.creditKind === "avoir" ? "avoir" : null;
