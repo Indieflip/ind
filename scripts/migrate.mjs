@@ -818,6 +818,14 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v1
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v10', '1') on conflict (key) do nothing`);
 }
 
+// Dev : en-tête de la fiche d'anomalie + tâche « fréquence de réclamation » en attente, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v11'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('anomaly', 'Fiche', 'En-tête', false, ${"« Fiche d'anomalie · N° X - JJ/MM/AA » (date de création de la fiche, à défaut date de livraison) ; titre Fournisseur — Type d'anomalie ; produits sous le titre, sauf pour « Bon de livraison manquant ». Partie repliable « Détail du problème »."}, '', ${pos})`);
+  await db.execute(sql`insert into dev_items (kind, title, detail, owner, priority, position) values ('pending', ${"Réclamations : fréquence par type d'anomalie"}, ${"Garder la fiche de réclamation avec un N° unique. Pouvoir choisir une fréquence de réclamation (ex. écarts de pesée : une fois par semaine) : un mail unique = une réclamation unique = plusieurs anomalies. But : moins de mails envoyés et un traitement plus simple pour le fournisseur."}, 'moi', 'haute', ${Date.now() % 1000000})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v11', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

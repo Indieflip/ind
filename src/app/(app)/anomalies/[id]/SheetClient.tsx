@@ -67,10 +67,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
     <>
     {/* Détail du problème */}
     <section className="card space-y-4 p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">{s.problemDetail}</h2>
-        {!editable && <span className="text-xs text-stone-500">{s.readOnly}</span>}
-      </div>
+      {!editable && <p className="text-xs text-stone-500">{s.readOnly}</p>}
       {supplier && (
         <dl className="grid gap-3 rounded-lg bg-stone-50 p-3 text-sm sm:grid-cols-3">
           <div><dt className="label">{t.common.supplier}</dt><dd className="font-medium">{supplier.id ? <Link href={`/mercurial/fournisseurs/${supplier.id}`} className="text-brand-700 hover:underline">{supplier.name}</Link> : supplier.name}</dd></div>

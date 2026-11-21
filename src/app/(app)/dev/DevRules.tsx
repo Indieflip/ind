@@ -3,6 +3,9 @@
 import { MODES, RESOLUTIONS, STAGES, modeIcon, stageStyles } from "@/lib/anomaly";
 import { useI18n } from "@/lib/i18n/client";
 import { DataTable, type Col } from "@/components/table/DataTable";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { saveCharacteristicPointAction } from "@/lib/actions/dev";
 
 const box = "rounded-xl border border-stone-200 bg-white p-4";
 
@@ -76,7 +79,7 @@ export function AnomalyRules() {
 
 /** Dev > Développement technique > Développement : « Caractéristiques : Suivi » (types de suivi et étapes), filtrable par l'en-tête */
 type CharRow = { id: string; characteristic: string; post: string; detail: string; steps: [string, string][]; reminder: string };
-export function FollowUpCharacteristics() {
+export function FollowUpCharacteristics({ points }: { points: Record<string, string> }) {
   const { t } = useI18n();
   const r = t.rules;
   const rows: CharRow[] = [
@@ -87,20 +90,9 @@ export function FollowUpCharacteristics() {
     { key: "characteristic", label: r.characteristic, text: (x) => x.characteristic, keepCase: true, width: "12%", className: "font-medium" },
     { key: "post", label: r.post, text: (x) => x.post, keepCase: true, width: "16%", className: "font-medium",
       render: (x) => (x.id.startsWith("stage-") ? <span className={`badge ${stageStyles[x.id.slice(6) as "a_traiter"]}`}>{x.post}</span> : x.post) },
-    { key: "detail", label: r.detail, text: (x) => x.detail, keepCase: true, width: "20%", className: "text-stone-700" },
-    { key: "steps", label: r.steps, text: (x) => x.steps.map(([st, c]) => `${t.stages[st as "a_traiter"] ?? st} ${c}`).join(" "), keepCase: true, sortable: false,
-      render: (x) => (x.steps.length ? (
-        <ol className="space-y-1">
-          {x.steps.map(([st, cond], i) => (
-            <li key={i} className="flex flex-wrap items-baseline gap-1">
-              <span className="tabular-nums text-stone-400">{i + 1}.</span>
-              <span className={`badge ${stageStyles[st as "a_traiter"] ?? "bg-stone-100"}`}>{t.stages[st as "a_traiter"] ?? st}</span>
-              <span className="text-stone-700">{cond}</span>
-            </li>
-          ))}
-        </ol>
-      ) : "—") },
-    { key: "reminder", label: r.reminderRule, text: (x) => x.reminder, keepCase: true, width: "18%", className: "text-stone-700" },
+    { key: "detail", label: r.detail, text: (x) => x.detail, keepCase: true, width: "26%", className: "text-stone-700" },
+    { key: "reminder", label: r.reminderRule, text: (x) => x.reminder, keepCase: true, width: "24%", className: "text-stone-700" },
+    { key: "point", label: r.point, text: (x) => points[x.id] ?? "", keepCase: true, render: (x) => <PointCell id={x.id} value={points[x.id] ?? ""} placeholder={r.pointPlaceholder} /> },
   ];
   return (
     <section>
@@ -109,5 +101,23 @@ export function FollowUpCharacteristics() {
       <p className="mb-2 max-w-3xl text-xs text-stone-500">{r.followIntro}</p>
       <DataTable rows={rows} cols={cols} rowKey={(x) => x.id} dense fixed mergedHeader />
     </section>
+  );
+}
+
+/** Colonne « Point » : texte libre, enregistré en quittant le champ */
+function PointCell({ id, value, placeholder }: { id: string; value: string; placeholder: string }) {
+  const router = useRouter();
+  const [v, setV] = useState(value);
+  const [, start] = useTransition();
+  return (
+    <textarea
+      className="input min-h-[2.25rem] w-full py-1 text-xs"
+      rows={2}
+      value={v}
+      placeholder={placeholder}
+      aria-label={id}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={() => v.trim() !== value && start(async () => { await saveCharacteristicPointAction(id, v); router.refresh(); })}
+    />
   );
 }

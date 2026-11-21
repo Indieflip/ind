@@ -21,7 +21,7 @@ const prioStyle: Record<string, string> = { haute: "bg-red-100 text-red-800", mo
 const prioRank: Record<string, number> = { haute: 0, moyenne: 1, basse: 2, "": 3 };
 
 /** Onglet Dev : sous-onglets (en attente, objectifs, contraintes, idées, réalisé, règles) ; tout est modifiable */
-export function DevBoard({ items, reserved, tab, fields = [], project, study, competitors }: { competitors?: Competitor[]; study?: { id: number; title: string; content: string } | null; items: Item[]; reserved: boolean; tab: string; fields?: FieldRow[]; project?: { doc: string; kpis: ProjectKpis; roi: Roi } }) {
+export function DevBoard({ items, reserved, tab, fields = [], points = {}, project, study, competitors }: { competitors?: Competitor[]; study?: { id: number; title: string; content: string } | null; items: Item[]; reserved: boolean; tab: string; fields?: FieldRow[]; points?: Record<string, string>; project?: { doc: string; kpis: ProjectKpis; roi: Roi } }) {
   const { t } = useI18n();
   const d = t.dev;
   const router = useRouter();
@@ -154,7 +154,7 @@ export function DevBoard({ items, reserved, tab, fields = [], project, study, co
           {project ? <DevProject {...project} /> : null}
         </div>
       ) : current === "fields" ? (
-        <DevFields fields={fields} />
+        <DevFields fields={fields} points={points} />
       ) : (
         <>
           <div className="mb-3 flex items-center justify-between gap-2">

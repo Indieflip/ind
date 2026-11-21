@@ -16,7 +16,7 @@ export interface FieldRow { id: number; form: string; section: string; field: st
 const FORMS = ["reception", "anomaly", "claim", "weigh", "product", "supplier", "sheet", "credit"] as const;
 
 /** Dev > Développement : champs des fiches (obligatoire, règle de saisie, message), règles Réclamation / Anomalie, automatisations */
-export function DevFields({ fields }: { fields: FieldRow[] }) {
+export function DevFields({ fields, points = {} }: { fields: FieldRow[]; points?: Record<string, string> }) {
   const { t } = useI18n();
   const c = t.devFields;
   const router = useRouter();
@@ -58,7 +58,7 @@ export function DevFields({ fields }: { fields: FieldRow[] }) {
         <Fold title={t.rules.anomalyFold}><AnomalyRules /></Fold>
       </div>
 
-      <FollowUpCharacteristics />
+      <FollowUpCharacteristics points={points} />
 
       <section>
         <div className="mb-2 flex flex-wrap items-end justify-between gap-2">

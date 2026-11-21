@@ -74,7 +74,7 @@ export function TypeRecap({ items, types, today, typeFilter, baseQs, initialOpen
           <tbody>
             {rows.map(([ty, v]) => (
               <tr key={ty} className={ty === typeFilter ? "bg-brand-50" : v.n ? "" : "text-stone-400"}>
-                <td><Link href={typeHref(ty === typeFilter ? "" : ty)} className={`font-medium hover:underline ${v.n ? "text-brand-700" : "text-stone-500"}`}>{ty}</Link></td>
+                <td className="font-medium">{ty}</td>
                 <td className="text-right tabular-nums">{v.n}</td>
                 <td className="text-right tabular-nums">{fmtMoney(v.amount, locale)}</td>
                 <td className="text-center"><Link href={detailHref(ty)} className="inline-flex rounded-md p-1 text-brand-700 hover:bg-brand-50" title={A.seeSheets} aria-label={`${A.seeSheets} : ${ty}`}><Icon name="search" className="h-4 w-4" /></Link></td>

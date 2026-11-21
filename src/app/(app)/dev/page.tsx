@@ -38,6 +38,7 @@ export default async function DevPage({ searchParams }: { searchParams: Promise<
         reserved={reserved}
         tab={tab}
         fields={fieldsTab?.fields}
+        points={fieldsTab?.points}
         project={project}
         study={study}
         competitors={competitors}
@@ -50,7 +51,9 @@ export default async function DevPage({ searchParams }: { searchParams: Promise<
 /** Dev > Développement : champs des fiches */
 async function characteristics() {
   const fields = await getDb().select().from(schema.devFields).orderBy(asc(schema.devFields.position), asc(schema.devFields.id));
-  return { fields: fields.map((f) => ({ id: f.id, form: f.form, section: f.section ?? "", field: f.field, required: f.required, rule: f.rule ?? "", message: f.message ?? "", position: f.position })) };
+  let points: Record<string, string> = {};
+  try { points = JSON.parse((await getSetting("dev_char_points")) ?? "{}") ?? {}; } catch { points = {}; }
+  return { points, fields: fields.map((f) => ({ id: f.id, form: f.form, section: f.section ?? "", field: f.field, required: f.required, rule: f.rule ?? "", message: f.message ?? "", position: f.position })) };
 }
 
 /** Dev > Projet : document, hypothèses de coût et chiffres clés calculés en direct */

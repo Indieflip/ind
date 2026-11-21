@@ -131,9 +131,9 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
       <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4 p-6">
           <div className="min-w-0 space-y-1">
-            <p className="text-sm text-stone-500">{s.title} · {t.anomalies.number} {number}</p>
+            <p className="text-sm text-stone-500">{s.title} · {t.anomalies.number} {number} - {fmtDate(a.createdAt ?? rec?.deliveredAt, locale)}</p>
             <h1 className="text-2xl font-bold leading-tight sm:text-3xl">{sentence(supplier?.name ?? a.supplierName)} — {problemType}</h1>
-            {itemsLabel && <p className="text-base text-stone-700">{itemsLabel}</p>}
+            {itemsLabel && problemType !== t.anomalies.types.missing_bl && <p className="text-base text-stone-700">{itemsLabel}</p>}
             {a.claimNo && <p className="text-xs text-stone-500">{t.claims.title} N° {a.claimNo}</p>}
           </div>
           <div className="flex flex-col items-end gap-1.5 text-right">
@@ -163,7 +163,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
 
       {/* Le reste, replié */}
       <details className={fold}>
-        <summary className={summary}><span><strong>{s.card.details}</strong> · {s.card.detailsHint}</span><span className="text-stone-400 transition group-open:rotate-90">▸</span></summary>
+        <summary className={summary}><span><strong>{s.problemDetail}</strong></span><span className="text-stone-400 transition group-open:rotate-90">▸</span></summary>
         <div className="space-y-4 border-t border-stone-100 bg-stone-50/60 p-4">
       <AnomalySheetForm
         informative={isInformative(a)}

@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/db";
 import { getUser } from "@/lib/auth";
-import { setSetting } from "@/lib/settings";
+import { getSetting, setSetting } from "@/lib/settings";
 import { canSeeDev } from "@/lib/server/dev";
 
 async function guard() {
@@ -91,6 +91,18 @@ export async function saveCompetitorsAction(rows: Record<string, string>[]) {
     .filter((r) => r.name)
     .slice(0, 200);
   await setSetting("dev_competitors", JSON.stringify(clean));
+  revalidatePath("/dev");
+  return { ok: true };
+}
+
+/** Dev > Développement > Caractéristiques : colonne « Point » (texte libre par ligne) */
+export async function saveCharacteristicPointAction(id: string, text: string) {
+  await guard();
+  let cur: Record<string, string> = {};
+  try { cur = JSON.parse((await getSetting("dev_char_points")) ?? "{}") ?? {}; } catch { cur = {}; }
+  const k = id.slice(0, 80);
+  if (text.trim()) cur[k] = text.trim().slice(0, 2000); else delete cur[k];
+  await setSetting("dev_char_points", JSON.stringify(cur));
   revalidatePath("/dev");
   return { ok: true };
 }
