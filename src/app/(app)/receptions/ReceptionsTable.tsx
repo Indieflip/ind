@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteReceptionsAction } from "@/lib/actions/receptions";
@@ -14,6 +15,7 @@ export interface ReceptionRow {
   blNumber: string | null;
   date: string; // affichage
   dateSort: string; // ISO
+  day?: string; // AAAA-MM-JJ (heure de Paris), pour le filtre par calendrier
   supplierName: string;
   lineCount: number;
   status: string;
@@ -24,7 +26,7 @@ export interface ReceptionRow {
   draftId?: number;
 }
 
-export function ReceptionsTable({ rows, canDelete }: { rows: ReceptionRow[]; canDelete: boolean }) {
+export function ReceptionsTable({ rows, canDelete, canEdit = false }: { rows: ReceptionRow[]; canDelete: boolean; canEdit?: boolean }) {
   const { t } = useI18n();
   const router = useRouter();
   const [sel, setSel] = useState<Set<string | number>>(new Set());
@@ -33,7 +35,7 @@ export function ReceptionsTable({ rows, canDelete }: { rows: ReceptionRow[]; can
   const href = (r: ReceptionRow) => (r.draftId ? `/receptions/new?draft=${r.draftId}` : `/receptions/${r.id}`);
   const cols: Col<ReceptionRow>[] = [
     { key: "number", label: t.receptions.numberLong, align: "right", width: "4.5rem", text: (r) => (r.draftId ? "" : String(r.number)), sort: (r) => r.number, href, render: (r) => (r.draftId ? "—" : String(r.number)) },
-    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, className: "whitespace-nowrap" },
+    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, date: (r) => r.day, className: "whitespace-nowrap" },
     { key: "supplier", label: t.common.supplier, text: (r) => r.supplierName },
     { key: "bl", label: t.receptions.blInvoice, text: (r) => r.blNumber ?? "", render: (r) => r.blNumber || (r.draftId ? "—" : t.receptions.noBl) },
     { key: "lines", label: t.mercurial.products, align: "right", text: (r) => String(r.lineCount), sort: (r) => r.lineCount },
@@ -47,6 +49,15 @@ export function ReceptionsTable({ rows, canDelete }: { rows: ReceptionRow[]; can
         : <span className="text-xs text-stone-500">{t.receptions.toConsolidate}</span>,
     },
     { key: "author", label: t.receptions.createdBy, text: (r) => r.author ?? "" },
+    // Modifier : seulement une fiche de réception pas encore consolidée (brouillon : reprendre la saisie)
+    ...(canEdit ? [{
+      key: "edit", label: "", sortable: false, filterable: false, width: "3rem", text: () => "",
+      render: (r: ReceptionRow) => (r.draftId
+        ? <Link href={`/receptions/new?draft=${r.draftId}`} className="btn-ghost p-1.5 text-brand-700" title={t.receptions.resumeDraft} aria-label={t.receptions.resumeDraft}><Icon name="edit" className="h-4 w-4" /></Link>
+        : !r.consolidated
+        ? <Link href={`/receptions/${r.id}/edit`} className="btn-ghost p-1.5 text-brand-700" title={t.receptions.edit} aria-label={t.receptions.edit}><Icon name="edit" className="h-4 w-4" /></Link>
+        : null),
+    } as Col<ReceptionRow>] : []),
   ];
   const selectedRows = rows.filter((r) => sel.has(r.id));
   const deletable = selectedRows.filter((r) => !r.consolidated);

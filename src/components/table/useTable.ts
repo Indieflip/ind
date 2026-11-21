@@ -11,6 +11,8 @@ export interface ColumnDef<R> {
   /** Liste pré-enregistrée de suggestions ; par défaut les valeurs de la colonne */
   options?: string[];
   filterable?: boolean;
+  /** Colonne date : filtre par calendrier / période (valeur « AAAA-MM-JJ ») au lieu du texte */
+  date?: (r: R) => string | null | undefined;
 }
 
 const coll = new Intl.Collator("fr", { sensitivity: "base", numeric: true });
@@ -50,7 +52,15 @@ export function useTable<R>(rows: R[], cols: ColumnDef<R>[], opts: { pageSize?: 
       }),
     );
     const hit = (text: string, t: { q: string; exact: boolean }) => (t.exact ? text.trim().toLowerCase() === t.q.toLowerCase() : matches(text, t.q));
-    let out = rows.filter((r) => cols.every((c) => !terms[c.key].length || terms[c.key].some((t) => hit(c.text(r), t))));
+    // Colonne date : filtre « du~au » (bornes incluses, l'une ou l'autre peut manquer)
+    const inRange = (c: ColumnDef<R>, r: R) => {
+      const [from, to] = (filters[c.key] ?? "").split("~");
+      if (!from && !to) return true;
+      const d = c.date?.(r) ?? "";
+      if (!d) return false;
+      return (!from || d >= from) && (!to || d <= to);
+    };
+    let out = rows.filter((r) => cols.every((c) => (c.date ? inRange(c, r) : !terms[c.key].length || terms[c.key].some((t) => hit(c.text(r), t)))));
     if (sort) {
       const c = cols.find((x) => x.key === sort.key);
       if (c) {
@@ -74,7 +84,7 @@ export function useTable<R>(rows: R[], cols: ColumnDef<R>[], opts: { pageSize?: 
     filters,
     setFilter: (key: string, v: string) => { setFilters((f) => ({ ...f, [key]: v })); setPage(0); },
     reset: () => { setFilters({}); setPage(0); },
-    active: Object.values(filters).some((v) => v.replace(/\|/g, "").trim() !== ""),
+    active: Object.values(filters).some((v) => v.replace(/[|~]/g, "").trim() !== ""),
     sort,
     toggleSort: (key: string) => setSort((s) => (s?.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" })),
     options,

@@ -4,7 +4,7 @@ import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
 import { fmtDateTime } from "@/lib/format";
 import { listReceptions, one, receptionFilters, type SP } from "@/lib/server/queries";
-import { Field, PageHeader } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { Icon } from "@/components/Icon";
 import { DraftBanner } from "@/components/reception/DraftBanner";
 import { ReceptionsTable, type ReceptionRow } from "./ReceptionsTable";
@@ -36,15 +36,10 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
       {one(sp.draft) === "saved" && <p className="no-print mb-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{t.receptions.draftSaved}</p>}
 
       <h2 className="mb-2 text-lg font-semibold">{t.receptions.listTitle}</h2>
-      <form method="get" className="no-print card mb-3 flex flex-wrap items-end gap-3 p-3">
-        <Field label={t.common.from}><input type="date" name="from" defaultValue={f.from} className="input py-2" /></Field>
-        <Field label={t.common.to}><input type="date" name="to" defaultValue={f.to} className="input py-2" /></Field>
-        <button className="btn-secondary py-2">{t.common.apply}</button>
-        {(f.from || f.to) && <Link href="/receptions" className="btn-ghost py-2">{t.common.reset}</Link>}
-      </form>
 
       <ReceptionsTable
         canDelete={can.deleteDraftReception(user.role)}
+        canEdit={can.editReception(user.role)}
         rows={raw.map((r): ReceptionRow => ({
           id: r.id,
           number: r.number,
@@ -53,6 +48,7 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
             : r.blNumber,
           date: fmtDateTime(r.deliveredAt, locale),
           dateSort: r.deliveredAt.toISOString(),
+          day: r.deliveredAt.toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" }),
           supplierName: r.supplierName,
           lineCount: r.lineCount,
           status: r.status,
@@ -63,7 +59,7 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
           // Brouillons en cours (réceptions pas encore enregistrées) : à reprendre depuis le tableau
           can.receive(user.role)
             ? drafts.map((d): ReceptionRow => ({
-                id: -d.id, draftId: d.id, number: 0, blNumber: d.blNumber, date: fmtDateTime(d.updatedAt, locale), dateSort: d.updatedAt.toISOString(),
+                id: -d.id, draftId: d.id, number: 0, blNumber: d.blNumber, date: fmtDateTime(d.updatedAt, locale), dateSort: d.updatedAt.toISOString(), day: d.updatedAt.toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" }),
                 supplierName: d.supplierName || "—", lineCount: 0, status: "draft", statusLabel: t.receptions.draftStatus, consolidated: false, author: d.by,
               }))
             : [],

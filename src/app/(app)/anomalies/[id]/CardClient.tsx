@@ -41,8 +41,8 @@ export function ReviewButtons({ id, value, editable }: { id: number; value: stri
  * Carte de la fiche : prochaine étape et gros boutons d'action. Chaque bouton fait avancer le statut
  * et note la date de dernière action ; « Avoir reçu » demande le montant puis clôture.
  */
-export function ActionCard({ id, stage, resolution, editable, claimed, mailHref, phone, supplier, nextDate }: {
-  id: number; stage: string; resolution: string | null; editable: boolean; claimed: string; mailHref: string; phone: string; supplier: string; nextDate: string | null;
+export function ActionCard({ id, stage, resolution, editable, claimed, mailHref, phone, supplier, nextDate, missingBl = false }: {
+  missingBl?: boolean; id: number; stage: string; resolution: string | null; editable: boolean; claimed: string; mailHref: string; phone: string; supplier: string; nextDate: string | null;
 }) {
   const { t } = useI18n();
   const s = t.sheet;
@@ -57,7 +57,7 @@ export function ActionCard({ id, stage, resolution, editable, claimed, mailHref,
   const next =
     stage === "a_traiter" ? `${c.nextClaim} ${supplier}. ${c.nextClaimMail}`
     : stage === "reclamee" ? `${c.nextWait}${nextDate ? ` ${c.nextFollowOn} ${nextDate}` : ""}.`
-    : stage === "a_verifier" ? c.nextVerify
+    : stage === "a_verifier" ? (missingBl ? c.nextVerifyBl : c.nextVerify)
     : stage === "cloturee" ? `${c.closed} : ${resolution ? t.resolutions[resolution as "avoir"] : "—"}.`
     : c.cancelled;
   const big = "rounded-xl px-5 py-3 text-base font-semibold min-h-[48px] disabled:opacity-50";
@@ -79,7 +79,12 @@ export function ActionCard({ id, stage, resolution, editable, claimed, mailHref,
           )}
           {stage === "a_traiter" && <button type="button" className={secondary} disabled={pending} onClick={() => follow(c.called)}>☎ {c.iCalled}</button>}
           {stage !== "a_traiter" && <button type="button" className={secondary} disabled={pending} onClick={() => follow(c.followed)}>↻ {c.iFollowed}</button>}
-          <button type="button" className={stage === "a_traiter" ? secondary : primary} disabled={pending} onClick={() => setCredit({ amount: claimed, number: "", date: new Date().toISOString().slice(0, 10), kind: "avoir" })}>€ {c.creditReceived}</button>
+          {/* Bon de livraison manquant : pas d'avoir, on note que le BL est arrivé (simple indication, le BL reste à vérifier) */}
+          {missingBl ? (
+            stage !== "a_verifier" && <button type="button" className={stage === "a_traiter" ? secondary : primary} disabled={pending} onClick={() => run(async () => { await followUpTodayAction(id, c.blReceivedNote); await moveAnomalyAction(id, "a_verifier"); })}>📄 {c.blReceived}</button>
+          ) : (
+            <button type="button" className={stage === "a_traiter" ? secondary : primary} disabled={pending} onClick={() => setCredit({ amount: claimed, number: "", date: new Date().toISOString().slice(0, 10), kind: "avoir" })}>€ {c.creditReceived}</button>
+          )}
           {stage !== "a_traiter" && <button type="button" className={secondary} disabled={pending} onClick={() => close("livraison")}>{t.resolutions.livraison}</button>}
           <button type="button" className={ghost} disabled={pending} onClick={() => close("sans_suite")}>{t.resolutions.sans_suite}</button>
           {phone && <a href={`tel:${phone}`} className={`${ghost} inline-flex items-center`}>☎ {phone}</a>}

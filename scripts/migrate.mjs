@@ -834,6 +834,14 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v1
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v12', '1') on conflict (key) do nothing`);
 }
 
+// Dev > Développement : liste des fiches de réception (filtre date par calendrier, crayon Modifier), bouton « Bon de livraison reçu », une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v13'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Liste des fiches de réception', 'Date', false, ${"Filtre dans l'en-tête de la colonne : calendrier (un jour ou du … au …) et périodes rapides (aujourd'hui, 7 derniers jours, ce mois, mois dernier, cette année). Lien vers la fiche sur le N° ; crayon « Modifier » tant que la fiche n'est pas consolidée."}, '', ${pos})`);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('anomaly', 'Fiche', 'Bon de livraison reçu', false, ${"Type « Bon de livraison manquant » : remplace le bouton « Avoir reçu ». Simple indication : note « bon de livraison reçu (à vérifier) » dans l'historique et passage à « À vérifier » ; l'utilisateur vérifie le BL puis clôture."}, '', ${pos + 1})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v13', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

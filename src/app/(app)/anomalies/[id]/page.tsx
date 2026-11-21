@@ -145,7 +145,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
           </div>
         </div>
         <div className="border-t border-stone-100 p-6 pt-4">
-          <ActionCard id={a.id} stage={a.stage} resolution={a.resolution} editable={editable} claimed={a.claimedAmount != null ? String(num(a.claimedAmount)).replace(".", ",") : ""} mailHref={mailHref} phone={claimPhone} supplier={sentence(supplier?.name ?? a.supplierName)} nextDate={nextDue} />
+          <ActionCard id={a.id} stage={a.stage} resolution={a.resolution} editable={editable} claimed={a.claimedAmount != null ? String(num(a.claimedAmount)).replace(".", ",") : ""} mailHref={mailHref} phone={claimPhone} supplier={sentence(supplier?.name ?? a.supplierName)} nextDate={nextDue} missingBl={problemType === t.anomalies.types.missing_bl} />
         </div>
       </section>
 
