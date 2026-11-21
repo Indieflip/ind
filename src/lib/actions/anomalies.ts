@@ -47,7 +47,7 @@ export async function updateAnomalyAction(
   id: number,
   data: {
     status?: string; creditAmount?: string; followUp?: string; description?: string; nature?: string; result?: string; lastActionAt?: string; nextActionAt?: string;
-    stage?: string; resolution?: string; mode?: string; claimedAmount?: string; creditNumber?: string; creditDate?: string; creditKind?: string;
+    stage?: string; resolution?: string; mode?: string; claimedAmount?: string; creditNumber?: string; creditDate?: string; creditKind?: string; docDate?: string;
     problemType?: string; productId?: number | null; note?: string;
     items?: { productId: number | null; name: string; qty: number | null; unit: string; price: number | null }[];
   },
@@ -90,6 +90,7 @@ export async function updateAnomalyAction(
   }
   if (data.creditNumber !== undefined) set.creditNumber = data.creditNumber.trim() || null;
   if (data.creditKind !== undefined) set.creditKind = data.creditKind === "facture" ? "facture" : data.creditKind === "avoir" ? "avoir" : null;
+  if (data.docDate !== undefined) set.docDate = /^\d{4}-\d{2}-\d{2}$/.test(data.docDate) ? data.docDate : null;
   if (data.creditDate !== undefined) set.creditDate = /^\d{4}-\d{2}-\d{2}$/.test(data.creditDate) ? data.creditDate : null;
   if (data.mode !== undefined && MODES.includes(data.mode as (typeof MODES)[number])) set.mode = data.mode;
   if (data.claimedAmount !== undefined) {

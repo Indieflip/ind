@@ -5,10 +5,9 @@ import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
-import { fmtDate, fmtDateTime, fmtMoney, fmtNum, num, sentence } from "@/lib/format";
+import { fmtDate, fmtDateTime, fmtMoney, num, sentence } from "@/lib/format";
 import { lineDocLabel } from "@/lib/documents";
 import { receptionNumbers } from "@/lib/server/queries";
-import { decisionStyles } from "@/components/DecisionBadge";
 import { Icon } from "@/components/Icon";
 import { claimStyles, isInformative } from "@/lib/anomaly";
 import { AnomalySheetForm } from "./SheetClient";
@@ -83,6 +82,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   }
   if (a.resolution === "avoir" && a.creditAmount) assistant.push({ date: a.creditDate ? fmtDate(a.creditDate, locale) : null, text: `${S.saving} ${fmtMoney(num(a.creditAmount), locale)}` });
   void claims;
+  void photos;
   // Procédure de réclamation du fournisseur (protocole) et délai de relance
   // Coordonnées « Réclamation » du fournisseur en priorité, sinon celles de la société
   // Adresse de réclamation (sinon société) + les mails ajoutés avec le « + » du même bloc
@@ -92,6 +92,11 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   const claimPhone = supplier?.contacts?.reclamation?.phone || supplier?.contacts?.societe?.phone || supplier?.phone || "";
   const docs = (rec?.documents as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[] | null) ?? (rec?.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : []);
   const reference = rec ? lineDocLabel(docs, line?.document, rec.blNumber) : a.reference;
+  // Date BL / Facture : enregistrée sur la fiche, sinon celle du document du bon, la livraison, la référence ou la fiche
+  const lineDocDate = (line?.document && docs.find((d) => d.number === line.document)?.date) || docs.find((d) => d.date)?.date;
+  const refDate = /du (\d{2})\/(\d{2})\/(\d{2})/.exec(a.reference ?? "");
+  const parisDay = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
+  const docDateFallback = lineDocDate || (rec ? parisDay(rec.deliveredAt) : refDate ? `20${refDate[3]}-${refDate[2]}-${refDate[1]}` : parisDay(a.createdAt));
   // Les fiches d'anomalie ne sont jamais figées (seules les fiches de réception le sont)
   const locked = false;
   const editable = can.manageAnomalies(user.role) && !locked;
@@ -170,7 +175,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
         showAssistant={false}
         products={supplierProducts}
         supplier={{ id: supplier?.id ?? null, name: sentence(supplier?.name ?? a.supplierName) }}
-        reference={reference ?? (rec ? fmtDate(rec.deliveredAt, locale) : null)}
+        document={reference ? { label: reference.replace(/\s+du \d{2}\/\d{2}\/\d{2}$/, ""), href: rec ? `/receptions/${rec.id}` : null } : null}
         missingBlType={t.anomalies.types.missing_bl}
         initial={{
           items: (a.items?.length ? a.items : itemsDefault).map((x) => {
@@ -195,6 +200,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
           creditNumber: a.creditNumber ?? "",
           creditDate: a.creditDate ?? "",
           creditKind: a.creditKind ?? "avoir",
+          docDate: a.docDate ?? docDateFallback,
         }}
       />
 
@@ -202,62 +208,6 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
         </div>
       </details>
 
-      <details className={fold}>
-        <summary className={summary}><span><strong>{s.reception}</strong>{rec ? ` · N° ${numbers.get(rec.id) ?? rec.id}, ${fmtDateTime(rec.deliveredAt, locale)}` : ""}</span><span className="text-stone-400 transition group-open:rotate-90">▸</span></summary>
-        <div className="grid gap-px border-t border-stone-100 bg-stone-200 md:grid-cols-2">
-          {/* Réception d'origine */}
-          <div className="bg-white p-4">
-            <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-stone-500"><Icon name="truck" className="h-4 w-4" /> {s.reception}</h2>
-            {rec ? (
-              <>
-                <dl className="divide-y divide-stone-100">
-                  {info(t.receptions.numberLong, <Link className="text-brand-700 hover:underline" href={`/receptions/${rec.id}`}>{numbers.get(rec.id) ?? rec.id} →</Link>)}
-                  {info(t.common.supplier, supplier ? <Link className="text-brand-700 hover:underline" href={`/mercurial/fournisseurs/${supplier.id}`}>{sentence(supplier.name)}</Link> : sentence(rec.supplierName))}
-                  {info(t.wizard.dateTime, fmtDateTime(rec.deliveredAt, locale))}
-                  {info(t.receptions.documents, docs.map((d) => `${t.wizard.docTypes[d.type]} ${d.number}${d.date ? ` ${t.receptions.docOf} ${fmtDate(d.date, locale)}` : ""}`).join(" · ") || "—")}
-                  {info(t.receptions.driver, rec.driverName)}
-                  {info(t.receptions.truckTemp, rec.truckTemp != null ? `${fmtNum(rec.truckTemp, locale, 1)} °C` : null)}
-                  {info(t.receptions.vehicleClean, rec.vehicleClean == null ? null : rec.vehicleClean ? t.common.yes : t.common.no)}
-                </dl>
-              </>
-            ) : (
-              <dl className="divide-y divide-stone-100">
-                {info(t.common.supplier, supplier ? <Link className="text-brand-700 hover:underline" href={`/mercurial/fournisseurs/${supplier.id}`}>{sentence(supplier.name)}</Link> : sentence(a.supplierName))}
-                {info(t.anomalies.blInvoice, a.reference)}
-                {info(t.common.date, fmtDate(a.createdAt, locale))}
-                <p className="pt-2 text-xs text-stone-500">{a.imported ? s.fromFile : s.noReception}</p>
-              </dl>
-            )}
-          </div>
-
-          {/* Produit concerné, tel que contrôlé à la réception */}
-          <div className="bg-white p-4">
-            <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-stone-500"><Icon name="box" className="h-4 w-4" /> {s.product}</h2>
-            {line ? (
-              <>
-                <dl className="divide-y divide-stone-100">
-                  {info(t.common.product, line.productName)}
-                  {info(t.wizard.ordered, line.qtyOrdered != null ? `${fmtNum(num(line.qtyOrdered), locale, 3)} ${line.unit ?? ""}` : null)}
-                  {info(t.wizard.received, line.qtyReceived != null ? `${fmtNum(num(line.qtyReceived), locale, 3)} ${line.unit ?? ""}` : null)}
-                  {info(t.wizard.temperature, line.temperature != null ? `${fmtNum(line.temperature, locale, 1)} °C` : null)}
-                  {info(t.wizard.dlc, line.dlc ? fmtDate(line.dlc, locale) : null)}
-                  {info(t.wizard.lot, line.lot)}
-                  {info(t.wizard.unitPrice, line.unitPrice ? fmtMoney(num(line.unitPrice), locale) : null)}
-                  {info(t.common.status, <span className={`badge ${decisionStyles[line.decision].badge}`}>{t.decision[line.decision]}</span>)}
-                </dl>
-                {photos.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {photos.map((p) => <a key={p.id} href={p.url} target="_blank" rel="noreferrer"><img src={p.url} alt="" className="h-20 w-20 rounded-lg border border-stone-200 object-cover" /></a>)}
-                  </div>
-                )}
-              </>
-            ) : (
-              <dl className="divide-y divide-stone-100">{info(t.common.product, a.productName)}</dl>
-            )}
-            {a.photoUrl && !photos.length && <a href={a.photoUrl} target="_blank" rel="noreferrer"><img src={a.photoUrl} alt="" className="mt-2 h-24 rounded-lg border border-stone-200 object-cover" /></a>}
-          </div>
-        </div>
-      </details>
 
       <details className={fold}>
         <summary className={summary}><span><strong>{s.procedure}</strong> · {sentence(supplier?.name ?? a.supplierName)} · {s.delay} {process?.delay ?? 3} {t.kanban.days}</span><span className="text-stone-400 transition group-open:rotate-90">▸</span></summary>

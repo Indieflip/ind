@@ -9,15 +9,16 @@ import { useI18n } from "@/lib/i18n/client";
 import { Icon } from "@/components/Icon";
 import { MoneyInput } from "@/components/MoneyInput";
 import { UnitSelect } from "@/components/UnitSelect";
+import { ProductCombo } from "@/components/ProductCombo";
 
 export interface Item { productId: number | null; name: string; qty: string; unit: string; price: string }
 interface Values {
   items: Item[];
   problemType: string; productId: number | null; productName: string; note: string; description: string; followUp: string; lastActionAt: string; nextActionAt: string;
-  creditAmount: string; claimedAmount: string; stage: string; resolution: string; mode: string; creditNumber: string; creditDate: string; creditKind: string;
+  creditAmount: string; claimedAmount: string; stage: string; resolution: string; mode: string; creditNumber: string; creditDate: string; creditKind: string; docDate: string;
 }
 
-export function AnomalySheetForm({ id, initial, editable, informative, types, products, assistant = [], showAssistant = true, units = [], supplier, reference, missingBlType }: { supplier?: { id: number | null; name: string }; reference?: string | null; missingBlType?: string; units?: string[]; id: number; initial: Values; editable: boolean; informative?: boolean; types: string[]; products: { id: number; name: string; unit?: string; price?: number | null }[]; assistant?: { date: string | null; text: string }[]; showAssistant?: boolean }) {
+export function AnomalySheetForm({ id, initial, editable, informative, types, products, assistant = [], showAssistant = true, units = [], supplier, document, missingBlType }: { supplier?: { id: number | null; name: string }; document?: { label: string; href: string | null } | null; missingBlType?: string; units?: string[]; id: number; initial: Values; editable: boolean; informative?: boolean; types: string[]; products: { id: number; name: string; unit?: string; price?: number | null }[]; assistant?: { date: string | null; text: string }[]; showAssistant?: boolean }) {
   const { t } = useI18n();
   const a = t.anomalies;
   const s = t.sheet;
@@ -36,19 +37,18 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
   const closedWithout = stage === "cloturee" && !v.resolution;
   const [typeList, setTypeList] = useState(types);
   const [managing, setManaging] = useState(false);
-  const [free, setFree] = useState<number[]>([]);
   const typeOptions = v.problemType && !typeList.includes(v.problemType) ? [v.problemType, ...typeList] : typeList;
   // Produits de la fiche : quantité et prix par produit
   const setItem = (i: number, patch: Partial<Item>) => { setV({ ...v, items: v.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) }); setSaved(false); };
   // Prix du Mercurial repris seulement si l'unité de la ligne est celle du produit (ex. dorade au Kg ≠ à la Pièce)
   const productOf = (it: Item) => (it.productId ? products.find((x) => x.id === it.productId) : undefined);
   const priceStr = (p?: { price?: number | null }) => (p?.price != null ? String(p.price).replace(".", ",") : "");
-  const pickItem = (i: number, text: string) => {
-    const p = products.find((x) => x.name === text);
+
+  const pickProduct = (i: number, name: string, p: { id: number; unit?: string; price?: number | null } | null) => {
     const cur = v.items[i];
     const unit = cur.unit || canonUnit(p?.unit ?? "");
     const sameUnit = !!p && key(unit) === key(p.unit ?? "");
-    setItem(i, { name: text, productId: p?.id ?? null, unit, ...(p && !cur.price && sameUnit ? { price: priceStr(p) } : {}) });
+    setItem(i, { name, productId: p?.id ?? null, unit, ...(p && !cur.price && sameUnit ? { price: priceStr(products.find((y) => y.id === p.id)) } : {}) });
   };
   const changeUnit = (i: number, u: string) => {
     const it = v.items[i];
@@ -72,9 +72,13 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
         {!editable && <span className="text-xs text-stone-500">{s.readOnly}</span>}
       </div>
       {supplier && (
-        <dl className="grid gap-3 rounded-lg bg-stone-50 p-3 text-sm sm:grid-cols-2">
-          <div><dt className="label">{t.common.supplier}</dt><dd className="font-medium">{supplier.id ? <Link href={`/mercurial/fournisseurs/${supplier.id}`} className="text-brand-700 hover:underline">{supplier.name} →</Link> : supplier.name}</dd></div>
-          <div><dt className="label">{a.blInvoice}</dt><dd className="font-medium">{reference || "—"}</dd></div>
+        <dl className="grid gap-3 rounded-lg bg-stone-50 p-3 text-sm sm:grid-cols-3">
+          <div><dt className="label">{t.common.supplier}</dt><dd className="font-medium">{supplier.id ? <Link href={`/mercurial/fournisseurs/${supplier.id}`} className="text-brand-700 hover:underline">{supplier.name}</Link> : supplier.name}</dd></div>
+          <div><dt className="label">{a.blInvoice}</dt><dd className="font-medium">{document?.href ? <Link href={document.href} className="text-brand-700 hover:underline">{document.label}</Link> : document?.label || "—"}</dd></div>
+          <div>
+            <dt className="label">{s.docDate}</dt>
+            <dd>{editable ? <input type="date" className="input py-1 text-sm" value={v.docDate} onChange={set("docDate")} /> : <span className="font-medium">{v.docDate ? v.docDate.split("-").reverse().map((x, i) => (i === 2 ? x.slice(2) : x)).join("/") : "—"}</span>}</dd>
+          </div>
         </dl>
       )}
       <div className="grid gap-3 sm:grid-cols-2">
@@ -95,23 +99,8 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
               {v.items.map((x, i) => (
                 <tr key={i}>
                   <td>
-                    {/* Liste déroulante : les produits du fournisseur (comme dans son compte) ; « Autre produit » pour une saisie libre */}
-                    {products.length > 0 && !free.includes(i) && (x.productId || !x.name) ? (
-                      <select className="input py-1.5 text-sm" value={x.productId ?? ""} disabled={!editable} onChange={(e) => {
-                        if (e.target.value === "__free") { setFree([...free, i]); setItem(i, { productId: null, name: "" }); return; }
-                        const p = products.find((y) => String(y.id) === e.target.value);
-                        pickItem(i, p?.name ?? "");
-                      }}>
-                        <option value="">{s.productPlaceholder}</option>
-                        {products.map((p) => <option key={p.id} value={p.id}>{p.name}{p.unit ? ` (${p.unit})` : ""}</option>)}
-                        <option value="__free">✎ {s.otherProduct}</option>
-                      </select>
-                    ) : (
-                      <span className="flex gap-1">
-                        <input className="input py-1.5 text-sm" list={`sheet-products-${id}`} value={x.name} onChange={(e) => pickItem(i, e.target.value)} disabled={!editable} placeholder={s.productPlaceholder} />
-                        {editable && products.length > 0 && <button type="button" className="btn-ghost shrink-0 px-1.5 text-xs" title={s.supplierList} onClick={() => { setFree(free.filter((j) => j !== i)); setItem(i, { productId: null, name: "" }); }}>☰</button>}
-                      </span>
-                    )}
+                    {/* Saisie du produit : suggestions des produits du fournisseur au fil de la frappe */}
+                    <ProductCombo value={x.name} products={products} disabled={!editable} placeholder={s.productPlaceholder} onChange={(name, p) => pickProduct(i, name, p)} />
                     {x.productId ? <Link href={`/mercurial/produits/${x.productId}`} className="mt-0.5 block text-[11px] text-brand-700 underline">{s.seeProduct} →</Link> : x.name ? <span className="mt-0.5 block text-[11px] text-amber-700">{s.productNotLinked}</span> : null}
                   </td>
                   <td><input className="input py-1.5 text-right text-sm" inputMode="decimal" value={x.qty} onChange={(e) => setItem(i, { qty: e.target.value })} disabled={!editable} /></td>
@@ -127,7 +116,6 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
             </tbody>
           </table>
         </div>
-        <datalist id={`sheet-products-${id}`}>{products.map((p) => <option key={p.id} value={p.name} />)}</datalist>
         <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
           {editable && <button type="button" className="btn-secondary py-1.5 text-sm" onClick={() => { setV({ ...v, items: [...v.items, { productId: null, name: "", qty: "", unit: "", price: "" }] }); setSaved(false); }}><Icon name="plus" className="h-4 w-4" /> {s.addItem}</button>}
           {itemsTotal > 0 && <span className="font-semibold">{s.itemsTotal} : {itemsTotal.toFixed(2).replace(".", ",")} €</span>}

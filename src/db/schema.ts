@@ -308,6 +308,8 @@ export const anomalies = pgTable(
     /** Forme de la régularisation : avoir | facture (régularisation sur une facture) */
     creditKind: text("credit_kind"),
     creditDate: date("credit_date"),
+    /** Date du BL / de la facture concerné(e) */
+    docDate: date("doc_date"),
     /** Écarts de pesée regroupés par bon : clé du bon (rec:12 ou ref:Fournisseur : Facture 123) */
     groupKey: text("group_key"),
     createdBy: integer("created_by").references(() => users.id),

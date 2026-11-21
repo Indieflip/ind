@@ -1,0 +1,1 @@
+ALTER TABLE "anomalies" ADD COLUMN "doc_date" date;

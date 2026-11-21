@@ -798,6 +798,26 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v9
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v9', '1') on conflict (key) do nothing`);
 }
 
+// Date BL / Facture sur chaque fiche d'anomalie (document du bon, sinon date de livraison, sinon référence « du JJ/MM/AA », sinon date de la fiche), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'anomaly_doc_date_v1'`)).rows.length) {
+  await db.execute(sql`update anomalies a set doc_date = coalesce(
+    (select (d->>'date')::date from reception_lines l join receptions r on r.id = l.reception_id, jsonb_array_elements(coalesce(r.documents, '[]'::jsonb)) d where l.id = a.line_id and d->>'number' = l.document and d->>'date' ~ '^\d{4}-\d{2}-\d{2}$' limit 1),
+    (select (d->>'date')::date from receptions r, jsonb_array_elements(coalesce(r.documents, '[]'::jsonb)) d where r.id = a.reception_id and d->>'date' ~ '^\d{4}-\d{2}-\d{2}$' limit 1),
+    (select (r.delivered_at at time zone 'Europe/Paris')::date from receptions r where r.id = a.reception_id),
+    case when a.reference ~ 'du \d{2}/\d{2}/\d{2}' then to_date(substring(a.reference from 'du (\d{2}/\d{2}/\d{2})'), 'DD/MM/YY') end,
+    (a.created_at at time zone 'Europe/Paris')::date
+  ) where doc_date is null`);
+  await db.execute(sql`insert into app_settings (key, value) values ('anomaly_doc_date_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev > Développement : fiche d'anomalie (date BL / Facture, saisie du produit, Réception d'origine retirée), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v10'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('anomaly', 'Détail du problème', 'Date BL / Facture', false, ${"Reprise du document du bon (sinon date de livraison, sinon date indiquée dans la référence, sinon date de la fiche) ; modifiable. Le N° de BL / Facture renvoie au bon de réception."}, '', ${pos})`);
+  await db.execute(sql`update dev_fields set rule = ${"Un ou plusieurs produits, chacun avec quantité, unité et prix ; total reportable dans le montant réclamé. Saisie libre : au fil de la frappe, une courte liste (8 au plus) propose les produits du fournisseur correspondants, juste sous le champ (↑ ↓ Entrée pour choisir) ; sans choix, le produit est gardé hors liste."}, updated_at = now() where form = 'anomaly' and field = 'Produits'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v10', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

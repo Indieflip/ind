@@ -3,6 +3,9 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { fmtDate, fmtMoney } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/client";
+import { Icon } from "@/components/Icon";
+import { FilterInput } from "@/components/table/FilterInput";
+import { matches } from "@/lib/search";
 
 type Period = "mois" | "trimestre" | "annee" | "perso";
 export type RecapItem = { d: string; k: string; amt: number };
@@ -28,6 +31,7 @@ export function TypeRecap({ items, types, today, typeFilter, baseQs, initialOpen
   const [y, m] = today.split("-").map(Number);
   const [from, setFrom] = useState(iso(new Date(y, m - 1, 1)));
   const [to, setTo] = useState(today);
+  const [q, setQ] = useState("");
   const [rFrom, rTo] = rangeOf(p, today, from, to);
   const { rows, total } = useMemo(() => {
     // Tous les types d'anomalie, même sans fiche sur la période
@@ -37,9 +41,9 @@ export function TypeRecap({ items, types, today, typeFilter, baseQs, initialOpen
       const e = map.get(it.k) ?? { n: 0, amount: 0 };
       map.set(it.k, { n: e.n + 1, amount: e.amount + it.amt });
     }
-    const rows = [...map].sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0], "fr"));
+    const rows = [...map].filter(([k]) => !q || matches(k, q)).sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0], "fr"));
     return { rows, total: rows.reduce((acc, [, v]) => ({ n: acc.n + v.n, amount: acc.amount + v.amount }), { n: 0, amount: 0 }) };
-  }, [items, types, rFrom, rTo]);
+  }, [items, types, rFrom, rTo, q]);
   const typeHref = (ty: string) => `/anomalies?${new URLSearchParams({ ...baseQs, ...(ty ? { type: ty } : {}) })}`;
   // « Détail » : la liste des fiches d'anomalie de ce type
   const detailHref = (ty: string) => `/anomalies?${new URLSearchParams({ view: "liste", type: ty })}`;
@@ -66,14 +70,14 @@ export function TypeRecap({ items, types, today, typeFilter, baseQs, initialOpen
           <span className="text-xs text-stone-500">{fmtDate(rFrom, locale)} → {fmtDate(rTo, locale)}</span>
         </div>
         <table className="table max-w-2xl text-sm">
-          <thead><tr><th>{t.sheet.problemType}</th><th className="text-right">{A.count}</th><th className="text-right">{A.amount}</th><th className="text-right">{A.detail}</th></tr></thead>
+          <thead><tr><th>{t.sheet.problemType}<div className="mt-1 max-w-56 font-normal"><FilterInput value={q} onChange={setQ} options={types} /></div></th><th className="text-right">{A.count}</th><th className="text-right">{A.amount}</th><th className="w-16 text-center">{A.detail}</th></tr></thead>
           <tbody>
             {rows.map(([ty, v]) => (
               <tr key={ty} className={ty === typeFilter ? "bg-brand-50" : v.n ? "" : "text-stone-400"}>
                 <td><Link href={typeHref(ty === typeFilter ? "" : ty)} className={`font-medium hover:underline ${v.n ? "text-brand-700" : "text-stone-500"}`}>{ty}</Link></td>
                 <td className="text-right tabular-nums">{v.n}</td>
                 <td className="text-right tabular-nums">{fmtMoney(v.amount, locale)}</td>
-                <td className="text-right"><Link href={detailHref(ty)} className="text-sm text-brand-700 hover:underline">{A.seeSheets} →</Link></td>
+                <td className="text-center"><Link href={detailHref(ty)} className="inline-flex rounded-md p-1 text-brand-700 hover:bg-brand-50" title={A.seeSheets} aria-label={`${A.seeSheets} : ${ty}`}><Icon name="search" className="h-4 w-4" /></Link></td>
               </tr>
             ))}
             {!rows.length && <tr><td colSpan={4} className="py-4 text-center text-stone-500">{A.noneInPeriod}</td></tr>}
