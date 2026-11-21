@@ -135,6 +135,8 @@ export const products = pgTable(
     price: numeric("price", { precision: 12, scale: 4 }),
     /** Prix bloqué : un prix différent sur un BL crée une anomalie, pas une variation de prix */
     priceLocked: boolean("price_locked").notNull().default(false),
+    /** Perte acceptable (%) à la pesée (ex. poisson à fileter) : écart = facturé − pesé − perte */
+    acceptableLossPct: numeric("acceptable_loss_pct", { precision: 5, scale: 2 }),
     /** Doublon choisi à la main : « oui », « a_verifier » ou « non » (vide = détection automatique) */
     duplicateFlag: text("duplicate_flag"),
     /** Produit issu de l'onglet Fruits et légumes (prix du mois en cours) */

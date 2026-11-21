@@ -979,6 +979,46 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v1
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v18', '1') on conflict (key) do nothing`);
 }
 
+// Perte acceptable (%) des poissons, reprise des écarts de pesée du fichier (valeur la plus fréquente par produit), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'loss_pct_v1'`)).rows.length) {
+  await db.execute(sql`update products p set acceptable_loss_pct = x.pct from (
+      select distinct on (product_id) product_id, round(acceptable_loss / nullif(qty_invoiced, 0) * 100, 1) as pct
+      from weigh_gaps
+      where product_id is not null and acceptable_loss > 0 and qty_invoiced > 0 and (nature ilike '%poisson%' or nature ilike '%mer%')
+      group by product_id, 2 order by product_id, count(*) desc
+    ) x where p.id = x.product_id and p.acceptable_loss_pct is null`);
+  // Variantes de produit sans écart rattaché : même perte que le produit de base (ex. Daurade 6/800 fileté)
+  await db.execute(sql`insert into app_settings (key, value) values ('loss_pct_v1', '1') on conflict (key) do nothing`);
+}
+
+// Montant réclamé des fiches d'anomalie = somme des produits (quantité × prix), quand les produits ont un prix, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'claimed_from_items_v1'`)).rows.length) {
+  const res = await db.execute(sql`update anomalies a set claimed_amount = t.s from (
+      select id, round((select sum((e->>'qty')::numeric * (e->>'price')::numeric) from jsonb_array_elements(items) e
+        where jsonb_typeof(e->'qty') = 'number' and jsonb_typeof(e->'price') = 'number'), 2) as s
+      from anomalies where items is not null
+    ) t where a.id = t.id and t.s > 0 and (a.claimed_amount is null or abs(a.claimed_amount - t.s) > 0.005)`);
+  console.log(`[migrate] montant réclamé recalculé sur ${res.rowCount ?? 0} fiche(s)`);
+  await db.execute(sql`insert into app_settings (key, value) values ('claimed_from_items_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev > Développement : montant = somme des produits, filtres en cascade, sans suite hors économies, perte acceptable, en-tête de fiche d'anomalie, historique du compte produit, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v19'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  const rows = [
+    ["anomaly", "Détail du problème", "Montant réclamé (calcul)", false, "Somme des produits (quantité × prix) dès qu'un produit a un prix : calculé, non saisi ; sinon saisi à la main.", ""],
+    ["anomaly", "Fiche", "En-tête", false, "Bandeau rouge propre à la fiche d'anomalie (FA…), avec les liens vers la fiche de réception (FP…) et la réclamation (FDR…).", ""],
+    ["anomaly", "Économies", "Sans suite", false, "Une fiche clôturée « sans suite » n'est jamais comptée dans les économies récupérées.", ""],
+    ["product", "Compte produit", "Perte acceptable (%)", false, "Modifiable ; retirée de l'écart de pesée à la réception : écart = facturé − pesé − perte (ex. poisson fileté).", ""],
+    ["product", "Compte produit", "Historique", false, "Un seul tableau : création, prix, mises à jour du Mercurial, anomalies et réceptions, lignes cliquables.", ""],
+    ["reception", "Tableaux", "Filtres en cascade", false, "Chaque filtre ne propose que les valeurs encore possibles avec les autres filtres choisis.", ""],
+  ];
+  for (const [i, r] of rows.entries()) {
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values (${r[0]}, ${r[1]}, ${r[2]}, ${r[3]}, ${r[4]}, ${r[5]}, ${pos + i})`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v19', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

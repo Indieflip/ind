@@ -12,7 +12,7 @@ import { NatureSelect } from "@/components/NatureSelect";
 
 /** Compte produit : modifier (nom, unité, nature, prix, prix bloqué, actif) ou supprimer le produit */
 export function ProductEditor({ product, units, natures, fv }: {
-  product: { id: number; name: string; unit: string; nature: string | null; priceMin: number | null; price: number | null; priceLocked: boolean; active: boolean };
+  product: { id: number; name: string; unit: string; nature: string | null; priceMin: number | null; price: number | null; priceLocked: boolean; active: boolean; lossPct: number | null };
   units: string[]; natures: string[]; fv: boolean;
 }) {
   const { t } = useI18n();
@@ -22,10 +22,10 @@ export function ProductEditor({ product, units, natures, fv }: {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const str = (n: number | null) => (n != null ? String(n).replace(".", ",") : "");
-  const [v, setV] = useState({ name: product.name, unit: product.unit, nature: product.nature ?? "", priceMin: str(product.priceMin), price: str(product.price), priceLocked: product.priceLocked });
+  const [v, setV] = useState({ name: product.name, unit: product.unit, nature: product.nature ?? "", priceMin: str(product.priceMin), price: str(product.price), priceLocked: product.priceLocked, lossPct: str(product.lossPct) });
   const save = () => start(async () => {
     const res = await updateMercurialRowAction(product.id, {
-      name: v.name, unit: v.unit, nature: v.nature, priceLocked: v.priceLocked,
+      name: v.name, unit: v.unit, nature: v.nature, priceLocked: v.priceLocked, acceptableLossPct: v.lossPct,
       ...(fv ? {} : { priceMin: v.priceMin, price: v.price }),
     }, { trace: false });
     if (res && "error" in res && res.error === "exists") return void (await appAlert(m.duplicateEdit));
@@ -58,6 +58,7 @@ export function ProductEditor({ product, units, natures, fv }: {
             <label><span className="label">{m.priceMax}</span><MoneyInput value={v.price} onChange={(e) => setV({ ...v, price: e.target.value })} /></label>
           </>
         )}
+        <label><span className="label">{P.lossPct}</span><div className="relative"><input className="input pr-8 text-right" inputMode="decimal" value={v.lossPct} onChange={(e) => setV({ ...v, lossPct: e.target.value })} placeholder="0" /><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-stone-400">%</span></div><span className="mt-0.5 block text-xs text-stone-500">{P.lossPctHint}</span></label>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" className="h-4 w-4 accent-brand-600" checked={v.priceLocked} onChange={(e) => setV({ ...v, priceLocked: e.target.checked })} /> 🔒 {m.locked}</label>
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">

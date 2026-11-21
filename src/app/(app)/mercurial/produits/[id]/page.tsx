@@ -9,8 +9,10 @@ import { can } from "@/lib/permissions";
 import { fmtDate, fmtMoney, fmtNum, num, sentence } from "@/lib/format";
 import { fvRange, parisMonth } from "@/lib/pricing";
 import { Icon } from "@/components/Icon";
-import { MajLog } from "../../mise-a-jour/MajLog";
 import { ProductEditor } from "./ProductEditor";
+import { ProductHistory, type HistoryRow } from "./ProductHistory";
+import { anomalyNumbers } from "@/lib/server/savings";
+import { receptionNumbers } from "@/lib/server/queries";
 
 type Event = { at: Date; icon: string; tone: string; title: string; text: string; href?: string };
 
@@ -69,6 +71,22 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     })),
     ...anomalies.map((a) => ({ at: a.createdAt, icon: "alert", tone: "bg-rose-100 text-rose-700", title: `${P.evAnomaly} · ${a.problemType || (t.anomalies.types[a.type as keyof typeof t.anomalies.types] ?? a.type)}`, text: `${a.description} · ${t.stages[a.stage as keyof typeof t.stages] ?? a.stage}`, href: `/anomalies/${a.id}` })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
+  // Un seul tableau d'historique : création, prix, anomalies (ci-dessus), mises à jour du Mercurial et réceptions, cliquables
+  const [anoNums, recNums] = await Promise.all([anomalyNumbers(), receptionNumbers()]);
+  const history: HistoryRow[] = [
+    ...events.map((e, i) => ({
+      id: `e${i}`, date: e.at.toISOString(), dateLabel: fmtDate(e.at, locale), nature: e.title.split(" · ")[0], tone: e.tone,
+      detail: e.href?.startsWith("/anomalies/") ? `${fmtNo("anomaly", anoNums.get(Number(e.href.split("/").pop()))?.n)} · ${e.title.split(" · ")[1] ?? ""} — ${e.text}` : e.text,
+      href: e.href ?? null,
+    })),
+    ...maj.map((m) => ({ id: `m${m.id}`, date: m.date ? `${m.date}T12:00:00` : m.createdAt.toISOString(), dateLabel: m.date ? fmtDate(m.date, locale) : fmtDate(m.createdAt, locale), nature: P.evMaj, tone: "bg-violet-100 text-violet-800", detail: [m.nature, m.detail, m.reference].filter(Boolean).join(" · "), href: null })),
+    ...lines.map((x) => ({
+      id: `r${x.id}`, date: x.deliveredAt.toISOString(), dateLabel: fmtDate(x.deliveredAt, locale), nature: P.evReception, tone: x.decision === "refuse" ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800",
+      detail: `${fmtNo("reception", recNums.get(x.receptionId))} · ${x.document || x.blNumber || "—"} · ${num(x.qtyOrdered) != null ? `${fmtNum(num(x.qtyOrdered)!, locale)} ${x.unit ?? ""}` : "—"}${num(x.unitPrice) != null ? ` × ${money(num(x.unitPrice))}` : ""}${x.decision === "refuse" ? ` · ${t.decision.refuse}` : ""}`,
+      href: `/receptions/${x.receptionId}`,
+    })),
+  ];
+
 
   const info = (k: string, v: React.ReactNode) => (
     <div className="flex justify-between gap-3 border-b border-stone-100 py-2 text-sm last:border-b-0">
@@ -102,7 +120,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             fv={!!fv}
             units={unitRows.map((u) => u.name)}
             natures={natureList}
-            product={{ id: product.id, name: product.name, unit: product.unit, nature: product.nature, priceMin: num(product.priceMin), price: num(product.price), priceLocked: product.priceLocked, active: product.active }}
+            product={{ id: product.id, name: product.name, unit: product.unit, nature: product.nature, priceMin: num(product.priceMin), price: num(product.price), priceLocked: product.priceLocked, active: product.active, lossPct: num(product.acceptableLossPct) }}
           />
         )}
       </header>
@@ -114,7 +132,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         {tile(P.anomalies, String(anomalies.length), `${changes.length} ${P.priceChanges.toLowerCase()}`)}
       </div>
 
-      <div className="grid items-start gap-5 lg:grid-cols-[20rem_1fr]">
+      <div className="grid items-start gap-5">
         <section className="card p-4">
           <dl>
             {info(P.supplier, supplier ? sentence(supplier.name) : "—")}
@@ -122,39 +140,17 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             {info(P.nature, product.nature || "—")}
             {info(P.service, product.service || "—")}
             {info(P.unit, product.unit)}
+            {info(P.lossPct, num(product.acceptableLossPct) != null ? `${String(num(product.acceptableLossPct)).replace(".", ",")} %` : "—")}
             {info(P.created, fmtDate(product.createdAt, locale))}
           </dl>
         </section>
 
-        <section className="card p-4 sm:p-5">
-          <h2 className="font-semibold">{P.history}</h2>
-          <p className="mb-4 text-xs text-stone-500">{P.historyHint}</p>
-          <ol className="space-y-0">
-            {events.map((e, i) => (
-              <li key={i} className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${e.tone}`}><Icon name={e.icon} className="h-4 w-4" /></span>
-                  {i < events.length - 1 && <span className="w-px flex-1 bg-stone-200" />}
-                </div>
-                <div className={`min-w-0 flex-1 ${i < events.length - 1 ? "pb-4" : ""}`}>
-                  <p className="text-xs text-stone-400">{fmtDate(e.at, locale)}</p>
-                  <p className="text-sm font-semibold">{e.href ? <Link href={e.href} className="hover:text-brand-700 hover:underline">{e.title}</Link> : e.title}</p>
-                  {e.text && <p className="text-sm text-stone-600">{e.text}</p>}
-                </div>
-              </li>
-            ))}
-          </ol>
-        </section>
       </div>
 
       <section>
         <h2 className="font-semibold">{t.maj.productHistory}</h2>
-        <p className="mb-2 text-xs text-stone-500">{t.maj.productHistoryHint}</p>
-        <MajLog
-          compact
-          editable={can.editPrices(user.role)}
-          rows={maj.map((r) => ({ id: r.id, date: r.date, nature: r.nature, item: product.name, original: null, detail: r.detail, supplier: null, supplierId: r.supplierId, reference: r.reference, claim: r.claim, priceHref: null }))}
-        />
+        <p className="mb-2 text-xs text-stone-500">{P.historyAll}</p>
+        <ProductHistory rows={history} />
       </section>
 
       <section className="card overflow-hidden">

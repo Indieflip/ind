@@ -38,9 +38,10 @@ export function savingsOf(all: AnomalyLite[]) {
   const list = all.filter((a) => !a.informative);
   // Économies = avoirs obtenus avec une réclamation (« Réclamation avec relances » ou « Vérification de l'avoir - avec réclamation »)
   const withClaim = list.filter((a) => isClaimMode(a.mode));
-  const credits = withClaim.filter((a) => (a.credit ?? 0) > 0);
+  // Clôturée « sans suite » : rien de récupéré, jamais comptée dans les économies (même si un montant d'avoir traîne)
+  const credits = withClaim.filter((a) => (a.credit ?? 0) > 0 && a.resolution !== "sans_suite");
   const deferred = withClaim.filter((a) => stageOf(a.stage) === "cloturee" && a.resolution === "livraison");
-  const verifiedCredits = list.filter((a) => !isClaimMode(a.mode) && (a.credit ?? 0) > 0);
+  const verifiedCredits = list.filter((a) => !isClaimMode(a.mode) && (a.credit ?? 0) > 0 && a.resolution !== "sans_suite");
   const open = list.filter((a) => isOpenStage(stageOf(a.stage)));
   const waiting = open.filter((a) => stageOf(a.stage) !== "a_traiter");
   const waitingClaim = waiting.filter((a) => isClaimMode(a.mode));

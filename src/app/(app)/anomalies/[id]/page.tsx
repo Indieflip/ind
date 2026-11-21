@@ -132,19 +132,23 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
       </div>
 
       {/* La carte : l'essentiel, la prochaine étape et les actions */}
-      <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4 p-6">
+      <section className="overflow-hidden rounded-2xl border border-rose-200 bg-white shadow-sm">
+        {/* En-tête propre à la fiche d'anomalie (bandeau rouge) : ne se confond pas avec les autres fiches */}
+        <div className="flex flex-wrap items-start justify-between gap-4 bg-gradient-to-r from-rose-700 to-rose-600 px-6 py-5 text-white">
           <div className="min-w-0 space-y-1">
-            <p className="text-sm text-stone-500">{s.title} · {fmtNo("anomaly", number)} - {fmtDate(a.createdAt ?? rec?.deliveredAt, locale)}</p>
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/80"><Icon name="alert" className="h-4 w-4" /> {s.title} · {fmtNo("anomaly", number)} - {fmtDate(a.createdAt ?? rec?.deliveredAt, locale)}</p>
             <h1 className="text-2xl font-bold leading-tight sm:text-3xl">{sentence(supplier?.name ?? a.supplierName)} — {problemType}</h1>
-            {itemsLabel && problemType !== t.anomalies.types.missing_bl && problemType !== WEIGH_TYPE && <p className="text-base text-stone-700">{itemsLabel}</p>}
-            {a.claimNo && <p className="text-xs"><Link href={`/reclamations?n=${a.claimNo}${claimYear ? `&y=${claimYear}` : ""}`} className="font-medium text-brand-700 hover:underline">{t.claims.title} {fmtNo("claim", a.claimNo)}</Link></p>}
+            {itemsLabel && problemType !== t.anomalies.types.missing_bl && problemType !== WEIGH_TYPE && <p className="text-base text-white/90">{itemsLabel}</p>}
+            <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-sm">
+              {rec && <Link href={`/receptions/${rec.id}`} className="font-medium text-white underline decoration-white/50 hover:decoration-white">{t.receptions.sheetLink} {fmtNo("reception", numbers.get(rec.id))} →</Link>}
+              {a.claimNo && <Link href={`/reclamations?n=${a.claimNo}${claimYear ? `&y=${claimYear}` : ""}`} className="font-medium text-white underline decoration-white/50 hover:decoration-white">{t.claims.title} {fmtNo("claim", a.claimNo)} →</Link>}
+            </div>
           </div>
           <div className="flex flex-col items-end gap-1.5 text-right">
             <span className={`rounded-full px-3 py-1 text-sm font-semibold ${stageCls[a.stage] ?? "bg-stone-100"}`}>{t.stages[a.stage as "a_traiter"] ?? a.stage}</span>
 {problemType !== t.anomalies.types.missing_bl && (<>
             <p className="text-3xl font-bold tabular-nums">{a.claimedAmount ? fmtMoney(num(a.claimedAmount), locale) : "—"}</p>
-            <p className="text-xs text-stone-500">{problemType === t.anomalies.types.missing_bl ? s.amountOnly : s.claimed}</p>
+            <p className="text-xs text-white/80">{s.claimed}</p>
             </>)}
           </div>
         </div>

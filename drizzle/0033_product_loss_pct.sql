@@ -1,0 +1,1 @@
+ALTER TABLE "products" ADD COLUMN "acceptable_loss_pct" numeric(5, 2);

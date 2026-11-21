@@ -67,6 +67,8 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
   const itemsTotal = v.items.reduce((sum, x) => sum + (n(x.qty) ?? 0) * (n(x.price) ?? 0), 0);
   // Bon de livraison manquant : le montant est le total des produits (calculé, non saisi)
   const isMissingBl = !!missingBlType && v.problemType === missingBlType;
+  // Montant réclamé = somme des produits (quantité × prix) dès qu'un produit a un prix ; sinon saisi à la main (BL manquant : toujours calculé)
+  const amountFromItems = isMissingBl || itemsTotal > 0;
   // Enregistrer : on dit toujours ce qui se passe (champ manquant, erreur, ou fiche enregistrée)
   const save = () => {
     setError("");
@@ -78,7 +80,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
         void _n; void _p;
         const res = await updateAnomalyAction(id, {
           ...rest,
-          ...(isMissingBl ? { claimedAmount: itemsTotal ? itemsTotal.toFixed(2) : "" } : {}),
+          ...(amountFromItems ? { claimedAmount: itemsTotal ? itemsTotal.toFixed(2) : "" } : {}),
           items: items.map((x) => ({ productId: x.productId, name: x.name, qty: n(x.qty), unit: x.unit, price: n(x.price) })),
         });
         if (res?.ok) { setSaved(true); router.refresh(); }
@@ -141,7 +143,6 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
         <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
           {editable && <button type="button" className="btn-secondary py-1.5 text-sm" onClick={() => { setV({ ...v, items: [...v.items, { productId: null, name: "", qty: "", unit: "", price: "" }] }); setSaved(false); }}><Icon name="plus" className="h-4 w-4" /> {s.addItem}</button>}
           {itemsTotal > 0 && <span className="font-semibold">{s.itemsTotal} : {itemsTotal.toFixed(2).replace(".", ",")} €</span>}
-          {editable && itemsTotal > 0 && !isMissingBl && <button type="button" className="text-xs text-brand-700 underline" onClick={() => { setV({ ...v, claimedAmount: itemsTotal.toFixed(2).replace(".", ",") }); setSaved(false); }}>{s.useAsClaimed}</button>}
         </div>
       </div>
       <label className="block">
@@ -151,12 +152,12 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
       <div className="grid gap-3 sm:grid-cols-[14rem_1fr]">
         <label>
           <span className="label">{missingBlType && v.problemType === missingBlType ? s.amountOnly : s.claimed}</span>
-          {isMissingBl ? (
+          {amountFromItems ? (
             <div className="input bg-stone-50 text-right font-semibold tabular-nums" title={s.amountFromItems}>{itemsTotal.toFixed(2).replace(".", ",")} €</div>
           ) : (
             <MoneyInput value={v.claimedAmount} onChange={set("claimedAmount")} disabled={!editable} />
           )}
-          {isMissingBl && <span className="mt-1 block text-xs text-stone-500">{s.amountFromItems}</span>}
+          {amountFromItems && <span className="mt-1 block text-xs text-stone-500">{s.amountFromItems}</span>}
           {informative && <span className="mt-1 block text-xs text-sky-700">ℹ {s.informative}</span>}
         </label>
         <label className="block">

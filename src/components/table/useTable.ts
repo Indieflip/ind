@@ -39,24 +39,8 @@ export function useTable<R>(rows: R[], cols: ColumnDef<R>[], opts: { pageSize?: 
   }, [filters, sort, opts.storageKey, restored]);
   const [page, setPage] = useState(0);
 
-  const options = useMemo(() => {
-    const o: Record<string, string[]> = {};
-    for (const c of cols) {
-      if (c.options) o[c.key] = c.options;
-      else {
-        const set = new Set<string>();
-        for (const r of rows) {
-          const v = c.text(r);
-          if (v) set.add(v);
-          if (set.size > 2000) break;
-        }
-        o[c.key] = [...set];
-      }
-    }
-    return o;
-  }, [rows, cols]);
-
-  const filtered = useMemo(() => {
+  // Correspondance d'une ligne au filtre d'une colonne
+  const match = useMemo(() => {
     // Plusieurs choix séparés par « | » : la ligne correspond si elle correspond à l'un d'eux.
     // Une valeur choisie dans la liste (étiquette, ex. l'unité « Sac ») est cherchée telle quelle : « Sac » ne ramène pas « Sachet ».
     // Le texte en cours de saisie (après le dernier « | ») reste une recherche approchée.
@@ -80,7 +64,38 @@ export function useTable<R>(rows: R[], cols: ColumnDef<R>[], opts: { pageSize?: 
       if (!d) return false;
       return (!from || d >= from) && (!to || d <= to);
     };
-    let out = rows.filter((r) => cols.every((c) => (c.date ? inRange(c, r) : !terms[c.key].length || terms[c.key].some((t) => hit(c.text(r), t)))));
+    return (c: ColumnDef<R>, r: R) => (c.date ? inRange(c, r) : !terms[c.key].length || terms[c.key].some((t) => hit(c.text(r), t)));
+  }, [cols, filters]);
+
+  // Choix proposés dans chaque filtre : seulement les valeurs encore possibles avec les autres filtres
+  // (ex. type « Écart de pesée » choisi → la colonne Produit ne propose que les produits de ces fiches)
+  const options = useMemo(() => {
+    const o: Record<string, string[]> = {};
+    for (const c of cols) {
+      const others = cols.filter((x) => x.key !== c.key && (filters[x.key] ?? "").replace(/[|~]/g, "").trim());
+      const pool = others.length ? rows.filter((r) => others.every((x) => match(x, r))) : rows;
+      if (c.options) {
+        if (!others.length) { o[c.key] = c.options; continue; }
+        // Liste pré-enregistrée : gardée si la valeur (ou un élément d'une liste « a, b ») existe encore
+        const lower = new Set<string>();
+        for (const r of pool) for (const part of c.text(r).split(/,\s*/)) lower.add(part.trim().toLowerCase());
+        for (const r of pool) lower.add(c.text(r).trim().toLowerCase());
+        o[c.key] = c.options.filter((x) => lower.has(x.trim().toLowerCase()));
+      } else {
+        const set = new Set<string>();
+        for (const r of pool) {
+          const v = c.text(r);
+          if (v) set.add(v);
+          if (set.size > 2000) break;
+        }
+        o[c.key] = [...set];
+      }
+    }
+    return o;
+  }, [rows, cols, filters, match]);
+
+  const filtered = useMemo(() => {
+    let out = rows.filter((r) => cols.every((c) => match(c, r)));
     if (sort) {
       const c = cols.find((x) => x.key === sort.key);
       if (c) {
@@ -96,7 +111,7 @@ export function useTable<R>(rows: R[], cols: ColumnDef<R>[], opts: { pageSize?: 
       }
     }
     return out;
-  }, [rows, cols, filters, sort]);
+  }, [rows, cols, match, sort]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, pages - 1);

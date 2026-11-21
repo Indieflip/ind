@@ -46,12 +46,12 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
   // Mêmes règles que le calcul : avoirs obtenus AVEC réclamation ; quantités en trop hors statistiques
   const counted = (a: AnomalyLite) => !a.informative;
   const obtainedItems = (xs: AnomalyLite[]) => [
-    ...xs.filter((a) => counted(a) && isClaimMode(a.mode) && (a.credit ?? 0) > 0).map((a) => contrib(a, "credit")),
+    ...xs.filter((a) => counted(a) && isClaimMode(a.mode) && (a.credit ?? 0) > 0 && a.resolution !== "sans_suite").map((a) => contrib(a, "credit")),
     ...xs.filter((a) => counted(a) && isClaimMode(a.mode) && stageOf(a.stage) === "cloturee" && a.resolution === "livraison" && !(a.credit ?? 0) && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed")),
   ];
   const pendingItems = (xs: AnomalyLite[]) => xs.filter((a) => counted(a) && isClaimMode(a.mode) && (stageOf(a.stage) === "reclamee" || stageOf(a.stage) === "a_verifier") && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
   const todoItems = list.filter((a) => counted(a) && stageOf(a.stage) === "a_traiter" && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
-  const verifiedItems = list.filter((a) => counted(a) && !isClaimMode(a.mode) && (a.credit ?? 0) > 0).map((a) => contrib(a, "credit"));
+  const verifiedItems = list.filter((a) => counted(a) && !isClaimMode(a.mode) && (a.credit ?? 0) > 0 && a.resolution !== "sans_suite").map((a) => contrib(a, "credit"));
   const extraItems = list.filter((a) => a.informative).map((a) => contrib(a, "claimed"));
 
   // Par fournisseur : regroupé par compte fournisseur (les fautes d'orthographe rattachées au même compte), sinon par nom écrit
@@ -149,7 +149,7 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
             {(["quantite", "prix", "qualite", "autre"] as SavingKind[]).map((k) => {
               const xs = list.filter((a) => savingKindOf(a.type) === k);
               const v = savingsOf(xs);
-              const credits = xs.filter((a) => !a.informative && isClaimMode(a.mode) && (a.credit ?? 0) > 0).map((a) => contrib(a, "credit"));
+              const credits = xs.filter((a) => !a.informative && isClaimMode(a.mode) && (a.credit ?? 0) > 0 && a.resolution !== "sans_suite").map((a) => contrib(a, "credit"));
               const deferred = xs.filter((a) => !a.informative && isClaimMode(a.mode) && stageOf(a.stage) === "cloturee" && a.resolution === "livraison" && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
               const label = e.kinds[k];
               return (

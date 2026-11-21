@@ -167,9 +167,15 @@ async function writeContent(
   // Le détail, la réclamation et la perte acceptable déjà saisis sont conservés si le bon est modifié.
   const oldGaps = await tx.select().from(schema.weighGaps).where(eq(schema.weighGaps.receptionId, recId));
   await tx.delete(schema.weighGaps).where(eq(schema.weighGaps.receptionId, recId));
+  // Perte acceptable du produit (compte produit, en %) : retirée de l'écart (ex. poisson fileté)
+  const lossPct = new Map<number, number>();
+  const ids = p.lines.map((l) => l.productId).filter((x): x is number => !!x);
+  if (ids.length) for (const r of await tx.select({ id: schema.products.id, pct: schema.products.acceptableLossPct }).from(schema.products).where(inArray(schema.products.id, ids))) if (num(r.pct)) lossPct.set(r.id, num(r.pct)!);
   for (const l of p.lines) {
     if (unitName(l.unit) !== "Kg" || l.qtyOrdered == null || l.qtyReceived == null) continue;
-    const gapQty = Math.round((l.qtyOrdered - l.qtyReceived) * 1000) / 1000;
+    const pct = l.productId ? lossPct.get(l.productId) ?? 0 : 0;
+    const loss = pct ? Math.round(l.qtyOrdered * pct * 10) / 1000 : 0;
+    const gapQty = Math.round((l.qtyOrdered - l.qtyReceived - loss) * 1000) / 1000;
     const gapAmount = l.unitPrice != null ? Math.round(gapQty * l.unitPrice * 10000) / 10000 : null;
     if (gapQty === 0) continue;
     if (Math.abs(gapQty) <= 0.01 && (gapAmount == null || Math.abs(gapAmount) <= 0.1)) continue;
@@ -187,7 +193,7 @@ async function writeContent(
       qtyWeighed: String(l.qtyReceived),
       gapQty: String(gapQty),
       gapAmount: gapAmount != null ? String(gapAmount) : null,
-      acceptableLoss: prev?.acceptableLoss ?? null,
+      acceptableLoss: loss ? String(loss) : prev?.acceptableLoss ?? null,
       detail: prev?.detail ?? null,
       claimDate: prev?.claimDate ?? null,
       receptionId: recId,
