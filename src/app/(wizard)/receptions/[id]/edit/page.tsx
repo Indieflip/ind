@@ -1,5 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import { Suspense } from "react";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
@@ -7,7 +6,9 @@ import { can } from "@/lib/permissions";
 import { num } from "@/lib/format";
 import { getDict } from "@/lib/i18n/server";
 import { buildReservesText } from "@/components/reception/helpers";
-import { Wizard } from "@/components/reception/Wizard";
+import { EditReception } from "@/components/reception/EditReception";
+import { receptionNumbers } from "@/lib/server/queries";
+import { fmtNo } from "@/lib/numbering";
 import type { Draft, DraftLine } from "@/lib/reception-types";
 
 export const dynamic = "force-dynamic";
@@ -97,9 +98,8 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
   const auto = buildReservesText(draft, t, { suppliers: [], products: [], categories, fetchedAt: "" });
   draft.reservesEdited = (rec.reservesText ?? "").trim() !== auto.trim();
 
-  return (
-    <Suspense>
-      <Wizard blReadingEnabled={!!process.env.ANTHROPIC_API_KEY} editId={id} initialDraft={draft} receiver={{ name: user.role === "invite" ? "" : user.name.trim(), mustType: user.role === "invite" || !user.name.trim() }} />
-    </Suspense>
-  );
+  // Modification : une seule page simple (Livraison, Produits, Réserves), pas le parcours en étapes
+  void user;
+  const seq = (await receptionNumbers()).get(id);
+  return <EditReception id={id} initialDraft={draft} number={fmtNo("reception", seq)} />;
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { throttled } from "@/lib/server/throttle";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
@@ -21,8 +22,7 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
   const user = await requireUser(can.viewAnomalies);
   const { t, locale } = await getDict();
   const e = t.savings;
-  await syncWeighAnomalies();
-  await ensureAnomaliesLinked();
+  await Promise.all([throttled("weigh-anomalies", 5 * 60_000, syncWeighAnomalies), throttled("anomalies-linked", 10 * 60_000, ensureAnomaliesLinked)]);
   const period = (PERIODS as readonly string[]).includes(one((await searchParams).p) ?? "") ? (one((await searchParams).p) as (typeof PERIODS)[number]) : "all";
   const now = new Date();
   const start =

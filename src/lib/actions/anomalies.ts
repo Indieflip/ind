@@ -1,4 +1,5 @@
 "use server";
+import { invalidate } from "@/lib/server/throttle";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/db";
@@ -177,6 +178,7 @@ export async function updateWeighGapAction(id: number, data: WeighGapInput) {
   await db.update(schema.weighGaps).set(set).where(eq(schema.weighGaps.id, id));
   revalidatePath("/anomalies", "layout");
   return { ok: true };
+  invalidate("weigh-anomalies");
 }
 
 /** Nouvel écart de pesée saisi à la main (ou collé depuis un autre tableau) */

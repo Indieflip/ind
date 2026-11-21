@@ -1,9 +1,10 @@
 "use client";
+import { DateField } from "@/components/DateField";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { followUpTodayAction, moveAnomalyAction, setAnomalyReviewAction, updateAnomalyAction } from "@/lib/actions/anomalies";
 import { useI18n } from "@/lib/i18n/client";
-import { appConfirm } from "@/components/Confirm";
+import { appAlert, appConfirm } from "@/components/Confirm";
 import { MoneyInput } from "@/components/MoneyInput";
 
 export const REVIEWS = ["a_verifier", "verifiee", "a_voir"] as const;
@@ -27,7 +28,7 @@ export function ReviewButtons({ id, value, editable }: { id: number; value: stri
           key={r}
           type="button"
           disabled={!editable || pending}
-          onClick={() => { const next = cur === r ? "" : r; setCur(next || null); start(async () => { await setAnomalyReviewAction(id, next); router.refresh(); }); }}
+          onClick={() => { const next = cur === r ? "" : r; setCur(next || null); start(async () => { try { await setAnomalyReviewAction(id, next); router.refresh(); } catch { setCur(value); await appAlert(t.sheet.saveFailed); } }); }}
           className={`rounded-full border-2 px-3 py-1 text-sm font-semibold transition ${cur === r ? reviewStyles[r] : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"}`}
         >
           {t.sheet.reviews[r]}
@@ -50,7 +51,14 @@ export function ActionCard({ id, stage, resolution, editable, claimed, mailHref,
   const router = useRouter();
   const [pending, start] = useTransition();
   const [credit, setCredit] = useState<null | { amount: string; number: string; date: string; kind: string }>(null);
-  const run = (fn: () => Promise<unknown>) => start(async () => { await fn(); router.refresh(); });
+  // Chaque action dit si elle a échoué (connexion, droits…) au lieu de ne rien faire
+  const run = (fn: () => Promise<unknown>) => start(async () => {
+    try {
+      const res = (await fn()) as { error?: string } | undefined;
+      if (res && typeof res === "object" && "error" in res && res.error) await appAlert(`${t.common.error} : ${res.error}`);
+      router.refresh();
+    } catch { await appAlert(t.sheet.saveFailed); }
+  });
   const follow = (note: string) => run(() => followUpTodayAction(id, note));
   const close = async (res: "sans_suite" | "livraison") => { if (await appConfirm(res === "sans_suite" ? c.confirmNoFollow : c.confirmDelivery)) run(() => moveAnomalyAction(id, "cloturee", res)); };
 
@@ -102,7 +110,7 @@ export function ActionCard({ id, stage, resolution, editable, claimed, mailHref,
           </div>
           <label><span className="label">{s.creditAmount} *</span><MoneyInput value={credit.amount} onChange={(e) => setCredit({ ...credit, amount: e.target.value })} /></label>
           <label><span className="label">{credit.kind === "facture" ? s.invoiceNumber : s.creditNumber}</span><input className="input" value={credit.number} onChange={(e) => setCredit({ ...credit, number: e.target.value })} /></label>
-          <label><span className="label">{credit.kind === "facture" ? s.invoiceDate : s.creditDate}</span><input type="date" className="input" value={credit.date} onChange={(e) => setCredit({ ...credit, date: e.target.value })} /></label>
+          <label><span className="label">{credit.kind === "facture" ? s.invoiceDate : s.creditDate}</span><DateField today value={credit.date} onChange={(x) => setCredit({ ...credit, date: x })} /></label>
           <div className="flex items-end gap-2">
             <button type="button" className="btn-primary" disabled={pending || !credit.amount.trim()} onClick={() => run(async () => { await updateAnomalyAction(id, { stage: "cloturee", resolution: "avoir", creditAmount: credit.amount, creditNumber: credit.number, creditDate: credit.date, creditKind: credit.kind, lastActionAt: new Date().toISOString().slice(0, 10) }); setCredit(null); })}>{c.closeWithCredit}</button>
             <button type="button" className="btn-ghost" onClick={() => setCredit(null)}>{t.common.cancel}</button>

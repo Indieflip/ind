@@ -1,4 +1,5 @@
 "use client";
+import { dayOf } from "@/lib/numbering";
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -24,7 +25,7 @@ export function MajLog({ rows, editable, compact = false, products = [] }: { row
   const { t, locale } = useI18n();
   const m = t.maj;
   const all: Col<Row>[] = [
-    { key: "date", label: m.date, text: (r) => (r.date ? fmtDate(r.date, locale) : ""), sort: (r) => r.date, className: "whitespace-nowrap" },
+    { key: "date", label: m.date, text: (r) => (r.date ? fmtDate(r.date, locale) : ""), sort: (r) => r.date, date: (r) => dayOf(r.date), className: "whitespace-nowrap" },
     { key: "nature", label: m.nature, text: (r) => r.nature ?? "" },
     { key: "item", label: m.item, text: (r) => r.item ?? "", render: (r) => <>{r.item || "—"}{r.original && <span className="block text-[11px] text-stone-400" title={m.original}>{r.original}</span>}</> },
     { key: "detail", label: m.detail, text: (r) => r.detail ?? "", className: "whitespace-pre-wrap", render: (r) => <>{r.detail}{r.priceHref && <a href={r.priceHref} className="mt-0.5 block text-[11px] font-semibold text-brand-700 underline">{m.seePrice}</a>}</> },

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { throttled } from "@/lib/server/throttle";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
@@ -24,7 +25,7 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
       .from(schema.receptionDrafts)
       .leftJoin(schema.users, eq(schema.users.id, schema.receptionDrafts.createdBy))
       .orderBy(desc(schema.receptionDrafts.updatedAt)),
-    runDueExports().then(async () => { const [[c], last] = await Promise.all([getDb().select({ n: count() }).from(schema.receptionExports), lastAutoExport()]); return { n: c.n, last }; }),
+    throttled("due-exports", 5 * 60_000, runDueExports).then(async () => { const [[c], last] = await Promise.all([getDb().select({ n: count() }).from(schema.receptionExports), lastAutoExport()]); return { n: c.n, last }; }),
   ]);
   return (
     <>

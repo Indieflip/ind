@@ -1,4 +1,5 @@
 import { fmtNo, parseNo } from "@/lib/numbering";
+import { throttled } from "@/lib/server/throttle";
 import { anomalyNumbers } from "@/lib/server/savings";
 import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
@@ -28,10 +29,9 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
   const user = await requireUser(can.viewAnomalies);
   const { t, locale } = await getDict();
   const sp = await searchParams;
-  await ensureAnomaliesLinked();
-  await syncWeighAnomalies();
-  await ensureClaimNumbers();
-  const processes = await supplierProcesses();
+  // Tâches de fond : en parallèle et au plus toutes les quelques minutes (pas à chaque ouverture)
+  await Promise.all([throttled("anomalies-linked", 10 * 60_000, ensureAnomaliesLinked), throttled("weigh-anomalies", 5 * 60_000, syncWeighAnomalies)]);
+  const [, processes] = await Promise.all([ensureClaimNumbers(), supplierProcesses()]);
   const view = one(sp.view) === "liste" ? "list" : "board";
   // « Aller à la fiche N° » : fiche en cours ou consolidée (N° définitif ou provisoire)
   // Numéro tapé « FA401 » ou « 401 » : fiche de l'année en cours en priorité, sinon la plus récente

@@ -6,7 +6,7 @@ import { Notice } from "@/components/Notice";
 import { canSeeDev } from "@/lib/server/dev";
 import { getRestaurantName } from "@/lib/settings";
 import { backupSettings, lastBackup } from "@/lib/server/backup";
-import { and, count, eq, inArray, isNull, ne } from "drizzle-orm";
+import { count, eq, inArray } from "drizzle-orm";
 import { supplierProcesses } from "@/lib/server/followup";
 import { daysSince, DEFAULT_FOLLOW_UP_DAYS, verificationDue } from "@/lib/anomaly";
 import { getDb, schema } from "@/db";
@@ -15,17 +15,26 @@ export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
-  const { t } = await getDict();
   const r = user.role;
-  // Demandes à l'administrateur en attente
-  let pendingRequests = 0;
-  if (r === "admin") {
-    try {
-      const [row] = await getDb().select({ n: count() }).from(schema.adminRequests).where(eq(schema.adminRequests.status, "open"));
-      pendingRequests = row?.n ?? 0;
-    } catch { /* base indisponible */ }
-  }
-  const devVisible = await canSeeDev(user);
+  // Toutes les lectures du cadre (menu, bandeaux) en parallèle : moins d'attente à chaque page
+  const [{ t }, pendingRequests, devVisible, restaurant, backupInfo, open, processes] = await Promise.all([
+    getDict(),
+    // Demandes à l'administrateur en attente
+    r === "admin"
+      ? getDb().select({ n: count() }).from(schema.adminRequests).where(eq(schema.adminRequests.status, "open")).then(([row]) => row?.n ?? 0).catch(() => 0)
+      : Promise.resolve(0),
+    canSeeDev(user),
+    getRestaurantName(),
+    can.backup(r) ? Promise.all([lastBackup(), backupSettings()]) : Promise.resolve(null),
+    can.manageAnomalies(r)
+      ? getDb()
+          .select({ id: schema.anomalies.id, stage: schema.anomalies.stage, mode: schema.anomalies.mode, supplierId: schema.anomalies.supplierId, supplierName: schema.anomalies.supplierName, lastActionAt: schema.anomalies.lastActionAt, createdAt: schema.anomalies.createdAt })
+          .from(schema.anomalies)
+          .where(inArray(schema.anomalies.stage, ["a_traiter", "reclamee", "a_verifier"]))
+          .catch(() => [])
+      : Promise.resolve([]),
+    can.manageAnomalies(r) ? supplierProcesses().catch(() => null) : Promise.resolve(null),
+  ]);
   const items: NavItem[] = [
     { href: "/accueil", label: t.nav.home, icon: "home", show: true, badge: r === "admin" ? pendingRequests : 0 },
     { href: "/receptions", label: t.nav.receptions, icon: "truck", show: can.viewReceptions(r) },
@@ -39,8 +48,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   // Rappel de sauvegarde pour l'administrateur quand l'envoi automatique n'a pas pris le relais
   let backupReminder: string | null = null;
-  if (can.backup(r)) {
-    const [last, bs] = await Promise.all([lastBackup(), backupSettings()]);
+  if (backupInfo) {
+    const [last, bs] = backupInfo;
     const days = last ? Math.floor((Date.now() - last.createdAt.getTime()) / 86_400_000) : null;
     if (days == null) backupReminder = t.backup.reminderNever;
     else if (days >= bs.frequencyDays) backupReminder = `${t.backup.reminder} ${days} ${t.backup.daysAgo}.`;
@@ -49,21 +58,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Rappel quotidien : réclamations sans nouvelle action depuis le délai du fournisseur (3 jours par défaut)
   let dueAnomalies = 0;
   let dueVerifications = 0;
-  if (can.manageAnomalies(r)) {
-    const a = schema.anomalies;
-    try {
-      const open = await getDb()
-        .select({ id: a.id, stage: a.stage, mode: a.mode, supplierId: a.supplierId, supplierName: a.supplierName, lastActionAt: a.lastActionAt, createdAt: a.createdAt })
-        .from(a)
-        .where(and(inArray(a.stage, ["a_traiter", "reclamee", "a_verifier"])));
-      if (open.length) {
-        const processes = await supplierProcesses();
+  if (open.length && processes) {
+    {
+      {
         const now = new Date();
         const days = (x: (typeof open)[number]) => daysSince(x.lastActionAt, x.createdAt, now);
         dueAnomalies = open.filter((x) => x.mode !== "verification" && x.stage !== "a_traiter" && days(x) >= (processes.find(x.supplierId, x.supplierName)?.delay ?? DEFAULT_FOLLOW_UP_DAYS)).length;
         dueVerifications = open.filter((x) => verificationDue(x.stage, x.mode, days(x))).length;
       }
-    } catch { /* base indisponible : pas de rappel */ }
+    }
   }
 
   return (
@@ -74,7 +77,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         roleLabel={t.roles[user.role]}
         logoutLabel={t.nav.logout}
         dev={devVisible ? { href: "/dev", label: t.nav.dev } : null}
-        restaurant={await getRestaurantName()}
+        restaurant={restaurant}
         appName={t.app.name}
         moreLabel={t.nav.more}
         search={{ label: t.search.title, placeholder: t.search.placeholderShort, button: t.search.button }}

@@ -1,3 +1,4 @@
+import { PeriodParams } from "@/components/PeriodParams";
 import { asc, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
@@ -55,10 +56,8 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader title={t.reporting.title} />
-      <FilterBar applyLabel={t.common.apply} resetHref="/reporting" resetLabel={t.common.reset}>
-        <Field label={t.common.from}><input type="date" name="from" defaultValue={from} className="input py-2" /></Field>
-        <Field label={t.common.to}><input type="date" name="to" defaultValue={to} className="input py-2" /></Field>
-      </FilterBar>
+      {/* Période (modèle commun : calendrier + périodes rapides) */}
+      <div className="no-print mb-4"><PeriodParams from={from ?? ""} to={to ?? ""} /></div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Stat label={t.reporting.receptions} value={k.receptions} />

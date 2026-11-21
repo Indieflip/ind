@@ -7,10 +7,10 @@ const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 const short = (v: string) => (v ? v.split("-").reverse().map((x, i) => (i === 2 ? x.slice(2) : x)).join("/") : "");
 
 /**
- * Filtre d'en-tête d'une colonne date : calendrier (un jour, ou du … au …) et périodes rapides.
+ * Modèle « période » (filtre d'en-tête d'une colonne date, ou sélecteur de période d'une page) : calendrier (un jour, ou du … au …) et périodes rapides.
  * Valeur « AAAA-MM-JJ~AAAA-MM-JJ » (l'une des bornes peut être vide).
  */
-export function DateRangeFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function DateRangeFilter({ value, onChange, large = false }: { value: string; onChange: (v: string) => void; large?: boolean }) {
   const { t } = useI18n();
   const T = t.table;
   const [from, to] = value.split("~");
@@ -20,7 +20,16 @@ export function DateRangeFilter({ value, onChange }: { value: string; onChange: 
   const pop = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    const place = () => { const r = btn.current?.getBoundingClientRect(); if (r) setPos({ left: Math.min(r.left, window.innerWidth - 300), top: r.bottom + 4 }); };
+    // Toujours dans l'écran : ouvert vers le haut quand il manque de place en dessous
+    const place = () => {
+      const r = btn.current?.getBoundingClientRect();
+      if (!r) return;
+      const h = pop.current?.offsetHeight ?? 290;
+      const below = r.bottom + 4;
+      const top = below + h > window.innerHeight - 8 ? Math.max(8, r.top - h - 4) : below;
+      setPos({ left: Math.max(8, Math.min(r.left, window.innerWidth - 296)), top });
+    };
+    requestAnimationFrame(place);
     place();
     const close = (e: MouseEvent) => { if (!pop.current?.contains(e.target as Node) && !btn.current?.contains(e.target as Node)) setOpen(false); };
     window.addEventListener("scroll", place, true);
@@ -40,7 +49,7 @@ export function DateRangeFilter({ value, onChange }: { value: string; onChange: 
   const label = from && to && from === to ? short(from) : from || to ? `${short(from) || "…"} → ${short(to) || "…"}` : "";
   return (
     <div className="relative min-w-0">
-      <button ref={btn} type="button" onClick={() => setOpen((o) => !o)} className={`flex min-h-[1.9rem] w-full items-center gap-1 rounded-lg border bg-white px-2 py-0.5 text-left text-xs font-normal ${label ? "border-brand-500 text-brand-800" : "border-stone-300 text-stone-400"}`}>
+      <button ref={btn} type="button" onClick={() => setOpen((o) => !o)} className={`flex w-full items-center gap-1 rounded-lg border bg-white text-left font-normal ${large ? "min-h-[2.5rem] px-3 py-1.5 text-sm" : "min-h-[1.9rem] px-2 py-0.5 text-xs"} ${label ? "border-brand-500 text-brand-800" : "border-stone-300 text-stone-400"}`}>
         <span aria-hidden="true">📅</span>
         <span className="truncate">{label || T.period}</span>
         {label && <span role="button" tabIndex={0} aria-label={T.clear} className="ml-auto px-0.5 text-stone-400 hover:text-stone-700" onClick={(e) => { e.stopPropagation(); onChange(""); }}>×</span>}

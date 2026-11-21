@@ -1,4 +1,6 @@
 "use client";
+import { dayOf } from "@/lib/numbering";
+import { DateField } from "@/components/DateField";
 import { fmtNo } from "@/lib/numbering";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -66,7 +68,7 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
           </select>
         </label>
         <label><span className="label">{t.common.product}</span><input name="productName" className="input" defaultValue={pre.product ?? ""} /></label>
-        <label><span className="label">{t.anomalies.nextAction}</span><input type="date" name="nextActionAt" className="input" /></label>
+        <label><span className="label">{t.anomalies.nextAction}</span><DateField name="nextActionAt" /></label>
       </div>
       <label className="block">
         <span className="label">{t.anomalies.problem} *</span>
@@ -118,7 +120,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
       key: "number", width: "4rem", label: a.number, text: (r) => (r.number != null ? fmtNo("anomaly", r.number) : ""), sort: (r) => r.number, href: (r) => `/anomalies/${r.id}`,
       render: (r) => (r.number == null ? "—" : <strong>{fmtNo("anomaly", r.number)}</strong>),
     },
-    { key: "date", width: "5.25rem", label: a.deliveryDate, text: (r) => r.date, sort: (r) => r.dateSort, className: "" },
+    { key: "date", width: "5.25rem", label: a.deliveryDate, text: (r) => r.date, sort: (r) => r.dateSort, date: (r) => dayOf(r.dateSort), className: "" },
     { key: "nature", width: "4.5rem", label: a.nature, text: (r) => r.nature },
     { key: "supplier", width: "7.5%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => (r.supplierId ? <Link className="text-brand-700 hover:underline" href={`/mercurial/fournisseurs/${r.supplierId}`}>{sentence(r.supplier)}</Link> : sentence(r.supplier)) },
     { key: "reference", width: "7%", label: a.blInvoice, text: (r) => r.reference, render: (r) => (r.receptionId ? <Link className="text-brand-700 hover:underline" href={`/receptions/${r.receptionId}`}>{r.reference || "—"}</Link> : r.reference || "—") },

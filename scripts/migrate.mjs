@@ -948,6 +948,21 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v1
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v16', '1') on conflict (key) do nothing`);
 }
 
+// Dev > Développement : modification d'une fiche de réception sur une page, modèles de date, prix sans message, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v17'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  const rows = [
+    ["reception", "Modification", "Modifier une fiche de réception", false, "Une seule page, adaptée au téléphone : Livraison, Produits, Réserves (parties repliables) et barre « Enregistrer les modifications » toujours visible ; contrôles à l'enregistrement (conformité, prix ou « Non indiqué sur le bon », DLC) avec retour au produit concerné. Seulement tant que la fiche n'est pas consolidée.", ""],
+    ["reception", "Dates", "Modèle « date unique »", false, "Même calendrier partout (date du document, DLC, date BL / facture, date d'avoir, dernière action avec « Aujourd'hui », prochaine action, boulangerie).", ""],
+    ["reception", "Dates", "Modèle « période »", false, "Calendrier (un jour ou du … au …) et périodes rapides : colonnes Date des tableaux (réceptions, anomalies, réclamations, suivi des prix, mise à jour Mercurial, fiches de réception, compte fournisseur), Reporting, Suivi des prix, récap par type (Personnalisé).", ""],
+    ["reception", "Étape 3 - Contrôle", "Prix d'un produit sans prix", false, "Produit existant sans prix au Mercurial : le prix saisi devient son prix, sans message ni anomalie.", ""],
+  ];
+  for (const [i, r] of rows.entries()) {
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values (${r[0]}, ${r[1]}, ${r[2]}, ${r[3]}, ${r[4]}, ${r[5]}, ${pos + i})`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v17', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

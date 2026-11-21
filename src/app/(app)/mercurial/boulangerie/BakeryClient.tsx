@@ -1,4 +1,5 @@
 "use client";
+import { DateField } from "@/components/DateField";
 import { MoneyInput } from "@/components/MoneyInput";
 import { appConfirm } from "@/components/Confirm";
 import Link from "next/link";
@@ -63,7 +64,7 @@ export function AddBakeryRow() {
   useEffect(() => { if (state?.ok) ref.current?.reset(); }, [state]);
   return (
     <form ref={ref} action={action} className="card mb-4 grid gap-2 p-4 sm:grid-cols-[1.2fr_repeat(4,1fr)_1.5fr_auto] sm:items-end">
-      <label><span className="label">{t.bakery.date}</span><input type="date" name="date" className="input" required /></label>
+      <label><span className="label">{t.bakery.date}</span><DateField name="date" required /></label>
       {ITEMS.map((k) => (
         <label key={k}><span className="label">{t.bakery[k]}</span><input name={k} className="input" inputMode="decimal" /></label>
       ))}

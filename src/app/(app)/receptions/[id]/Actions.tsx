@@ -35,10 +35,11 @@ export function AddNote({ receptionId, placeholder, label }: { receptionId: numb
 }
 
 /** Champ « Actions » d'une anomalie du bon : c'est le champ « Action » du tableau Anomalies */
-export function AnomalyActionField({ id, initial, editable, label, saveLabel, savedLabel }: { id: number; initial: string; editable: boolean; label: string; saveLabel: string; savedLabel: string }) {
+export function AnomalyActionField({ id, initial, editable, label, saveLabel, savedLabel, failedLabel = "Échec de l'enregistrement : réessayez." }: { id: number; initial: string; editable: boolean; label: string; saveLabel: string; savedLabel: string; failedLabel?: string }) {
   const router = useRouter();
   const [v, setV] = useState(initial);
   const [saved, setSaved] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [pending, start] = useTransition();
   if (!editable) return initial ? <p className="mt-1 whitespace-pre-line text-xs text-stone-600"><strong>{label} :</strong> {initial}</p> : null;
   return (
@@ -50,12 +51,16 @@ export function AnomalyActionField({ id, initial, editable, label, saveLabel, sa
           type="button"
           className="btn-secondary shrink-0 py-1.5 text-sm"
           disabled={pending || v === initial}
-          onClick={() => start(async () => { await updateAnomalyAction(id, { followUp: v, lastActionAt: new Date().toISOString().slice(0, 10) }); setSaved(true); router.refresh(); })}
+          onClick={() => start(async () => {
+            try { await updateAnomalyAction(id, { followUp: v, lastActionAt: new Date().toISOString().slice(0, 10) }); setFailed(false); setSaved(true); router.refresh(); }
+            catch { setFailed(true); }
+          })}
         >
           {saveLabel}
         </button>
       </div>
-      {saved && <p className="text-xs text-emerald-700">{savedLabel}</p>}
+      {saved && !failed && <p className="text-xs text-emerald-700">{savedLabel}</p>}
+      {failed && <p className="text-xs font-medium text-red-700">⚠ {failedLabel}</p>}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 "use client";
+import { DateField } from "@/components/DateField";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/client";
@@ -152,7 +153,7 @@ function Documents({ draft, setDraft, editId }: { draft: Draft; setDraft: (fn: (
           </label>
           <label>
             <span className="label">{w.docDate}</span>
-            <input type="date" className="input" value={doc.date ?? ""} onChange={(e) => update(docs.map((x, j) => (j === i ? { ...x, date: e.target.value } : x)))} />
+            <DateField value={doc.date ?? ""} onChange={(x) => update(docs.map((d2, j) => (j === i ? { ...d2, date: x } : d2)))} />
           </label>
           <div className="col-span-2 flex items-end gap-2">
           <label className="flex-1">

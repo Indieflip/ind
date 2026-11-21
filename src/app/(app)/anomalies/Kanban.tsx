@@ -1,4 +1,5 @@
 "use client";
+import { appAlert } from "@/components/Confirm";
 import { fmtNo } from "@/lib/numbering";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -80,10 +81,12 @@ export function Kanban({ rows, canManage }: { rows: AnomalyRow[]; canManage: boo
   // Clôture « Avoir reçu » : on ouvre la fiche pour saisir le montant, le n° et la date de l'avoir
   const move = (id: number, stage: Stage, resolution?: string) =>
     start(async () => {
-      await moveAnomalyAction(id, stage, resolution);
-      setClosing(null);
-      if (resolution === "avoir") router.push(`/anomalies/${id}#avoir`);
-      else router.refresh();
+      try {
+        await moveAnomalyAction(id, stage, resolution);
+        setClosing(null);
+        if (resolution === "avoir") router.push(`/anomalies/${id}#avoir`);
+        else router.refresh();
+      } catch { await appAlert(t.sheet.saveFailed); }
     });
   // Clôturées : seulement les 7 derniers jours (le reste est dans la vue liste et la clôture hebdo)
   const weekAgo = Date.now() - 7 * 86_400_000;

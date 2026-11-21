@@ -27,3 +27,11 @@ export function parseNo(input: string | null | undefined) {
 
 /** Année (heure de Paris) d'une date, pour la numérotation annuelle */
 export const parisYear = (d: Date) => Number(new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", year: "numeric" }).format(d));
+
+/** Jour (AAAA-MM-JJ, heure de Paris) d'une date ISO, pour le filtre de période des colonnes Date */
+export const dayOf = (v: string | Date | null | undefined) => {
+  if (!v) return "";
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  const d = typeof v === "string" ? new Date(v) : v;
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
+};

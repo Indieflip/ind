@@ -1,4 +1,5 @@
 "use client";
+import { dayOf } from "@/lib/numbering";
 import { useRef, useState } from "react";
 import { saveClaimAction } from "@/lib/actions/prices";
 import { useI18n } from "@/lib/i18n/client";
@@ -45,7 +46,7 @@ export function PricesTable({ rows, editable }: { rows: PriceRow[]; editable: bo
   const pr = t.prices;
   const cols: Col<PriceRow>[] = [
     { key: "number", label: "N°", text: (r) => (r.number ? String(r.number) : ""), sort: (r) => r.number, width: "5%", className: "tabular-nums text-stone-500" },
-    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, className: "whitespace-nowrap", width: "8%" },
+    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, date: (r) => dayOf(r.dateSort), className: "whitespace-nowrap", width: "8%" },
     { key: "supplier", label: t.common.supplier, text: (r) => r.supplier || "—", href: (r) => (r.supplierId ? `/mercurial/fournisseurs/${r.supplierId}` : null), width: "12%" },
     { key: "product", label: t.common.product, keepCase: true, text: (r) => r.product, render: (r) => <>{r.product}{r.unit && <span className="text-xs text-stone-400"> / {r.unit}</span>}</>, width: "19%" },
     {

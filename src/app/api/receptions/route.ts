@@ -1,4 +1,6 @@
 import { revalidatePath } from "next/cache";
+import { syncWeighAnomalies } from "@/lib/server/weighAnomalies";
+import { invalidate } from "@/lib/server/throttle";
 import { assertUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { DuplicateDocError, payloadSchema, saveReception } from "@/lib/server/receptions";
@@ -19,6 +21,8 @@ export async function POST(req: Request) {
     if (e instanceof DuplicateDocError) return Response.json({ error: "duplicate_doc", duplicate: e.info }, { status: 409 });
     throw e;
   }
+  // Écarts de pesée du bon → fiche d'anomalie « Écart de pesée » tout de suite (les pages ne le refont plus à chaque ouverture)
+  await syncWeighAnomalies().catch(() => invalidate("weigh-anomalies"));
   revalidatePath("/receptions");
   return Response.json({ id });
 }

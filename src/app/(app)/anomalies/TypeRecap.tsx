@@ -5,6 +5,7 @@ import { fmtDate, fmtMoney } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/client";
 import { Icon } from "@/components/Icon";
 import { FilterInput } from "@/components/table/FilterInput";
+import { DateRangeFilter } from "@/components/table/DateRangeFilter";
 import { matches } from "@/lib/search";
 
 type Period = "mois" | "trimestre" | "annee" | "perso";
@@ -61,10 +62,8 @@ export function TypeRecap({ items, types, today, typeFilter, baseQs, initialOpen
             <button key={k} type="button" onClick={() => setP(k)} className={`rounded-lg px-3 py-1.5 font-medium ${p === k ? "bg-brand-600 text-white" : "bg-white text-stone-700 ring-1 ring-stone-200 hover:bg-stone-50"}`}>{A.periods[k]}</button>
           ))}
           {p === "perso" && (
-            <span className="flex flex-wrap items-center gap-1.5">
-              <input type="date" value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} className="input w-auto py-1 text-sm" aria-label={t.common.from} />
-              <span className="text-stone-400">→</span>
-              <input type="date" value={to} onChange={(e) => e.target.value && setTo(e.target.value)} className="input w-auto py-1 text-sm" aria-label={t.common.to} />
+            <span className="w-full max-w-xs">
+              <DateRangeFilter large value={`${from}~${to}`} onChange={(v) => { const [f, tt] = v.split("~"); if (f) setFrom(f); if (tt || f) setTo(tt || f); }} />
             </span>
           )}
           <span className="text-xs text-stone-500">{fmtDate(rFrom, locale)} → {fmtDate(rTo, locale)}</span>

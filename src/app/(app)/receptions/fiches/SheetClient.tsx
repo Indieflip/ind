@@ -1,4 +1,5 @@
 "use client";
+import { dayOf } from "@/lib/numbering";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteExportedSheetsAction, setSheetValidatorsAction } from "@/lib/actions/sheets";
@@ -15,7 +16,7 @@ export function ManualExport({ rows }: { rows: ManualRow[] }) {
   const router = useRouter();
   const [sel, setSel] = useState<Set<string | number>>(new Set());
   const cols: Col<ManualRow>[] = [
-    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, className: "whitespace-nowrap" },
+    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, date: (r) => dayOf(r.dateSort), className: "whitespace-nowrap" },
     { key: "supplier", label: t.common.supplier, text: (r) => r.supplier },
     { key: "docs", label: t.receptions.blInvoice, text: (r) => r.docs, keepCase: true },
     { key: "status", label: t.common.status, text: (r) => r.status },

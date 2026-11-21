@@ -1,4 +1,5 @@
 "use client";
+import { DateField } from "@/components/DateField";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
@@ -98,7 +99,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
           <div><dt className="label">{a.blInvoice}</dt><dd className="font-medium">{document?.href ? <Link href={document.href} className="text-brand-700 hover:underline">{document.label}</Link> : document?.label || "—"}</dd></div>
           <div>
             <dt className="label">{s.docDate}</dt>
-            <dd>{editable ? <input type="date" className="input py-1 text-sm" value={v.docDate} onChange={set("docDate")} /> : <span className="font-medium">{v.docDate ? v.docDate.split("-").reverse().map((x, i) => (i === 2 ? x.slice(2) : x)).join("/") : "—"}</span>}</dd>
+            <dd>{editable ? <DateField className="py-1 text-sm" value={v.docDate} onChange={(x) => { setV({ ...v, docDate: x }); setSaved(false); }} /> : <span className="font-medium">{v.docDate ? v.docDate.split("-").reverse().map((x, i) => (i === 2 ? x.slice(2) : x)).join("/") : "—"}</span>}</dd>
           </div>
         </dl>
       )}
@@ -216,7 +217,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
               </div>
               <label><span className="label">{s.creditAmount} *</span><MoneyInput value={v.creditAmount} onChange={set("creditAmount")} disabled={!editable} /></label>
               <label><span className="label">{(v.creditKind || "avoir") === "facture" ? s.invoiceNumber : s.creditNumber}</span><input className="input" value={v.creditNumber} onChange={set("creditNumber")} disabled={!editable} placeholder="AV-12345" /></label>
-              <label><span className="label">{(v.creditKind || "avoir") === "facture" ? s.invoiceDate : s.creditDate}</span><input type="date" className="input" value={v.creditDate} onChange={set("creditDate")} disabled={!editable} /></label>
+              <label><span className="label">{(v.creditKind || "avoir") === "facture" ? s.invoiceDate : s.creditDate}</span><DateField value={v.creditDate} onChange={(x) => { setV({ ...v, creditDate: x }); setSaved(false); }} disabled={!editable} /></label>
               {!v.creditAmount.trim() && <p className="text-xs text-amber-700 sm:col-span-3">{s.creditMissing}</p>}
             </div>
           )}
@@ -275,10 +276,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
 
       <label className="block max-w-xs">
         <span className="label">{a.lastAction}</span>
-        <div className="flex gap-1.5">
-          <input type="date" className="input" value={v.lastActionAt} onChange={set("lastActionAt")} disabled={!editable} />
-          {editable && <button type="button" className="btn-secondary shrink-0 px-2 text-xs" onClick={() => setV({ ...v, lastActionAt: today })}>{s.today}</button>}
-        </div>
+        <DateField today value={v.lastActionAt} onChange={(x) => { setV({ ...v, lastActionAt: x }); setSaved(false); }} disabled={!editable} />
       </label>
 
     </section>

@@ -1,4 +1,5 @@
 "use client";
+import { DateField } from "@/components/DateField";
 import { MoneyInput } from "@/components/MoneyInput";
 import { appConfirm } from "@/components/Confirm";
 import { useMemo, useState } from "react";
@@ -205,7 +206,7 @@ function LineCard({
         {!noDlc && (
           <div>
             <label className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.dlc}{dlcRequired(line, catalog) && <span className="ml-0.5 text-red-600">*</span>}</label>
-            <input type="date" className={`input py-2 ${needsDlc(line, catalog) ? "border-amber-400 bg-amber-50" : ""}`} value={line.dlc} onChange={(e) => onChange({ dlc: e.target.value })} />
+            <DateField className={`py-2 ${needsDlc(line, catalog) ? "border-amber-400 bg-amber-50" : ""}`} value={line.dlc} onChange={(x) => onChange({ dlc: x })} />
           </div>
         )}
         {!noDlc && field("lot", t.wizard.lot)}

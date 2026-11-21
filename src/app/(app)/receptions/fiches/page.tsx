@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { throttled } from "@/lib/server/throttle";
 import { asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
@@ -17,8 +18,7 @@ export default async function SheetsPage({ searchParams }: { searchParams: Promi
   const f = t.rsheet;
   const sp = await searchParams;
   // Rattrapage : exports automatiques dus (si la tâche du soir n'est pas passée) et archivage 5 ans
-  await runDueExports();
-  await purgeOldExports();
+  await Promise.all([throttled("due-exports", 5 * 60_000, runDueExports), throttled("purge-exports", 24 * 60 * 60_000, purgeOldExports)]);
   const today = parisDay();
   const e = schema.receptionExports;
   const r = schema.receptions;

@@ -1,4 +1,5 @@
 "use client";
+import { dayOf } from "@/lib/numbering";
 import { fmtNo } from "@/lib/numbering";
 import Link from "next/link";
 import { useState, useTransition } from "react";
@@ -48,7 +49,7 @@ export function ClaimsView({ rows: allRows, canManage, initialFilter, claimNo = 
         </div>
       ),
     },
-    { key: "date", width: "5rem", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateIso },
+    { key: "date", width: "5rem", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateIso, date: (r) => dayOf(r.dateIso) },
     { key: "supplier", width: "10%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => sentence(r.supplier) },
     { key: "reference", width: "9%", label: t.anomalies.blInvoice, text: (r) => r.reference },
     { key: "product", width: "11%", label: t.common.product, text: (r) => r.product },

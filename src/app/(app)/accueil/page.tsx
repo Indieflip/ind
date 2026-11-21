@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { throttled } from "@/lib/server/throttle";
 import { and, count, eq, isNull, or, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
@@ -52,7 +53,7 @@ export default async function HomePage() {
   }
 
   // Fiche de réception de marchandises : exports automatiques dus (rattrapage si la tâche du soir n'est pas passée)
-  await runDueExports();
+  await throttled("due-exports", 5 * 60_000, runDueExports);
 
   // Sauvegarde
   if (can.backup(r)) {

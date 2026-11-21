@@ -1,4 +1,6 @@
 import { revalidatePath } from "next/cache";
+import { syncWeighAnomalies } from "@/lib/server/weighAnomalies";
+import { invalidate } from "@/lib/server/throttle";
 import { assertUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { DuplicateDocError, LockedError, payloadSchema, updateReception } from "@/lib/server/receptions";
@@ -23,6 +25,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     throw e;
   }
   if (res == null) return Response.json({ error: "not_found" }, { status: 404 });
+  // Écarts de pesée du bon → fiche d'anomalie « Écart de pesée » tout de suite (les pages ne le refont plus à chaque ouverture)
+  await syncWeighAnomalies().catch(() => invalidate("weigh-anomalies"));
   revalidatePath("/receptions");
   revalidatePath(`/receptions/${id}`);
   return Response.json({ id });

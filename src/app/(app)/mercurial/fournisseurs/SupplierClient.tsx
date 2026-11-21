@@ -1,4 +1,5 @@
 "use client";
+import { dayOf } from "@/lib/numbering";
 import { fmtNo } from "@/lib/numbering";
 import { MoneyInput } from "@/components/MoneyInput";
 import { appConfirm } from "@/components/Confirm";
@@ -190,7 +191,7 @@ export function SupplierAnomalies({ rows, supplierId }: { rows: AnomalyRow[]; su
   const cols: Col<AnomalyRow>[] = [
     // N° de la fiche d'anomalie (lien vers la fiche)
     { key: "number", label: "N°", text: (r) => (r.number != null ? fmtNo("anomaly", r.number) : ""), sort: (r) => r.number, href: (r) => `/anomalies/${r.id}`, render: (r) => <span className={r.numberFinal ? "font-semibold" : "italic"}>{r.number}</span> },
-    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, className: "whitespace-nowrap" },
+    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, date: (r) => dayOf(r.dateSort), className: "whitespace-nowrap" },
     { key: "type", label: t.anomalies.type, text: (r) => r.type },
     { key: "product", label: t.common.product, text: (r) => r.product },
     { key: "description", label: t.anomalies.description, text: (r) => r.description },
@@ -212,7 +213,7 @@ export function SupplierReceptions({ rows }: { rows: RecRow[] }) {
   const { t } = useI18n();
   const cols: Col<RecRow>[] = [
     { key: "bl", label: t.receptions.bl, text: (r) => r.blNumber ?? "", href: (r) => `/receptions/${r.id}`, render: (r) => r.blNumber || t.receptions.noBl },
-    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, href: (r) => `/receptions/${r.id}`, className: "whitespace-nowrap" },
+    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, date: (r) => dayOf(r.dateSort), href: (r) => `/receptions/${r.id}`, className: "whitespace-nowrap" },
     { key: "lines", label: t.mercurial.products, align: "right", text: (r) => String(r.lines), sort: (r) => r.lines },
     { key: "status", label: t.common.status, text: (r) => r.statusLabel, render: (r) => <StatusBadge status={r.status} label={r.statusLabel} /> },
     { key: "state", label: t.nav.consolidation, text: (r) => (r.consolidated ? t.receptions.consolidated : t.receptions.toConsolidate) },

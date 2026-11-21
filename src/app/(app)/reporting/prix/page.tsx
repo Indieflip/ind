@@ -1,3 +1,4 @@
+import { PeriodParams } from "@/components/PeriodParams";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
@@ -54,8 +55,9 @@ export default async function PricesPage({ searchParams }: { searchParams: Promi
       </section>
 
       <form method="get" className="no-print card mb-4 flex flex-wrap items-end gap-3 p-3">
-        <Field label={t.common.from}><input type="date" name="from" defaultValue={f.from} className="input py-2" /></Field>
-        <Field label={t.common.to}><input type="date" name="to" defaultValue={f.to} className="input py-2" /></Field>
+        <PeriodParams from={f.from ?? ""} to={f.to ?? ""} />
+        {f.from && <input type="hidden" name="from" value={f.from} />}
+        {f.to && <input type="hidden" name="to" value={f.to} />}
         <label className="flex items-center gap-2 pb-2.5 text-sm font-medium">
           <input type="checkbox" name="unclaimed" value="1" defaultChecked={!!f.unclaimed} className="h-4 w-4 accent-brand-600" />
           {pr.unclaimed}

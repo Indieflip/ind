@@ -1,4 +1,5 @@
 import { parisYear, parseNo } from "@/lib/numbering";
+import { throttled } from "@/lib/server/throttle";
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
@@ -23,7 +24,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
   const claimNo = parseNo(one(sp.n));
   const claimYear = Number(one(sp.y)) || null;
   const { t, locale } = await getDict();
-  await syncWeighAnomalies();
+  await throttled("weigh-anomalies", 5 * 60_000, syncWeighAnomalies);
   await ensureClaimNumbers();
   const a = schema.anomalies;
   const db = getDb();
