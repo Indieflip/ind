@@ -135,6 +135,8 @@ export const products = pgTable(
     price: numeric("price", { precision: 12, scale: 4 }),
     /** Prix bloqué : un prix différent sur un BL crée une anomalie, pas une variation de prix */
     priceLocked: boolean("price_locked").notNull().default(false),
+    /** Doublon choisi à la main : « oui », « a_verifier » ou « non » (vide = détection automatique) */
+    duplicateFlag: text("duplicate_flag"),
     /** Produit issu de l'onglet Fruits et légumes (prix du mois en cours) */
     fvItemId: integer("fv_item_id"),
     active: boolean("active").notNull().default(true),

@@ -62,7 +62,7 @@ export async function addMercurialRowAction(_p: R, form: FormData): Promise<R> {
 /** Modification d'une cellule du mercurial. Un changement de prix est tracé dans le suivi des prix. */
 export async function updateMercurialRowAction(
   id: number,
-  data: { supplierId?: number; name?: string; unit?: string; price?: string; priceMin?: string; service?: string; nature?: string; priceLocked?: boolean },
+  data: { supplierId?: number; name?: string; unit?: string; price?: string; priceMin?: string; service?: string; nature?: string; priceLocked?: boolean; duplicateFlag?: string },
   /** Correction depuis le compte produit : pas de ligne automatique dans l'historique des prix */
   opts: { trace?: boolean } = {},
 ) {
@@ -83,6 +83,7 @@ export async function updateMercurialRowAction(
   if (data.unit?.trim()) set.unit = await ensureUnit(data.unit);
   if (data.service !== undefined) set.service = data.service.trim() || null;
   if (data.priceLocked !== undefined) set.priceLocked = data.priceLocked;
+  if (data.duplicateFlag !== undefined) set.duplicateFlag = ["oui", "a_verifier", "non"].includes(data.duplicateFlag) ? data.duplicateFlag : null;
   if (data.nature !== undefined) {
     set.nature = data.nature.trim() || null;
     set.categoryId = await categoryIdFor(set.nature);

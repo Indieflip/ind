@@ -1,5 +1,6 @@
 import { fmtNo, parseNo } from "@/lib/numbering";
 import { throttled } from "@/lib/server/throttle";
+import { linkToProducts } from "@/lib/server/productLinks";
 import { anomalyNumbers } from "@/lib/server/savings";
 import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
@@ -31,6 +32,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
   const sp = await searchParams;
   // Tâches de fond : en parallèle et au plus toutes les quelques minutes (pas à chaque ouverture)
   await Promise.all([throttled("anomalies-linked", 10 * 60_000, ensureAnomaliesLinked), throttled("weigh-anomalies", 5 * 60_000, syncWeighAnomalies)]);
+  await throttled("product-links", 10 * 60_000, linkToProducts);
   const [, processes] = await Promise.all([ensureClaimNumbers(), supplierProcesses()]);
   const view = one(sp.view) === "liste" ? "list" : "board";
   // « Aller à la fiche N° » : fiche en cours ou consolidée (N° définitif ou provisoire)

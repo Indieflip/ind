@@ -50,7 +50,7 @@ const COUNTRIES: [string, RegExp][] = [
   ["CANADA", /\bcanada\b/], ["AUSTRALIE", /\baustralie\b/], ["JAPON", /\bjapon\b/], ["URUGUAY", /\buruguay\b/], ["IRAN", /\biran\b/], ["NIGERIA", /\bnigeria\b/],
   ["CHILI", /\bchili\b/], ["BRESIL", /\bbresil\b/], ["MEXIQUE", /\bmexique\b/], ["COLOMBIE", /\bcolombie\b/], ["NOUVELLE-ZELANDE", /\bnouvelle zelande\b/],
 ];
-const countriesOf = (s: string) => { const n = normalize(s); return COUNTRIES.filter(([, re]) => re.test(n)).map(([c]) => c); };
+export const countriesOf = (s: string) => { const n = normalize(s); return COUNTRIES.filter(([, re]) => re.test(n)).map(([c]) => c); };
 
 /**
  * Colonne « BL / Facture » : sans le nom du fournisseur (il a sa colonne) et sans « à partir » :

@@ -1,0 +1,1 @@
+ALTER TABLE "products" ADD COLUMN "duplicate_flag" text;

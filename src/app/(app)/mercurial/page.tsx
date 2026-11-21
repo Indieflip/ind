@@ -1,4 +1,6 @@
 import { asc, eq } from "drizzle-orm";
+import { throttled } from "@/lib/server/throttle";
+import { linkToProducts } from "@/lib/server/productLinks";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
@@ -16,13 +18,14 @@ export default async function MercurialPage() {
   // Historique du Mercurial : nettoyage et rattachement aux produits (une fois)
   await ensureMajNormalized();
   await ensureMajCleanup();
+  await throttled("product-links", 10 * 60_000, linkToProducts);
   const { t } = await getDict();
   const db = getDb();
   const p = schema.products;
   const s = schema.suppliers;
   const [all, units, supplierRows, fvItems] = await Promise.all([
     db
-      .select({ id: p.id, supplierId: p.supplierId, supplier: s.name, nature: p.nature, name: p.name, unit: p.unit, priceMin: p.priceMin, price: p.price, priceLocked: p.priceLocked, active: p.active, fvItemId: p.fvItemId, updated: productUpdatedAt })
+      .select({ id: p.id, supplierId: p.supplierId, supplier: s.name, nature: p.nature, name: p.name, unit: p.unit, priceMin: p.priceMin, price: p.price, priceLocked: p.priceLocked, duplicateFlag: p.duplicateFlag, active: p.active, fvItemId: p.fvItemId, updated: productUpdatedAt })
       .from(p)
       .innerJoin(s, eq(s.id, p.supplierId))
       .orderBy(asc(s.name), asc(p.name)),

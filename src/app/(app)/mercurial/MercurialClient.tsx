@@ -23,6 +23,8 @@ interface Opt { id: number; name: string }
 interface Row {
   id: number; supplierId: number; supplier: string; nature: string | null;
   name: string; unit: string; priceMin: number | null; price: number | null; priceLocked: boolean; active: boolean;
+  /** Doublon choisi à la main (sinon détection automatique) */
+  duplicateFlag?: string | null;
   /** Produit de l'onglet Fruits et légumes (prix du mois en cours) */
   fv: boolean;
   /** Dernière mise à jour du produit (création, variation de prix, ligne de l'historique du Mercurial) */
@@ -189,7 +191,9 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
     }
     return out;
   }, [rows, dups]);
-  const dupLabel = (r: Row) => (isDup(r) ? m.dupYes : r.active && toCheck.has(r.id) ? m.dupCheck : "");
+  // Choix fait à la main (Oui / À vérifier / Non) prioritaire sur la détection automatique
+  const dupLabel = (r: Row) =>
+    r.duplicateFlag === "oui" ? m.dupYes : r.duplicateFlag === "a_verifier" ? m.dupCheck : r.duplicateFlag === "non" ? "" : isDup(r) ? m.dupYes : r.active && toCheck.has(r.id) ? m.dupCheck : "";
   const cols: ColumnDef<Row>[] = useMemo(
     () => [
       { key: "supplier", text: (r) => r.supplier, options: suppliers.map((s) => s.name) },
@@ -277,7 +281,22 @@ function MercurialRow({ r, dup = "", suppliers, units, natures, editable }: { r:
         <td>{r.unit}</td>
         <td className="whitespace-nowrap text-right tabular-nums">{r.priceMin != null ? fmtMoney(r.priceMin, locale) : ""}</td>
         <td className="whitespace-nowrap text-right tabular-nums">{r.price != null ? fmtMoney(r.price, locale) : ""}</td>
-        <td>{dup && <span className={`badge ${dup === m.dupYes ? "bg-amber-100 text-amber-900" : "bg-sky-100 text-sky-800"}`}>{dup}</span>}</td>
+        <td>
+          {editable ? (
+            // Doublon modifiable : Oui / À vérifier / Non ; « Auto » revient à la détection
+            <select
+              className={`w-full rounded-md border px-1 py-0.5 text-xs ${dup === m.dupYes ? "border-amber-300 bg-amber-50 text-amber-900" : dup === m.dupCheck ? "border-sky-300 bg-sky-50 text-sky-800" : "border-stone-200 bg-white text-stone-400"}`}
+              value={r.duplicateFlag ?? ""}
+              onChange={(e) => save({ duplicateFlag: e.target.value })}
+              aria-label={m.duplicate}
+            >
+              <option value="">{dup ? `${dup} (${m.dupAuto})` : `— (${m.dupAuto})`}</option>
+              <option value="oui">{m.dupYes}</option>
+              <option value="a_verifier">{m.dupCheck}</option>
+              <option value="non">{m.dupNo}</option>
+            </select>
+          ) : dup && <span className={`badge ${dup === m.dupYes ? "bg-amber-100 text-amber-900" : "bg-sky-100 text-sky-800"}`}>{dup}</span>}
+        </td>
         <td className="text-right">
           {editable && !r.fv && <button className="btn-ghost px-1.5 py-1 text-xs" onClick={() => setEdit(true)} title={t.common.edit}><Icon name="edit" className="h-3.5 w-3.5" /> <span className="hidden xl:inline">{t.common.edit}</span></button>}
           {editable && r.fv && <Link href="/mercurial/fruits-legumes" className="btn-ghost px-1.5 py-1 text-xs" title={m.fvEdit}><Icon name="leaf" className="h-3.5 w-3.5" /> <span className="hidden xl:inline">{t.common.edit}</span></Link>}

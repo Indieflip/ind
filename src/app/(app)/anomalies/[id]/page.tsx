@@ -1,6 +1,7 @@
 import { fmtNo } from "@/lib/numbering";
 import { anomalyNumbers } from "@/lib/server/savings";
 import Link from "next/link";
+import { BackLink } from "@/components/BackLink";
 import { WEIGH_TYPE } from "@/lib/anomaly";
 import { notFound } from "next/navigation";
 import { and, asc, eq, isNull, lt, max, sql } from "drizzle-orm";
@@ -126,7 +127,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="no-print flex flex-wrap items-center justify-between gap-2">
-        <Link href="/anomalies" className="btn-ghost -ml-2 px-2"><Icon name="chevronLeft" className="h-4 w-4" /> {t.anomalies.title}</Link>
+        <BackLink href="/anomalies?view=liste" label={t.anomalies.title} />
         <ReviewButtons id={a.id} value={a.review ?? null} editable={can.manageAnomalies(user.role)} />
       </div>
 

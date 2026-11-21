@@ -14,6 +14,7 @@ export function StepPhoto({
   onNoBl,
   readingEnabled,
   receiverMustType = false,
+  receiverRequired = true,
 }: {
   draft: Draft;
   setDraft: (fn: (d: Draft) => Draft) => void;
@@ -21,6 +22,8 @@ export function StepPhoto({
   onNoBl: () => void;
   readingEnabled: boolean;
   receiverMustType?: boolean;
+  /** Signature du réceptionnaire : demandée seulement pour un profil invité */
+  receiverRequired?: boolean;
 }) {
   const { t } = useI18n();
   const w = t.wizard;
@@ -110,7 +113,7 @@ export function StepPhoto({
         </label>
       </section>
 
-      <section id="receiver" className={`card space-y-3 p-4 ${!draft.receiverSignature ? "ring-2 ring-amber-300" : ""}`}>
+      {receiverRequired && <section id="receiver" className={`card space-y-3 p-4 ${!draft.receiverSignature ? "ring-2 ring-amber-300" : ""}`}>
         <h2 className="font-semibold">4. {w.receiverTitle} <span className="text-red-600">*</span></h2>
         <div>
           <label className="label">{w.receiverName} <span className="text-red-600">*</span></label>
@@ -124,7 +127,7 @@ export function StepPhoto({
           <span className="label">{w.receiverSignHere}</span>
           <SignaturePad value={draft.receiverSignature ?? ""} onChange={(sig) => setDraft((d) => ({ ...d, receiverSignature: sig }))} clearLabel={w.clearSignature} confirmText={w.clearSignatureConfirm} />
         </div>
-      </section>
+      </section>}
     </>
   );
 }

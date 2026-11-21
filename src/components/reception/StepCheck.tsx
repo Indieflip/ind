@@ -320,7 +320,6 @@ function AddProduct({ draft, setDraft, catalog, doc }: { draft: Draft; setDraft:
               {browse ? "▴" : "▾"}
             </button>
           </div>
-          <button type="button" className="btn-secondary w-full py-2 sm:w-auto" onClick={() => setBrowse(true)}><Icon name="search" className="h-4 w-4" /> {t.search.button}</button>
           {browse && results.length === 0 && <p className="text-xs text-stone-500">{t.wizard.noSupplierProducts}</p>}
           {results.length > 0 && (
             <ul className="max-h-72 divide-y divide-stone-100 overflow-y-auto rounded-lg border border-stone-200">

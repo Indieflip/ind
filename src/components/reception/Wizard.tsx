@@ -27,6 +27,8 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
   const [draftSaving, setDraftSaving] = useState(false);
   const [info, setInfo] = useState("");
   const [readCount, setReadCount] = useState(0);
+  // Enregistrement en attente : une info manquait, l'utilisateur est allé la compléter
+  const [retry, setRetry] = useState(false);
   const topRef = useRef<HTMLDivElement>(null);
 
   // Chargement : catalogue (cache puis réseau) + réception en cours
@@ -167,6 +169,20 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
     [blReadingEnabled, catalog, setDraft],
   );
 
+  // Info manquante complétée (photo d'étiquette, signature, conformité) : la fiche s'enregistre directement,
+  // sans repasser par toutes les étapes. Pour un champ tapé (prix, DLC), le bouton « Enregistrer la fiche » reste visible.
+  const lastBlocking = useRef("");
+  useEffect(() => {
+    if (!retry || saving || !draft) return;
+    const blocking = findProblem(draft);
+    const key = blocking ? blocking.anchor : "";
+    const prev = lastBlocking.current;
+    lastBlocking.current = key;
+    if (!blocking) {
+      if (/^(signature|label-photos|line-)/.test(prev)) void finish();
+    } else if (prev && key !== prev) setError(blocking.msg);
+  });
+
   if (!draft) {
     return <div className="p-8 text-center text-stone-500">{t.common.loading}</div>;
   }
@@ -204,49 +220,38 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
   const signed = !!draft.signature || !!draft.driverLeft || !!editId; // anciens bons modifiés : pas de blocage
   const canContinue = draft.step === 0 ? !!(draft.photoOk || draft.noBl) && signed : draft.step === 1 ? supplierOk : true;
 
+  /**
+   * Premier point bloquant avant d'enregistrer (étape et endroit où le corriger).
+   * « auto » : une fois corrigé (photo, signature, choix), la fiche s'enregistre toute seule ;
+   * pour un champ tapé (prix, DLC), le bouton « Enregistrer la fiche » reste à portée sur l'étape en cours.
+   */
+  const receiverRequired = !!receiver?.mustType; // signature du réceptionnaire : profil invité seulement
+  function findProblem(d: Draft): null | { msg: string; step: number; anchor: string; auto: boolean } {
+    if (!editId && !d.signature && !d.driverLeft) return { msg: t.wizard.signRequired, step: 0, anchor: "signature", auto: true };
+    if (!editId && receiverRequired && (!d.receiverName?.trim() || !d.receiverSignature)) return { msg: t.wizard.receiverRequired, step: 0, anchor: "receiver", auto: false };
+    const undecided = d.lines.filter((l) => !l.decision);
+    if (undecided.length) return { msg: `${undecided.length} ${t.wizard.undecided}`, step: 2, anchor: `line-${undecided[0].key}`, auto: true };
+    const noPrice = d.lines.filter((l) => l.productName.trim() && !l.unitPrice.trim() && !l.priceNotShown);
+    if (noPrice.length) return { msg: `${noPrice.length} ${t.wizard.missingPrice}`, step: 2, anchor: `line-${noPrice[0].key}`, auto: false };
+    const noDlc = d.lines.filter((l) => needsDlc(l, catalog));
+    if (noDlc.length) return { msg: `${noDlc.length} ${t.wizard.missingDlc}`, step: 2, anchor: `line-${noDlc[0].key}`, auto: false };
+    // Photo d'étiquette obligatoire pour les produits à DLC (nouvelles réceptions)
+    if (!editId && !(d.labelPhotos ?? []).length && labelPhotoRequired(d.lines, catalog)) return { msg: t.wizard.missingLabelPhoto, step: 0, anchor: "label-photos", auto: true };
+    return null;
+  }
+
   async function finish() {
     if (!draft) return;
-    if (!editId && !draft.signature && !draft.driverLeft) {
-      setError(t.wizard.signRequired);
-      go(0);
-      setTimeout(() => document.getElementById("signature")?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+    const problem = findProblem(draft);
+    if (problem) {
+      // On amène l'utilisateur au bon endroit ; une fois complété, pas besoin de refaire toutes les étapes
+      setError(problem.msg);
+      setRetry(true);
+      if (draft.step !== problem.step) go(problem.step);
+      setTimeout(() => document.getElementById(problem.anchor)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
       return;
     }
-    if (!editId && (!draft.receiverName?.trim() || !draft.receiverSignature)) {
-      setError(t.wizard.receiverRequired);
-      go(0);
-      setTimeout(() => document.getElementById("receiver")?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
-      return;
-    }
-    const undecided = draft.lines.filter((l) => !l.decision);
-    if (undecided.length) {
-      // On ramène l'utilisateur sur le premier produit à décider (sinon le bouton semble ne rien faire)
-      setError(`${undecided.length} ${t.wizard.undecided}`);
-      if (draft.step !== 2) go(2);
-      setTimeout(() => document.getElementById(`line-${undecided[0].key}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
-      return;
-    }
-    const noPrice = draft.lines.filter((l) => l.productName.trim() && !l.unitPrice.trim() && !l.priceNotShown);
-    if (noPrice.length) {
-      setError(`${noPrice.length} ${t.wizard.missingPrice}`);
-      if (draft.step !== 2) go(2);
-      setTimeout(() => document.getElementById(`line-${noPrice[0].key}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
-      return;
-    }
-    const noDlc = draft.lines.filter((l) => needsDlc(l, catalog));
-    if (noDlc.length) {
-      setError(`${noDlc.length} ${t.wizard.missingDlc}`);
-      if (draft.step !== 2) go(2);
-      setTimeout(() => document.getElementById(`line-${noDlc[0].key}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
-      return;
-    }
-    // Photo d'étiquette obligatoire pour les produits à DLC (nouvelles réceptions)
-    if (!editId && !(draft.labelPhotos ?? []).length && labelPhotoRequired(draft.lines, catalog)) {
-      setError(t.wizard.missingLabelPhoto);
-      go(0);
-      setTimeout(() => document.getElementById("label-photos")?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
-      return;
-    }
+    setRetry(false);
     setSaving(true);
     setError("");
     const payload = toPayload(draft);
@@ -340,6 +345,7 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
             setDraft={setDraft}
             readingEnabled={blReadingEnabled}
             receiverMustType={!!receiver?.mustType}
+            receiverRequired={receiverRequired}
             onConfirm={() => {
               const d = { ...draft, photoOk: true, noBl: false };
               setDraft(() => d);
@@ -402,7 +408,11 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
               <Icon name="file" className="hidden h-5 w-5 shrink-0 sm:block" /> <span className="text-xs leading-tight sm:text-sm">{draftSaving ? t.wizard.saving : t.wizard.saveDraft}</span>
             </button>
           )}
-          {draft.step < 3 ? (
+          {retry && draft.step < 3 && !editId ? (
+            <button type="button" className="btn-primary btn-lg flex-[1.4]" disabled={saving} onClick={finish}>
+              <Icon name="check" /> <span className="truncate text-sm sm:text-base">{saving ? t.wizard.saving : t.wizard.saveNow}</span>
+            </button>
+          ) : draft.step < 3 ? (
             <button type="button" className="btn-primary btn-lg flex-[1.4]" disabled={!canContinue} onClick={() => go(draft.step + 1)}>
               <span className="truncate">{t.common.continue}</span> <Icon name="chevronRight" />
             </button>

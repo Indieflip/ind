@@ -27,6 +27,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (res == null) return Response.json({ error: "not_found" }, { status: 404 });
   // Écarts de pesée du bon → fiche d'anomalie « Écart de pesée » tout de suite (les pages ne le refont plus à chaque ouverture)
   await syncWeighAnomalies().catch(() => invalidate("weigh-anomalies"));
+  invalidate("product-links");
   revalidatePath("/receptions");
   revalidatePath(`/receptions/${id}`);
   return Response.json({ id });

@@ -963,6 +963,22 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v1
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v17', '1') on conflict (key) do nothing`);
 }
 
+// Dev > Développement : enregistrement direct après une info manquante, signature réceptionnaire (invité), doublon modifiable, rattachements, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v18'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  const rows = [
+    ["reception", "Enregistrement", "Info manquante", false, "L'application amène au champ manquant ; une fois complété (photo d'étiquette, signature, conformité), la fiche s'enregistre directement. Pour un champ tapé (prix, DLC), le bouton « Enregistrer la fiche » reste disponible sur l'étape en cours, sans repasser par les étapes.", ""],
+    ["reception", "Étape 1 - Photos et signatures", "Signature du réceptionnaire", false, "Demandée seulement pour un profil invité (nom et signature) ; pour les autres profils, le nom de l'utilisateur connecté est repris.", ""],
+    ["reception", "Étape 3 - Contrôle", "Ajouter un produit", false, "Recherche au fil de la saisie (2 lettres) ou flèche pour la liste des produits du fournisseur ; une ligne par produit. Plus de bouton « Rechercher ».", ""],
+    ["product", "Mercurial", "Doublon (choix)", false, "Modifiable dans la colonne : auto (détection), Oui, À vérifier, Non.", ""],
+    ["product", "Compte produit", "Rattachements", false, "Écarts de pesée, produits des fiches d'anomalie, lignes de réception et historique du Mercurial rattachés automatiquement au compte produit du même fournisseur ; le compte produit affiche toutes ses anomalies.", ""],
+  ];
+  for (const [i, r] of rows.entries()) {
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values (${r[0]}, ${r[1]}, ${r[2]}, ${r[3]}, ${r[4]}, ${r[5]}, ${pos + i})`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v18', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

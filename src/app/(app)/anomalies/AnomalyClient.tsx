@@ -196,7 +196,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
         )}
         <span className="text-stone-500">{rows.length} {a.openCount} · {a.saving} : {fmtMoney(totalSaving, locale)}</span>
       </div>
-      <DataTable copy={copySpec} rows={rows} cols={shownCols} rowKey={(r) => r.id} empty={a.empty} selectable={canManage} selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} dense fixed rowClassName={(r) => (r.due ? "bg-red-50/60" : "")} />
+      <DataTable storageKey="anomalies-list" copy={copySpec} rows={rows} cols={shownCols} rowKey={(r) => r.id} empty={a.empty} selectable={canManage} selection={sel} onSelectionChange={setSel} defaultSort={{ key: "date", dir: "desc" }} dense fixed rowClassName={(r) => (r.due ? "bg-red-50/60" : "")} />
 
 
 

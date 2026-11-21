@@ -1,7 +1,7 @@
 import { fmtNo } from "@/lib/numbering";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
@@ -37,11 +37,12 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       .innerJoin(r, eq(r.id, l.receptionId))
       .where(eq(l.productId, id))
       .orderBy(desc(r.deliveredAt)),
+    // Anomalies du produit : produit principal, produits de la fiche (écarts de pesée compris) ou ligne du bon
     db
-      .select({ id: schema.anomalies.id, createdAt: schema.anomalies.createdAt, type: schema.anomalies.type, description: schema.anomalies.description, stage: schema.anomalies.stage })
+      .select({ id: schema.anomalies.id, createdAt: schema.anomalies.createdAt, type: schema.anomalies.type, problemType: schema.anomalies.problemType, description: schema.anomalies.description, stage: schema.anomalies.stage })
       .from(schema.anomalies)
-      .innerJoin(l, eq(l.id, schema.anomalies.lineId))
-      .where(eq(l.productId, id))
+      .leftJoin(l, eq(l.id, schema.anomalies.lineId))
+      .where(sql`${schema.anomalies.productId} = ${id} or ${l.productId} = ${id} or ${schema.anomalies.items} @> ${JSON.stringify([{ productId: id }])}::jsonb`)
       .orderBy(desc(schema.anomalies.createdAt)),
   ]);
 
@@ -66,7 +67,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       text: `${num(c.oldPrice) != null ? `${money(num(c.oldPrice))} → ` : ""}${money(num(c.newPrice))}${c.pct != null ? ` (${c.pct > 0 ? "+" : ""}${fmtNum(c.pct, locale, 1)} %)` : ""} · ${P.src[c.source]}${c.invoiceRef ? ` ${c.invoiceRef}` : ""}`,
       href: c.receptionId ? `/receptions/${c.receptionId}` : undefined,
     })),
-    ...anomalies.map((a) => ({ at: a.createdAt, icon: "alert", tone: "bg-rose-100 text-rose-700", title: `${P.evAnomaly} · ${t.anomalies.types[a.type as keyof typeof t.anomalies.types] ?? a.type}`, text: `${a.description} · ${t.stages[a.stage as keyof typeof t.stages] ?? a.stage}`, href: `/anomalies/${a.id}` })),
+    ...anomalies.map((a) => ({ at: a.createdAt, icon: "alert", tone: "bg-rose-100 text-rose-700", title: `${P.evAnomaly} · ${a.problemType || (t.anomalies.types[a.type as keyof typeof t.anomalies.types] ?? a.type)}`, text: `${a.description} · ${t.stages[a.stage as keyof typeof t.stages] ?? a.stage}`, href: `/anomalies/${a.id}` })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
   const info = (k: string, v: React.ReactNode) => (

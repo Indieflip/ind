@@ -23,7 +23,7 @@ const PHONE_STEPS: { title: string; items: string[]; gate?: string; auto?: strin
   {
     title: "Validation",
     items: ["Récapitulatif", "Texte des réserves à recopier sur le BL", "Enregistrement (hors ligne possible)"],
-    gate: "Pas d'enregistrement sans prix, décision, DLC obligatoire, photo d'étiquette (viandes, poissons, surgelés) ou signature du réceptionnaire",
+    gate: "Pas d'enregistrement sans prix, décision, DLC obligatoire, photo d'étiquette (viandes, poissons, surgelés) ou signature du réceptionnaire (profil invité seulement) ; une fois l'info complétée, la fiche s'enregistre sans refaire les étapes",
   },
 ];
 

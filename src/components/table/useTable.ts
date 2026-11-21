@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { matches } from "@/lib/search";
 
 export interface ColumnDef<R> {
@@ -18,10 +18,25 @@ export interface ColumnDef<R> {
 const coll = new Intl.Collator("fr", { sensitivity: "base", numeric: true });
 
 /** Filtres par colonne + tri A→Z / Z→A + pagination, côté navigateur */
-export function useTable<R>(rows: R[], cols: ColumnDef<R>[], opts: { pageSize?: number; defaultSort?: { key: string; dir: "asc" | "desc" } } = {}) {
+export function useTable<R>(rows: R[], cols: ColumnDef<R>[], opts: { pageSize?: number; defaultSort?: { key: string; dir: "asc" | "desc" }; storageKey?: string } = {}) {
   const pageSize = opts.pageSize ?? 1000;
+  // Filtres et tri gardés pendant la session (retour depuis une fiche : le tableau est comme on l'a laissé)
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [sort, setSort] = useState<{ key: string; dir: "asc" | "desc" } | null>(opts.defaultSort ?? null);
+  const [restored, setRestored] = useState(!opts.storageKey);
+  useEffect(() => {
+    if (!opts.storageKey) return;
+    try {
+      const v = JSON.parse(sessionStorage.getItem(`table:${opts.storageKey}`) ?? "null") as { filters?: Record<string, string>; sort?: { key: string; dir: "asc" | "desc" } | null } | null;
+      if (v?.filters) setFilters(v.filters);
+      if (v?.sort !== undefined) setSort(v.sort ?? null);
+    } catch { /* stockage indisponible */ }
+    setRestored(true);
+  }, [opts.storageKey]);
+  useEffect(() => {
+    if (!opts.storageKey || !restored) return;
+    try { sessionStorage.setItem(`table:${opts.storageKey}`, JSON.stringify({ filters, sort })); } catch { /* stockage indisponible */ }
+  }, [filters, sort, opts.storageKey, restored]);
   const [page, setPage] = useState(0);
 
   const options = useMemo(() => {

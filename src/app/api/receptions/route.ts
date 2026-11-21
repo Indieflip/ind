@@ -23,6 +23,7 @@ export async function POST(req: Request) {
   }
   // Écarts de pesée du bon → fiche d'anomalie « Écart de pesée » tout de suite (les pages ne le refont plus à chaque ouverture)
   await syncWeighAnomalies().catch(() => invalidate("weigh-anomalies"));
+  invalidate("product-links");
   revalidatePath("/receptions");
   return Response.json({ id });
 }

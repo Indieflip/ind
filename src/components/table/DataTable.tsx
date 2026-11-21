@@ -60,6 +60,7 @@ export function DataTable<R>({
   fixed,
   copy,
   mergedHeader,
+  storageKey,
 }: {
   rows: R[];
   cols: Col<R>[];
@@ -80,9 +81,11 @@ export function DataTable<R>({
   copy?: { source: string; fields: (r: R) => RowFields; actions?: (r: R) => RowAction[] };
   /** En-tête sur une seule ligne : le titre de la colonne est dans le champ de filtre, avec le tri à côté */
   mergedHeader?: boolean;
+  /** Garde filtres et tri pendant la session (retour depuis une fiche) */
+  storageKey?: string;
 }) {
   const { t } = useI18n();
-  const tb = useTable(rows, cols, { pageSize, defaultSort });
+  const tb = useTable(rows, cols, { pageSize, defaultSort, storageKey });
   const sel = selection ?? new Set<string | number>();
   const allOn = tb.filtered.length > 0 && tb.filtered.every((r) => sel.has(rowKey(r)));
   return (
