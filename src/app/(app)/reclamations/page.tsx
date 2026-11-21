@@ -1,3 +1,4 @@
+import { parisYear, parseNo } from "@/lib/numbering";
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
@@ -19,7 +20,8 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
   const sp = await searchParams;
   const f = one(sp.f);
   // Lien depuis une fiche d'anomalie : « Réclamation N° 258 » → les fiches de cette réclamation
-  const claimNo = Number(one(sp.n)) || null;
+  const claimNo = parseNo(one(sp.n));
+  const claimYear = Number(one(sp.y)) || null;
   const { t, locale } = await getDict();
   await syncWeighAnomalies();
   await ensureClaimNumbers();
@@ -44,12 +46,13 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
         canManage={can.manageAnomalies(user.role)}
         initialFilter={f === "sans-montant" ? "missing" : undefined}
         claimNo={claimNo}
+        claimYear={claimYear}
         rows={rows.map(({ a: x, supplier, documents, blNumber, lineDoc }) => {
           const delay = processes.find(x.supplierId, x.supplierName)?.delay ?? 3;
           const days = daysSince(x.lastActionAt, x.createdAt, now);
           const stage = stageOf(x.stage);
           return {
-            id: x.id, claimNo: x.claimNo ?? 0, consolidated: !!x.consolidatedAt, date: fmtDate(x.createdAt, locale), dateIso: x.createdAt.toISOString(), supplier: supplier ?? x.supplierName, supplierId: x.supplierId,
+            id: x.id, claimNo: x.claimNo ?? 0, year: parisYear(x.createdAt), consolidated: !!x.consolidatedAt, date: fmtDate(x.createdAt, locale), dateIso: x.createdAt.toISOString(), supplier: supplier ?? x.supplierName, supplierId: x.supplierId,
             reference: (x.receptionId ? lineDocLabel(documents, lineDoc, blNumber) : null) ?? x.reference ?? "", product: x.productName ?? "",
             subject: x.description, mode: x.mode, stage, resolution: x.resolution, claimed: num(x.claimedAmount), credit: num(x.creditAmount),
             days, due: (stage === "reclamee" || stage === "a_verifier") && isClaimMode(x.mode) && days >= delay, source: x.source,

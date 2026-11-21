@@ -1,3 +1,4 @@
+import { fmtNo, parseNo } from "@/lib/numbering";
 import { anomalyNumbers } from "@/lib/server/savings";
 import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
@@ -33,11 +34,12 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
   const processes = await supplierProcesses();
   const view = one(sp.view) === "liste" ? "list" : "board";
   // « Aller à la fiche N° » : fiche en cours ou consolidée (N° définitif ou provisoire)
-  const wanted = Number(one(sp.n));
-  if (Number.isInteger(wanted) && wanted > 0) {
-    const nums = await anomalyNumbers();
-    const hit = [...nums.entries()].find(([, v]) => v.n === wanted);
-    if (hit) redirect(`/anomalies/${hit[0]}`);
+  // Numéro tapé « FA401 » ou « 401 » : fiche de l'année en cours en priorité, sinon la plus récente
+  const wanted = parseNo(one(sp.n));
+  const nums = await anomalyNumbers();
+  if (wanted) {
+    const hits = [...nums.entries()].filter(([, v]) => v.n === wanted).sort((x, y) => y[1].year - x[1].year);
+    if (hits[0]) redirect(`/anomalies/${hits[0][0]}`);
   }
   const a = schema.anomalies;
   const db = getDb();
@@ -59,14 +61,29 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
   ]);
   const extra = new Map(docs.map((d) => [d.id, d]));
   // N° : numéro attribué, sinon suite des numéros par date
-  const maxNum = active.reduce((m, c) => Math.max(m, c.number ?? 0), 0);
-  const provisional = new Map(active.filter((x) => x.number == null).sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime() || x.id - y.id).map((x, i) => [x.id, maxNum + i + 1]));
+  const provisional = new Map([...nums].map(([id, v]) => [id, v.n]));
   const day = today();
   void day;
   const now = new Date();
+  const M = t.anomalies.missingFields;
+  const missingOf = (x: typeof active[number]) => {
+    const out: string[] = [];
+    if (!x.supplierId) out.push(M.supplier);
+    if (!x.receptionId && !(x.reference ?? "").trim()) out.push(M.reference);
+    if (!x.items?.length && !(x.productName ?? "").trim()) out.push(M.product);
+    else if (x.items?.some((i) => i.productId == null)) out.push(M.productLink);
+    if (x.claimedAmount == null && x.type !== "missing_bl") out.push(M.amount);
+    if (x.stage === "cloturee" && !x.resolution) out.push(M.resolution);
+    if (x.resolution === "avoir") {
+      if (x.creditAmount == null) out.push(M.creditAmount);
+      if (!(x.creditNumber ?? "").trim()) out.push(M.creditNumber);
+      if (!x.creditDate) out.push(M.creditDate);
+    }
+    return out;
+  };
   const toRow = (x: typeof active[number]) => ({
     id: x.id,
-    number: x.number ?? provisional.get(x.id) ?? null,
+    number: provisional.get(x.id) ?? x.number ?? null,
     numberFinal: x.number != null,
     date: fmtDate(x.createdAt, locale),
     dateSort: x.createdAt.toISOString(),
@@ -98,6 +115,8 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     due: (stageOf(x.stage) === "reclamee" || stageOf(x.stage) === "a_verifier") && isClaimMode(x.mode) && daysSince(x.lastActionAt, x.createdAt, now) >= (processes.find(x.supplierId, x.supplierName)?.delay ?? 3),
     receptionId: x.receptionId,
     photoUrl: x.photoUrl,
+    // Champs non remplis sur la fiche (colonne « À compléter »)
+    missing: missingOf(x),
   });
   const preselect = Number(one(sp.reception)) || null;
   // Récap par type d'anomalie sur une période (mois, trimestre, année en cours ou dates choisies) : nombre de fiches et montant réclamé

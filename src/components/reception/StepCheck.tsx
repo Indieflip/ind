@@ -226,7 +226,8 @@ function LineCard({
             <p className={`mt-0.5 text-xs font-semibold ${pc.kind === "increase" ? "text-red-600" : "text-emerald-600"}`}>{fmtPct(pc.pct)}</p>
           )}
           {pc.kind === "ok" && <p className="mt-0.5 text-xs text-stone-500">{t.wizard.inRange}</p>}
-          {pc.kind === "new" && <p className="mt-0.5 text-xs font-semibold text-sky-700">{t.wizard.newProduct}</p>}
+          {/* Produit existant sans prix : le prix saisi devient son prix, sans message ; seul un produit hors liste est signalé */}
+          {pc.kind === "new" && !line.productId && <p className="mt-0.5 text-xs font-semibold text-sky-700">{t.wizard.newProduct}</p>}
         </div>
       </div>
 

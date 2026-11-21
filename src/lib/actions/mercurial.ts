@@ -63,6 +63,8 @@ export async function addMercurialRowAction(_p: R, form: FormData): Promise<R> {
 export async function updateMercurialRowAction(
   id: number,
   data: { supplierId?: number; name?: string; unit?: string; price?: string; priceMin?: string; service?: string; nature?: string; priceLocked?: boolean },
+  /** Correction depuis le compte produit : pas de ligne automatique dans l'historique des prix */
+  opts: { trace?: boolean } = {},
 ) {
   const user = await assertUser(can.editMercurial);
   const db = getDb();
@@ -92,7 +94,9 @@ export async function updateMercurialRowAction(
   if (data.price !== undefined) {
     const newPrice = num(data.price);
     const old = num(product.price);
-    if (newPrice != null && newPrice !== old) {
+    if (newPrice != null && newPrice !== old && opts.trace === false) {
+      set.price = String(newPrice);
+    } else if (newPrice != null && newPrice !== old) {
       set.price = String(newPrice);
       const supplier = await db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, data.supplierId ?? product.supplierId) });
       await db.insert(schema.priceChanges).values({

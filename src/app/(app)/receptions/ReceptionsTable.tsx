@@ -1,4 +1,5 @@
 "use client";
+import { fmtNo } from "@/lib/numbering";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -18,6 +19,7 @@ export interface ReceptionRow {
   day?: string; // AAAA-MM-JJ (heure de Paris), pour le filtre par calendrier
   supplierName: string;
   lineCount: number;
+  anomalyCount?: number;
   status: string;
   statusLabel: string;
   consolidated: boolean;
@@ -34,11 +36,13 @@ export function ReceptionsTable({ rows, canDelete, canEdit = false }: { rows: Re
   const stateLabel = (r: ReceptionRow) => (r.draftId ? "—" : r.consolidated ? t.receptions.consolidated : t.receptions.toConsolidate);
   const href = (r: ReceptionRow) => (r.draftId ? `/receptions/new?draft=${r.draftId}` : `/receptions/${r.id}`);
   const cols: Col<ReceptionRow>[] = [
-    { key: "number", label: t.receptions.numberLong, align: "right", width: "4.5rem", text: (r) => (r.draftId ? "" : String(r.number)), sort: (r) => r.number, href, render: (r) => (r.draftId ? "—" : String(r.number)) },
+    { key: "number", label: t.receptions.numberLong, width: "5rem", text: (r) => (r.draftId ? "" : fmtNo("reception", r.number)), sort: (r) => r.number, href, render: (r) => (r.draftId ? "—" : fmtNo("reception", r.number)) },
     { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, date: (r) => r.day, className: "whitespace-nowrap" },
     { key: "supplier", label: t.common.supplier, text: (r) => r.supplierName },
     { key: "bl", label: t.receptions.blInvoice, text: (r) => r.blNumber ?? "", render: (r) => r.blNumber || (r.draftId ? "—" : t.receptions.noBl) },
-    { key: "lines", label: t.mercurial.products, align: "right", text: (r) => String(r.lineCount), sort: (r) => r.lineCount },
+    // Anomalie : nombre de fiches d'anomalie identifiées sur le bon
+    { key: "anomalies", label: t.receptions.anomalyCol, align: "right", text: (r) => String(r.anomalyCount ?? 0), sort: (r) => r.anomalyCount ?? 0,
+      render: (r) => (r.anomalyCount ? <span className="badge bg-red-100 font-semibold text-red-800">{r.anomalyCount}</span> : <span className="text-stone-400">0</span>) },
     { key: "status", label: t.common.status, text: (r) => r.statusLabel, options: Object.values(t.receptionStatus), render: (r) => <StatusBadge status={r.status} label={r.statusLabel} /> },
     {
       key: "state", label: t.nav.consolidation, text: stateLabel, options: [t.receptions.consolidated, t.receptions.toConsolidate],

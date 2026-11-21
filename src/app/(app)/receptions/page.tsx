@@ -51,6 +51,7 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
           day: r.deliveredAt.toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" }),
           supplierName: r.supplierName,
           lineCount: r.lineCount,
+          anomalyCount: r.anomalyCount,
           status: r.status,
           statusLabel: t.receptionStatus[r.status],
           consolidated: !!r.consolidatedAt,

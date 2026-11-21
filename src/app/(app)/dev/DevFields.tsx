@@ -7,8 +7,7 @@ import { appConfirm } from "@/components/Confirm";
 import { Icon } from "@/components/Icon";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { DevAutomations } from "./DevAutomations";
-import { AnomalyRules, FollowUpCharacteristics } from "./DevRules";
-import { DevFold as Fold } from "./DevFold";
+import { FollowUpCharacteristics } from "./DevRules";
 
 
 export interface FieldRow { id: number; form: string; section: string; field: string; required: boolean; rule: string; message: string; position: number }
@@ -53,10 +52,6 @@ export function DevFields({ fields, points = {} }: { fields: FieldRow[]; points?
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <Fold title={t.rules.anomalyFold}><AnomalyRules /></Fold>
-      </div>
-
       <FollowUpCharacteristics points={points} />
 
       <section>

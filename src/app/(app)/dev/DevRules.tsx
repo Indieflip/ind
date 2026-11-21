@@ -3,6 +3,7 @@
 import { MODES, RESOLUTIONS, STAGES, WEIGH_TYPE, modeIcon, stageStyles } from "@/lib/anomaly";
 import { useI18n } from "@/lib/i18n/client";
 import { DataTable, type Col } from "@/components/table/DataTable";
+import { NUM_FORMAT, fmtNo, type NumKind } from "@/lib/numbering";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { saveCharacteristicPointAction } from "@/lib/actions/dev";
@@ -88,6 +89,12 @@ export function FollowUpCharacteristics({ points }: { points: Record<string, str
     // Types d'anomalie : quand la fiche est créée automatiquement, et le rappel qui s'applique
     ...(Object.keys(t.anomalies.types) as (keyof typeof t.anomalies.types)[]).map((k) => ({ id: `type-${k}`, characteristic: r.charType, post: t.anomalies.types[k], detail: `${r.createdWhen} ${(r.typeText as Record<string, string>)[k] ?? "—"}`, steps: [] as [string, string][], reminder: (r.typeReminder as Record<string, string>)[k] ?? r.typeReminderDefault })),
     { id: "type-weigh", characteristic: r.charType, post: WEIGH_TYPE, detail: `${r.createdWhen} ${r.weighTypeText}`, steps: [], reminder: r.typeReminderDefault },
+    // Numéro incrémentation : format de chaque fiche / compte (tiré de src/lib/numbering.ts)
+    ...(Object.keys(NUM_FORMAT) as NumKind[]).map((k) => ({
+      id: `num-${k}`, characteristic: r.charNumber, post: r.numPosts[k],
+      detail: `${fmtNo(k, 1)}, ${fmtNo(k, 2)}… ${r.numDetail.replace("{n}", NUM_FORMAT[k].digits === 4 ? "9999" : "999").replace("{next}", fmtNo(k, NUM_FORMAT[k].digits === 4 ? 10000 : 1000))}`,
+      steps: [] as [string, string][], reminder: NUM_FORMAT[k].yearly ? r.numYearly : r.numPermanent,
+    })),
   ];
   const cols: Col<CharRow>[] = [
     { key: "point", label: r.point, text: (x) => points[x.id] ?? "", keepCase: true, width: "16%", render: (x) => <PointCell id={x.id} value={points[x.id] ?? ""} placeholder={r.pointPlaceholder} /> },

@@ -893,6 +893,61 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v1
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v15', '1') on conflict (key) do nothing`);
 }
 
+// Daurade royale El Turquie 8/1000 : deux produits distincts (écaillé filet épilé / filet sans peau épilé), écarts et fiches d'anomalie rattachés, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'daurade_products_v1'`)).rows.length) {
+  const base = (await db.execute(sql`select supplier_id, nature, category_id, service, unit, price from products where name ~* '^daurade royale? el turquie 8/1000$' order by active desc, id limit 1`)).rows[0];
+  if (base) {
+    const variants = [
+      { name: "Daurade Royale El Turquie 8/1000 (Ecaillé filet épilé)", re: "daurade royale? el turquie 8/1000.*[eé]caill" },
+      { name: "Daurade Royale El Turquie 8/1000 (Filet sans peau epile)", re: "daurade royale? el turquie 8/1000.*sans peau" },
+    ];
+    for (const v of variants) {
+      let id = (await db.execute(sql`select id from products where supplier_id = ${base.supplier_id} and lower(name) = lower(${v.name}) limit 1`)).rows[0]?.id;
+      if (!id) {
+        id = (await db.execute(sql`insert into products (supplier_id, name, unit, category_id, price, nature, service, active)
+          values (${base.supplier_id}, ${v.name}, ${base.unit ?? "Kg"}, ${base.category_id}, ${base.price}, ${base.nature}, ${base.service}, true) returning id`)).rows[0].id;
+      }
+      // Écarts de pesée : nom unifié + lien vers le compte produit
+      await db.execute(sql`update weigh_gaps set product_id = ${id}, product = ${v.name} where product ~* ${v.re}`);
+      await db.execute(sql`update reception_lines set product_id = ${id}, product_name = ${v.name} where product_name ~* ${v.re}`);
+      // Fiches d'anomalie : produits de la fiche rattachés
+      await db.execute(sql`update anomalies set items = (
+          select jsonb_agg(case when e->>'name' ~* ${v.re} then e || jsonb_build_object('productId', ${id}::int, 'name', ${v.name}::text) else e end)
+          from jsonb_array_elements(items) e)
+        where items is not null and items::text ~* ${v.re}`);
+      await db.execute(sql`update anomalies set product_id = ${id}, product_name = ${v.name} where product_name ~* ${v.re}`);
+    }
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('daurade_products_v1', '1') on conflict (key) do nothing`);
+}
+
+// Doublons traités par l'équipe : lignes automatiques de l'historique des prix créées par ces corrections (modifications manuelles depuis le 21/11/26) supprimées, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dup_history_cleanup_v1'`)).rows.length) {
+  const res = await db.execute(sql`delete from price_changes where source = 'manual' and date >= '2026-11-21T00:00:00+01:00'`);
+  console.log(`[migrate] historique des prix : ${res.rowCount ?? 0} ligne(s) automatique(s) de correction supprimée(s)`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dup_history_cleanup_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev > Développement : numérotation FP / FPM / FA / FDR / FR / PR, doublon « À vérifier », colonne À compléter, liste des fiches (Anomalie), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v16'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  const rows = [
+    ["reception", "Fiche", "N°", false, "FP001, FP002… par année de livraison (remise à zéro le 01/01) ; au-delà de 999, un chiffre est ajouté.", ""],
+    ["sheet", "Fiche", "N°", false, "FPM001… par année (remise à zéro le 01/01).", ""],
+    ["anomaly", "Fiche", "N°", false, "FA001… par année de création (remise à zéro le 01/01). Recherche « Fiche N° » : FA401 ou 401.", ""],
+    ["claim", "Fiche", "N°", false, "FDR001… par année de création (remise à zéro le 01/01) ; plusieurs anomalies regroupées partagent le même N°.", ""],
+    ["supplier", "Compte", "N°", false, "FR0001… numéro permanent du compte.", ""],
+    ["product", "Compte", "N°", false, "PR0001… numéro permanent du compte.", ""],
+    ["product", "Mercurial", "Doublon", false, "Oui : même nom et même unité chez le même fournisseur. À vérifier : produits très proches (même nom avec une autre unité, ou nom presque identique).", ""],
+    ["anomaly", "Liste", "À compléter", false, "Champs non remplis de chaque fiche : fournisseur, BL / facture, produit (ou hors Mercurial), montant, résolution, montant / N° / date d'avoir.", ""],
+    ["reception", "Liste des fiches de réception", "Anomalie", false, "Nombre de fiches d'anomalie identifiées sur le bon ; dans la fiche, lien vers chaque fiche d'anomalie (FA…).", ""],
+  ];
+  for (const [i, r] of rows.entries()) {
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values (${r[0]}, ${r[1]}, ${r[2]}, ${r[3]}, ${r[4]}, ${r[5]}, ${pos + i})`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v16', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

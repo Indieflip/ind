@@ -27,7 +27,7 @@ export function ProductEditor({ product, units, natures, fv }: {
     const res = await updateMercurialRowAction(product.id, {
       name: v.name, unit: v.unit, nature: v.nature, priceLocked: v.priceLocked,
       ...(fv ? {} : { priceMin: v.priceMin, price: v.price }),
-    });
+    }, { trace: false });
     if (res && "error" in res && res.error === "exists") return void (await appAlert(m.duplicateEdit));
     setOpen(false);
     router.refresh();

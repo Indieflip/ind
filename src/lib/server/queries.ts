@@ -1,4 +1,5 @@
 import "server-only";
+import { parisYear } from "@/lib/numbering";
 import { and, desc, eq, isNotNull, isNull, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import { matches } from "@/lib/search";
 import { getDb, schema } from "@/db";
@@ -34,9 +35,11 @@ export function receptionWhere(f: ReceptionFilters) {
 
 /** Numéro d'ordre : 1, 2, 3… dans l'ordre de création. Recalculé à chaque affichage,
  *  il se renumérote donc tout seul après une suppression. */
+/** N° de fiche de réception (FP001…) : par année de livraison, dans l'ordre d'enregistrement ; remise à zéro le 01/01 */
 export async function receptionNumbers() {
-  const rows = await getDb().select({ id: schema.receptions.id }).from(schema.receptions).orderBy(schema.receptions.id);
-  return new Map(rows.map((r, i) => [r.id, i + 1]));
+  const rows = await getDb().select({ id: schema.receptions.id, at: schema.receptions.deliveredAt }).from(schema.receptions).orderBy(schema.receptions.id);
+  const perYear = new Map<number, number>();
+  return new Map(rows.map((r) => { const y = parisYear(r.at); const n = (perYear.get(y) ?? 0) + 1; perYear.set(y, n); return [r.id, n] as [number, number]; }));
 }
 
 export async function listReceptions(f: ReceptionFilters, limit = 1000) {
@@ -59,6 +62,7 @@ function listRaw(f: ReceptionFilters, limit: number) {
       driverName: r.driverName,
       consolidatedAt: r.consolidatedAt,
       lineCount: sql<number>`(select count(*)::int from reception_lines l where l.reception_id = ${r.id})`,
+      anomalyCount: sql<number>`(select count(*)::int from anomalies a where a.reception_id = ${r.id})`,
       createdByName: schema.users.name,
     })
     .from(r)

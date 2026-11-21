@@ -1,3 +1,4 @@
+import { fmtNo } from "@/lib/numbering";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { asc, desc, eq, sql } from "drizzle-orm";
@@ -92,7 +93,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
           <div className="flex items-center gap-4">
             <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-2xl font-bold">{sentence(supplier.name).charAt(0)}</span>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-white/60">N° {supplier.id}{!supplier.active ? ` · ${t.suppliers.inactive}` : ""}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-white/60">{fmtNo("supplier", supplier.id)}{!supplier.active ? ` · ${t.suppliers.inactive}` : ""}</p>
               <h1 className="text-2xl font-bold leading-tight">{sentence(supplier.name)}</h1>
             </div>
           </div>

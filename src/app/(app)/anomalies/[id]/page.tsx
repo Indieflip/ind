@@ -1,4 +1,7 @@
+import { fmtNo } from "@/lib/numbering";
+import { anomalyNumbers } from "@/lib/server/savings";
 import Link from "next/link";
+import { WEIGH_TYPE } from "@/lib/anomaly";
 import { notFound } from "next/navigation";
 import { and, asc, eq, isNull, lt, max, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -26,19 +29,19 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   await ensureClaimNumbers();
   const a = await db.query.anomalies.findFirst({ where: eq(schema.anomalies.id, id) });
   if (!a) notFound();
-  const [rec, line, supplier, claims, photos, numbers, maxNum, rank, author] = await Promise.all([
+  const [rec, line, supplier, claims, photos, numbers, anoNums, author] = await Promise.all([
     a.receptionId ? db.query.receptions.findFirst({ where: eq(schema.receptions.id, a.receptionId) }) : undefined,
     a.lineId ? db.query.receptionLines.findFirst({ where: eq(schema.receptionLines.id, a.lineId) }) : undefined,
     a.supplierId ? db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, a.supplierId), columns: { id: true, name: true, email: true, phone: true, contacts: true } }) : undefined,
     db.select().from(schema.claims).where(eq(schema.claims.anomalyId, id)).orderBy(asc(schema.claims.date)),
     a.lineId ? db.select().from(schema.receptionPhotos).where(eq(schema.receptionPhotos.lineId, a.lineId)) : Promise.resolve([]),
     receptionNumbers(),
-    db.select({ m: max(schema.anomalies.number) }).from(schema.anomalies),
-    // N° : rang parmi les anomalies sans numéro
-    a.number ? Promise.resolve([{ n: 0 }]) : db.select({ n: sql<number>`count(*)::int` }).from(schema.anomalies).where(and(isNull(schema.anomalies.number), lt(schema.anomalies.createdAt, a.createdAt))),
+    anomalyNumbers(),
     a.createdBy ? db.query.users.findFirst({ where: eq(schema.users.id, a.createdBy), columns: { name: true } }) : undefined,
   ]);
-  const number = a.number ?? (maxNum[0]?.m ?? 0) + (rank[0]?.n ?? 0) + 1;
+  // N° de fiche (FA…) : par année de création
+  const number = anoNums.get(a.id)?.n ?? a.number ?? null;
+  const claimYear = anoNums.get(a.id)?.year;
   // Type de problème (liste modifiable) et produits du fournisseur pour le rattachement
   const typeLabel = t.anomalies.types[a.type];
   const problemType = a.problemType || typeLabel;
@@ -64,7 +67,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   if (a.imported) assistant.push({ date: fmtDate(a.createdAt, locale), text: S.imported });
   else if (rec) assistant.push({ date: fmtDate(a.createdAt, locale), text: `${S.createdFrom} ${numbers.get(rec.id) ?? rec.id}` });
   else assistant.push({ date: fmtDate(a.createdAt, locale), text: `${S.createdBy}${author ? ` ${author.name}` : ""}` });
-  if (a.claimNo) assistant.push({ date: null, text: `${S.claimNumber} ${a.claimNo}` });
+  if (a.claimNo) assistant.push({ date: null, text: `${S.claimNumber} ${fmtNo("claim", a.claimNo)}` });
   if (isInformative(a)) assistant.push({ date: null, text: S.informative });
   if (a.lastActionAt) assistant.push({ date: fmtDate(a.lastActionAt, locale), text: S.lastAction });
   const open = ["a_traiter", "reclamee", "a_verifier"].includes(a.stage);
@@ -131,10 +134,10 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
       <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4 p-6">
           <div className="min-w-0 space-y-1">
-            <p className="text-sm text-stone-500">{s.title} · {t.anomalies.number} {number} - {fmtDate(a.createdAt ?? rec?.deliveredAt, locale)}</p>
+            <p className="text-sm text-stone-500">{s.title} · {fmtNo("anomaly", number)} - {fmtDate(a.createdAt ?? rec?.deliveredAt, locale)}</p>
             <h1 className="text-2xl font-bold leading-tight sm:text-3xl">{sentence(supplier?.name ?? a.supplierName)} — {problemType}</h1>
-            {itemsLabel && problemType !== t.anomalies.types.missing_bl && <p className="text-base text-stone-700">{itemsLabel}</p>}
-            {a.claimNo && <p className="text-xs"><Link href={`/reclamations?n=${a.claimNo}`} className="font-medium text-brand-700 hover:underline">{t.claims.title} N° {a.claimNo}</Link></p>}
+            {itemsLabel && problemType !== t.anomalies.types.missing_bl && problemType !== WEIGH_TYPE && <p className="text-base text-stone-700">{itemsLabel}</p>}
+            {a.claimNo && <p className="text-xs"><Link href={`/reclamations?n=${a.claimNo}${claimYear ? `&y=${claimYear}` : ""}`} className="font-medium text-brand-700 hover:underline">{t.claims.title} {fmtNo("claim", a.claimNo)}</Link></p>}
           </div>
           <div className="flex flex-col items-end gap-1.5 text-right">
             <span className={`rounded-full px-3 py-1 text-sm font-semibold ${stageCls[a.stage] ?? "bg-stone-100"}`}>{t.stages[a.stage as "a_traiter"] ?? a.stage}</span>

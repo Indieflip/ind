@@ -1,4 +1,5 @@
 "use client";
+import { fmtNo } from "@/lib/numbering";
 import { MoneyInput } from "@/components/MoneyInput";
 import { appConfirm } from "@/components/Confirm";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
@@ -188,7 +189,7 @@ export function SupplierAnomalies({ rows, supplierId }: { rows: AnomalyRow[]; su
   const { t } = useI18n();
   const cols: Col<AnomalyRow>[] = [
     // N° de la fiche d'anomalie (lien vers la fiche)
-    { key: "number", label: "N°", text: (r) => (r.number != null ? String(r.number) : ""), sort: (r) => r.number, href: (r) => `/anomalies/${r.id}`, render: (r) => <span className={r.numberFinal ? "font-semibold" : "italic"}>{r.number}</span> },
+    { key: "number", label: "N°", text: (r) => (r.number != null ? fmtNo("anomaly", r.number) : ""), sort: (r) => r.number, href: (r) => `/anomalies/${r.id}`, render: (r) => <span className={r.numberFinal ? "font-semibold" : "italic"}>{r.number}</span> },
     { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, className: "whitespace-nowrap" },
     { key: "type", label: t.anomalies.type, text: (r) => r.type },
     { key: "product", label: t.common.product, text: (r) => r.product },

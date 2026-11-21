@@ -1,4 +1,5 @@
 import "server-only";
+import { parisYear } from "@/lib/numbering";
 import { asc, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 
@@ -9,9 +10,15 @@ import { getDb, schema } from "@/db";
 export async function ensureClaimNumbers() {
   const db = getDb();
   const a = schema.anomalies;
-  const todo = await db.select({ id: a.id }).from(a).where(isNull(a.claimNo)).orderBy(asc(a.createdAt), asc(a.id));
+  const todo = await db.select({ id: a.id, createdAt: a.createdAt }).from(a).where(isNull(a.claimNo)).orderBy(asc(a.createdAt), asc(a.id));
   if (!todo.length) return;
-  const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${a.claimNo}), 0)::int` }).from(a);
-  let n = max;
-  for (const r of todo) await db.execute(sql`update anomalies set claim_no = ${++n} where id = ${r.id} and claim_no is null`);
+  // N° de réclamation (FDR001…) : par année de création, remise à zéro le 01/01
+  const maxByYear = new Map<number, number>();
+  for (const r of (await db.execute<{ y: number; m: number }>(sql`select extract(year from ${a.createdAt} at time zone 'Europe/Paris')::int as y, coalesce(max(${a.claimNo}), 0)::int as m from ${a} group by 1`)).rows) maxByYear.set(Number(r.y), Number(r.m));
+  for (const r of todo) {
+    const y = parisYear(r.createdAt);
+    const n = (maxByYear.get(y) ?? 0) + 1;
+    maxByYear.set(y, n);
+    await db.execute(sql`update anomalies set claim_no = ${n} where id = ${r.id} and claim_no is null`);
+  }
 }

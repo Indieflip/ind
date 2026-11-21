@@ -1,4 +1,5 @@
 "use client";
+import { fmtNo } from "@/lib/numbering";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -10,13 +11,14 @@ import { fmtMoney, sentence } from "@/lib/format";
 import { DataTable, type Col } from "@/components/table/DataTable";
 
 export interface ClaimViewRow {
-  id: number; claimNo: number; consolidated: boolean; date: string; dateIso: string; supplier: string; supplierId: number | null; reference: string; product: string; subject: string;
+  id: number; claimNo: number; year?: number; consolidated: boolean; date: string; dateIso: string; supplier: string; supplierId: number | null; reference: string; product: string; subject: string;
   mode: string; stage: Stage; resolution: string | null; claimed: number | null; credit: number | null; days: number; due: boolean; source: string;
 }
 
 /** Vignettes Réclamée / À vérifier sur facture / Clôturée / Annulée + tableau (clic → fiche d'anomalie) */
-export function ClaimsView({ rows: allRows, canManage, initialFilter, claimNo = null }: { rows: ClaimViewRow[]; canManage: boolean; initialFilter?: "missing"; claimNo?: number | null }) {
-  const rows = claimNo ? allRows.filter((r) => r.claimNo === claimNo) : allRows;
+export function ClaimsView({ rows: allRows, canManage, initialFilter, claimNo = null, claimYear = null }: { rows: ClaimViewRow[]; canManage: boolean; initialFilter?: "missing"; claimNo?: number | null; claimYear?: number | null }) {
+  // Numéro par année : la réclamation FDR… de l'année demandée (sinon toutes les années)
+  const rows = claimNo ? allRows.filter((r) => r.claimNo === claimNo && (!claimYear || r.year === claimYear)) : allRows;
   const { t, locale } = useI18n();
   const c = t.claims;
   const tiles: Stage[] = ["reclamee", "a_verifier", "cloturee", "annulee"];
@@ -34,10 +36,10 @@ export function ClaimsView({ rows: allRows, canManage, initialFilter, claimNo = 
   const cols: Col<ClaimViewRow>[] = [
     // N° de réclamation : seul lien vers la fiche d'anomalie / l'écart de pesée
     {
-      key: "claimNo", width: "4.5rem", label: "N°", text: (r) => String(r.claimNo), sort: (r) => r.claimNo,
+      key: "claimNo", width: "5rem", label: "N°", text: (r) => fmtNo("claim", r.claimNo), sort: (r) => r.claimNo,
       render: (r) => (
         <div>
-          <Link href={`/anomalies/${r.id}`} className="font-semibold text-brand-700 hover:underline" title={t.sheet.open}>{r.claimNo}</Link>
+          <Link href={`/anomalies/${r.id}`} className="font-semibold text-brand-700 hover:underline" title={t.sheet.open}>{fmtNo("claim", r.claimNo)}</Link>
           {(groupSize.get(r.claimNo) ?? 0) > 1 && (
             <span className="block text-[10px] text-stone-500">
               {c.grouped}
@@ -72,7 +74,7 @@ export function ClaimsView({ rows: allRows, canManage, initialFilter, claimNo = 
     <>
       {claimNo && (
         <p className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-900">
-          <strong>{c.number} {claimNo}</strong> · {rows.length} {t.anomalies.sheetsLabel}
+          <strong>{fmtNo("claim", claimNo)}</strong> · {rows.length} {t.anomalies.sheetsLabel}
           <Link href="/reclamations" className="ml-auto text-brand-700 underline">✕ {c.all}</Link>
         </p>
       )}

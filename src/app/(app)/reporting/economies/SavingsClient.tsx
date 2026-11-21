@@ -1,4 +1,5 @@
 "use client";
+import { fmtNo } from "@/lib/numbering";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -39,7 +40,7 @@ export function DetailModal({ title, items, onClose }: { title: string; items: C
             <tbody>
               {items.map((c) => (
                 <tr key={`${c.kind}-${c.id}`} className="border-t border-stone-100">
-                  <td className="p-1.5"><Link href={`/anomalies/${c.id}`} className="font-semibold text-brand-700 hover:underline">{c.number}</Link></td>
+                  <td className="p-1.5"><Link href={`/anomalies/${c.id}`} className="font-semibold text-brand-700 hover:underline">{fmtNo("claim", c.number)}</Link></td>
                   <td className="whitespace-nowrap p-1.5">{c.date}</td>
                   <td className="p-1.5">{sentence(c.supplier)}</td>
                   <td className="p-1.5">{c.product}</td>

@@ -51,7 +51,12 @@ export function useTable<R>(rows: R[], cols: ColumnDef<R>[], opts: { pageSize?: 
         return [c.key, parts.map((q, i) => ({ q: q.trim(), exact: i < parts.length - 1 })).filter((x) => x.q)];
       }),
     );
-    const hit = (text: string, t: { q: string; exact: boolean }) => (t.exact ? text.trim().toLowerCase() === t.q.toLowerCase() : matches(text, t.q));
+    // Valeur choisie dans la liste : égale au texte, ou à l'un des éléments d'une liste « a, b, c »
+    const hit = (text: string, t: { q: string; exact: boolean }) => {
+      if (!t.exact) return matches(text, t.q);
+      const q = t.q.toLowerCase();
+      return text.trim().toLowerCase() === q || text.split(/,\s*/).some((x) => x.trim().toLowerCase() === q);
+    };
     // Colonne date : filtre « du~au » (bornes incluses, l'une ou l'autre peut manquer)
     const inRange = (c: ColumnDef<R>, r: R) => {
       const [from, to] = (filters[c.key] ?? "").split("~");

@@ -1,3 +1,4 @@
+import { fmtNo } from "@/lib/numbering";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { WEIGH_TYPE } from "@/lib/anomaly";
@@ -11,6 +12,7 @@ import { checkPrice } from "@/lib/pricing";
 import { StatusBadge, decisionStyles } from "@/components/DecisionBadge";
 import { Icon } from "@/components/Icon";
 import { receptionNumbers } from "@/lib/server/queries";
+import { anomalyNumbers } from "@/lib/server/savings";
 import { outcomeOf, outcomeStyles } from "@/lib/anomaly";
 import { AnomalyActionField, PrintButton, DeleteReceptionButton, AddNote } from "./Actions";
 
@@ -50,7 +52,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
   const blPhotos = photos.filter((p) => p.kind === "bl");
   const labelPhotos = photos.filter((p) => p.kind === "label");
   const docs = ((rec.documents as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[] | null) ?? (rec.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : [])) as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[];
-  const seq = (await receptionNumbers()).get(rec.id);
+  const [seq, anoNums] = await Promise.all([receptionNumbers().then((m) => m.get(rec.id)), anomalyNumbers()]);
   const [recAnomalies, recGaps] = await Promise.all([
     db.select().from(schema.anomalies).where(eq(schema.anomalies.receptionId, rec.id)).orderBy(asc(schema.anomalies.id)),
     db.select().from(schema.weighGaps).where(eq(schema.weighGaps.receptionId, rec.id)).orderBy(asc(schema.weighGaps.id)),
@@ -87,7 +89,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
       <section className="card overflow-hidden">
         <div className="flex flex-wrap items-start justify-between gap-4 bg-gradient-to-r from-brand-700 to-brand-600 px-5 py-4 text-white">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/70">{t.receptions.detail} · {t.receptions.numberLong} {seq ?? "—"}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/70">{t.receptions.detail} · {fmtNo("reception", seq)}</p>
             <h1 className="mt-0.5 text-2xl font-bold leading-tight">{sentence(rec.supplierName)}</h1>
             <p className="mt-1 flex items-center gap-1.5 text-sm text-white/85"><Icon name="truck" className="h-4 w-4" /> {fmtDateTime(rec.deliveredAt, locale)}</p>
           </div>
@@ -258,6 +260,10 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
             <h2 className="flex items-center gap-2 font-semibold"><Icon name="alert" className="h-5 w-5 text-red-600" /> {t.nav.anomalies}</h2>
             <div className="flex flex-wrap gap-1.5 text-xs">
               {recAnomalies.length > 0 && <span className="badge bg-red-100 text-red-800">{recAnomalies.length} {t.receptions.anomalyCount}</span>}
+              {/* Fiches d'anomalie créées pour ce bon : lien direct par numéro */}
+              {recAnomalies.map((a) => (
+                <Link key={a.id} href={`/anomalies/${a.id}`} className="badge bg-white font-semibold text-brand-700 ring-1 ring-brand-200 hover:bg-brand-50">{fmtNo("anomaly", anoNums.get(a.id)?.n ?? a.number)}</Link>
+              ))}
               {recAnomalies.filter((a) => a.status === "open").length > 0 && <span className="badge bg-amber-100 text-amber-900">{recAnomalies.filter((a) => a.status === "open").length} {t.receptions.toFollow}</span>}
               {recGaps.length > 0 && <span className="badge bg-sky-100 text-sky-800">{recGaps.length} {t.weigh.title.toLowerCase()} · {fmtMoney(recGaps.reduce((x, g) => x + (num(g.gapAmount) ?? 0), 0), locale)}</span>}
             </div>
@@ -268,7 +274,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
                 <li key={a.id} className="flex flex-wrap items-start justify-between gap-2 px-5 py-2.5 text-sm">
                   <div className="min-w-0 flex-1">
                     <Link href={`/anomalies/${a.id}`} className="font-medium text-brand-700 hover:underline">
-                      {a.number ? <span className="mr-1.5 text-stone-500">N° {a.number}</span> : null}
+                      <span className="mr-1.5 font-semibold">{fmtNo("anomaly", anoNums.get(a.id)?.n ?? a.number)}</span>
                       {t.anomalies.types[a.type]}{a.productName ? ` · ${a.productName}` : ""} →
                     </Link>
                     <p className="text-stone-600">{a.description}</p>

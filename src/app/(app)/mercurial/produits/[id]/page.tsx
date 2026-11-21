@@ -1,3 +1,4 @@
+import { fmtNo } from "@/lib/numbering";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { asc, desc, eq } from "drizzle-orm";
@@ -87,7 +88,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       <Link href="/mercurial" className="btn-ghost -ml-2 px-2"><Icon name="chevronLeft" className="h-4 w-4" /> {P.back}</Link>
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold"><span className="mr-2 align-middle text-sm font-semibold text-stone-400">N° {product.id}</span>{product.name}</h1>
+          <h1 className="text-2xl font-bold"><span className="mr-2 align-middle text-sm font-semibold text-stone-400">{fmtNo("product", product.id)}</span>{product.name}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
             {supplier && <Link href={`/mercurial/fournisseurs/${supplier.id}`} className="font-medium text-brand-700 hover:underline">{sentence(supplier.name)}</Link>}
             {locked && <span className="badge bg-sky-100 text-sky-800">🔒 {P.locked}</span>}

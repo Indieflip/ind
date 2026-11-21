@@ -1,4 +1,5 @@
 import "server-only";
+import { fmtNo } from "@/lib/numbering";
 import ExcelJS from "exceljs";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { and, asc, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
@@ -20,7 +21,8 @@ export const RETENTION_YEARS = 5;
 /** Heure de l'export automatique (heure de Paris) */
 export const AUTO_EXPORT_HOUR = 23;
 
-export const exportNumber = (s: { year: number; seq: number }) => `${s.year}-${String(s.seq).padStart(3, "0")}`;
+/** N° de fiche de réception de marchandises : FPM001… (par année, remise à zéro le 01/01) */
+export const exportNumber = (s: { year: number; seq: number }) => fmtNo("sheet", s.seq);
 export const parisDay = (d = new Date()) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(d);
 const parisHour = (d = new Date()) => Number(new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", hourCycle: "h23" }).format(d));
 
@@ -195,7 +197,7 @@ const periodOf = (x: LoadedExport, locale: string) => {
 const cellText = (v: string | number | null) => (v == null ? "" : typeof v === "number" ? String(v).replace(".", ",") : v);
 
 export function exportName(x: LoadedExport, format: SheetFormat) {
-  return `fiche-reception-${exportNumber(x)}-${x.mode === "manual" ? "manuel" : x.day}.${format}`;
+  return `fiche-reception-${exportNumber(x)}-${x.year}-${x.mode === "manual" ? "manuel" : x.day}.${format}`;
 }
 
 export async function sheetXlsx(list: LoadedExport[], meta: ExportMeta) {

@@ -1,4 +1,5 @@
 "use client";
+import { fmtNo } from "@/lib/numbering";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -106,7 +107,7 @@ export function Kanban({ rows, canManage }: { rows: AnomalyRow[]; canManage: boo
               <span className="flex items-center gap-1.5 text-xs text-stone-600">
                 {list.length} · {fmtMoney(total, locale)}
                 <button type="button" className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${(order[s] ?? "days") === "days" ? "text-stone-400 hover:bg-white" : "bg-white text-brand-700"}`} title={k.sortHint} onClick={() => setOrder({ ...order, [s]: nextOrder[order[s] ?? "days"] })}>
-                  {(order[s] ?? "days") === "za" ? "Z→A" : "A→Z"}
+                  {(order[s] ?? "days") === "az" ? "▲" : (order[s] ?? "days") === "za" ? "▼" : "▲▼"}
                 </button>
               </span>
             </header>
@@ -116,7 +117,7 @@ export function Kanban({ rows, canManage }: { rows: AnomalyRow[]; canManage: boo
                 <li key={r.id} className={`rounded-lg border bg-white p-2.5 text-sm shadow-sm ${r.due ? "border-red-300" : "border-stone-200"}`}>
                   <Link href={`/anomalies/${r.id}`} className="block">
                     <div className="flex items-start justify-between gap-2">
-                      <span className={`text-xs ${r.numberFinal ? "font-semibold text-stone-700" : "italic text-stone-400"}`}>N° {r.number}</span>
+                      <span className={`text-xs ${r.numberFinal ? "font-semibold text-stone-700" : "italic text-stone-400"}`}>{fmtNo("anomaly", r.number)}</span>
                       {s !== "cloturee" && (
                         <span className={`badge ${r.due ? "bg-red-100 text-red-800" : "bg-stone-100 text-stone-600"}`} title={k.sinceLast}>{r.days} {k.days}</span>
                       )}

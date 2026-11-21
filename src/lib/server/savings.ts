@@ -1,4 +1,5 @@
 import "server-only";
+import { parisYear } from "@/lib/numbering";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { num } from "@/lib/format";
@@ -15,8 +16,8 @@ export async function loadAnomalies(): Promise<AnomalyLite[]> {
     .from(schema.anomalies)
     .leftJoin(schema.suppliers, eq(schema.suppliers.id, schema.anomalies.supplierId));
   // N° de fiche : définitif une fois consolidée, sinon provisoire (suite des numéros, par date)
-  const max = rows.reduce((m, r) => Math.max(m, r.a.number ?? 0), 0);
-  const prov = new Map(rows.filter((r) => r.a.number == null).sort((x, y) => x.a.createdAt.getTime() - y.a.createdAt.getTime() || x.a.id - y.a.id).map((r, i) => [r.a.id, max + i + 1]));
+  const nums = numberAnomalies(rows.map((r) => r.a));
+  const prov = new Map([...nums].map(([id, v]) => [id, v.n]));
   return rows.map(({ a, supplier }) => ({
     id: a.id, supplierId: a.supplierId, supplierName: a.supplierName, supplier, claimNo: a.claimNo, informative: isInformative(a), type: a.type, displayNumber: a.number ?? prov.get(a.id) ?? 0, numberFinal: a.number != null, stage: a.stage, resolution: a.resolution, mode: a.mode,
     claimed: num(a.claimedAmount), credit: num(a.creditAmount), createdAt: a.createdAt, closedAt: a.closedAt, consolidatedAt: a.consolidatedAt,
@@ -76,11 +77,7 @@ export function weekOf(d: Date) {
 /** N° de fiche de chaque anomalie : définitif (consolidée) ou provisoire */
 export async function anomalyNumbers() {
   const rows = await getDb().select({ id: schema.anomalies.id, number: schema.anomalies.number, createdAt: schema.anomalies.createdAt }).from(schema.anomalies);
-  const max = rows.reduce((m, r) => Math.max(m, r.number ?? 0), 0);
-  const out = new Map<number, { n: number; final: boolean }>();
-  for (const r of rows) if (r.number != null) out.set(r.id, { n: r.number, final: true });
-  rows.filter((r) => r.number == null).sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime() || x.id - y.id).forEach((r, i) => out.set(r.id, { n: max + i + 1, final: false }));
-  return out;
+  return numberAnomalies(rows);
 }
 
 /** Types d'économies : regroupement des types d'anomalie */
@@ -93,3 +90,19 @@ export const SAVING_KINDS = {
 export type SavingKind = keyof typeof SAVING_KINDS;
 export const savingKindOf = (type: string): SavingKind =>
   ((Object.keys(SAVING_KINDS) as SavingKind[]).find((k) => (SAVING_KINDS[k] as readonly string[]).includes(type)) ?? "autre");
+
+/**
+ * N° de fiche d'anomalie (FA001…) : par année de création, remise à zéro le 01/01.
+ * Numéro déjà attribué gardé ; les autres prennent la suite dans l'année, par date de création.
+ */
+export function numberAnomalies(rows: { id: number; number: number | null; createdAt: Date }[]) {
+  const out = new Map<number, { n: number; final: boolean; year: number }>();
+  const byYear = new Map<number, typeof rows>();
+  for (const r of rows) { const y = parisYear(r.createdAt); byYear.set(y, [...(byYear.get(y) ?? []), r]); }
+  for (const [year, list] of byYear) {
+    const max = list.reduce((m, r) => Math.max(m, r.number ?? 0), 0);
+    for (const r of list) if (r.number != null) out.set(r.id, { n: r.number, final: true, year });
+    list.filter((r) => r.number == null).sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime() || x.id - y.id).forEach((r, i) => out.set(r.id, { n: max + i + 1, final: false, year }));
+  }
+  return out;
+}

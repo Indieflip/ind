@@ -1,4 +1,5 @@
 "use client";
+import { fmtNo } from "@/lib/numbering";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
@@ -89,6 +90,7 @@ export interface AnomalyRow {
   stage: string; resolution: string | null; mode: string; claimed: number | null; days: number; delay: number; closedAt: string | null;
   review?: string;
   problemType?: string;
+  missing?: string[];
 }
 
 /** Anomalies : à suivre aujourd'hui, suivi (colonnes du fichier), consolidation */
@@ -113,8 +115,8 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
   const totalSaving = [...rows, ...consolidated].reduce((s, r) => s + (r.saving ?? 0), 0);
   const cols: Col<AnomalyRow>[] = [
     {
-      key: "number", width: "3.25rem", label: a.number, text: (r) => (r.number != null ? String(r.number) : ""), sort: (r) => r.number, href: (r) => `/anomalies/${r.id}`,
-      render: (r) => (r.number == null ? "—" : <strong>{r.number}</strong>),
+      key: "number", width: "4rem", label: a.number, text: (r) => (r.number != null ? fmtNo("anomaly", r.number) : ""), sort: (r) => r.number, href: (r) => `/anomalies/${r.id}`,
+      render: (r) => (r.number == null ? "—" : <strong>{fmtNo("anomaly", r.number)}</strong>),
     },
     { key: "date", width: "5.25rem", label: a.deliveryDate, text: (r) => r.date, sort: (r) => r.dateSort, className: "" },
     { key: "nature", width: "4.5rem", label: a.nature, text: (r) => r.nature },
@@ -158,6 +160,12 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
   // Contrôle de la fiche (À vérifier / Vérifiée / À voir), modifiable dans la liste
   const reviewLabel = (v?: string) => (v ? t.sheet.reviews[v as "a_verifier"] ?? "" : "");
   // Type d'anomalie : pour traiter les fiches type par type (filtre et tri en en-tête)
+  // À compléter : les champs non remplis de chaque fiche (filtrable : ex. « N° d'avoir »)
+  shownCols.push({
+    key: "missing", width: "9rem", label: a.toComplete, text: (r) => (r.missing ?? []).join(", "), keepCase: true,
+    options: Object.values(a.missingFields), sort: (r) => r.missing?.length ?? 0,
+    render: (r) => (r.missing?.length ? <span className="text-xs text-amber-800">{r.missing.join(", ")}</span> : <span className="text-xs text-emerald-700">✓</span>),
+  });
   shownCols.splice(1, 0, { key: "problemType", width: "8rem", label: t.sheet.problemType, text: (r) => r.problemType ?? "", options: [...new Set(rows.map((r) => r.problemType ?? "").filter(Boolean))].sort((x, y) => x.localeCompare(y, "fr")), keepCase: true });
   shownCols.splice(1, 0, {
     key: "review", width: "6.5rem", label: t.sheet.reviewLabel, text: (r) => reviewLabel(r.review), options: Object.values(t.sheet.reviews),
