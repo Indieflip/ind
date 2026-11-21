@@ -87,12 +87,12 @@ export function FollowUpCharacteristics({ points }: { points: Record<string, str
     ...STAGES.map((st) => ({ id: `stage-${st}`, characteristic: r.charStage, post: t.stages[st], detail: r.stageText[st], steps: [] as [string, string][], reminder: r.stageReminder[st] })),
   ];
   const cols: Col<CharRow>[] = [
+    { key: "point", label: r.point, text: (x) => points[x.id] ?? "", keepCase: true, width: "16%", render: (x) => <PointCell id={x.id} value={points[x.id] ?? ""} placeholder={r.pointPlaceholder} /> },
     { key: "characteristic", label: r.characteristic, text: (x) => x.characteristic, keepCase: true, width: "12%", className: "font-medium" },
     { key: "post", label: r.post, text: (x) => x.post, keepCase: true, width: "16%", className: "font-medium",
       render: (x) => (x.id.startsWith("stage-") ? <span className={`badge ${stageStyles[x.id.slice(6) as "a_traiter"]}`}>{x.post}</span> : x.post) },
-    { key: "detail", label: r.detail, text: (x) => x.detail, keepCase: true, width: "26%", className: "text-stone-700" },
-    { key: "reminder", label: r.reminderRule, text: (x) => x.reminder, keepCase: true, width: "24%", className: "text-stone-700" },
-    { key: "point", label: r.point, text: (x) => points[x.id] ?? "", keepCase: true, render: (x) => <PointCell id={x.id} value={points[x.id] ?? ""} placeholder={r.pointPlaceholder} /> },
+    { key: "detail", label: r.detail, text: (x) => x.detail, keepCase: true, width: "24%", className: "text-stone-700" },
+    { key: "reminder", label: r.reminderRule, text: (x) => x.reminder, keepCase: true, className: "text-stone-700" },
   ];
   return (
     <section>
@@ -104,7 +104,7 @@ export function FollowUpCharacteristics({ points }: { points: Record<string, str
   );
 }
 
-/** Colonne « Point » : texte libre, enregistré en quittant le champ */
+/** Colonne « Origine » : texte libre, enregistré en quittant le champ */
 function PointCell({ id, value, placeholder }: { id: string; value: string; placeholder: string }) {
   const router = useRouter();
   const [v, setV] = useState(value);

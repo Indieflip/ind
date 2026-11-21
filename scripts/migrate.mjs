@@ -826,6 +826,14 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v1
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v11', '1') on conflict (key) do nothing`);
 }
 
+// Dev > Développement : montant masqué pour un BL manquant, recherche produit à la réception (une ligne par produit), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v12'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = rule || ${" Pour « Bon de livraison manquant », pas de montant en haut à droite."}, updated_at = now() where form = 'anomaly' and field = 'En-tête'`);
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Étape 3 - Contrôle', 'Recherche de produit', false, ${"Produits du fournisseur au Mercurial : une ligne par produit (même nom et même unité regroupés), avec le prix ou la fourchette « prix min - prix max »."}, '', ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v12', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

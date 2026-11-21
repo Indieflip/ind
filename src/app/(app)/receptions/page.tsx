@@ -35,6 +35,7 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
       {can.receive(user.role) && <DraftBanner />}
       {one(sp.draft) === "saved" && <p className="no-print mb-3 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{t.receptions.draftSaved}</p>}
 
+      <h2 className="mb-2 text-lg font-semibold">{t.receptions.listTitle}</h2>
       <form method="get" className="no-print card mb-3 flex flex-wrap items-end gap-3 p-3">
         <Field label={t.common.from}><input type="date" name="from" defaultValue={f.from} className="input py-2" /></Field>
         <Field label={t.common.to}><input type="date" name="to" defaultValue={f.to} className="input py-2" /></Field>

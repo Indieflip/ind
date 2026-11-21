@@ -32,10 +32,10 @@ export function ReceptionsTable({ rows, canDelete }: { rows: ReceptionRow[]; can
   const stateLabel = (r: ReceptionRow) => (r.draftId ? "—" : r.consolidated ? t.receptions.consolidated : t.receptions.toConsolidate);
   const href = (r: ReceptionRow) => (r.draftId ? `/receptions/new?draft=${r.draftId}` : `/receptions/${r.id}`);
   const cols: Col<ReceptionRow>[] = [
-    { key: "number", label: t.receptions.numberLong, align: "right", width: "4.5rem", text: (r) => (r.draftId ? "" : String(r.number)), sort: (r) => r.number },
-    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, href, className: "whitespace-nowrap" },
+    { key: "number", label: t.receptions.numberLong, align: "right", width: "4.5rem", text: (r) => (r.draftId ? "" : String(r.number)), sort: (r) => r.number, href, render: (r) => (r.draftId ? "—" : String(r.number)) },
+    { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, className: "whitespace-nowrap" },
     { key: "supplier", label: t.common.supplier, text: (r) => r.supplierName },
-    { key: "bl", label: t.receptions.blInvoice, text: (r) => r.blNumber ?? "", href, render: (r) => r.blNumber || (r.draftId ? "—" : t.receptions.noBl) },
+    { key: "bl", label: t.receptions.blInvoice, text: (r) => r.blNumber ?? "", render: (r) => r.blNumber || (r.draftId ? "—" : t.receptions.noBl) },
     { key: "lines", label: t.mercurial.products, align: "right", text: (r) => String(r.lineCount), sort: (r) => r.lineCount },
     { key: "status", label: t.common.status, text: (r) => r.statusLabel, options: Object.values(t.receptionStatus), render: (r) => <StatusBadge status={r.status} label={r.statusLabel} /> },
     {

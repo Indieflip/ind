@@ -11,7 +11,7 @@ import { Icon } from "../Icon";
 import { UnitSelect } from "../UnitSelect";
 import { similarity } from "@/lib/fuzzy";
 import { PhotoButton, Thumbs } from "./PhotoButton";
-import { dlcRequired, needsDlc, docNumbers, docsOf, evaluate, isBakerySupplier, lineDoc, lineFromProduct, matches, priceCheck, suggestedReason, withAutoDecision } from "./helpers";
+import { groupProducts, priceRange, dlcRequired, needsDlc, docNumbers, docsOf, evaluate, isBakerySupplier, lineDoc, lineFromProduct, matches, priceCheck, suggestedReason, withAutoDecision } from "./helpers";
 import { az } from "@/lib/search";
 
 const DEFAULT_UNITS = ["Pièce", "Kg", "Litre", "Sachet"];
@@ -39,9 +39,6 @@ export function StepCheck({
   const shown = multi ? draft.lines.filter((l) => lineDoc(draft, l) === current) : draft.lines;
   return (
     <>
-      <a href="/protocoles" target="_blank" className="flex items-center gap-2 text-sm font-medium text-brand-700 underline">
-        <Icon name="book" className="h-4 w-4" /> {t.wizard.weighProtocol}
-      </a>
       {bakery && <BakeryBlock draft={draft} setDraft={setDraft} />}
       {multi && (
         <section className="card p-3">
@@ -99,7 +96,7 @@ function LineCard({
   const [swapBrowse, setSwapBrowse] = useState(false);
   const swapResults = useMemo(() => {
     if (!catalog || (!swapBrowse && swapQ.trim().length < 2)) return [];
-    const own = catalog.products.filter((p) => p.supplierId === supplierId && (!swapQ.trim() || matches(p.name, swapQ))).sort((a, b) => az(a.name, b.name));
+    const own = groupProducts(catalog.products.filter((p) => p.supplierId === supplierId && (!swapQ.trim() || matches(p.name, swapQ)))).sort((a, b) => az(a.name, b.name));
     return swapBrowse ? own : own.slice(0, 8);
   }, [catalog, swapQ, supplierId, swapBrowse]);
   // Hygiène : pas de DLC ni de lot
@@ -294,7 +291,7 @@ function AddProduct({ draft, setDraft, catalog, doc }: { draft: Draft; setDraft:
 
   const results = useMemo(() => {
     if (!catalog || (!browse && q.trim().length < 2)) return [];
-    const own = catalog.products.filter((p) => p.supplierId === draft.supplierId && (!q.trim() || matches(p.name, q))).sort((a, b) => az(a.name, b.name));
+    const own = groupProducts(catalog.products.filter((p) => p.supplierId === draft.supplierId && (!q.trim() || matches(p.name, q)))).sort((a, b) => az(a.name, b.name));
     return browse ? own : own.slice(0, 12);
   }, [catalog, q, draft.supplierId, browse]);
 
@@ -332,7 +329,7 @@ function AddProduct({ draft, setDraft, catalog, doc }: { draft: Draft; setDraft:
                     }}
                   >
                     <span>{p.name}</span>
-                    <span className="text-xs text-stone-500">{p.unit} · {fmtMoney(p.price, locale)}</span>
+                    <span className="shrink-0 pl-2 text-xs text-stone-500">{p.unit}{priceRange(p, (v) => fmtMoney(v, locale)) ? ` · ${priceRange(p, (v) => fmtMoney(v, locale))}` : ""}</span>
                   </button>
                 </li>
               ))}

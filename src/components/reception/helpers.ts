@@ -39,6 +39,30 @@ export function newDraft(): Draft {
   };
 }
 
+/**
+ * Recherche de produits : une seule ligne par produit (même nom et même unité chez le fournisseur),
+ * avec la fourchette de prix « min - max » de ses lignes au Mercurial.
+ */
+export function groupProducts(list: CatalogProduct[]): CatalogProduct[] {
+  const k = (p: CatalogProduct) => `${p.name.trim().toLowerCase()}|${(p.unit ?? "").trim().toLowerCase()}`;
+  const map = new Map<string, CatalogProduct>();
+  for (const p of list) {
+    const cur = map.get(k(p));
+    if (!cur) { map.set(k(p), { ...p }); continue; }
+    const prices = [cur.priceMin, cur.price, p.priceMin, p.price].filter((x): x is number => x != null);
+    map.set(k(p), { ...cur, priceMin: prices.length ? Math.min(...prices) : null, price: prices.length ? Math.max(...prices) : null, locked: cur.locked || p.locked });
+  }
+  return [...map.values()];
+}
+
+/** Prix affiché dans la recherche : « 3,70 € » ou « 3,70 € - 5,40 € » */
+export function priceRange(p: { priceMin?: number | null; price?: number | null }, fmt: (v: number) => string) {
+  const lo = p.priceMin ?? p.price;
+  const hi = p.price ?? p.priceMin;
+  if (lo == null || hi == null) return "";
+  return Math.abs(hi - lo) < 0.005 ? fmt(hi) : `${fmt(Math.min(lo, hi))} - ${fmt(Math.max(lo, hi))}`;
+}
+
 export function lineFromProduct(p: CatalogProduct | null, extra: Partial<DraftLine> = {}): DraftLine {
   return {
     key: uuid(),

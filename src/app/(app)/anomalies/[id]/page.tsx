@@ -138,8 +138,10 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
           </div>
           <div className="flex flex-col items-end gap-1.5 text-right">
             <span className={`rounded-full px-3 py-1 text-sm font-semibold ${stageCls[a.stage] ?? "bg-stone-100"}`}>{t.stages[a.stage as "a_traiter"] ?? a.stage}</span>
+{problemType !== t.anomalies.types.missing_bl && (<>
             <p className="text-3xl font-bold tabular-nums">{a.claimedAmount ? fmtMoney(num(a.claimedAmount), locale) : "—"}</p>
             <p className="text-xs text-stone-500">{problemType === t.anomalies.types.missing_bl ? s.amountOnly : s.claimed}</p>
+            </>)}
           </div>
         </div>
         <div className="border-t border-stone-100 p-6 pt-4">
