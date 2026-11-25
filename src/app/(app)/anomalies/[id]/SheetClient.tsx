@@ -202,7 +202,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
               className={`rounded-lg border-2 px-2 py-2 text-left text-sm ${v.mode === m ? "border-brand-600 bg-brand-50 font-semibold text-brand-800" : "border-stone-200 bg-white text-stone-500"}`}
             >
               {modeIcon(m)} {t.modes[m]}
-              <span className="block text-[11px] font-normal text-stone-500">{s.modeHints[m]}</span>
+              {m === "reclamation" && <span className="block text-[11px] font-normal text-stone-500">{s.modeHints[m]}</span>}
             </button>
           ))}
         </div>

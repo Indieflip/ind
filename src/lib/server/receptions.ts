@@ -318,7 +318,7 @@ async function writeContent(
         reason: l.reason,
         document: l.document || null,
         note: l.note || null,
-        priceNotShown: l.unitPrice == null && !!l.priceNotShown,
+        priceNotShown: !!l.priceNotShown,
         position: position++,
       })
       .returning();

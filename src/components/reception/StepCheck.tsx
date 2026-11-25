@@ -216,10 +216,14 @@ function LineCard({
             <span className="ml-1 font-normal text-stone-400">{rangeLabel}</span>
             {line.priceLocked && <span className="ml-1 badge bg-sky-100 text-sky-800">🔒 {t.wizard.lockedBadge}</span>}
           </label>
-          <MoneyInput className={`input py-2 ${!line.unitPrice.trim() && !line.priceNotShown ? "border-amber-400 bg-amber-50" : ""}`} value={line.unitPrice} disabled={!!line.priceNotShown} onChange={(e) => onChange({ unitPrice: e.target.value, ...(e.target.value.trim() ? { priceNotShown: false } : {}) })} />
+          <MoneyInput className={`input py-2 ${!line.unitPrice.trim() && !line.priceNotShown ? "border-amber-400 bg-amber-50" : ""}`} value={line.unitPrice} disabled={!!line.priceNotShown} onChange={(e) => onChange({ unitPrice: e.target.value })} />
           {/* Soit un prix, soit « Non indiqué sur le bon » (l'un ou l'autre pour valider le bon) */}
           <label className="mt-1 flex items-center gap-1.5 text-xs text-stone-600">
-            <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={!!line.priceNotShown} onChange={(e) => onChange({ priceNotShown: e.target.checked, ...(e.target.checked ? { unitPrice: "" } : {}) })} />
+            <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={!!line.priceNotShown} onChange={(e) => {
+              // Prix non indiqué sur le bon : on reprend le prix du Mercurial (le prix maximum s'il y a une fourchette)
+              const ref = line.mercurialPrice ?? line.mercurialMin ?? null;
+              onChange(e.target.checked ? { priceNotShown: true, unitPrice: ref != null ? String(ref).replace(".", ",") : "" } : { priceNotShown: false, unitPrice: "" });
+            }} />
             {t.wizard.priceNotShown}
           </label>
           {pc.kind === "locked" && <p className="mt-0.5 text-xs font-semibold text-red-700">{fmtPct(pc.pct)} · {t.wizard.lockedWarn}</p>}

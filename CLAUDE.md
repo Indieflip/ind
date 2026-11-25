@@ -8,5 +8,5 @@
   - **Projet** (Dev > Développement commercial : « Modules en place » et « Modules importants à ajouter ») : `src/app/(app)/dev/projectModules.ts`, à mettre à jour dès qu'un module est ajouté, modifié ou planifié.
   - **Schéma de l'application** (Dev > Développement commercial > Marché, « Le parcours d'une livraison ») : `src/components/AppFlow.tsx`, à mettre à jour dès qu'une étape, un blocage, une automatisation ou un module change.
   - **Procédures** (menu Procédures : réception en parties repliables Avant de commencer / Contrôler la livraison (contrôles, refus, pesée, conformité des produits) / Saisie, réclamation, réglementation) : `src/app/(app)/protocoles/Procedures.tsx`, à tenir à jour de la même façon.
-- Numéros des fiches et comptes : toujours afficher avec `fmtNo` (`src/lib/numbering.ts` : FP, FPM, FA, FDR par année, remise à zéro le 01/01 ; FR, PR permanents).
+- Numéros des fiches et comptes : toujours afficher avec `fmtNo` (`src/lib/numbering.ts` : RCP (fiche de réception), FPM, ANO (anomalie), R (réclamation, 4 chiffres) par année, remise à zéro le 01/01 ; FR, PR permanents).
 - Les étapes de données ponctuelles vont dans `scripts/migrate.mjs`, avant le commentaire « Fruits et légumes : rattacher les produits », protégées par un drapeau `app_settings`.

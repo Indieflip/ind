@@ -1036,6 +1036,16 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v2
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v20', '1') on conflict (key) do nothing`);
 }
 
+// Dev > Développement : numérotation RCP / ANO / R, prix Mercurial si « Non indiqué sur le bon », liste des anomalies par défaut, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v21'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = replace(replace(replace(rule, 'FP001, FP002', 'RCP001, RCP002'), 'FA001', 'ANO001'), 'FDR001', 'R0001') where field = 'N°'`);
+  await db.execute(sql`update dev_fields set rule = replace(rule, 'FA401 ou 401', 'ANO401 ou 401') where field = 'N°'`);
+  await db.execute(sql`update dev_fields set rule = ${"« Non indiqué sur le bon » coché : le prix du Mercurial est repris (prix maximum s'il y a une fourchette) et le champ prix est bloqué ; décoché, le prix redevient à saisir. Un prix ou la case pour valider le bon."} where form = 'reception' and field = 'Prix unitaire / Non indiqué sur le bon'`);
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('anomaly', 'Liste', 'Ouverture du menu', false, ${"Le menu Anomalies ouvre directement la liste ; le tableau de bord en colonnes reste accessible par le bouton « Tableau de bord ». Colonnes : Date, N°, Fournisseur, BL / Facture, Nature, Montant, Type d'anomalie, Statut, Contrôle, À compléter."}, '', ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v21', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

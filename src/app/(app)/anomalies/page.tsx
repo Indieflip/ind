@@ -34,7 +34,8 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
   await Promise.all([throttled("anomalies-linked", 10 * 60_000, ensureAnomaliesLinked), throttled("weigh-anomalies", 5 * 60_000, syncWeighAnomalies)]);
   await throttled("product-links", 10 * 60_000, linkToProducts);
   const [, processes] = await Promise.all([ensureClaimNumbers(), supplierProcesses()]);
-  const view = one(sp.view) === "liste" ? "list" : "board";
+  // Menu Anomalies : la liste d'abord ; le tableau de bord en colonnes avec ?view=tableau
+  const view = one(sp.view) === "tableau" ? "board" : "list";
   // « Aller à la fiche N° » : fiche en cours ou consolidée (N° définitif ou provisoire)
   // Numéro tapé « FA401 » ou « 401 » : fiche de l'année en cours en priorité, sinon la plus récente
   const wanted = parseNo(one(sp.n));
@@ -139,8 +140,8 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
           <button className="btn-secondary px-2 py-1.5" aria-label={t.common.search}><Icon name="search" className="h-4 w-4" /></button>
         </form>
         <div className="flex rounded-lg border border-stone-200 bg-white p-0.5 text-sm">
-          <Link href="/anomalies" className={`rounded-md px-3 py-1.5 font-medium ${view === "board" ? "bg-brand-600 text-white" : "text-stone-600"}`}>{t.kanban.board}</Link>
-          <Link href="/anomalies?view=liste" className={`rounded-md px-3 py-1.5 font-medium ${view === "list" ? "bg-brand-600 text-white" : "text-stone-600"}`}>{t.kanban.list}</Link>
+          <Link href="/anomalies?view=tableau" className={`rounded-md px-3 py-1.5 font-medium ${view === "board" ? "bg-brand-600 text-white" : "text-stone-600"}`}>{t.kanban.board}</Link>
+          <Link href="/anomalies" className={`rounded-md px-3 py-1.5 font-medium ${view === "list" ? "bg-brand-600 text-white" : "text-stone-600"}`}>{t.kanban.list}</Link>
         </div>
       </PageHeader>
       {can.createAnomaly(user.role) && (
@@ -150,7 +151,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
         />
       )}
       <DueBox rows={active.map(toRow)} />
-      <TypeRecap items={recapItems} types={allTypes} today={parisDay(new Date())} typeFilter={typeFilter} baseQs={view === "list" ? { view: "liste" } : {}} initialOpen={!!typeFilter} />
+      <TypeRecap items={recapItems} types={allTypes} today={parisDay(new Date())} typeFilter={typeFilter} baseQs={view === "board" ? { view: "tableau" } : {}} initialOpen={!!typeFilter} />
       {view === "board" ? (
         <Kanban rows={shown.map(toRow)} canManage={can.manageAnomalies(user.role)} />
       ) : (

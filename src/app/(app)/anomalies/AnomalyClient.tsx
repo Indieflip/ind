@@ -175,8 +175,10 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
   });
   // Montant de la fiche (montant réclamé = somme des produits)
   shownCols.push({ key: "claimed", width: "5.5rem", label: a.amount, align: "right", text: (r) => (r.claimed != null ? fmtMoney(r.claimed, locale) : ""), sort: (r) => r.claimed, filterable: false, className: "tabular-nums" });
-  // Ordre des colonnes : Date, N°, Nature, Fournisseur, BL / Facture, Produit, Montant, Type d'anomalie, Statut, Contrôle, À compléter
-  const ORDER = ["date", "number", "nature", "supplier", "reference", "product", "claimed", "problemType", "stage", "review", "missing", "edit"];
+  // Ordre des colonnes : Date, N°, Fournisseur, BL / Facture, Nature, Montant, Type d'anomalie, Statut, Contrôle, À compléter
+  const ORDER = ["date", "number", "supplier", "reference", "nature", "claimed", "problemType", "stage", "review", "missing", "edit"];
+  // Colonne Produit retirée (le produit est dans la fiche)
+  shownCols.splice(0, shownCols.length, ...shownCols.filter((c) => c.key !== "product"));
   shownCols.sort((x, y) => (ORDER.indexOf(x.key) + 1 || 99) - (ORDER.indexOf(y.key) + 1 || 99));
   return (
     <>

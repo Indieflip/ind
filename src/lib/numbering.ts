@@ -4,10 +4,10 @@
  * Comptes (fournisseur, produit) : numéro permanent.
  */
 export const NUM_FORMAT = {
-  reception: { prefix: "FP", digits: 3, yearly: true },
+  reception: { prefix: "RCP", digits: 3, yearly: true },
   sheet: { prefix: "FPM", digits: 3, yearly: true },
-  anomaly: { prefix: "FA", digits: 3, yearly: true },
-  claim: { prefix: "FDR", digits: 3, yearly: true },
+  anomaly: { prefix: "ANO", digits: 3, yearly: true },
+  claim: { prefix: "R", digits: 4, yearly: true },
   supplier: { prefix: "FR", digits: 4, yearly: false },
   product: { prefix: "PR", digits: 4, yearly: false },
 } as const;
@@ -19,7 +19,7 @@ export function fmtNo(kind: NumKind, n: number | null | undefined) {
   return `${f.prefix}${String(Math.trunc(n)).padStart(f.digits, "0")}`;
 }
 
-/** Numéro tapé par l'utilisateur (« FA401 », « fa 401 », « 401 ») → 401 */
+/** Numéro tapé par l'utilisateur (« ANO401 », « ano 401 », « 401 ») → 401 */
 export function parseNo(input: string | null | undefined) {
   const m = /(\d+)/.exec(String(input ?? ""));
   return m ? Number(m[1]) : null;
