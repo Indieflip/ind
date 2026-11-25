@@ -144,6 +144,8 @@ export const en: Dict = {
     summary: "Summary",
     anomalyCol: "Issues",
     sheetLink: "Receipt sheet",
+    importedState: "Imported",
+    importedHint: "Sheet generated from imported issues: not consolidated, never auto-exported",
     listTitle: "Goods receipt sheets",
     numberLong: "No.",
     blInvoice: "Note / invoice",

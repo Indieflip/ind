@@ -19,6 +19,8 @@ export interface ReceptionRow {
   day?: string; // AAAA-MM-JJ (heure de Paris), pour le filtre par calendrier
   supplierName: string;
   lineCount: number;
+  /** Fiche générée à partir des anomalies importées : jamais consolidée automatiquement */
+  imported?: boolean;
   anomalyCount?: number;
   status: string;
   statusLabel: string;
@@ -33,7 +35,7 @@ export function ReceptionsTable({ rows, canDelete, canEdit = false }: { rows: Re
   const router = useRouter();
   const [sel, setSel] = useState<Set<string | number>>(new Set());
   const [pending, start] = useTransition();
-  const stateLabel = (r: ReceptionRow) => (r.draftId ? "—" : r.consolidated ? t.receptions.consolidated : t.receptions.toConsolidate);
+  const stateLabel = (r: ReceptionRow) => (r.draftId ? "—" : r.consolidated ? t.receptions.consolidated : r.imported ? t.receptions.importedState : t.receptions.toConsolidate);
   const href = (r: ReceptionRow) => (r.draftId ? `/receptions/new?draft=${r.draftId}` : `/receptions/${r.id}`);
   const cols: Col<ReceptionRow>[] = [
     { key: "number", label: t.receptions.numberLong, width: "5rem", text: (r) => (r.draftId ? "" : fmtNo("reception", r.number)), sort: (r) => r.number, href, render: (r) => (r.draftId ? "—" : fmtNo("reception", r.number)) },
@@ -45,11 +47,13 @@ export function ReceptionsTable({ rows, canDelete, canEdit = false }: { rows: Re
       render: (r) => (r.anomalyCount ? <span className="badge bg-red-100 font-semibold text-red-800">{r.anomalyCount}</span> : <span className="text-stone-400">0</span>) },
     { key: "status", label: t.common.status, text: (r) => r.statusLabel, options: Object.values(t.receptionStatus), render: (r) => <StatusBadge status={r.status} label={r.statusLabel} /> },
     {
-      key: "state", label: t.nav.consolidation, text: stateLabel, options: [t.receptions.consolidated, t.receptions.toConsolidate],
+      key: "state", label: t.nav.consolidation, text: stateLabel, options: [t.receptions.consolidated, t.receptions.toConsolidate, t.receptions.importedState],
       render: (r) => r.draftId
         ? <span className="text-xs text-stone-400">—</span>
         : r.consolidated
         ? <span className="badge bg-emerald-50 text-emerald-800"><Icon name="check" className="mr-0.5 h-3 w-3" />{t.receptions.consolidated}</span>
+        : r.imported
+        ? <span className="badge bg-violet-50 text-violet-800" title={t.receptions.importedHint}>{t.receptions.importedState}</span>
         : <span className="text-xs text-stone-500">{t.receptions.toConsolidate}</span>,
     },
     { key: "author", label: t.receptions.createdBy, text: (r) => r.author ?? "" },

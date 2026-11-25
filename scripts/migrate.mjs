@@ -1133,6 +1133,85 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v2
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v27', '1') on conflict (key) do nothing`);
 }
 
+// Fiches de réception générées à partir des anomalies importées (fichier de suivi et écarts de pesée), NON consolidées, une fois.
+// Une fiche par fournisseur + document (BL / facture) + jour ; marquées « importées » : jamais consolidées ni exportées automatiquement.
+if (!(await db.execute(sql`select 1 from app_settings where key = 'receptions_from_imports_v1'`)).rows.length) {
+  const { randomUUID } = await import("node:crypto");
+  const rows = (await db.execute(sql`select id, source, supplier_id, supplier_name, reference, doc_date::text as doc_date,
+      to_char(created_at at time zone 'Europe/Paris', 'YYYY-MM-DD') as day, product_name, product_id, items, description, group_key, type, problem_type
+    from anomalies where reception_id is null and source in ('file', 'weigh') order by created_at, id`)).rows;
+  const norm = (x) => String(x ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+  const groups = new Map();
+  for (const a of rows) {
+    const day = a.doc_date || a.day;
+    const key = `${a.supplier_id ?? norm(a.supplier_name)}|${norm(a.reference)}|${day}`;
+    if (!groups.has(key)) groups.set(key, { day, a, list: [] });
+    groups.get(key).list.push(a);
+  }
+  const docOf = (ref, date) => {
+    const r = String(ref ?? "").trim();
+    if (!r || /^pas de bl/i.test(r)) return [];
+    const m = /^(BL|Facture|Doc\.?|Document)\s+(.+?)(?:\s+du\s+\d{2}\/\d{2}\/\d{2})?$/i.exec(r);
+    const type = !m ? "bl" : /^fact/i.test(m[1]) ? "facture" : /^doc/i.test(m[1]) ? "autre" : "bl";
+    return [{ type, number: m ? m[2].trim() : r, date: date || null }];
+  };
+  let made = 0;
+  for (const g of groups.values()) {
+    const a0 = g.a;
+    const docs = docOf(a0.reference, a0.doc_date);
+    const reserves = g.list.map((a) => `- ${a.problem_type || a.type} : ${a.description}`).join("\n");
+    const [rec] = (await db.execute(sql`insert into receptions (client_uuid, supplier_id, supplier_name, delivered_at, bl_number, documents, status, reserves_text, notes, imported_from)
+      values (${`import-anomalies-${randomUUID()}`}, ${a0.supplier_id}, ${a0.supplier_name}, ((${g.day}::date + time '12:00') at time zone 'Europe/Paris'),
+        ${docs[0]?.number ?? null}, ${JSON.stringify(docs)}::jsonb, 'with_reserves', ${reserves},
+        ${"Fiche générée à partir des anomalies importées (fichier de suivi / écarts de pesée), non consolidée."}, 'anomalies') returning id`)).rows;
+    let pos = 0;
+    const lineByName = new Map();
+    const addLine = async (l) => {
+      const k = norm(l.name);
+      if (lineByName.has(k)) return lineByName.get(k);
+      const cat = l.productId ? (await db.execute(sql`select category_id from products where id = ${l.productId}`)).rows[0]?.category_id ?? null : null;
+      const [line] = (await db.execute(sql`insert into reception_lines (reception_id, product_id, product_name, unit, category_id, qty_ordered, qty_received, unit_price, decision, note, document, position)
+        values (${rec.id}, ${l.productId ?? null}, ${l.name}, ${l.unit || "Pièce"}, ${cat}, ${l.qo ?? null}, ${l.qr ?? null}, ${l.price ?? null}, 'conform', ${l.note ?? null}, ${docs[0]?.number ?? null}, ${pos++}) returning id`)).rows;
+      lineByName.set(k, line.id);
+      return line.id;
+    };
+    for (const a of g.list) {
+      let lineId = null;
+      if (a.source === "weigh" && a.group_key?.startsWith("ref:")) {
+        // Écarts de pesée du bon : lignes avec quantité facturée / pesée ; les écarts sont rattachés à la fiche
+        const gaps = (await db.execute(sql`select id, product, product_id, qty_invoiced, qty_weighed, unit_price, detail from weigh_gaps
+          where reception_id is null and lower(trim(coalesce(supplier_ref, product))) = ${a.group_key.slice(4)}`)).rows;
+        for (const w of gaps) {
+          const id = await addLine({ name: w.product, productId: w.product_id, unit: "Kg", qo: w.qty_invoiced, qr: w.qty_weighed, price: w.unit_price, note: w.detail });
+          lineId ??= id;
+        }
+        if (gaps.length) {
+          await db.execute(sql`update weigh_gaps set reception_id = ${rec.id} where id in (select jsonb_array_elements_text(${JSON.stringify(gaps.map((w) => w.id))}::jsonb)::int)`);
+          await db.execute(sql`update anomalies set group_key = ${`rec:${rec.id}`} where id = ${a.id}`);
+        }
+      } else {
+        // Anomalie du fichier : une ligne par produit de la fiche (prix connu), le détail de l'anomalie en note
+        const items = Array.isArray(a.items) && a.items.length ? a.items : a.product_name ? [{ name: a.product_name, productId: a.product_id, unit: "", qty: null, price: null }] : [];
+        for (const it of items) {
+          const id = await addLine({ name: it.name, productId: it.productId, unit: it.unit, price: it.price, note: `${a.problem_type || a.type}${it.qty != null ? ` : ${it.qty} ${it.unit ?? ""}` : ""} — ${a.description}`.slice(0, 500) });
+          lineId ??= id;
+        }
+      }
+      await db.execute(sql`update anomalies set reception_id = ${rec.id}, line_id = coalesce(line_id, ${lineId}) where id = ${a.id}`);
+    }
+    made++;
+  }
+  console.log(`[migrate] fiches de réception générées à partir des anomalies importées : ${made} (non consolidées)`);
+  await db.execute(sql`insert into app_settings (key, value) values ('receptions_from_imports_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev : fiches de réception générées à partir des anomalies importées, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v28'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Liste des fiches de réception', 'Importée', false, ${"Fiches générées à partir des anomalies importées (fichier de suivi, écarts de pesée) : une par fournisseur + BL / facture + jour, lignes reprises des produits et des pesées ; état « Importée », jamais consolidées ni exportées automatiquement ; supprimer ou modifier la fiche ne supprime pas les anomalies importées."}, '', ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v28', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

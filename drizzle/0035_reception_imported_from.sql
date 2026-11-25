@@ -1,0 +1,1 @@
+ALTER TABLE "receptions" ADD COLUMN "imported_from" text;

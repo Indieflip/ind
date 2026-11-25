@@ -56,6 +56,7 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
           status: r.status,
           statusLabel: t.receptionStatus[r.status],
           consolidated: !!r.consolidatedAt,
+          imported: !!r.importedFrom,
           author: r.createdByName,
         })).concat(
           // Brouillons en cours (réceptions pas encore enregistrées) : à reprendre depuis le tableau

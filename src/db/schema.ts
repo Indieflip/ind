@@ -179,6 +179,8 @@ export const receptions = pgTable(
     /** Consolidation = validation : le bon ne peut plus être modifié ni supprimé */
     consolidatedAt: timestamp("consolidated_at", { withTimezone: true }),
     consolidatedBy: integer("consolidated_by").references(() => users.id),
+    /** Fiche générée à partir des anomalies importées (fichier de suivi, écarts de pesée) : jamais consolidée ni exportée automatiquement */
+    importedFrom: text("imported_from"),
   },
   (t) => [uniqueIndex("receptions_client_uuid_idx").on(t.clientUuid), index("receptions_delivered_idx").on(t.deliveredAt)],
 );

@@ -515,7 +515,8 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
       else if (a.type === "temperature" && !a.productName) keep.truck = true;
       else if (a.productName) keep.products.add(a.productName.toLowerCase());
     }
-    const drop = anomalies.filter((a) => !touched(a)).map((a) => a.id);
+    // Anomalies importées (fichier de suivi, écarts de pesée) : jamais supprimées par une modification du bon
+    const drop = anomalies.filter((a) => !touched(a) && a.source !== "file" && a.source !== "weigh").map((a) => a.id);
     if (drop.length) await tx.delete(schema.anomalies).where(inArray(schema.anomalies.id, drop));
 
     // 3. Réécrire le contenu

@@ -142,6 +142,8 @@ export const fr = {
     summary: "Synthèse",
     anomalyCol: "Anomalie",
     sheetLink: "Fiche de réception",
+    importedState: "Importée",
+    importedHint: "Fiche générée à partir des anomalies importées : non consolidée, jamais exportée automatiquement",
     listTitle: "Liste des fiches de réception",
     numberLong: "N°",
     blInvoice: "BL / Facture",

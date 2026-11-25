@@ -61,6 +61,7 @@ function listRaw(f: ReceptionFilters, limit: number) {
       status: r.status,
       driverName: r.driverName,
       consolidatedAt: r.consolidatedAt,
+      importedFrom: r.importedFrom,
       lineCount: sql<number>`(select count(*)::int from reception_lines l where l.reception_id = ${r.id})`,
       anomalyCount: sql<number>`(select count(*)::int from anomalies a where a.reception_id = ${r.id})`,
       createdByName: schema.users.name,
