@@ -2,6 +2,7 @@ import { fmtNo } from "@/lib/numbering";
 import { anomalyNumbers } from "@/lib/server/savings";
 import Link from "next/link";
 import { BackLink } from "@/components/BackLink";
+import { claimMailHref } from "@/lib/claimMail";
 
 /** Réclamation par mail : ouverte dans Outlook (web), dans un nouvel onglet, déjà rédigée */
 const OUTLOOK_COMPOSE = "https://outlook.live.com/mail/0/deeplink/compose";
@@ -10,6 +11,7 @@ import { notFound } from "next/navigation";
 import { and, asc, eq, isNull, lt, max, sql, ne } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
+import { getRestaurantName } from "@/lib/settings";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
 import { fmtDate, fmtDateTime, fmtMoney, num, sentence } from "@/lib/format";
@@ -120,12 +122,24 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   const sortKey = (d: string | null) => (d ? d.split("/").reverse().join("") : "99");
   const timeline = [...assistant.map((x) => ({ ...x, user: false })), ...userLines].map((x, i) => ({ ...x, i })).sort((x, y) => sortKey(x.date).localeCompare(sortKey(y.date)) || x.i - y.i);
   // Mail de réclamation (Outlook) : la fiche + les autres fiches « À traiter » du même fournisseur (proposées pour un seul mail)
-  const itemLines = (items: typeof a.items, productName: string | null, description: string) =>
-    items?.length ? items.map((x) => `- ${x.name}${x.qty != null ? ` : ${x.qty} ${x.unit}` : ""}`) : [`- ${productName ?? ""} : ${description}`];
+  // Produits d'une fiche pour le mail : désignation, détail (type + quantité), montant (quantité × prix)
+  const mailProducts = (o: { items: typeof a.items; productName: string | null; description: string; problemType: string | null; type: string; claimedAmount: string | null }) => {
+    const kind = o.problemType || t.anomalies.types[o.type as "other"] || o.type;
+    if (o.items?.length) {
+      return o.items.map((x) => ({
+        name: x.name,
+        detail: `${kind}${x.qty != null ? ` : ${String(x.qty).replace(".", ",")} ${x.unit}` : ""}`,
+        amount: x.qty != null && x.price != null ? Math.round(x.qty * x.price * 100) / 100 : null,
+      }));
+    }
+    return [{ name: o.productName || kind, detail: o.description, amount: num(o.claimedAmount) }];
+  };
+  const shortDate = (d: string | Date | null | undefined) => (d ? fmtDate(d, locale) : "");
+  const docOnly = (ref: string | null | undefined) => (ref ?? "").replace(/\s+du \d{2}\/\d{2}\/\d{2}$/, "");
   const mailSelf = {
     id: a.id, label: "", amount: num(a.claimedAmount),
-    intro: `${s.mailIntro} ${rec ? fmtDate(rec.deliveredAt, locale) : fmtDate(a.createdAt, locale)}${reference ? ` (${reference})` : ""}`,
-    lines: itemLines(a.items, a.productName, a.description),
+    delivery: shortDate(rec?.deliveredAt ?? a.createdAt), doc: docOnly(reference), docDate: shortDate(a.docDate),
+    products: mailProducts(a),
   };
   const othersRaw = a.supplierId && stageOf(a.stage) === "a_traiter"
     ? await db
@@ -139,14 +153,16 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
     return {
       id: o.id, amount: num(o.claimedAmount),
       label: `${fmtNo("anomaly", anoNums.get(o.id)?.n)} · ${o.problemType || t.anomalies.types[o.type]}${o.productName ? ` · ${o.productName}` : ""}${ref ? ` · ${ref}` : ""}`,
-      intro: `${s.mailIntro} ${fmtDate(deliveredAt ?? o.createdAt, locale)}${ref ? ` (${ref})` : ""}`,
-      lines: itemLines(o.items, o.productName, o.description),
+      delivery: shortDate(deliveredAt ?? o.createdAt), doc: docOnly(ref), docDate: shortDate(o.docDate),
+      products: mailProducts(o),
     };
   });
-  const mailParts = { to: claimEmail, subject: `${s.mailSubject} — ${sentence(supplier?.name ?? a.supplierName)}${reference ? ` — ${reference}` : ""}`, hello: s.mailHello, ask: s.mailAsk, bye: s.mailBye, amountLabel: s.mailAmount, compose: OUTLOOK_COMPOSE };
-  const mailHref = `${OUTLOOK_COMPOSE}?to=${encodeURIComponent(claimEmail)}&subject=${encodeURIComponent(`${s.mailSubject} — ${reference ?? ""} ${a.productName ?? ""}`.trim())}&body=${encodeURIComponent(
-    `${s.mailHello}\n\n${s.mailIntro} ${rec ? fmtDate(rec.deliveredAt, locale) : fmtDate(a.createdAt, locale)}${reference ? ` (${reference})` : ""} :\n${(a.items?.length ? a.items.map((x) => `- ${x.name}${x.qty != null ? ` : ${x.qty} ${x.unit}` : ""}`).join("\n") : `- ${a.productName ?? ""} : ${a.description}`)}${a.claimedAmount ? `\n- ${s.mailAmount} : ${fmtMoney(num(a.claimedAmount), locale)}` : ""}\n\n${s.mailAsk}\n\n${s.mailBye}`,
-  )}`;
+  const restaurant = await getRestaurantName();
+  const M = t.sheet.mailTpl;
+  const mailParts = {
+    to: claimEmail, subject: M.subject, hello: M.hello, intro: M.intro, deliveryOf: M.deliveryOf, docOf: M.docOf, total: M.total, ask: M.ask, bye: M.bye,
+    signature: [user.name, restaurant].filter(Boolean).join("\n"), compose: OUTLOOK_COMPOSE,
+  };
   const itemsLabel = a.items?.length ? a.items.map((x) => x.name).join(" · ") : a.productName ?? line?.productName ?? "";
   const stageCls: Record<string, string> = { a_traiter: "bg-red-100 text-red-800", en_attente: "bg-amber-100 text-amber-900", cloturee: "bg-emerald-100 text-emerald-800", annulee: "bg-stone-200 text-stone-700" };
   const fold = "group rounded-xl border border-stone-200 bg-white";
@@ -268,9 +284,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
             className="btn-secondary py-1.5 text-sm"
             target="_blank"
             rel="noreferrer"
-            href={`${OUTLOOK_COMPOSE}?to=${encodeURIComponent(claimEmail)}&subject=${encodeURIComponent(`${s.mailSubject} — ${reference ?? ""} ${a.productName ?? ""}`.trim())}&body=${encodeURIComponent(
-              `${s.mailHello}\n\n${s.mailIntro} ${rec ? fmtDate(rec.deliveredAt, locale) : fmtDate(a.createdAt, locale)}${reference ? ` (${reference})` : ""} :\n- ${a.productName ?? ""} : ${a.description}${a.claimedAmount ? `\n- ${s.mailAmount} : ${fmtMoney(num(a.claimedAmount), locale)}` : ""}\n\n${s.mailAsk}\n\n${s.mailBye}`,
-            )}`}
+            href={claimMailHref(mailParts, [mailSelf])}
           >
             ✉ {s.mail}{claimEmail ? ` (${claimEmail})` : ""}
           </a>

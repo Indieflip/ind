@@ -28,13 +28,14 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
+  const [noteDay, setNoteDay] = useState(() => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" }));
   const [pending, start] = useTransition();
   // Après enregistrement, la fiche reprend les valeurs enregistrées (montants remis en forme…)
   const initialKey = JSON.stringify(initial);
   useEffect(() => { setV(JSON.parse(initialKey)); }, [initialKey]);
   const dirty = JSON.stringify(v) !== initialKey;
   const set = (k: keyof Values) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => { setV({ ...v, [k]: e.target.value }); setSaved(false); setError(""); };
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
   const stage = stageOf(v.stage);
   const closedWithout = stage === "cloturee" && !v.resolution;
   const [typeList, setTypeList] = useState(types);
@@ -252,14 +253,16 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
         {editable && (
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
             <input className="input max-w-sm flex-1 py-1.5 text-sm" value={note} onChange={(e) => setNote(e.target.value)} placeholder={s.followUpNote} />
+            {/* Date de la relance : aujourd'hui par défaut, ou une autre date */}
+            <span className="w-40"><DateField className="py-1.5 text-sm" value={noteDay} onChange={setNoteDay} ariaLabel={s.followUpDate} /></span>
             <button
               type="button"
               className="btn-secondary py-1.5 text-sm"
               disabled={pending || dirty}
               title={dirty ? s.saveFirst : undefined}
-              onClick={() => start(async () => { await followUpTodayAction(id, note); setNote(""); router.refresh(); })}
+              onClick={() => start(async () => { await followUpTodayAction(id, note, noteDay); setNote(""); setNoteDay(today); router.refresh(); })}
             >
-              📞 {s.followedToday}
+              📞 {noteDay === today ? s.followedToday : s.followedOn}
             </button>
           </div>
         )}

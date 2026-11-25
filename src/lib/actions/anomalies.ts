@@ -205,17 +205,20 @@ export async function moveAnomalyAction(id: number, stage: string, resolution?: 
 }
 
 /** « Relancé aujourd'hui » : date de dernière action = aujourd'hui, une ligne ajoutée à l'action */
-export async function followUpTodayAction(id: number, note: string) {
+export async function followUpTodayAction(id: number, note: string, day?: string) {
   await assertUser(can.manageAnomalies);
   const db = getDb();
   const cur = await db.query.anomalies.findFirst({ where: eq(schema.anomalies.id, id) });
   if (!cur) return { error: "not_found" };
-  const d = new Date();
-  const label = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`;
+  // Date de l'action : aujourd'hui par défaut, ou une autre date choisie (relance faite un autre jour)
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
+  const iso = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : today;
+  const [yy, mm, dd] = iso.split("-");
+  const label = `${dd}/${mm}/${yy.slice(2)}`;
   const line = `${label} : ${note.trim() || "relance"}`;
   const stage = stageOf(cur.stage) === "a_traiter" ? "en_attente" : stageOf(cur.stage);
   await db.update(schema.anomalies).set({
-    followUp: [cur.followUp, line].filter(Boolean).join("\n"), lastActionAt: d.toISOString().slice(0, 10), stage, ...legacyOf(stage, cur.resolution),
+    followUp: [cur.followUp, line].filter(Boolean).join("\n"), lastActionAt: cur.lastActionAt && cur.lastActionAt > iso ? cur.lastActionAt : iso, stage, ...legacyOf(stage, cur.resolution),
   }).where(eq(schema.anomalies.id, id));
   revalidatePath("/anomalies", "layout");
   return { ok: true };

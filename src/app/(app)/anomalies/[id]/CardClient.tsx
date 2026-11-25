@@ -1,4 +1,5 @@
 "use client";
+import { claimMailHref, type MailFiche, type MailParts } from "@/lib/claimMail";
 import { DateField } from "@/components/DateField";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -42,8 +43,6 @@ export function ReviewButtons({ id, value, editable }: { id: number; value: stri
  * Carte de la fiche : prochaine étape et gros boutons d'action. Chaque bouton fait avancer le statut
  * et note la date de dernière action ; « Avoir reçu » demande le montant puis clôture.
  */
-export interface MailFiche { id: number; label: string; intro: string; lines: string[]; amount: number | null }
-export interface MailParts { to: string; subject: string; hello: string; ask: string; bye: string; amountLabel: string; compose: string }
 
 /**
  * Carte de la fiche : prochaine étape et gros boutons d'action. Chaque bouton fait avancer le statut et note l'action dans l'historique.
@@ -61,7 +60,7 @@ export function ActionCard({ id, stage, resolution, editable, claimed, phone, su
   const [pending, start] = useTransition();
   const [credit, setCredit] = useState<null | { amount: string; number: string; date: string; kind: string }>(null);
   // Champ de détail déplié : appel / SMS (Téléphone) ou réponse du fournisseur (Retour mail)
-  const [note, setNote] = useState<null | { kind: "phone" | "mail"; text: string }>(null);
+  const [note, setNote] = useState<null | { kind: "phone" | "mail" | "noFollow"; text: string }>(null);
   // Autres fiches « À traiter » du même fournisseur : cochées d'office pour partir dans la même réclamation
   const [withOthers, setWithOthers] = useState<number[]>(others.map((o) => o.id));
   // Chaque action dit si elle a échoué (connexion, droits…) au lieu de ne rien faire
@@ -79,8 +78,7 @@ export function ActionCard({ id, stage, resolution, editable, claimed, phone, su
   // Mail de réclamation : la fiche + les fiches cochées du même fournisseur, en un seul message
   const fiches = [self, ...others.filter((o) => withOthers.includes(o.id))];
   const fmt = (n: number) => `${n.toFixed(2).replace(".", ",")} €`;
-  const body = `${mail.hello}\n\n${fiches.map((f) => `${f.intro} :\n${f.lines.join("\n")}${f.amount != null ? `\n- ${mail.amountLabel} : ${fmt(f.amount)}` : ""}`).join("\n\n")}${fiches.length > 1 ? `\n\n${mail.amountLabel} (${fiches.length}) : ${fmt(fiches.reduce((x, f) => x + (f.amount ?? 0), 0))}` : ""}\n\n${mail.ask}\n\n${mail.bye}`;
-  const mailHref = `${mail.compose}?to=${encodeURIComponent(mail.to)}&subject=${encodeURIComponent(fiches.length > 1 ? `${mail.subject} (${fiches.length} ${c.sheets})` : mail.subject)}&body=${encodeURIComponent(body)}`;
+  const mailHref = claimMailHref(mail, fiches);
   const sendClaim = () => run(async () => {
     const ids = fiches.map((f) => f.id);
     if (ids.length > 1) await groupClaimsAction(ids);
@@ -136,7 +134,7 @@ export function ActionCard({ id, stage, resolution, editable, claimed, phone, su
           <button type="button" className={secondary} disabled={pending} onClick={() => setNote({ kind: "phone", text: "" })}>☎ {c.phone}</button>
           {st === "a_traiter" && creditBtn(secondary)}
           {st === "en_attente" && <button type="button" className={ghost} disabled={pending} onClick={async () => { if (await appConfirm(c.confirmBackToDo)) run(() => moveAnomalyAction(id, "a_traiter")); }}>← {t.stages.a_traiter}</button>}
-          <button type="button" className={ghost} disabled={pending} onClick={() => close("sans_suite")}>{t.resolutions.sans_suite}</button>
+          <button type="button" className={ghost} disabled={pending} onClick={() => setNote({ kind: "noFollow", text: "" })}>{t.resolutions.sans_suite}</button>
           {phone && <a href={`tel:${phone}`} className={`${ghost} inline-flex items-center`}>☎ {phone}</a>}
         </div>
       )}
@@ -144,11 +142,17 @@ export function ActionCard({ id, stage, resolution, editable, claimed, phone, su
       {editable && note && (
         <div className="space-y-2 rounded-xl border border-stone-200 bg-stone-50 p-3">
           <label className="block">
-            <span className="label">{note.kind === "phone" ? c.phoneDetail : c.mailReplyDetail}</span>
-            <textarea autoFocus className="input" rows={3} value={note.text} onChange={(e) => setNote({ ...note, text: e.target.value })} placeholder={note.kind === "phone" ? c.phonePlaceholder : c.mailReplyPlaceholder} />
+            {note.kind === "noFollow" && <p className="mb-1 text-sm font-medium text-stone-800">{c.confirmNoFollow}</p>}
+            <span className="label">{note.kind === "phone" ? c.phoneDetail : note.kind === "mail" ? c.mailReplyDetail : c.noFollowDetail}</span>
+            <textarea autoFocus className="input" rows={3} value={note.text} onChange={(e) => setNote({ ...note, text: e.target.value })} placeholder={note.kind === "phone" ? c.phonePlaceholder : note.kind === "mail" ? c.mailReplyPlaceholder : c.noFollowPlaceholder} />
           </label>
           <div className="flex gap-2">
-            <button type="button" className="btn-primary" disabled={pending} onClick={() => { const n = note; setNote(null); follow(`${n.kind === "phone" ? c.phone : c.mailReply}${n.text.trim() ? ` : ${n.text.trim()}` : ""}`); }}>{t.common.save}</button>
+            {note.kind === "noFollow" ? (
+              // Sans suite : le détail est noté dans l'historique, puis la fiche est clôturée
+              <button type="button" className="btn-primary" disabled={pending} onClick={() => { const n = note; setNote(null); run(async () => { await followUpTodayAction(id, `${t.resolutions.sans_suite}${n.text.trim() ? ` : ${n.text.trim()}` : ""}`); await moveAnomalyAction(id, "cloturee", "sans_suite"); }); }}>{c.closeNoFollow}</button>
+            ) : (
+              <button type="button" className="btn-primary" disabled={pending} onClick={() => { const n = note; setNote(null); follow(`${n.kind === "phone" ? c.phone : c.mailReply}${n.text.trim() ? ` : ${n.text.trim()}` : ""}`); }}>{t.common.save}</button>
+            )}
             <button type="button" className="btn-ghost" onClick={() => setNote(null)}>{t.common.cancel}</button>
           </div>
         </div>
