@@ -18,7 +18,7 @@ const PHONE_STEPS: { title: string; items: string[]; gate?: string; auto?: strin
   },
   {
     title: "Contrôle des produits",
-    items: ["Q facturée, Q contrôlée, unité", "T° produit, DLC / DDM, lot, note", "Prix unitaire (obligatoire)", "Acceptée / Refus proposé automatiquement"],
+    items: ["Q facturée, Q contrôlée, unité", "T° produit, DLC / DDM, lot, note", "Prix unitaire (obligatoire)", "Acceptée / Refus proposé automatiquement", "Refus / Retour : produit concerné + quantité"],
   },
   {
     title: "Validation",
@@ -28,7 +28,7 @@ const PHONE_STEPS: { title: string; items: string[]; gate?: string; auto?: strin
 ];
 
 const AUTO: { title: string; items: string[] }[] = [
-  { title: "Anomalies créées", items: ["Refus, manque, quantité en trop", "T° au-delà du seuil + marge, DLC dépassée", "Prix ≥ +10 % au-dessus du mercurial, prix bloqué", "Véhicule sale, BL manquant"] },
+  { title: "Anomalies créées", items: ["Refus, retour marchandise, manque, quantité en trop", "T° au-delà du seuil + marge, DLC dépassée", "Prix ≥ +10 % au-dessus du mercurial, prix bloqué", "Véhicule sale, BL manquant"] },
   { title: "Prix et mercurial", items: ["Mercurial mis à jour avec le prix du bon", "Variation de prix enregistrée", "Historique du Mercurial repris dans le Suivi des prix"] },
   { title: "Pesée et suivis", items: ["Écarts de pesée (au kg, tares et perte acceptable du produit déduites), une anomalie « Écart de pesée » par bon", "Suivi viande / poisson, boulangerie", "N° d'anomalie et de réclamation"] },
 ];

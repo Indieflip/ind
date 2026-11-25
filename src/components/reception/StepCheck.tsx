@@ -258,22 +258,44 @@ function LineCard({
       )}
 
       <p className="mt-3 mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{t.wizard.productConformity} <span className="text-red-600">*</span></p>
-      <div className="grid grid-cols-2 gap-1.5">
-        {(["conform", "refuse"] as Decision[]).map((d) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => onChange({ decision: d, decisionManual: true, reason: d === "conform" ? "" : line.reason || suggestedReason(line, catalog, truckTemp) })}
-            className={`rounded-lg border px-2 py-2 text-sm font-semibold ${line.decision === d ? decisionStyles[d].badge + " border-transparent" : "border-stone-200 bg-white text-stone-500"}`}
-          >
-            {d === "conform" ? t.wizard.accepted : t.decision[d]}
-          </button>
-        ))}
+      {/* Accepté / Refus / Retour : Refus et Retour ouvrent « Produit concerné » et « Quantité » */}
+      <div className="grid grid-cols-3 gap-1.5">
+        {(["conform", "refus", "retour"] as const).map((k) => {
+          const d: Decision = k === "conform" ? "conform" : k === "refus" ? "refuse" : "reserve";
+          const active = k === "conform" ? line.decision === "conform" : k === "retour" ? line.returnKind === "retour" && line.decision === "reserve" : line.decision === "refuse";
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => onChange({
+                decision: d, decisionManual: true,
+                reason: d === "conform" ? "" : line.reason || suggestedReason(line, catalog, truckTemp),
+                returnKind: k === "conform" ? "" : k,
+                returnProduct: k === "conform" ? "" : line.returnProduct || line.productName,
+                returnQty: k === "conform" ? "" : line.returnQty || line.qtyOrdered || line.qtyReceived,
+              })}
+              className={`rounded-lg border px-2 py-2 text-sm font-semibold ${active ? decisionStyles[d].badge + " border-transparent" : "border-stone-200 bg-white text-stone-500"}`}
+            >
+              {k === "conform" ? t.wizard.accepted : k === "refus" ? t.decision.refuse : t.wizard.returnBtn}
+            </button>
+          );
+        })}
       </div>
       <p className="mt-1 text-[11px] text-stone-500">{t.wizard.autoDecisionHint}</p>
 
       {line.decision && line.decision !== "conform" && (
         <div className="mt-3 space-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            <label className="col-span-2">
+              <span className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.returnProduct}</span>
+              <input className="input py-2" value={line.returnProduct ?? ""} placeholder={line.productName} onChange={(e) => onChange({ returnProduct: e.target.value })} />
+            </label>
+            <label>
+              <span className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.returnQty} ({line.unit})</span>
+              <input className="input py-2" inputMode="decimal" value={line.returnQty ?? ""} placeholder={line.qtyOrdered || line.qtyReceived} onChange={(e) => onChange({ returnQty: e.target.value })} />
+            </label>
+          </div>
+          <p className="text-[11px] text-stone-500">{t.wizard.returnHint}</p>
           <select className="input" value={line.reason} onChange={(e) => onChange({ reason: e.target.value as DraftLine["reason"] })}>
             <option value="">{t.wizard.chooseReason}</option>
             {REASONS.map((r) => (

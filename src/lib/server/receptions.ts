@@ -32,6 +32,9 @@ const lineSchema = z.object({
   document: z.string().trim().max(100).nullish(),
   note: z.string().trim().max(500).nullish(),
   ref: z.number().int().nullish(),
+  returnKind: z.enum(["refus", "retour"]).nullish(),
+  returnProduct: z.string().trim().max(200).nullish(),
+  returnQty: z.number().nullish(),
 });
 
 export const payloadSchema = z.object({
@@ -325,6 +328,9 @@ async function writeContent(
         document: l.document || null,
         note: l.note || null,
         priceNotShown: !!l.priceNotShown,
+        returnKind: l.returnKind ?? null,
+        returnProduct: l.returnProduct || null,
+        returnQty: l.returnQty != null ? String(l.returnQty) : null,
         position: position++,
       })
       .returning();
@@ -362,7 +368,11 @@ async function writeContent(
     if (l.decision !== "conform" && !keep.products.has(l.productName.toLowerCase())) {
       const reasonLabel = l.reason ? (t.reasons as Record<string, string>)[l.reason] ?? l.reason : "";
       const qtyFacts = describeLine(l, ["qty_less", "qty_more"], cat, t);
-      const why = [reasonLabel.toLowerCase(), ...(facts.length ? facts : qtyFacts)].filter(Boolean);
+      const retQty = l.returnKind ? l.returnQty ?? l.qtyOrdered ?? l.qtyReceived : null;
+      const retName = l.returnProduct || l.productName;
+      // Refus / Retour : « 3 kg Bavette » en tête du détail, montant = quantité × prix
+      const retFact = retQty != null ? `${qtyText(retQty, l.unit)}${retName !== l.productName ? ` (${retName})` : ""}` : "";
+      const why = [retFact, reasonLabel.toLowerCase(), ...(facts.length ? facts : qtyFacts)].filter(Boolean);
       await tx.insert(schema.anomalies).values({
         receptionId: recId,
         lineId: line.id,
@@ -372,8 +382,10 @@ async function writeContent(
         nature: natureOf(l.categoryId),
         reference: lineRef(l),
         type: (l.reason && reasonToAnomaly[l.reason]) || (l.qtyReceived != null && l.qtyOrdered != null && l.qtyReceived < l.qtyOrdered ? "missing" : "other"),
-        description: `${t.decision[l.decision]}${why.length ? ` : ${[...new Set(why)].join(" ; ")}` : ""}`,
-        claimedAmount: money(l.decision === "refuse" && l.unitPrice != null ? l.unitPrice * (l.qtyOrdered ?? l.qtyReceived ?? 0) : gapValue(l)),
+        description: `${l.returnKind === "retour" ? t.wizard.returnBtn : t.decision[l.decision]}${why.length ? ` : ${[...new Set(why)].join(" ; ")}` : ""}`,
+        claimedAmount: money(retQty != null && l.unitPrice != null ? l.unitPrice * retQty : l.decision === "refuse" && l.unitPrice != null ? l.unitPrice * (l.qtyOrdered ?? l.qtyReceived ?? 0) : gapValue(l)),
+        ...(retQty != null ? { items: [{ productId: retName === l.productName ? productId : null, name: retName, qty: retQty, unit: l.unit, price: l.unitPrice }] } : {}),
+        ...(l.returnKind === "retour" ? { problemType: t.wizard.returnProblem } : {}),
         photoUrl: l.photos[0] ?? null,
         createdBy: user.id,
         createdAt: date,

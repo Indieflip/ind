@@ -62,7 +62,9 @@ export async function buildSheetData(receptionIds: number[], locale = "fr") {
     header: [f.colDate, t.common.supplier, t.common.product, f.colTruck, f.colProduct, f.colPackaging, f.colDlc, f.colLabel, f.colDecision, f.colVisa],
     rows: rows.map(({ rec, line, by }) => {
       const why = reason(line.reason);
-      const decision = line.decision === "refuse" ? f.refused : line.decision === "reserve" ? f.reserved : f.accepted;
+      const rq = line.returnQty != null ? `${String(Number(line.returnQty)).replace(".", ",")} ${line.unit ?? ""}`.trim() : "";
+      const base = line.returnKind === "retour" ? f.returned : line.decision === "refuse" ? f.refused : line.decision === "reserve" ? f.reserved : f.accepted;
+      const decision = rq && line.decision !== "conform" ? `${base} ${rq}` : base;
       return [
         time(rec.deliveredAt),
         rec.supplierName,

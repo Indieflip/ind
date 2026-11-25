@@ -193,6 +193,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
                 )}
               </dl>
               {l.reason && <p className="mt-1 text-xs text-stone-600">{(t.reasons as Record<string, string>)[l.reason] ?? l.reason}</p>}
+              {l.returnKind && l.decision !== "conform" && <p className="mt-1 text-xs font-medium text-red-700">{l.returnKind === "retour" ? t.wizard.returnBtn : t.decision.refuse} : {l.returnQty != null ? `${fmtNum(num(l.returnQty))} ${l.unit ?? ""}` : ""} {l.returnProduct && l.returnProduct !== l.productName ? l.returnProduct : ""}</p>}
               {l.note && <p className="mt-1 text-xs italic text-stone-600">{t.wizard.note} : {l.note}</p>}
               <div className="mt-1 flex gap-2">
                 {photos.filter((p) => p.lineId === l.id).map((p) => (
@@ -244,6 +245,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
                   <td>
                     <span className={`badge ${decisionStyles[l.decision].badge}`}>{t.decision[l.decision]}</span>
                     {l.reason && <div className="mt-1 text-xs text-stone-600">{(t.reasons as Record<string, string>)[l.reason] ?? l.reason}</div>}
+                    {l.returnKind && l.decision !== "conform" && <div className="mt-1 text-xs font-medium text-red-700">{l.returnKind === "retour" ? t.wizard.returnBtn : t.decision.refuse} : {l.returnQty != null ? `${fmtNum(num(l.returnQty))} ${l.unit ?? ""}` : ""} {l.returnProduct && l.returnProduct !== l.productName ? l.returnProduct : ""}</div>}
                     {l.note && <div className="mt-1 text-xs italic text-stone-600">{t.wizard.note} : {l.note}</div>}
                     {linePhotos.map((p) => (
                       <a key={p.id} href={p.url} target="_blank" className="mt-1 block"><img src={p.url} alt="" className="h-14 w-14 rounded object-cover" /></a>

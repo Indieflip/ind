@@ -55,11 +55,16 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     mercurialMin: num(l.mercurialMin),
     priceLocked: l.priceLocked,
     decision: l.decision,
+    // Refus / réserve déjà choisis : gardés tels quels quand on corrige la ligne
+    decisionManual: l.decision !== "conform",
 
     reason: (l.reason ?? "") as DraftLine["reason"],
     doc: l.document ?? undefined,
     note: l.note ?? "",
     priceNotShown: l.priceNotShown,
+    returnKind: (l.returnKind ?? "") as DraftLine["returnKind"],
+    returnProduct: l.returnProduct ?? "",
+    returnQty: str(l.returnQty),
     photos: photos.filter((p) => p.lineId === l.id).map((p) => p.url),
   }));
 
