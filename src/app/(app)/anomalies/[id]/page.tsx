@@ -2,6 +2,9 @@ import { fmtNo } from "@/lib/numbering";
 import { anomalyNumbers } from "@/lib/server/savings";
 import Link from "next/link";
 import { BackLink } from "@/components/BackLink";
+
+/** Réclamation par mail : ouverte dans Outlook (web), dans un nouvel onglet, déjà rédigée */
+const OUTLOOK_COMPOSE = "https://outlook.live.com/mail/0/deeplink/compose";
 import { WEIGH_TYPE } from "@/lib/anomaly";
 import { notFound } from "next/navigation";
 import { and, asc, eq, isNull, lt, max, sql } from "drizzle-orm";
@@ -116,7 +119,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   });
   const sortKey = (d: string | null) => (d ? d.split("/").reverse().join("") : "99");
   const timeline = [...assistant.map((x) => ({ ...x, user: false })), ...userLines].map((x, i) => ({ ...x, i })).sort((x, y) => sortKey(x.date).localeCompare(sortKey(y.date)) || x.i - y.i);
-  const mailHref = `mailto:${claimEmail}?subject=${encodeURIComponent(`${s.mailSubject} — ${reference ?? ""} ${a.productName ?? ""}`.trim())}&body=${encodeURIComponent(
+  const mailHref = `${OUTLOOK_COMPOSE}?to=${encodeURIComponent(claimEmail)}&subject=${encodeURIComponent(`${s.mailSubject} — ${reference ?? ""} ${a.productName ?? ""}`.trim())}&body=${encodeURIComponent(
     `${s.mailHello}\n\n${s.mailIntro} ${rec ? fmtDate(rec.deliveredAt, locale) : fmtDate(a.createdAt, locale)}${reference ? ` (${reference})` : ""} :\n${(a.items?.length ? a.items.map((x) => `- ${x.name}${x.qty != null ? ` : ${x.qty} ${x.unit}` : ""}`).join("\n") : `- ${a.productName ?? ""} : ${a.description}`)}${a.claimedAmount ? `\n- ${s.mailAmount} : ${fmtMoney(num(a.claimedAmount), locale)}` : ""}\n\n${s.mailAsk}\n\n${s.mailBye}`,
   )}`;
   const itemsLabel = a.items?.length ? a.items.map((x) => x.name).join(" · ") : a.productName ?? line?.productName ?? "";
@@ -238,7 +241,9 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
         <div className="mt-3 flex flex-wrap gap-2">
           <a
             className="btn-secondary py-1.5 text-sm"
-            href={`mailto:${claimEmail}?subject=${encodeURIComponent(`${s.mailSubject} — ${reference ?? ""} ${a.productName ?? ""}`.trim())}&body=${encodeURIComponent(
+            target="_blank"
+            rel="noreferrer"
+            href={`${OUTLOOK_COMPOSE}?to=${encodeURIComponent(claimEmail)}&subject=${encodeURIComponent(`${s.mailSubject} — ${reference ?? ""} ${a.productName ?? ""}`.trim())}&body=${encodeURIComponent(
               `${s.mailHello}\n\n${s.mailIntro} ${rec ? fmtDate(rec.deliveredAt, locale) : fmtDate(a.createdAt, locale)}${reference ? ` (${reference})` : ""} :\n- ${a.productName ?? ""} : ${a.description}${a.claimedAmount ? `\n- ${s.mailAmount} : ${fmtMoney(num(a.claimedAmount), locale)}` : ""}\n\n${s.mailAsk}\n\n${s.mailBye}`,
             )}`}
           >

@@ -1046,6 +1046,35 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v2
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v21', '1') on conflict (key) do nothing`);
 }
 
+// Prix « Non indiqué sur le bon » : prix du Mercurial repris sur la ligne, puis montants des fiches d'anomalie liées complétés, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'price_not_shown_fill_v1'`)).rows.length) {
+  await db.execute(sql`update reception_lines l set unit_price = coalesce(l.mercurial_price, l.mercurial_min, p.price)
+    from products p where p.id = l.product_id and l.price_not_shown and l.unit_price is null and coalesce(l.mercurial_price, l.mercurial_min, p.price) is not null`);
+  // Produits de la fiche sans prix : prix de la ligne du bon (même produit)
+  await db.execute(sql`update anomalies a set items = (
+      select jsonb_agg(case when e->'price' is null or jsonb_typeof(e->'price') = 'null' then e || jsonb_build_object('price', l.unit_price::float) else e end)
+      from jsonb_array_elements(a.items) e)
+    from reception_lines l where l.id = a.line_id and l.price_not_shown and l.unit_price is not null and a.items is not null`);
+  // Fiche sans produits : manque × prix
+  await db.execute(sql`update anomalies a set claimed_amount = round((l.qty_ordered - l.qty_received) * l.unit_price, 2)
+    from reception_lines l where l.id = a.line_id and l.price_not_shown and l.unit_price is not null and a.claimed_amount is null
+      and (a.items is null or jsonb_array_length(a.items) = 0) and l.qty_ordered > l.qty_received`);
+  // Montant = somme des produits
+  await db.execute(sql`update anomalies a set claimed_amount = t.s from (
+      select id, round((select sum((e->>'qty')::numeric * (e->>'price')::numeric) from jsonb_array_elements(items) e
+        where jsonb_typeof(e->'qty') = 'number' and jsonb_typeof(e->'price') = 'number'), 2) as s from anomalies where items is not null
+    ) t where a.id = t.id and t.s > 0 and (a.claimed_amount is null or abs(a.claimed_amount - t.s) > 0.005)`);
+  await db.execute(sql`insert into app_settings (key, value) values ('price_not_shown_fill_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev > Développement : mail de réclamation dans Outlook, Résolution toujours visible, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v22'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('anomaly', 'Fiche', 'Envoyer la réclamation', false, ${"Ouvre Outlook (web) dans un nouvel onglet, avec le destinataire (contact réclamation du fournisseur), l'objet et le message déjà rédigés."}, '', ${pos})`);
+  await db.execute(sql`update dev_fields set rule = rule || ${" Toujours visible ; choisir une résolution clôture la fiche."} where form = 'anomaly' and section = 'Suivi de la réclamation' and field = 'Résolution'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v22', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

@@ -208,7 +208,8 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
         </div>
       </div>
 
-      {stage === "cloturee" && (
+      {/* Résolution : toujours visible ; en choisir une clôture la fiche */}
+      {(
         <div>
           <span className="label">{s.resolution}</span>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -217,7 +218,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
                 key={r}
                 type="button"
                 disabled={!editable}
-                onClick={() => { setV({ ...v, resolution: r }); setSaved(false); }}
+                onClick={() => { setV({ ...v, resolution: r, stage: "cloturee" }); setSaved(false); }}
                 className={`rounded-lg border-2 px-2 py-2 text-sm font-semibold ${v.resolution === r ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-stone-200 bg-white text-stone-500"}`}
               >
                 {t.resolutions[r]}

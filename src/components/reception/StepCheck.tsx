@@ -221,7 +221,8 @@ function LineCard({
           <label className="mt-1 flex items-center gap-1.5 text-xs text-stone-600">
             <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={!!line.priceNotShown} onChange={(e) => {
               // Prix non indiqué sur le bon : on reprend le prix du Mercurial (le prix maximum s'il y a une fourchette)
-              const ref = line.mercurialPrice ?? line.mercurialMin ?? null;
+              const cp = line.productId ? catalog?.products.find((x) => x.id === line.productId) : undefined;
+              const ref = line.mercurialPrice ?? line.mercurialMin ?? cp?.price ?? cp?.priceMin ?? null;
               onChange(e.target.checked ? { priceNotShown: true, unitPrice: ref != null ? String(ref).replace(".", ",") : "" } : { priceNotShown: false, unitPrice: "" });
             }} />
             {t.wizard.priceNotShown}

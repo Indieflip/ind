@@ -83,7 +83,7 @@ export function ActionCard({ id, stage, resolution, editable, claimed, mailHref,
       {editable && open && !credit && (
         <div className="flex flex-wrap gap-2.5">
           {stage === "a_traiter" && (
-            <a href={mailHref} className={`${primary} inline-flex items-center`} onClick={() => follow(c.mailSent)}>✉ {c.sendClaim}</a>
+            <a href={mailHref} target="_blank" rel="noreferrer" className={`${primary} inline-flex items-center`} onClick={() => follow(c.mailSent)}>✉ {c.sendClaim}</a>
           )}
           {stage === "a_traiter" && <button type="button" className={secondary} disabled={pending} onClick={() => follow(c.called)}>☎ {c.iCalled}</button>}
           {stage !== "a_traiter" && <button type="button" className={secondary} disabled={pending} onClick={() => follow(c.followed)}>↻ {c.iFollowed}</button>}
