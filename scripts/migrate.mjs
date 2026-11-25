@@ -1261,6 +1261,43 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v3
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v31', '1') on conflict (key) do nothing`);
 }
 
+// Anciennes fiches de réception modifiées : la fiche « Écart de pesée » créée à la modification est reportée
+// sur la fiche d'anomalie existante (produits, montant, type Écart de pesée) puis retirée ; suppression d'ANO407 demandée, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'imported_edits_fix_v1'`)).rows.length) {
+  // ANO407 (2026) : N° enregistré, sinon N° provisoire (à la suite du dernier N° enregistré, par date de création)
+  const yearOf = sql`extract(year from created_at at time zone 'Europe/Paris') = 2026`;
+  let ano407 = (await db.execute(sql`select id from anomalies where number = 407 and ${yearOf}`)).rows[0]?.id ?? null;
+  if (!ano407) {
+    const max = Number((await db.execute(sql`select coalesce(max(number), 0) as m from anomalies where ${yearOf}`)).rows[0].m);
+    if (407 > max) ano407 = (await db.execute(sql`select id from anomalies where number is null and ${yearOf} order by created_at, id offset ${407 - max - 1} limit 1`)).rows[0]?.id ?? null;
+  }
+  const dups = (await db.execute(sql`select a.* from anomalies a join receptions r on r.id = a.reception_id
+    where r.imported_from is not null and a.source = 'weigh' and a.number is null and a.consolidated_at is null`)).rows;
+  let merged = 0;
+  for (const d of dups) {
+    const own = (await db.execute(sql`select id, type, product_name, items from anomalies where reception_id = ${d.reception_id} and id <> ${d.id} and consolidated_at is null and number is not null order by id`)).rows;
+    const names = new Set((d.items ?? []).map((it) => String(it.name).trim().toLowerCase()));
+    const hit = (a) => names.has(String(a.product_name ?? "").trim().toLowerCase()) || (a.items ?? []).some((it) => names.has(String(it.name).trim().toLowerCase()));
+    const target = own.find(hit) ?? (own.length === 1 ? own[0] : own.find((a) => a.type === "missing" || a.type === "quantity"));
+    if (!target) continue;
+    await db.execute(sql`update anomalies set type = 'quantity', problem_type = 'Écart de pesée', source = 'weigh', group_key = ${d.group_key},
+      items = ${JSON.stringify(d.items ?? [])}::jsonb, product_name = ${d.product_name}, product_id = coalesce(${d.product_id}, product_id), description = ${d.description},
+      claimed_amount = coalesce(${d.claimed_amount}, claimed_amount), supplier_id = coalesce(${d.supplier_id}, supplier_id), nature = coalesce(${d.nature}, nature) where id = ${target.id}`);
+    await db.execute(sql`delete from anomalies where id = ${d.id}`);
+    merged++;
+  }
+  if (ano407) await db.execute(sql`delete from anomalies where id = ${ano407} and consolidated_at is null`);
+  console.log(`[migrate] écarts de pesée reportés sur la fiche existante : ${merged} ; ANO407 ${ano407 ? "supprimée" : "introuvable"}`);
+  await db.execute(sql`insert into app_settings (key, value) values ('imported_edits_fix_v1', ${JSON.stringify({ merged, ano407 })}) on conflict (key) do nothing`);
+}
+
+// Dev : anciennes fiches modifiées sans nouvelle fiche d'anomalie, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v32'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Modification', 'Fiche importée : pas de nouvelle anomalie', false, ${"Modifier une ancienne fiche (importée) ne crée aucune nouvelle fiche d'anomalie et n'en supprime aucune : la fiche existante est mise à jour (produit indiqué, quantités, prix, montant). Produit au kg avec Q Facturée / Q Contrôlée : l'écart de pesée est calculé et reporté sur la fiche existante, dont le type passe à « Écart de pesée »."}, '', ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v32', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

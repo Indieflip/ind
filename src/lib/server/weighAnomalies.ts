@@ -1,6 +1,6 @@
 import "server-only";
 import { WEIGH_TYPE } from "@/lib/anomaly";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { num } from "@/lib/format";
 import { legacyOf } from "@/lib/anomaly";
@@ -15,10 +15,14 @@ const eur = (n: number) => `${n.toFixed(2).replace(".", ",")} €`;
  */
 export async function syncWeighAnomalies() {
   const db = getDb();
-  const [gaps, existing] = await Promise.all([
+  const [gaps, existing, importedRecs] = await Promise.all([
     db.select().from(schema.weighGaps),
     db.select().from(schema.anomalies).where(eq(schema.anomalies.source, "weigh")),
+    db.select({ id: schema.receptions.id }).from(schema.receptions).where(isNotNull(schema.receptions.importedFrom)),
   ]);
+  // Anciennes fiches (générées depuis les anomalies importées) : jamais de nouvelle fiche d'anomalie,
+  // l'écart de pesée est reporté sur la fiche d'anomalie existante de la réception
+  const imported = new Set(importedRecs.map((r) => r.id));
   const groups = new Map<string, (typeof gaps)[number][]>();
   for (const g of gaps) {
     const q = num(g.gapQty);
@@ -61,6 +65,22 @@ export async function syncWeighAnomalies() {
       }
       continue;
     }
+    if (first.receptionId && imported.has(first.receptionId)) {
+      const own = await db.select().from(schema.anomalies).where(and(eq(schema.anomalies.receptionId, first.receptionId), isNull(schema.anomalies.consolidatedAt)));
+      const names = new Set(lines.map((g) => g.product.trim().toLowerCase()));
+      const hit = (a: (typeof own)[number]) => names.has((a.productName ?? "").trim().toLowerCase()) || !!a.items?.some((it) => names.has(it.name.trim().toLowerCase()));
+      const target = own.find(hit) ?? (own.length === 1 ? own[0] : own.find((a) => a.type === "missing" || a.type === "quantity"));
+      if (target) {
+        await db.update(schema.anomalies).set({
+          ...values, claimedAmount: values.claimedAmount ?? target.claimedAmount,
+          // Produit indiqué sur la fiche de réception : compte produit repris de la fiche existante s'il manque
+          items: values.items.map((it) => (it.productId ? it : { ...it, productId: target.items?.find((x) => x.name.trim().toLowerCase() === it.name.trim().toLowerCase())?.productId ?? (values.items.length === 1 ? target.productId : null) ?? null })),
+          type: "quantity", problemType: WEIGH_TYPE, source: "weigh", groupKey: key,
+        }).where(eq(schema.anomalies.id, target.id));
+        byKey.set(key, { ...target, groupKey: key });
+      }
+      continue;
+    }
     // Étape de départ (lignes du fichier) d'après la colonne « Réclamation »
     const claimDates = lines.map((g) => g.claimDate).filter((d): d is string => !!d);
     const allFv = lines.every((g) => /fruits/i.test(g.nature ?? ""));
@@ -75,6 +95,7 @@ export async function syncWeighAnomalies() {
     });
   }
   // Groupes disparus (bon modifié, écarts supprimés) : l'anomalie encore à traiter est retirée
-  const gone = existing.filter((a) => a.groupKey && !groups.has(a.groupKey) && !a.consolidatedAt && a.stage === "a_traiter").map((a) => a.id);
+  // (jamais sur une ancienne fiche : la fiche d'anomalie existante est gardée)
+  const gone = existing.filter((a) => a.groupKey && !groups.has(a.groupKey) && !a.consolidatedAt && a.stage === "a_traiter" && !(a.receptionId && imported.has(a.receptionId))).map((a) => a.id);
   if (gone.length) await db.delete(schema.anomalies).where(and(inArray(schema.anomalies.id, gone), isNull(schema.anomalies.consolidatedAt)));
 }
