@@ -40,7 +40,8 @@ export function savingsOf(all: AnomalyLite[]) {
   const withClaim = list.filter((a) => isClaimMode(a.mode));
   // Clôturée « sans suite » : rien de récupéré, jamais comptée dans les économies (même si un montant d'avoir traîne)
   const credits = withClaim.filter((a) => (a.credit ?? 0) > 0 && a.resolution !== "sans_suite");
-  const deferred = withClaim.filter((a) => stageOf(a.stage) === "cloturee" && a.resolution === "livraison");
+  // Livraison différée ou retour de la marchandise : le montant réclamé est récupéré
+  const deferred = withClaim.filter((a) => stageOf(a.stage) === "cloturee" && (a.resolution === "livraison" || a.resolution === "retour"));
   const verifiedCredits = list.filter((a) => !isClaimMode(a.mode) && (a.credit ?? 0) > 0 && a.resolution !== "sans_suite");
   const open = list.filter((a) => isOpenStage(stageOf(a.stage)));
   const waiting = open.filter((a) => stageOf(a.stage) !== "a_traiter");

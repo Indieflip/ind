@@ -47,7 +47,7 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
   const counted = (a: AnomalyLite) => !a.informative;
   const obtainedItems = (xs: AnomalyLite[]) => [
     ...xs.filter((a) => counted(a) && isClaimMode(a.mode) && (a.credit ?? 0) > 0 && a.resolution !== "sans_suite").map((a) => contrib(a, "credit")),
-    ...xs.filter((a) => counted(a) && isClaimMode(a.mode) && stageOf(a.stage) === "cloturee" && a.resolution === "livraison" && !(a.credit ?? 0) && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed")),
+    ...xs.filter((a) => counted(a) && isClaimMode(a.mode) && stageOf(a.stage) === "cloturee" && (a.resolution === "livraison" || a.resolution === "retour") && !(a.credit ?? 0) && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed")),
   ];
   const pendingItems = (xs: AnomalyLite[]) => xs.filter((a) => counted(a) && isClaimMode(a.mode) && (stageOf(a.stage) === "reclamee" || stageOf(a.stage) === "a_verifier") && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
   const todoItems = list.filter((a) => counted(a) && stageOf(a.stage) === "a_traiter" && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
@@ -120,7 +120,7 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
           <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{e.rate}</p>
           <p className="mt-1 text-2xl font-bold tabular-nums">{s.rate == null ? "—" : `${Math.round(s.rate * 100)} %`}</p>
           <p className="mt-0.5 text-xs opacity-80">{e.rateHint}</p>
-          {s.pending.withoutAmount + s.toProcess.count > 0 && <Link href="/reclamations?f=sans-montant" className="mt-1 block text-[11px] font-semibold text-red-700 underline">{e.fillMissing}</Link>}
+          {s.pending.withoutAmount + s.toProcess.count > 0 && <Link href="/anomalies/reclamations?f=sans-montant" className="mt-1 block text-[11px] font-semibold text-red-700 underline">{e.fillMissing}</Link>}
         </div>
       </div>
 
@@ -150,7 +150,7 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
               const xs = list.filter((a) => savingKindOf(a.type) === k);
               const v = savingsOf(xs);
               const credits = xs.filter((a) => !a.informative && isClaimMode(a.mode) && (a.credit ?? 0) > 0 && a.resolution !== "sans_suite").map((a) => contrib(a, "credit"));
-              const deferred = xs.filter((a) => !a.informative && isClaimMode(a.mode) && stageOf(a.stage) === "cloturee" && a.resolution === "livraison" && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
+              const deferred = xs.filter((a) => !a.informative && isClaimMode(a.mode) && stageOf(a.stage) === "cloturee" && (a.resolution === "livraison" || a.resolution === "retour") && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
               const label = e.kinds[k];
               return (
                 <tr key={k}>

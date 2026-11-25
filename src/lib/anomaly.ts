@@ -41,7 +41,8 @@ export const stageOf = (v: string | null | undefined): Stage => (STAGES.includes
 export const isOpenStage = (s: Stage) => s === "a_traiter" || s === "reclamee" || s === "a_verifier";
 
 /** Résolution d'une anomalie clôturée : par un avoir, ou par la marchandise livrée plus tard */
-export const RESOLUTIONS = ["avoir", "livraison", "sans_suite"] as const;
+/** Résolutions : avoir / régularisation, livraison différée, retour de la marchandise au fournisseur, sans suite */
+export const RESOLUTIONS = ["avoir", "livraison", "retour", "sans_suite"] as const;
 export type Resolution = (typeof RESOLUTIONS)[number];
 /**
  * Types de suivi :

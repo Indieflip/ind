@@ -226,8 +226,8 @@ export function ClaimProcedure() {
           <h2 className="mb-3 text-lg font-bold">Quel suivi choisir ?</h2>
           <div className="space-y-2 text-sm">
             <p><span className="font-semibold">Réclamation avec relances</span> : il faut contacter et relancer le fournisseur.</p>
-            <p><span className="font-semibold">Vérification de l'avoir - avec réclamation</span> : la réclamation est faite (souvent sur le BL), il reste à vérifier l'avoir.</p>
-            <p><span className="font-semibold">Vérification de l'avoir - sans réclamation</span> : le fournisseur régularise seul ; rappel après 7 jours (à traiter) ou 15 jours (à vérifier).</p>
+            <p><span className="font-semibold">Avec relance</span> : la réclamation est faite (souvent sur le BL), il reste à vérifier l'avoir.</p>
+            <p><span className="font-semibold">Sans relance</span> : le fournisseur régularise seul ; rappel après 7 jours (à traiter) ou 15 jours (à vérifier).</p>
           </div>
         </div>
       </section>

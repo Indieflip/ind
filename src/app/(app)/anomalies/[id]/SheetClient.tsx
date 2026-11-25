@@ -189,10 +189,29 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
         </div>
       </div>
 
+      {/* Type de suivi : en deuxième, juste après le statut */}
+      <div>
+        <span className="label">{s.mode}</span>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {MODES.map((m) => (
+            <button
+              key={m}
+              type="button"
+              disabled={!editable}
+              onClick={() => { setV({ ...v, mode: m }); setSaved(false); }}
+              className={`rounded-lg border-2 px-2 py-2 text-left text-sm ${v.mode === m ? "border-brand-600 bg-brand-50 font-semibold text-brand-800" : "border-stone-200 bg-white text-stone-500"}`}
+            >
+              {modeIcon(m)} {t.modes[m]}
+              <span className="block text-[11px] font-normal text-stone-500">{s.modeHints[m]}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {stage === "cloturee" && (
         <div>
-          <span className="label">{s.resolution} *</span>
-          <div className="grid grid-cols-3 gap-2">
+          <span className="label">{s.resolution}</span>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {RESOLUTIONS.map((r) => (
               <button
                 key={r}
@@ -224,24 +243,6 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
           )}
         </div>
       )}
-
-      <div>
-        <span className="label">{s.mode}</span>
-        <div className="grid gap-2 sm:grid-cols-3">
-          {MODES.map((m) => (
-            <button
-              key={m}
-              type="button"
-              disabled={!editable}
-              onClick={() => { setV({ ...v, mode: m }); setSaved(false); }}
-              className={`rounded-lg border-2 px-2 py-2 text-left text-sm ${v.mode === m ? "border-brand-600 bg-brand-50 font-semibold text-brand-800" : "border-stone-200 bg-white text-stone-500"}`}
-            >
-              {modeIcon(m)} {t.modes[m]}
-              <span className="block text-[11px] font-normal text-stone-500">{s.modeHints[m]}</span>
-            </button>
-          ))}
-        </div>
-      </div>
 
       <div>
         <label className="block">

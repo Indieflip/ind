@@ -139,9 +139,9 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/80"><Icon name="alert" className="h-4 w-4" /> {s.title} · {fmtNo("anomaly", number)} - {fmtDate(a.createdAt ?? rec?.deliveredAt, locale)}</p>
             <h1 className="text-2xl font-bold leading-tight sm:text-3xl">{sentence(supplier?.name ?? a.supplierName)} — {problemType}</h1>
             {itemsLabel && problemType !== t.anomalies.types.missing_bl && problemType !== WEIGH_TYPE && <p className="text-base text-white/90">{itemsLabel}</p>}
-            <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-sm">
-              {rec && <Link href={`/receptions/${rec.id}`} className="font-medium text-white underline decoration-white/50 hover:decoration-white">{t.receptions.sheetLink} {fmtNo("reception", numbers.get(rec.id))} →</Link>}
-              {a.claimNo && <Link href={`/reclamations?n=${a.claimNo}${claimYear ? `&y=${claimYear}` : ""}`} className="font-medium text-white underline decoration-white/50 hover:decoration-white">{t.claims.title} {fmtNo("claim", a.claimNo)} →</Link>}
+            <div className="flex flex-col items-start gap-0.5 pt-1 text-sm">
+              {rec && <Link href={`/receptions/${rec.id}`} className="font-medium text-white underline decoration-white/50 hover:decoration-white">{t.receptions.sheetLink} {fmtNo("reception", numbers.get(rec.id))}</Link>}
+              {a.claimNo && <Link href={`/anomalies/reclamations?n=${a.claimNo}${claimYear ? `&y=${claimYear}` : ""}`} className="font-medium text-white underline decoration-white/50 hover:decoration-white">{t.claims.title} {fmtNo("claim", a.claimNo)}</Link>}
             </div>
           </div>
           <div className="flex flex-col items-end gap-1.5 text-right">

@@ -60,7 +60,7 @@ export function ActionCard({ id, stage, resolution, editable, claimed, mailHref,
     } catch { await appAlert(t.sheet.saveFailed); }
   });
   const follow = (note: string) => run(() => followUpTodayAction(id, note));
-  const close = async (res: "sans_suite" | "livraison") => { if (await appConfirm(res === "sans_suite" ? c.confirmNoFollow : c.confirmDelivery)) run(() => moveAnomalyAction(id, "cloturee", res)); };
+  const close = async (res: "sans_suite" | "livraison" | "retour") => { if (await appConfirm(res === "sans_suite" ? c.confirmNoFollow : res === "retour" ? c.confirmReturn : c.confirmDelivery)) run(() => moveAnomalyAction(id, "cloturee", res)); };
 
   const next =
     stage === "a_traiter" ? `${c.nextClaim} ${supplier}. ${c.nextClaimMail}`
@@ -94,6 +94,7 @@ export function ActionCard({ id, stage, resolution, editable, claimed, mailHref,
             <button type="button" className={stage === "a_traiter" ? secondary : primary} disabled={pending} onClick={() => setCredit({ amount: claimed, number: "", date: new Date().toISOString().slice(0, 10), kind: "avoir" })}>€ {c.creditReceived}</button>
           )}
           {stage !== "a_traiter" && <button type="button" className={secondary} disabled={pending} onClick={() => close("livraison")}>{t.resolutions.livraison}</button>}
+          {!missingBl && <button type="button" className={secondary} disabled={pending} onClick={() => close("retour")}>{t.resolutions.retour}</button>}
           <button type="button" className={ghost} disabled={pending} onClick={() => close("sans_suite")}>{t.resolutions.sans_suite}</button>
           {phone && <a href={`tel:${phone}`} className={`${ghost} inline-flex items-center`}>☎ {phone}</a>}
         </div>

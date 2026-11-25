@@ -55,7 +55,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     receptionNumbers(),
     // Documents des bons (type, numéro, date) et fournisseurs, pour les colonnes Fournisseur et BL / Facture
     db
-      .select({ id: a.id, documents: schema.receptions.documents, blNumber: schema.receptions.blNumber, lineDoc: schema.receptionLines.document, supplier: schema.suppliers.name })
+      .select({ id: a.id, documents: schema.receptions.documents, blNumber: schema.receptions.blNumber, lineDoc: schema.receptionLines.document, linePrice: schema.receptionLines.unitPrice, supplier: schema.suppliers.name })
       .from(a)
       .leftJoin(schema.receptions, eq(schema.receptions.id, a.receptionId))
       .leftJoin(schema.receptionLines, eq(schema.receptionLines.id, a.lineId))
@@ -74,7 +74,10 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     if (!x.receptionId && !(x.reference ?? "").trim()) out.push(M.reference);
     if (!x.items?.length && !(x.productName ?? "").trim()) out.push(M.product);
     else if (x.items?.some((i) => i.productId == null)) out.push(M.productLink);
-    if (x.claimedAmount == null && x.type !== "missing_bl") out.push(M.amount);
+    // Montant : manquant seulement si un prix est connu (sur le bon ou sur un produit de la fiche) ;
+    // un bon sans prix (« Non indiqué sur le bon ») ne permet pas de chiffrer : rien à compléter
+    const hasPrice = (x.lineId ? extra.get(x.id)?.linePrice != null : false) || !!x.items?.some((i) => i.price != null);
+    if (x.claimedAmount == null && x.type !== "missing_bl" && (hasPrice || (!x.lineId && !x.items?.length))) out.push(M.amount);
     if (x.stage === "cloturee" && !x.resolution) out.push(M.resolution);
     if (x.resolution === "avoir") {
       if (x.creditAmount == null) out.push(M.creditAmount);

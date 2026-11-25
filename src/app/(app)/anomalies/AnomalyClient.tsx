@@ -120,7 +120,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
       key: "number", width: "4rem", label: a.number, text: (r) => (r.number != null ? fmtNo("anomaly", r.number) : ""), sort: (r) => r.number, href: (r) => `/anomalies/${r.id}`,
       render: (r) => (r.number == null ? "—" : <strong>{fmtNo("anomaly", r.number)}</strong>),
     },
-    { key: "date", width: "5.25rem", label: a.deliveryDate, text: (r) => r.date, sort: (r) => r.dateSort, date: (r) => dayOf(r.dateSort), className: "" },
+    { key: "date", width: "5.25rem", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, date: (r) => dayOf(r.dateSort), className: "" },
     { key: "nature", width: "4.5rem", label: a.nature, text: (r) => r.nature },
     { key: "supplier", width: "7.5%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => (r.supplierId ? <Link className="text-brand-700 hover:underline" href={`/mercurial/fournisseurs/${r.supplierId}`}>{sentence(r.supplier)}</Link> : sentence(r.supplier)) },
     { key: "reference", width: "7%", label: a.blInvoice, text: (r) => r.reference, render: (r) => (r.receptionId ? <Link className="text-brand-700 hover:underline" href={`/receptions/${r.receptionId}`}>{r.reference || "—"}</Link> : r.reference || "—") },
@@ -173,6 +173,11 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
     key: "review", width: "6.5rem", label: t.sheet.reviewLabel, text: (r) => reviewLabel(r.review), options: Object.values(t.sheet.reviews),
     render: (r) => <ReviewSelect id={r.id} value={r.review ?? ""} disabled={!canManage} />,
   });
+  // Montant de la fiche (montant réclamé = somme des produits)
+  shownCols.push({ key: "claimed", width: "5.5rem", label: a.amount, align: "right", text: (r) => (r.claimed != null ? fmtMoney(r.claimed, locale) : ""), sort: (r) => r.claimed, filterable: false, className: "tabular-nums" });
+  // Ordre des colonnes : Date, N°, Nature, Fournisseur, BL / Facture, Produit, Montant, Type d'anomalie, Statut, Contrôle, À compléter
+  const ORDER = ["date", "number", "nature", "supplier", "reference", "product", "claimed", "problemType", "stage", "review", "missing", "edit"];
+  shownCols.sort((x, y) => (ORDER.indexOf(x.key) + 1 || 99) - (ORDER.indexOf(y.key) + 1 || 99));
   return (
     <>
 

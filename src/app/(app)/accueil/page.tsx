@@ -45,11 +45,11 @@ export default async function HomePage() {
     const sum = (xs: typeof open) => xs.reduce((s, x) => s + Number(x.claimedAmount ?? 0), 0);
     if (late.length) tasks.push({ key: "late", label: h.late, detail: money(sum(late)), count: late.length, href: "/anomalies", tone: "red", icon: "alert" });
     if (todo.length) tasks.push({ key: "todo", label: h.anomaliesTodo, detail: money(sum(todo)), count: todo.length, href: "/anomalies", tone: "red", icon: "alert" });
-    if (toCheck.length) tasks.push({ key: "check", label: h.toCheck, detail: money(sum(toCheck)), count: toCheck.length, href: "/reclamations", tone: "sky", icon: "search" });
+    if (toCheck.length) tasks.push({ key: "check", label: h.toCheck, detail: money(sum(toCheck)), count: toCheck.length, href: "/anomalies/reclamations", tone: "sky", icon: "search" });
     if (verify.length) tasks.push({ key: "verify", label: h.verifyDue, detail: money(sum(verify)), count: verify.length, href: "/anomalies", tone: "sky", icon: "search" });
-    if (noAmount.length) tasks.push({ key: "noAmount", label: h.noAmount, count: noAmount.length, href: "/reclamations?f=sans-montant", tone: "amber", icon: "euro" });
+    if (noAmount.length) tasks.push({ key: "noAmount", label: h.noAmount, count: noAmount.length, href: "/anomalies/reclamations?f=sans-montant", tone: "amber", icon: "euro" });
     const [credits] = await db.select({ n: count() }).from(a).where(and(eq(a.stage, "cloturee"), eq(a.resolution, "avoir"), isNull(a.creditAmount)));
-    if (credits.n) tasks.push({ key: "creditMissing", label: h.creditMissing, count: credits.n, href: "/reclamations", tone: "amber", icon: "euro" });
+    if (credits.n) tasks.push({ key: "creditMissing", label: h.creditMissing, count: credits.n, href: "/anomalies/reclamations", tone: "amber", icon: "euro" });
   }
 
   // Fiche de réception de marchandises : exports automatiques dus (rattrapage si la tâche du soir n'est pas passée)

@@ -153,7 +153,7 @@ export function Kanban({ rows, canManage }: { rows: AnomalyRow[]; canManage: boo
                     <div className="mt-1.5 space-y-1 rounded-md bg-emerald-50 p-1.5">
                       <p className="text-[11px] font-semibold text-emerald-900">{k.howResolved}</p>
                       <div className="flex flex-wrap gap-1">
-                        {(["avoir", "livraison", "sans_suite"] as const).map((res) => (
+                        {(["avoir", "livraison", "retour", "sans_suite"] as const).map((res) => (
                           <button key={res} type="button" disabled={pending} className="rounded border border-emerald-300 bg-white px-1.5 py-0.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-100" onClick={() => move(r.id, "cloturee", res)}>{t.resolutions[res]}</button>
                         ))}
                         <button type="button" className="px-1 text-[11px] text-stone-500" onClick={() => setClosing(null)}>✕</button>

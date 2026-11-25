@@ -1019,6 +1019,23 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v1
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v19', '1') on conflict (key) do nothing`);
 }
 
+// Dev > Développement : suivi de la réclamation (ordre, libellés, Retour marchandise), colonnes Anomalies / Réclamations, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v20'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  const rows = [
+    ["anomaly", "Suivi de la réclamation", "Ordre", false, "Statut, Type de suivi (Réclamation avec relances / Avec relance / Sans relance), puis Résolution à la clôture.", ""],
+    ["anomaly", "Suivi de la réclamation", "Résolution", false, "Avoir / régularisation, Livraison différée, Retour marchandise (compte comme récupéré dans les économies), Sans suite (jamais compté).", ""],
+    ["anomaly", "À compléter", "Montant", false, "Signalé seulement si un prix est connu (sur le bon ou un produit de la fiche) : un bon sans prix ne permet pas de chiffrer.", ""],
+    ["anomaly", "Liste", "Colonnes", false, "Date, N°, Nature, Fournisseur, BL / Facture, Produit, Montant, Type d'anomalie, Statut, Contrôle, À compléter.", ""],
+    ["claim", "Réclamations", "Onglet et colonnes", false, "Onglet du menu Anomalies. Colonnes : Date, N°, Fournisseur, BL / Facture, Montant, Suivi, Dernière action, Statut.", ""],
+  ];
+  for (const [i, r] of rows.entries()) {
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values (${r[0]}, ${r[1]}, ${r[2]}, ${r[3]}, ${r[4]}, ${r[5]}, ${pos + i})`);
+  }
+  await db.execute(sql`update dev_fields set field = 'Type de suivi', rule = replace(replace(rule, 'Vérification de l''avoir - avec réclamation', 'Avec relance'), 'Vérification de l''avoir - sans réclamation', 'Sans relance') where rule like '%Vérification de l''avoir%' and field = 'Type de suivi'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v20', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

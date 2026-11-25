@@ -40,7 +40,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/receptions", label: t.nav.receptions, icon: "truck", show: can.viewReceptions(r) },
     { href: "/mercurial", label: t.nav.mercurial, icon: "list", show: can.viewMercurial(r) },
     { href: "/anomalies", label: t.nav.anomalies, icon: "alert", show: can.viewAnomalies(r) },
-    { href: "/reclamations", label: t.nav.claims, icon: "inbox", show: can.viewAnomalies(r) },
     { href: "/reporting", label: t.nav.reporting, icon: "chart", show: true },
     { href: "/protocoles", label: t.nav.protocols, icon: "book", show: can.viewProtocols(r) },
     { href: "/settings", label: t.nav.settings, icon: "gear", show: r === "admin" },

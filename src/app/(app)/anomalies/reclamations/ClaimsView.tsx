@@ -13,7 +13,7 @@ import { DataTable, type Col } from "@/components/table/DataTable";
 
 export interface ClaimViewRow {
   id: number; claimNo: number; year?: number; consolidated: boolean; date: string; dateIso: string; supplier: string; supplierId: number | null; reference: string; product: string; subject: string;
-  mode: string; stage: Stage; resolution: string | null; claimed: number | null; credit: number | null; days: number; due: boolean; source: string;
+  mode: string; lastActionAt?: string; lastActionLabel?: string; stage: Stage; resolution: string | null; claimed: number | null; credit: number | null; days: number; due: boolean; source: string;
 }
 
 /** Vignettes Réclamée / À vérifier sur facture / Clôturée / Annulée + tableau (clic → fiche d'anomalie) */
@@ -52,14 +52,13 @@ export function ClaimsView({ rows: allRows, canManage, initialFilter, claimNo = 
     { key: "date", width: "5rem", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateIso, date: (r) => dayOf(r.dateIso) },
     { key: "supplier", width: "10%", label: t.common.supplier, text: (r) => r.supplier, render: (r) => sentence(r.supplier) },
     { key: "reference", width: "9%", label: t.anomalies.blInvoice, text: (r) => r.reference },
-    { key: "product", width: "11%", label: t.common.product, text: (r) => r.product },
-    { key: "subject", label: c.subject, text: (r) => r.subject, keepCase: true, className: "text-stone-700" },
     { key: "mode", width: "6.5rem", label: c.mode, text: (r) => t.modes[r.mode as "reclamation"], options: Object.values(t.modes), render: (r) => <span className="text-xs">{modeIcon(r.mode)} {t.modes[r.mode as "reclamation"]}</span> },
     {
       key: "claimed", width: "6rem", label: c.amount, align: "right", text: (r) => (r.claimed != null ? fmtMoney(r.claimed, locale) : ""), sort: (r) => r.claimed,
       // Montant manquant : saisie directe dans la ligne
       render: (r) => (canManage && r.claimed == null && isOpen(r) ? <AmountCell id={r.id} /> : r.claimed != null ? fmtMoney(r.claimed, locale) : "—"),
     },
+    { key: "lastAction", width: "6rem", label: c.lastAction, text: (r) => r.lastActionLabel ?? "", sort: (r) => r.lastActionAt ?? "", date: (r) => r.lastActionAt ?? null, className: "whitespace-nowrap" },
     {
       key: "stage", width: "8rem", label: t.common.status, text: (r) => t.stages[r.stage], options: Object.values(t.stages),
       render: (r) => (
@@ -71,12 +70,15 @@ export function ClaimsView({ rows: allRows, canManage, initialFilter, claimNo = 
       ),
     },
   ];
+  // Ordre : Date, N°, Fournisseur, BL / Facture, Montant, Suivi, Dernière action, Statut
+  const ORDER = ["date", "claimNo", "supplier", "reference", "claimed", "mode", "lastAction", "stage"];
+  cols.sort((x, y) => (ORDER.indexOf(x.key) + 1 || 99) - (ORDER.indexOf(y.key) + 1 || 99));
   return (
     <>
       {claimNo && (
         <p className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-900">
           <strong>{fmtNo("claim", claimNo)}</strong> · {rows.length} {t.anomalies.sheetsLabel}
-          <Link href="/reclamations" className="ml-auto text-brand-700 underline">✕ {c.all}</Link>
+          <Link href="/anomalies/reclamations" className="ml-auto text-brand-700 underline">✕ {c.all}</Link>
         </p>
       )}
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
