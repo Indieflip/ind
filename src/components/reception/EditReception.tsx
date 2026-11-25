@@ -58,15 +58,21 @@ export function EditReception({ id, initialDraft, number }: { id: number; initia
       setOpen((o) => ({ ...o, delivery: true }));
       return setError(E.deliveryMissing);
     }
+    // Fiche importée (générée depuis les anomalies importées) : aucun champ obligatoire ; sans décision = Conforme
+    if (draft.imported) return send({ ...draft, lines: draft.lines.map((l) => (l.decision ? l : { ...l, decision: "conform" as const })) });
     const undecided = draft.lines.find((l) => !l.decision);
     if (undecided) { goLine(undecided.key); return setError(`${draft.lines.filter((l) => !l.decision).length} ${t.wizard.undecided}`); }
     const noPrice = draft.lines.filter((l) => l.productName.trim() && !l.unitPrice.trim() && !l.priceNotShown);
     if (noPrice.length) { goLine(noPrice[0].key); return setError(`${noPrice.length} ${t.wizard.missingPrice}`); }
     const noDlc = draft.lines.filter((l) => needsDlc(l, catalog));
     if (noDlc.length) { goLine(noDlc[0].key); return setError(`${noDlc.length} ${t.wizard.missingDlc}`); }
+    return send(draft);
+  }
+
+  async function send(d: Draft) {
     setSaving(true);
     try {
-      await sendReception(toPayload(draft), id);
+      await sendReception(toPayload(d), id);
       router.push(`/receptions/${id}`);
       router.refresh();
     } catch (e) {
@@ -92,6 +98,7 @@ export function EditReception({ id, initialDraft, number }: { id: number; initia
         <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">{E.title} · {number}</span>
       </div>
       <h1 className="text-xl font-bold leading-tight">{draft.supplierName}</h1>
+      {draft.imported && <p className="rounded-lg bg-violet-50 px-3 py-2 text-sm text-violet-800">{E.importedHint}</p>}
 
       {section("delivery", E.delivery, E.deliveryHint, <StepDelivery draft={draft} setDraft={setDraft} catalog={catalog} editId={id} />)}
       {section("products", `${E.products} (${draft.lines.length})`, E.productsHint, <StepCheck draft={draft} setDraft={setDraft} updateLine={updateLine} catalog={catalog} />)}

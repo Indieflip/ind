@@ -109,6 +109,7 @@ export const en: Dict = {
     unsaved: "Modifications non enregistrées",
     saveFailed: "La fiche n'a pas pu être enregistrée",
     deliveryMissing: "Indiquez le fournisseur et la date de livraison.",
+    importedHint: "Sheet generated from imported anomalies: no required field (price, use-by date, temperature, conformity). A line without decision is saved as Compliant.",
   },
   table: {
     between: "Between…",

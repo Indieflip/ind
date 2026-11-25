@@ -102,6 +102,8 @@ export interface Draft {
   /** Étape 1 : qualité de la photo confirmée, ou livraison sans BL */
   photoOk?: boolean;
   noBl?: boolean;
+  /** Fiche générée depuis les anomalies importées : aucun champ obligatoire */
+  imported?: boolean;
   blRead: "idle" | "running" | "done" | "none" | "unavailable" | "error";
   lines: DraftLine[];
   reservesText: string;

@@ -79,6 +79,7 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     receiverName: rec.receiverName ?? "",
     receiverSignature: rec.receiverSignatureUrl ?? "",
     blRead: "idle",
+    imported: !!rec.importedFrom,
     photoOk: photos.some((p) => p.kind === "bl"),
     noBl: !photos.some((p) => p.kind === "bl"),
     lines: draftLines,

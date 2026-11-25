@@ -65,6 +65,7 @@ export function StepCheck({
           catalog={catalog}
           supplierId={draft.supplierId}
           truckTemp={draft.truckTemp}
+          optional={!!draft.imported}
           onChange={(patch) => updateLine(l.key, patch)}
           onRemove={async () => await appConfirm(t.wizard.removeLineConfirm) && setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
         />
@@ -81,6 +82,7 @@ function LineCard({
   onChange,
   onRemove,
   truckTemp,
+  optional = false,
 }: {
   line: DraftLine;
   catalog?: Catalog;
@@ -88,6 +90,8 @@ function LineCard({
   onChange: (patch: Partial<DraftLine>) => void;
   onRemove: () => void;
   truckTemp?: string;
+  /** Fiche importée : aucun champ signalé comme obligatoire */
+  optional?: boolean;
 }) {
   const { t, locale } = useI18n();
   const cat = catalog?.categories.find((c) => c.id === line.categoryId);
@@ -200,13 +204,13 @@ function LineCard({
               <Icon name="thermo" className="h-3.5 w-3.5" /> {t.wizard.temperature}
               <span className="text-stone-400">≤ {cat.conformMax}</span>
             </label>
-            <input className={`input py-2 ${ev.issues.includes("temp_missing") ? "border-amber-400" : ""}`} inputMode="decimal" value={line.temperature} onChange={(e) => onChange({ temperature: e.target.value })} />
+            <input className={`input py-2 ${!optional && ev.issues.includes("temp_missing") ? "border-amber-400" : ""}`} inputMode="decimal" value={line.temperature} onChange={(e) => onChange({ temperature: e.target.value })} />
           </div>
         )}
         {!noDlc && (
           <div>
             <label className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.dlc}{dlcRequired(line, catalog) && <span className="ml-0.5 text-red-600">*</span>}</label>
-            <DateField className={`py-2 ${needsDlc(line, catalog) ? "border-amber-400 bg-amber-50" : ""}`} value={line.dlc} onChange={(x) => onChange({ dlc: x })} />
+            <DateField className={`py-2 ${!optional && needsDlc(line, catalog) ? "border-amber-400 bg-amber-50" : ""}`} value={line.dlc} onChange={(x) => onChange({ dlc: x })} />
           </div>
         )}
         {!noDlc && field("lot", t.wizard.lot)}
@@ -216,7 +220,7 @@ function LineCard({
             <span className="ml-1 font-normal text-stone-400">{rangeLabel}</span>
             {line.priceLocked && <span className="ml-1 badge bg-sky-100 text-sky-800">🔒 {t.wizard.lockedBadge}</span>}
           </label>
-          <MoneyInput className={`input py-2 ${!line.unitPrice.trim() && !line.priceNotShown ? "border-amber-400 bg-amber-50" : ""}`} value={line.unitPrice} disabled={!!line.priceNotShown} onChange={(e) => onChange({ unitPrice: e.target.value })} />
+          <MoneyInput className={`input py-2 ${!optional && !line.unitPrice.trim() && !line.priceNotShown ? "border-amber-400 bg-amber-50" : ""}`} value={line.unitPrice} disabled={!!line.priceNotShown} onChange={(e) => onChange({ unitPrice: e.target.value })} />
           {/* Soit un prix, soit « Non indiqué sur le bon » (l'un ou l'autre pour valider le bon) */}
           <label className="mt-1 flex items-center gap-1.5 text-xs text-stone-600">
             <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={!!line.priceNotShown} onChange={(e) => {

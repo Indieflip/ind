@@ -107,6 +107,7 @@ export const fr = {
     unsaved: "Modifications non enregistrées",
     saveFailed: "La fiche n'a pas pu être enregistrée",
     deliveryMissing: "Indiquez le fournisseur et la date de livraison.",
+    importedHint: "Fiche générée depuis les anomalies importées : aucun champ obligatoire (prix, DLC, température, conformité). Une ligne sans décision est enregistrée Conforme.",
   },
   table: {
     between: "Entre…",
@@ -143,7 +144,7 @@ export const fr = {
     anomalyCol: "Anomalie",
     sheetLink: "Fiche de réception",
     importedState: "Importée",
-    importedHint: "Fiche générée à partir des anomalies importées : non consolidée, jamais exportée automatiquement",
+    importedHint: "Fiche générée à partir des anomalies importées : non consolidée, jamais exportée automatiquement, sans champ obligatoire",
     listTitle: "Liste des fiches de réception",
     numberLong: "N°",
     blInvoice: "BL / Facture",
