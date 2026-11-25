@@ -239,6 +239,13 @@
       "when": 1795269071425,
       "tag": "0033_product_loss_pct",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1795635476953,
+      "tag": "0034_anomaly_mode_default",
+      "breakpoints": true
     }
   ]
 }

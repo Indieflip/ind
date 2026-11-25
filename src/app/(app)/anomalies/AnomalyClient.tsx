@@ -88,7 +88,7 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
 export interface AnomalyRow {
   id: number; number: number | null; numberFinal: boolean; date: string; dateSort: string; nature: string; supplier: string; supplierId: number | null; reference: string; product: string; problem: string;
   action: string; lastActionAt: string; result: string; saving: number | null; status: string; statusLabel: string;
-  type: string; nextActionAt: string; due: boolean; verify?: "a_traiter" | "a_verifier" | null; receptionId: number | null; photoUrl: string | null; consolidated?: string;
+  type: string; nextActionAt: string; due: boolean; verify?: "a_traiter" | "en_attente" | null; receptionId: number | null; photoUrl: string | null; consolidated?: string;
   stage: string; resolution: string | null; mode: string; claimed: number | null; days: number; delay: number; closedAt: string | null;
   review?: string;
   problemType?: string;
@@ -174,7 +174,7 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
     render: (r) => <ReviewSelect id={r.id} value={r.review ?? ""} disabled={!canManage} />,
   });
   // Montant de la fiche (montant réclamé = somme des produits)
-  shownCols.push({ key: "claimed", width: "5.5rem", label: a.amount, align: "right", text: (r) => (r.claimed != null ? fmtMoney(r.claimed, locale) : ""), sort: (r) => r.claimed, filterable: false, className: "tabular-nums" });
+  shownCols.push({ key: "claimed", width: "5.5rem", label: a.amount, align: "right", text: (r) => (r.claimed != null ? fmtMoney(r.claimed, locale) : ""), sort: (r) => r.claimed, range: (r) => r.claimed, className: "tabular-nums" });
   // Ordre des colonnes : Date, N°, Fournisseur, BL / Facture, Nature, Montant, Type d'anomalie, Statut, Contrôle, À compléter
   const ORDER = ["date", "number", "supplier", "reference", "nature", "claimed", "problemType", "stage", "review", "missing", "edit"];
   // Colonne Produit retirée (le produit est dans la fiche)

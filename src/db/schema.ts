@@ -302,7 +302,7 @@ export const anomalies = pgTable(
     /** Résolution d'une anomalie clôturée : avoir | livraison (livraison différée) | sans_suite */
     resolution: text("resolution"),
     /** reclamation (démarche active, relances) | verification (on vérifie seulement l'avoir / la facture) */
-    mode: text("mode").notNull().default("reclamation"),
+    mode: text("mode").notNull().default("verification_reclamation"),
     /** Montant en jeu (réclamé) ; l'avoir obtenu est creditAmount (Économie HT) */
     claimedAmount: numeric("claimed_amount", { precision: 12, scale: 2 }),
     /** reception | manual | file | weigh */

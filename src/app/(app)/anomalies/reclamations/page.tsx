@@ -56,7 +56,7 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
             id: x.id, claimNo: x.claimNo ?? 0, year: parisYear(x.createdAt), consolidated: !!x.consolidatedAt, date: fmtDate(x.createdAt, locale), dateIso: x.createdAt.toISOString(), supplier: supplier ?? x.supplierName, supplierId: x.supplierId,
             reference: (x.receptionId ? lineDocLabel(documents, lineDoc, blNumber) : null) ?? x.reference ?? "", product: x.productName ?? "",
             subject: x.description, mode: x.mode, lastActionAt: x.lastActionAt ?? undefined, lastActionLabel: x.lastActionAt ? fmtDate(x.lastActionAt, locale) : "", stage, resolution: x.resolution, claimed: num(x.claimedAmount), credit: num(x.creditAmount),
-            days, due: (stage === "reclamee" || stage === "a_verifier") && isClaimMode(x.mode) && days >= delay, source: x.source,
+            days, due: stage === "en_attente" && isClaimMode(x.mode) && days >= delay, source: x.source,
           };
         })}
       />

@@ -34,12 +34,12 @@ export default async function HomePage() {
 
   // Anomalies et réclamations
   if (can.viewAnomalies(r)) {
-    const open = await db.select().from(a).where(and(or(eq(a.stage, "a_traiter"), eq(a.stage, "reclamee"), eq(a.stage, "a_verifier"))));
+    const open = await db.select().from(a).where(and(or(eq(a.stage, "a_traiter"), eq(a.stage, "en_attente"))));
     const processes = await supplierProcesses();
     const now = new Date();
     const todo = open.filter((x) => stageOf(x.stage) === "a_traiter");
     const late = open.filter((x) => stageOf(x.stage) !== "a_traiter" && isClaimMode(x.mode) && daysSince(x.lastActionAt, x.createdAt, now) >= (processes.find(x.supplierId, x.supplierName)?.delay ?? DEFAULT_FOLLOW_UP_DAYS));
-    const toCheck = open.filter((x) => stageOf(x.stage) === "a_verifier");
+    const toCheck = open.filter((x) => stageOf(x.stage) === "en_attente" && !isClaimMode(x.mode));
     const noAmount = open.filter((x) => x.claimedAmount == null);
     const verify = open.filter((x) => verificationDue(x.stage, x.mode, daysSince(x.lastActionAt, x.createdAt, now)));
     const sum = (xs: typeof open) => xs.reduce((s, x) => s + Number(x.claimedAmount ?? 0), 0);

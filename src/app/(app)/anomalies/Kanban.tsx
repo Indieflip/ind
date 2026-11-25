@@ -10,9 +10,9 @@ import { useI18n } from "@/lib/i18n/client";
 import { fmtMoney, sentence } from "@/lib/format";
 import type { AnomalyRow } from "./AnomalyClient";
 
-const COLUMNS: Stage[] = ["a_traiter", "reclamee", "a_verifier", "cloturee"];
-const NEXT: Partial<Record<Stage, Stage>> = { a_traiter: "reclamee", reclamee: "a_verifier", a_verifier: "cloturee" };
-const PREV: Partial<Record<Stage, Stage>> = { reclamee: "a_traiter", a_verifier: "reclamee", cloturee: "a_verifier" };
+const COLUMNS: Stage[] = ["a_traiter", "en_attente", "cloturee"];
+const NEXT: Partial<Record<Stage, Stage>> = { a_traiter: "en_attente", en_attente: "cloturee" };
+const PREV: Partial<Record<Stage, Stage>> = { en_attente: "a_traiter", cloturee: "en_attente" };
 
 /** Rappel du jour : réclamations sans nouvelle depuis le délai du fournisseur, et anomalies à traiter */
 export function DueBox({ rows }: { rows: AnomalyRow[] }) {
@@ -56,7 +56,7 @@ export function DueBox({ rows }: { rows: AnomalyRow[] }) {
             {verify.map((r) => (
               <li key={r.id} className="flex flex-wrap items-center gap-2">
                 <span className="badge bg-sky-100 text-sky-800">{r.days} {k.days}</span>
-                <span className="badge bg-stone-100 text-stone-700">{r.verify === "a_verifier" ? k.verifyCheck : k.verifyTodo}</span>
+                <span className="badge bg-stone-100 text-stone-700">{r.verify === "en_attente" ? k.verifyCheck : k.verifyTodo}</span>
                 <strong>{sentence(r.supplier)}</strong> · {r.product || r.problem}
                 <Link className="ml-auto text-xs font-semibold text-sky-800 underline" href={`/anomalies/${r.id}`}>{k.verifyOpen}</Link>
               </li>

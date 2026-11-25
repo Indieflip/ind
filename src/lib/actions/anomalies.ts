@@ -213,7 +213,7 @@ export async function followUpTodayAction(id: number, note: string) {
   const d = new Date();
   const label = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(2)}`;
   const line = `${label} : ${note.trim() || "relance"}`;
-  const stage = stageOf(cur.stage) === "a_traiter" ? "reclamee" : stageOf(cur.stage);
+  const stage = stageOf(cur.stage) === "a_traiter" ? "en_attente" : stageOf(cur.stage);
   await db.update(schema.anomalies).set({
     followUp: [cur.followUp, line].filter(Boolean).join("\n"), lastActionAt: d.toISOString().slice(0, 10), stage, ...legacyOf(stage, cur.resolution),
   }).where(eq(schema.anomalies.id, id));

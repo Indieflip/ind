@@ -35,8 +35,7 @@ const AUTO: { title: string; items: string[] }[] = [
 
 const STAGES: { label: string; text: string; color: string }[] = [
   { label: "À traiter", text: "Créée, rien n'est encore fait", color: "border-t-red-500" },
-  { label: "Réclamée", text: "Mail au fournisseur ; relance au délai de son process (3 jours par défaut)", color: "border-t-amber-500" },
-  { label: "À vérifier sur facture", text: "Régularisation annoncée, à contrôler", color: "border-t-sky-500" },
+  { label: "En attente", text: "Réclamation envoyée (mail Outlook regroupant les fiches du fournisseur, ou téléphone) ; retour mail, avoir / régul, livraison ou retour marchandise ; relance au délai du fournisseur", color: "border-t-amber-500" },
   { label: "Clôturée", text: "Avec sa résolution", color: "border-t-brand-600" },
 ];
 

@@ -22,12 +22,12 @@ export function ClaimsView({ rows: allRows, canManage, initialFilter, claimNo = 
   const rows = claimNo ? allRows.filter((r) => r.claimNo === claimNo && (!claimYear || r.year === claimYear)) : allRows;
   const { t, locale } = useI18n();
   const c = t.claims;
-  const tiles: Stage[] = ["reclamee", "a_verifier", "cloturee", "annulee"];
+  const tiles: Stage[] = ["cloturee", "annulee"];
   const [filter, setFilter] = useState<Stage | "open" | "missing" | "all">(initialFilter ?? "all");
-  const isOpen = (r: ClaimViewRow) => r.stage === "reclamee" || r.stage === "a_verifier" || r.stage === "a_traiter";
+  const isOpen = (r: ClaimViewRow) => r.stage === "en_attente" || r.stage === "a_traiter";
   const missing = rows.filter((r) => isOpen(r) && r.claimed == null);
   const counts = Object.fromEntries(tiles.map((s) => [s, rows.filter((r) => r.stage === s).length])) as Record<Stage, number>;
-  const shown = filter === "all" ? rows : filter === "open" ? rows.filter((r) => r.stage === "reclamee" || r.stage === "a_verifier") : filter === "missing" ? missing : rows.filter((r) => r.stage === filter);
+  const shown = filter === "all" ? rows : filter === "open" ? rows.filter((r) => r.stage === "en_attente") : filter === "missing" ? missing : rows.filter((r) => r.stage === filter);
   const sum = (k: "claimed" | "credit") => shown.reduce((s, r) => s + (r[k] ?? 0), 0);
   const [sel, setSel] = useState<Set<string | number>>(new Set());
   const [busy, startBusy] = useTransition();
@@ -54,7 +54,7 @@ export function ClaimsView({ rows: allRows, canManage, initialFilter, claimNo = 
     { key: "reference", width: "9%", label: t.anomalies.blInvoice, text: (r) => r.reference },
     { key: "mode", width: "6.5rem", label: c.mode, text: (r) => t.modes[r.mode as "reclamation"], options: Object.values(t.modes), render: (r) => <span className="text-xs">{modeIcon(r.mode)} {t.modes[r.mode as "reclamation"]}</span> },
     {
-      key: "claimed", width: "6rem", label: c.amount, align: "right", text: (r) => (r.claimed != null ? fmtMoney(r.claimed, locale) : ""), sort: (r) => r.claimed,
+      key: "claimed", width: "6rem", label: c.amount, align: "right", text: (r) => (r.claimed != null ? fmtMoney(r.claimed, locale) : ""), sort: (r) => r.claimed, range: (r) => r.claimed,
       // Montant manquant : saisie directe dans la ligne
       render: (r) => (canManage && r.claimed == null && isOpen(r) ? <AmountCell id={r.id} /> : r.claimed != null ? fmtMoney(r.claimed, locale) : "—"),
     },
@@ -65,7 +65,7 @@ export function ClaimsView({ rows: allRows, canManage, initialFilter, claimNo = 
         <div className="space-y-0.5">
           <span className={`badge ${stageStyles[r.stage]}`}>{t.stages[r.stage]}</span>
           {r.stage === "cloturee" && r.resolution && <div className="text-[11px] text-emerald-800">{t.resolutions[r.resolution as "avoir"]}</div>}
-          {(r.stage === "reclamee" || r.stage === "a_verifier") && <div className={`text-[11px] ${r.due ? "font-semibold text-red-700" : "text-stone-500"}`}>{r.days} {t.kanban.days}</div>}
+          {r.stage === "en_attente" && <div className={`text-[11px] ${r.due ? "font-semibold text-red-700" : "text-stone-500"}`}>{r.days} {t.kanban.days}</div>}
         </div>
       ),
     },
@@ -87,8 +87,8 @@ export function ClaimsView({ rows: allRows, canManage, initialFilter, claimNo = 
           <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-white/80">{c.all}</p>
         </button>
         <button type="button" onClick={() => setFilter("open")} className={`rounded-xl border bg-white p-3 text-left ${filter === "open" ? "border-red-500" : "border-stone-200"}`}>
-          <p className="text-2xl font-bold leading-none">{counts.reclamee + counts.a_verifier}</p>
-          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{c.inProgress}</p>
+          <p className="text-2xl font-bold leading-none">{counts.en_attente}</p>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{t.stages.en_attente}</p>
         </button>
         <button type="button" onClick={() => setFilter(filter === "missing" ? "all" : "missing")} className={`rounded-xl border bg-white p-3 text-left ${filter === "missing" ? "border-red-500" : "border-stone-200"}`}>
           <p className="text-2xl font-bold leading-none text-red-700">{missing.length}</p>

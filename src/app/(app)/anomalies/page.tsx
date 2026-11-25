@@ -118,7 +118,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     delay: processes.find(x.supplierId, x.supplierName)?.delay ?? 3,
     // À relancer : réclamée ou à vérifier, sans nouvelle action depuis le délai du fournisseur (3 jours par défaut)
     verify: verificationDue(x.stage, x.mode, daysSince(x.lastActionAt, x.createdAt, now)),
-    due: (stageOf(x.stage) === "reclamee" || stageOf(x.stage) === "a_verifier") && isClaimMode(x.mode) && daysSince(x.lastActionAt, x.createdAt, now) >= (processes.find(x.supplierId, x.supplierName)?.delay ?? 3),
+    due: stageOf(x.stage) === "en_attente" && isClaimMode(x.mode) && daysSince(x.lastActionAt, x.createdAt, now) >= (processes.find(x.supplierId, x.supplierName)?.delay ?? 3),
     receptionId: x.receptionId,
     photoUrl: x.photoUrl,
     // Champs non remplis sur la fiche (colonne « À compléter »)

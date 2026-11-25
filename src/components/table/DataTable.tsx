@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useI18n } from "@/lib/i18n/client";
 import { FilterInput, Pager, ResetFilters } from "./FilterInput";
 import { DateRangeFilter } from "./DateRangeFilter";
+import { NumberRangeFilter } from "./NumberRangeFilter";
 import { useTable, type ColumnDef } from "./useTable";
 import { RowMenu, type RowAction } from "./RowMenu";
 import { sentence } from "@/lib/format";
@@ -108,7 +109,7 @@ export function DataTable<R>({
                     <div className={`mb-0.5 truncate text-[11px] font-semibold text-stone-600 ${c.align === "right" ? "text-right" : ""}`}>{c.label}</div>
                     <div className={`flex items-center gap-1 ${c.align === "right" ? "flex-row-reverse" : ""}`}>
                       <div className="min-w-[5.5rem] flex-1">
-                        {c.date ? <DateRangeFilter value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} /> : c.filterable !== false ? (
+                        {c.date ? <DateRangeFilter value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} /> : c.range ? <NumberRangeFilter value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} /> : c.filterable !== false ? (
                           <FilterInput value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} options={c.keepCase || KEEP.has(c.key) ? tb.options[c.key] : [...new Set((tb.options[c.key] ?? []).map(sentence))]} />
                         ) : null}
                       </div>
@@ -151,7 +152,7 @@ export function DataTable<R>({
               {selectable && <th className="bg-white" />}
               {cols.map((c) => (
                 <th key={c.key} className="bg-white py-1.5">
-                  {c.date ? <DateRangeFilter value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} /> : c.filterable !== false && <FilterInput value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} options={c.keepCase || KEEP.has(c.key) ? tb.options[c.key] : [...new Set((tb.options[c.key] ?? []).map(sentence))]} />}
+                  {c.date ? <DateRangeFilter value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} /> : c.range ? <NumberRangeFilter value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} /> : c.filterable !== false && <FilterInput value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} options={c.keepCase || KEEP.has(c.key) ? tb.options[c.key] : [...new Set((tb.options[c.key] ?? []).map(sentence))]} />}
                 </th>
               ))}
               <th className="bg-white py-1.5 text-right">

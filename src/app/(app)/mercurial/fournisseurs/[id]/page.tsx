@@ -78,7 +78,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
   const natureMap = new Map<string, number>();
   for (const r of rows) if (r.active) for (const n of (r.nature ?? "").split(/,\s*/).filter(Boolean)) natureMap.set(n, (natureMap.get(n) ?? 0) + 1);
   const natureCounts = [...natureMap.entries()].sort((a, b) => b[1] - a[1]);
-  const openAnomalies = supplierAnomalies.filter((a) => a.stage === "a_traiter" || a.stage === "reclamee" || a.stage === "a_verifier").length;
+  const openAnomalies = supplierAnomalies.filter((a) => a.stage === "a_traiter" || a.stage === "en_attente").length;
   const tabCls = (on: boolean) => `-mb-px border-b-2 px-3 py-2 text-sm font-semibold ${on ? "border-brand-600 text-brand-700" : "border-transparent text-stone-500 hover:text-stone-800"}`;
 
   return (

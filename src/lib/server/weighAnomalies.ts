@@ -64,12 +64,12 @@ export async function syncWeighAnomalies() {
     // Étape de départ (lignes du fichier) d'après la colonne « Réclamation »
     const claimDates = lines.map((g) => g.claimDate).filter((d): d is string => !!d);
     const allFv = lines.every((g) => /fruits/i.test(g.nature ?? ""));
-    let stage: "a_traiter" | "reclamee" | "cloturee" = "a_traiter";
+    let stage: "a_traiter" | "en_attente" | "cloturee" = "a_traiter";
     if (!first.receptionId && claimDates.length === lines.length && allFv && claimDates.every((d) => d === "2026-10-12")) stage = "cloturee";
-    else if (claimDates.length) stage = "reclamee";
+    else if (claimDates.length) stage = "en_attente";
     const last = claimDates.sort().pop() ?? null;
     await db.insert(schema.anomalies).values({
-      ...values, type: "quantity", problemType: WEIGH_TYPE, source: "weigh", groupKey: key, mode: "reclamation", stage, ...legacyOf(stage, null),
+      ...values, type: "quantity", problemType: WEIGH_TYPE, source: "weigh", groupKey: key, mode: "verification_reclamation", stage, ...legacyOf(stage, null),
       lastActionAt: last, followUp: last ? `Réclamation le ${last.split("-").reverse().map((p, i) => (i === 2 ? p.slice(2) : p)).join("/")}` : null,
       createdAt: new Date(`${lines.map((g) => g.date).sort()[0]}T12:00:00Z`), closedAt: stage === "cloturee" ? new Date(`${last}T12:00:00Z`) : null,
     });

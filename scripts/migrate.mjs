@@ -1075,6 +1075,32 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v2
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v22', '1') on conflict (key) do nothing`);
 }
 
+// Statuts : « Réclamée » et « À vérifier sur facture » → « En attente » ; type de suivi « Réclamation avec relances » → « Avec relance », une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'stages_en_attente_v1'`)).rows.length) {
+  const a = await db.execute(sql`update anomalies set stage = 'en_attente' where stage in ('reclamee', 'a_verifier')`);
+  const m = await db.execute(sql`update anomalies set mode = 'verification_reclamation' where mode = 'reclamation'`);
+  console.log(`[migrate] statuts « En attente » : ${a.rowCount ?? 0} fiche(s) ; type de suivi « Avec relance » : ${m.rowCount ?? 0} fiche(s)`);
+  await db.execute(sql`insert into app_settings (key, value) values ('stages_en_attente_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev : point en attente « Version d'Outlook » + champs (statuts, boutons, téléphone, regroupement), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v23'`)).rows.length) {
+  await db.execute(sql`insert into dev_items (kind, title, detail, owner, priority, position) values ('pending', ${"Réclamation par mail : version d'Outlook à confirmer"}, ${"Le bouton « Envoyer la réclamation » ouvre Outlook.com (comptes Hotmail / Outlook personnels). Si la boîte du restaurant est sur Microsoft 365 (compte professionnel), basculer le lien vers outlook.office.com."}, 'moi', 'moyenne', ${Date.now() % 1000000})`);
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  const rows = [
+    ["anomaly", "Suivi de la réclamation", "Statut", true, "À traiter, En attente (réclamée ou à vérifier sur facture : on attend le fournisseur), Clôturée, Annulée. Retour possible de « En attente » à « À traiter ».", ""],
+    ["anomaly", "Fiche", "Boutons « En attente »", false, "Avoir / Régul (montant, n°, date puis clôture), Retour mail (réponse du fournisseur notée), Livraison différée, Retour marchandise ; et Téléphone, ← À traiter, Sans suite.", ""],
+    ["anomaly", "Fiche", "Téléphone", false, "Remplace « J'ai appelé » : un champ s'ouvre pour noter le détail de l'appel ou du SMS (noté dans l'historique).", ""],
+    ["claim", "Réclamation", "Regroupement à l'envoi", false, "À l'envoi d'une réclamation, les autres fiches « À traiter » du même fournisseur sont proposées (cochées d'office) : un seul mail, un seul N° R.", ""],
+    ["anomaly", "Suivi de la réclamation", "Type de suivi", false, "Avec relance ou Sans relance (« Réclamation avec relances » fusionné dans « Avec relance »).", ""],
+    ["anomaly", "Liste", "Montant (filtre)", false, "Filtre de l'en-tête : montant minimum et / ou maximum (entre deux montants).", ""],
+  ];
+  for (const [i, r] of rows.entries()) {
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values (${r[0]}, ${r[1]}, ${r[2]}, ${r[3]}, ${r[4]}, ${r[5]}, ${pos + i})`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v23', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

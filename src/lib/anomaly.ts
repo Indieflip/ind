@@ -28,17 +28,19 @@ export const claimStyles: Record<"en_cours" | "cloturee" | "annulee", string> = 
 };
 
 /** Suivi unique d'une anomalie */
-export const STAGES = ["a_traiter", "reclamee", "a_verifier", "cloturee", "annulee"] as const;
+/** Statuts : À traiter, En attente (réclamée ou à vérifier sur facture : on attend le fournisseur), Clôturée, Annulée */
+export const STAGES = ["a_traiter", "en_attente", "cloturee", "annulee"] as const;
 export type Stage = (typeof STAGES)[number];
 export const stageStyles: Record<Stage, string> = {
   a_traiter: "bg-red-100 text-red-800",
-  reclamee: "bg-amber-100 text-amber-900",
-  a_verifier: "bg-sky-100 text-sky-800",
+  en_attente: "bg-amber-100 text-amber-900",
   cloturee: "bg-emerald-100 text-emerald-800",
   annulee: "bg-stone-200 text-stone-600",
 };
-export const stageOf = (v: string | null | undefined): Stage => (STAGES.includes(v as Stage) ? (v as Stage) : "a_traiter");
-export const isOpenStage = (s: Stage) => s === "a_traiter" || s === "reclamee" || s === "a_verifier";
+/** Anciens statuts « Réclamée » et « À vérifier sur facture » : lus comme « En attente » */
+export const stageOf = (v: string | null | undefined): Stage => (v === "reclamee" || v === "a_verifier" ? "en_attente" : STAGES.includes(v as Stage) ? (v as Stage) : "a_traiter");
+export const isOpenStage = (s: Stage) => s === "a_traiter" || s === "en_attente";
+export const OPEN_STAGES = ["a_traiter", "en_attente"] as const;
 
 /** Résolution d'une anomalie clôturée : par un avoir, ou par la marchandise livrée plus tard */
 /** Résolutions : avoir / régularisation, livraison différée, retour de la marchandise au fournisseur, sans suite */
@@ -50,7 +52,8 @@ export type Resolution = (typeof RESOLUTIONS)[number];
  * - verification_reclamation : vérification de l'avoir AVEC réclamation (même effet que « réclamation » dans les économies) ;
  * - verification : vérification de l'avoir SANS réclamation (on contrôle seulement l'avoir / la régularisation reçue).
  */
-export const MODES = ["reclamation", "verification_reclamation", "verification"] as const;
+/** « Réclamation avec relances » fusionné dans « Avec relance » (verification_reclamation) */
+export const MODES = ["verification_reclamation", "verification"] as const;
 export type Mode = (typeof MODES)[number];
 /** Le suivi comporte une démarche auprès du fournisseur (relances, rappel à 3 jours, « avec réclamation » dans les économies) */
 export const isClaimMode = (m: string | null | undefined) => m !== "verification";
@@ -58,7 +61,7 @@ export const modeIcon = (m: string | null | undefined) => (m === "verification" 
 
 /** Anciens champs (statut / résultat) tenus à jour d'après l'étape, pour l'historique et les exports */
 export function legacyOf(stage: Stage, resolution: string | null) {
-  const status = stage === "a_traiter" ? "open" : stage === "reclamee" || stage === "a_verifier" ? "claimed" : stage === "cloturee" && resolution === "avoir" ? "credit_received" : "closed";
+  const status = stage === "a_traiter" ? "open" : stage === "en_attente" ? "claimed" : stage === "cloturee" && resolution === "avoir" ? "credit_received" : "closed";
   const result: Outcome = stage === "cloturee" ? "cloture" : stage === "annulee" ? "annule" : "en_cours";
   return { status: status as "open" | "claimed" | "credit_received" | "closed", result };
 }
@@ -70,11 +73,11 @@ export const DEFAULT_FOLLOW_UP_DAYS = 3;
 /** Vérification de l'avoir - sans réclamation : rappel si « À traiter » depuis 7 j, ou « À vérifier sur facture » depuis 15 j */
 export const VERIFY_TODO_DAYS = 7;
 export const VERIFY_CHECK_DAYS = 15;
-export function verificationDue(stage: string, mode: string | null | undefined, days: number): "a_traiter" | "a_verifier" | null {
+export function verificationDue(stage: string, mode: string | null | undefined, days: number): "a_traiter" | "en_attente" | null {
   if (mode !== "verification") return null;
   const s = stageOf(stage);
   if (s === "a_traiter" && days >= VERIFY_TODO_DAYS) return "a_traiter";
-  if (s === "a_verifier" && days >= VERIFY_CHECK_DAYS) return "a_verifier";
+  if (s === "en_attente" && days >= VERIFY_CHECK_DAYS) return "en_attente";
   return null;
 }
 

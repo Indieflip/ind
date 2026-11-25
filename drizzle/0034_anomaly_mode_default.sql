@@ -1,0 +1,1 @@
+ALTER TABLE "anomalies" ALTER COLUMN "mode" SET DEFAULT 'verification_reclamation';

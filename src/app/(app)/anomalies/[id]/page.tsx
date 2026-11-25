@@ -5,9 +5,9 @@ import { BackLink } from "@/components/BackLink";
 
 /** Réclamation par mail : ouverte dans Outlook (web), dans un nouvel onglet, déjà rédigée */
 const OUTLOOK_COMPOSE = "https://outlook.live.com/mail/0/deeplink/compose";
-import { WEIGH_TYPE } from "@/lib/anomaly";
+import { WEIGH_TYPE, stageOf } from "@/lib/anomaly";
 import { notFound } from "next/navigation";
-import { and, asc, eq, isNull, lt, max, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, lt, max, sql, ne } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
@@ -74,11 +74,11 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   if (a.claimNo) assistant.push({ date: null, text: `${S.claimNumber} ${fmtNo("claim", a.claimNo)}` });
   if (isInformative(a)) assistant.push({ date: null, text: S.informative });
   if (a.lastActionAt) assistant.push({ date: fmtDate(a.lastActionAt, locale), text: S.lastAction });
-  const open = ["a_traiter", "reclamee", "a_verifier"].includes(a.stage);
+  const open = ["a_traiter", "en_attente"].includes(stageOf(a.stage));
   if (open) {
     const from = a.lastActionAt ?? a.createdAt;
     if (a.mode === "verification") {
-      const due = addDays(from, a.stage === "a_verifier" ? 15 : 7);
+      const due = addDays(from, stageOf(a.stage) === "en_attente" ? 15 : 7);
       nextDue = fmtDate(due, locale);
       assistant.push({ date: fmtDate(due, locale), text: due < new Date() ? S.verifyLate : S.verifyPlanned });
     } else if (a.stage !== "a_traiter") {
@@ -119,11 +119,36 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   });
   const sortKey = (d: string | null) => (d ? d.split("/").reverse().join("") : "99");
   const timeline = [...assistant.map((x) => ({ ...x, user: false })), ...userLines].map((x, i) => ({ ...x, i })).sort((x, y) => sortKey(x.date).localeCompare(sortKey(y.date)) || x.i - y.i);
+  // Mail de réclamation (Outlook) : la fiche + les autres fiches « À traiter » du même fournisseur (proposées pour un seul mail)
+  const itemLines = (items: typeof a.items, productName: string | null, description: string) =>
+    items?.length ? items.map((x) => `- ${x.name}${x.qty != null ? ` : ${x.qty} ${x.unit}` : ""}`) : [`- ${productName ?? ""} : ${description}`];
+  const mailSelf = {
+    id: a.id, label: "", amount: num(a.claimedAmount),
+    intro: `${s.mailIntro} ${rec ? fmtDate(rec.deliveredAt, locale) : fmtDate(a.createdAt, locale)}${reference ? ` (${reference})` : ""}`,
+    lines: itemLines(a.items, a.productName, a.description),
+  };
+  const othersRaw = a.supplierId && stageOf(a.stage) === "a_traiter"
+    ? await db
+        .select({ o: schema.anomalies, deliveredAt: schema.receptions.deliveredAt, documents: schema.receptions.documents, blNumber: schema.receptions.blNumber })
+        .from(schema.anomalies)
+        .leftJoin(schema.receptions, eq(schema.receptions.id, schema.anomalies.receptionId))
+        .where(and(eq(schema.anomalies.supplierId, a.supplierId), eq(schema.anomalies.stage, "a_traiter"), ne(schema.anomalies.id, a.id)))
+    : [];
+  const mailOthers = othersRaw.map(({ o, deliveredAt, documents, blNumber }) => {
+    const ref = (o.receptionId ? lineDocLabel(documents as never, null, blNumber) : null) ?? o.reference;
+    return {
+      id: o.id, amount: num(o.claimedAmount),
+      label: `${fmtNo("anomaly", anoNums.get(o.id)?.n)} · ${o.problemType || t.anomalies.types[o.type]}${o.productName ? ` · ${o.productName}` : ""}${ref ? ` · ${ref}` : ""}`,
+      intro: `${s.mailIntro} ${fmtDate(deliveredAt ?? o.createdAt, locale)}${ref ? ` (${ref})` : ""}`,
+      lines: itemLines(o.items, o.productName, o.description),
+    };
+  });
+  const mailParts = { to: claimEmail, subject: `${s.mailSubject} — ${sentence(supplier?.name ?? a.supplierName)}${reference ? ` — ${reference}` : ""}`, hello: s.mailHello, ask: s.mailAsk, bye: s.mailBye, amountLabel: s.mailAmount, compose: OUTLOOK_COMPOSE };
   const mailHref = `${OUTLOOK_COMPOSE}?to=${encodeURIComponent(claimEmail)}&subject=${encodeURIComponent(`${s.mailSubject} — ${reference ?? ""} ${a.productName ?? ""}`.trim())}&body=${encodeURIComponent(
     `${s.mailHello}\n\n${s.mailIntro} ${rec ? fmtDate(rec.deliveredAt, locale) : fmtDate(a.createdAt, locale)}${reference ? ` (${reference})` : ""} :\n${(a.items?.length ? a.items.map((x) => `- ${x.name}${x.qty != null ? ` : ${x.qty} ${x.unit}` : ""}`).join("\n") : `- ${a.productName ?? ""} : ${a.description}`)}${a.claimedAmount ? `\n- ${s.mailAmount} : ${fmtMoney(num(a.claimedAmount), locale)}` : ""}\n\n${s.mailAsk}\n\n${s.mailBye}`,
   )}`;
   const itemsLabel = a.items?.length ? a.items.map((x) => x.name).join(" · ") : a.productName ?? line?.productName ?? "";
-  const stageCls: Record<string, string> = { a_traiter: "bg-red-100 text-red-800", reclamee: "bg-amber-100 text-amber-900", a_verifier: "bg-sky-100 text-sky-800", cloturee: "bg-emerald-100 text-emerald-800", annulee: "bg-stone-200 text-stone-700" };
+  const stageCls: Record<string, string> = { a_traiter: "bg-red-100 text-red-800", en_attente: "bg-amber-100 text-amber-900", cloturee: "bg-emerald-100 text-emerald-800", annulee: "bg-stone-200 text-stone-700" };
   const fold = "group rounded-xl border border-stone-200 bg-white";
   const summary = "flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3.5 text-[15px] hover:bg-stone-50";
 
@@ -148,7 +173,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
             </div>
           </div>
           <div className="flex flex-col items-end gap-1.5 text-right">
-            <span className={`rounded-full px-3 py-1 text-sm font-semibold ${stageCls[a.stage] ?? "bg-stone-100"}`}>{t.stages[a.stage as "a_traiter"] ?? a.stage}</span>
+            <span className={`rounded-full px-3 py-1 text-sm font-semibold ${stageCls[stageOf(a.stage)] ?? "bg-stone-100"}`}>{t.stages[stageOf(a.stage)]}</span>
 {problemType !== t.anomalies.types.missing_bl && (<>
             <p className="text-3xl font-bold tabular-nums">{a.claimedAmount ? fmtMoney(num(a.claimedAmount), locale) : "—"}</p>
             <p className="text-xs text-white/80">{s.claimed}</p>
@@ -156,7 +181,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
           </div>
         </div>
         <div className="border-t border-stone-100 p-6 pt-4">
-          <ActionCard id={a.id} stage={a.stage} resolution={a.resolution} editable={editable} claimed={a.claimedAmount != null ? String(num(a.claimedAmount)).replace(".", ",") : ""} mailHref={mailHref} phone={claimPhone} supplier={sentence(supplier?.name ?? a.supplierName)} nextDate={nextDue} missingBl={problemType === t.anomalies.types.missing_bl} />
+          <ActionCard id={a.id} stage={a.stage} resolution={a.resolution} editable={editable} claimed={a.claimedAmount != null ? String(num(a.claimedAmount)).replace(".", ",") : ""} mail={mailParts} self={mailSelf} others={mailOthers} phone={claimPhone} supplier={sentence(supplier?.name ?? a.supplierName)} nextDate={nextDue} missingBl={problemType === t.anomalies.types.missing_bl} />
         </div>
       </section>
 

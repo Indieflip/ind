@@ -13,6 +13,8 @@ export interface ColumnDef<R> {
   filterable?: boolean;
   /** Colonne date : filtre par calendrier / période (valeur « AAAA-MM-JJ ») au lieu du texte */
   date?: (r: R) => string | null | undefined;
+  /** Colonne de montants : filtre « entre deux montants » (minimum et / ou maximum) */
+  range?: (r: R) => number | null | undefined;
 }
 
 const coll = new Intl.Collator("fr", { sensitivity: "base", numeric: true });
@@ -64,7 +66,15 @@ export function useTable<R>(rows: R[], cols: ColumnDef<R>[], opts: { pageSize?: 
       if (!d) return false;
       return (!from || d >= from) && (!to || d <= to);
     };
-    return (c: ColumnDef<R>, r: R) => (c.date ? inRange(c, r) : !terms[c.key].length || terms[c.key].some((t) => hit(c.text(r), t)));
+    const num = (v: string | undefined) => { const n = parseFloat((v ?? "").replace(",", ".").replace(/[^\d.-]/g, "")); return Number.isFinite(n) ? n : null; };
+    const inBetween = (c: ColumnDef<R>, r: R) => {
+      const [lo, hi] = (filters[c.key] ?? "").split("~").map(num);
+      if (lo == null && hi == null) return true;
+      const v = c.range?.(r);
+      if (v == null) return false;
+      return (lo == null || v >= lo) && (hi == null || v <= hi);
+    };
+    return (c: ColumnDef<R>, r: R) => (c.date ? inRange(c, r) : c.range ? inBetween(c, r) : !terms[c.key].length || terms[c.key].some((t) => hit(c.text(r), t)));
   }, [cols, filters]);
 
   // Choix proposés dans chaque filtre : seulement les valeurs encore possibles avec les autres filtres

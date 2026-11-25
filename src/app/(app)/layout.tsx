@@ -30,7 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ? getDb()
           .select({ id: schema.anomalies.id, stage: schema.anomalies.stage, mode: schema.anomalies.mode, supplierId: schema.anomalies.supplierId, supplierName: schema.anomalies.supplierName, lastActionAt: schema.anomalies.lastActionAt, createdAt: schema.anomalies.createdAt })
           .from(schema.anomalies)
-          .where(inArray(schema.anomalies.stage, ["a_traiter", "reclamee", "a_verifier"]))
+          .where(inArray(schema.anomalies.stage, ["a_traiter", "en_attente"]))
           .catch(() => [])
       : Promise.resolve([]),
     can.manageAnomalies(r) ? supplierProcesses().catch(() => null) : Promise.resolve(null),

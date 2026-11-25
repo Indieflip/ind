@@ -49,7 +49,7 @@ export default async function SavingsPage({ searchParams }: { searchParams: Prom
     ...xs.filter((a) => counted(a) && isClaimMode(a.mode) && (a.credit ?? 0) > 0 && a.resolution !== "sans_suite").map((a) => contrib(a, "credit")),
     ...xs.filter((a) => counted(a) && isClaimMode(a.mode) && stageOf(a.stage) === "cloturee" && (a.resolution === "livraison" || a.resolution === "retour") && !(a.credit ?? 0) && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed")),
   ];
-  const pendingItems = (xs: AnomalyLite[]) => xs.filter((a) => counted(a) && isClaimMode(a.mode) && (stageOf(a.stage) === "reclamee" || stageOf(a.stage) === "a_verifier") && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
+  const pendingItems = (xs: AnomalyLite[]) => xs.filter((a) => counted(a) && isClaimMode(a.mode) && stageOf(a.stage) === "en_attente" && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
   const todoItems = list.filter((a) => counted(a) && stageOf(a.stage) === "a_traiter" && (a.claimed ?? 0) > 0).map((a) => contrib(a, "claimed"));
   const verifiedItems = list.filter((a) => counted(a) && !isClaimMode(a.mode) && (a.credit ?? 0) > 0 && a.resolution !== "sans_suite").map((a) => contrib(a, "credit"));
   const extraItems = list.filter((a) => a.informative).map((a) => contrib(a, "claimed"));

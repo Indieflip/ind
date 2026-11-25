@@ -182,17 +182,15 @@ export function ReceptionProcedure({ containers, editable, tab, control }: { con
 
 const STATUS: { label: string; color: string }[] = [
   { label: "À traiter", color: "bg-red-100 text-red-800 ring-red-200" },
-  { label: "Réclamée", color: "bg-amber-100 text-amber-900 ring-amber-200" },
-  { label: "À vérifier sur facture", color: "bg-sky-100 text-sky-800 ring-sky-200" },
+  { label: "En attente", color: "bg-amber-100 text-amber-900 ring-amber-200" },
   { label: "Clôturée", color: "bg-emerald-100 text-emerald-800 ring-emerald-200" },
 ];
 
 const CLAIMS: Step[] = [
   { title: "Nouvelle anomalie · À traiter", icon: "alert", you: ["Ouvrir la fiche depuis l'Accueil ou le tableau de bord", "Vérifier le montant réclamé et le type de suivi"], app: ["Crée l'anomalie à la réception, avec photo et montant", "Affiche le process du fournisseur (encadré orange)"] },
-  { title: "Réclamer · Réclamée", icon: "inbox", you: ["Suivre le process du fournisseur : bouton mail, téléphone…", "Passer l'anomalie en « Réclamée »"], app: ["Prépare le mail avec l'adresse « Réclamation » du fournisseur"] },
-  { title: "Relancer", icon: "layers", you: ["Sans réponse : relancer le fournisseur", "Cliquer « Relancé aujourd'hui »"], app: ["Rappel sur l'Accueil après le délai du fournisseur (3 jours par défaut)"] },
-  { title: "Vérifier · À vérifier sur facture", icon: "search", you: ["L'avoir ou la régularisation est annoncé : le contrôler sur la facture"], app: ["Rappel des avoirs et factures à vérifier"] },
-  { title: "Clôturer · Clôturée", icon: "check", you: ["Choisir la résolution", "Avoir : saisir le montant, le N° et la date"], app: ["Compte l'économie dans Reporting › Économies"] },
+  { title: "Réclamer · En attente", icon: "inbox", you: ["« Envoyer la réclamation » (Outlook) ou « Téléphone » (noter le détail de l'appel ou du SMS)", "Les autres fiches « À traiter » du fournisseur partent dans le même mail"], app: ["Prépare le mail avec l'adresse « Réclamation » du fournisseur, regroupe les fiches sous un même N° R, passe en « En attente »"] },
+  { title: "Suivre · En attente", icon: "layers", you: ["Réponse du fournisseur : « Retour mail » (noter la réponse)", "Sans réponse : relancer par « Téléphone » ; erreur : « ← À traiter »"], app: ["Rappel sur l'Accueil après le délai du fournisseur (3 jours par défaut)"] },
+  { title: "Clôturer · Clôturée", icon: "check", you: ["Avoir / Régul (montant, N°, date), Livraison différée, Retour marchandise ou Sans suite"], app: ["Compte l'économie dans Reporting › Économies"] },
 ];
 
 export function ClaimProcedure() {
