@@ -131,6 +131,8 @@ export const en: Dict = {
     page: "page",
   },
   receptions: {
+    consolidateImported: "Consolidate",
+    consolidateImportedConfirm: "Consolidate this old sheet? It will no longer be editable (its anomaly sheets stay editable).",
     draftStatus: "Draft",
     actions: "Actions",
     actionSaved: "Action saved (also shown in the Issues table).",

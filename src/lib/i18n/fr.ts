@@ -129,6 +129,8 @@ export const fr = {
     page: "page",
   },
   receptions: {
+    consolidateImported: "Consolider",
+    consolidateImportedConfirm: "Consolider cette ancienne fiche ? Elle ne sera plus modifiable (ses fiches d'anomalie restent modifiables).",
     draftStatus: "Brouillon",
     actions: "Actions",
     actionSaved: "Action enregistrée (visible aussi dans le tableau Anomalies).",
@@ -144,7 +146,7 @@ export const fr = {
     anomalyCol: "Anomalie",
     sheetLink: "Fiche de réception",
     importedState: "Importée",
-    importedHint: "Fiche générée à partir des anomalies importées : non consolidée, jamais exportée automatiquement, sans champ obligatoire",
+    importedHint: "Fiche générée à partir des anomalies importées : jamais exportée automatiquement, sans champ obligatoire ; bouton « Consolider » sur la fiche",
     listTitle: "Liste des fiches de réception",
     numberLong: "N°",
     blInvoice: "BL / Facture",

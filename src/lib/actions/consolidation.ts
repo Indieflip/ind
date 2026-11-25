@@ -1,9 +1,22 @@
 "use server";
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/db";
 import { assertUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
+
+/** Ancienne fiche (générée depuis les anomalies importées) : consolidation manuelle, la fiche n'est plus modifiable */
+export async function consolidateImportedAction(receptionId: number) {
+  const user = await assertUser(can.consolidate);
+  const r = schema.receptions;
+  const done = await getDb()
+    .update(r)
+    .set({ consolidatedAt: new Date(), consolidatedBy: user.id })
+    .where(and(eq(r.id, receptionId), isNotNull(r.importedFrom), isNull(r.consolidatedAt)))
+    .returning({ id: r.id });
+  revalidatePath("/receptions", "layout");
+  return { ok: done.length > 0 };
+}
 
 /** Note complémentaire sur un bon consolidé (horodatée, non modifiable) */
 export async function addNoteAction(receptionId: number, text: string) {
