@@ -1101,6 +1101,12 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v2
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v23', '1') on conflict (key) do nothing`);
 }
 
+// Dev : bouton « Retour mail » renommé « Retour fournisseur », une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v24'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = replace(rule, 'Retour mail', 'Retour fournisseur') where rule like '%Retour mail%'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v24', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
