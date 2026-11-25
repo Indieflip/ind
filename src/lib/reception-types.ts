@@ -152,5 +152,7 @@ export interface ReceptionPayload {
     photos: string[];
     document?: string | null;
     note?: string | null;
+    /** Modification : id de la ligne d'origine (pour reporter les changements sur les fiches d'anomalie) */
+    ref?: number | null;
   }[];
 }

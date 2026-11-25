@@ -1,7 +1,7 @@
 import "server-only";
 import { unitName } from "@/lib/units";
 import { nameKey, normalize } from "@/lib/search";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { num } from "@/lib/format";
@@ -30,6 +30,7 @@ const lineSchema = z.object({
   photos: z.array(z.string().max(2000)).max(10),
   document: z.string().trim().max(100).nullish(),
   note: z.string().trim().max(500).nullish(),
+  ref: z.number().int().nullish(),
 });
 
 export const payloadSchema = z.object({
@@ -519,6 +520,15 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
     const drop = anomalies.filter((a) => !touched(a) && a.source !== "file" && a.source !== "weigh").map((a) => a.id);
     if (drop.length) await tx.delete(schema.anomalies).where(inArray(schema.anomalies.id, drop));
 
+    // Fiche importée (générée depuis les anomalies importées) : ses fiches d'anomalie suivent la modification.
+    // Lignes d'origine de chaque produit de la fiche, repérées avant la réécriture
+    const norm = (x: string | null | undefined) => (x ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+    const linked = rec.importedFrom ? anomalies.filter((a) => !a.consolidatedAt && (a.source === "file" || a.source === "weigh")) : [];
+    const fileLinks = linked.filter((a) => a.source === "file").map((a) => {
+      const items = a.items?.length ? a.items : [{ productId: a.productId, name: a.productName ?? "", qty: null, unit: "", price: null }];
+      return { a, items, lineIds: items.map((it, k) => (k === 0 && !a.items?.length && a.lineId) || oldLines.find((o) => norm(o.productName) === norm(it.name))?.id || null) };
+    });
+
     // 3. Réécrire le contenu
     await tx.delete(schema.receptionPhotos).where(eq(schema.receptionPhotos.receptionId, id));
     await tx.delete(schema.receptionLines).where(eq(schema.receptionLines.receptionId, id));
@@ -528,6 +538,52 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
       .set({ ...supplier, ...headerValues(p), updatedBy: user.id, updatedAt: new Date() })
       .where(eq(schema.receptions.id, id));
     await writeContent(tx, id, supplier, p, user, t, keep, claims, unchanged);
+
+    if (linked.length) {
+      const newLines = await tx.select().from(schema.receptionLines).where(eq(schema.receptionLines.receptionId, id)).orderBy(asc(schema.receptionLines.position));
+      const byRef = new Map<number, { pl: Payload["lines"][number]; nl: (typeof newLines)[number] }>();
+      p.lines.forEach((pl, i) => { if (pl.ref && newLines[i]) byRef.set(pl.ref, { pl, nl: newLines[i] }); });
+      const first = p.documents?.[0] ?? (p.blNumber ? { type: "bl" as const, number: p.blNumber } : null);
+      const reference = first ? docLabel(first) : null;
+      const day = (d: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(d);
+      const at = new Date(p.deliveredAt);
+      // Référence reprise seulement si les documents ont été modifiés (« Pas de facture »… gardé sinon)
+      const docKey = (d: { type: string; number: string; date?: string | null }[] | null | undefined) => JSON.stringify((d ?? []).map((x) => [x.type, x.number.trim(), x.date ?? null]));
+      const docsChanged = docKey(rec.documents as { type: string; number: string; date?: string | null }[] | null) !== docKey(p.documents);
+      const common = (a: (typeof linked)[number]) => ({
+        supplierId: supplier.supplierId, supplierName: supplier.supplierName, ...(docsChanged ? { reference } : {}),
+        // Date de livraison changée : la fiche d'anomalie prend la nouvelle date
+        ...(day(a.createdAt) !== day(at) ? { createdAt: at, docDate: first?.date ?? null } : {}),
+      });
+      for (const { a, items, lineIds } of fileLinks) {
+        const next: NonNullable<typeof a.items> = [];
+        let lineId: number | null = null;
+        items.forEach((it, k) => {
+          const old = lineIds[k];
+          if (old == null) return void next.push(it);
+          const m = byRef.get(old);
+          if (!m) return; // ligne supprimée de la fiche de réception : produit retiré de l'anomalie
+          const { pl, nl } = m;
+          const gap = pl.qtyOrdered != null && pl.qtyReceived != null ? Math.round(Math.abs(pl.qtyOrdered - pl.qtyReceived) * 1000) / 1000 : null;
+          next.push({ productId: nl.productId ?? it.productId, name: pl.productName, qty: gap || it.qty, unit: pl.unit || it.unit, price: pl.unitPrice ?? it.price });
+          lineId ??= nl.id;
+        });
+        // Montant réclamé = somme des produits (quantité × prix) quand tout est connu ; sinon le montant saisi est gardé
+        const amount = next.length && next.every((x) => x.qty != null && x.price != null) ? Math.round(next.reduce((s, x) => s + x.qty! * x.price!, 0) * 100) / 100 : null;
+        await tx.update(schema.anomalies).set({
+          ...common(a),
+          ...(a.items?.length || lineId != null ? { items: next } : {}),
+          productName: next.length === 1 ? next[0].name : a.productName,
+          productId: next[0]?.productId ?? a.productId,
+          claimedAmount: amount != null ? String(amount) : a.claimedAmount,
+          lineId,
+        }).where(eq(schema.anomalies.id, a.id));
+      }
+      // Écarts de pesée : détail des produits recalculé depuis les pesées de la fiche (syncWeighAnomalies, juste après)
+      for (const a of linked.filter((x) => x.source === "weigh")) {
+        await tx.update(schema.anomalies).set({ ...common(a), items: null, groupKey: `rec:${id}` }).where(eq(schema.anomalies.id, a.id));
+      }
+    }
     return id;
   });
 }

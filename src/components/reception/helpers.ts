@@ -249,6 +249,7 @@ export function toPayload(d: Draft): ReceptionPayload {
         photos: l.photos,
         document: lineDoc(d, l) || null,
         note: l.note?.trim() || null,
+        ref: /^line-\d+$/.test(l.key) ? Number(l.key.slice(5)) : null,
       })),
   };
 }

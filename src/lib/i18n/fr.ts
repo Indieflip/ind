@@ -107,7 +107,7 @@ export const fr = {
     unsaved: "Modifications non enregistrées",
     saveFailed: "La fiche n'a pas pu être enregistrée",
     deliveryMissing: "Indiquez le fournisseur et la date de livraison.",
-    importedHint: "Fiche générée depuis les anomalies importées : aucun champ obligatoire (prix, DLC, température, conformité). Une ligne sans décision est enregistrée Conforme.",
+    importedHint: "Fiche générée depuis les anomalies importées : aucun champ obligatoire (prix, DLC, température, conformité). Une ligne sans décision est enregistrée Conforme. Les fiches d'anomalie liées sont mises à jour (produits, quantités, prix, montant)."
   },
   table: {
     between: "Entre…",
@@ -1113,6 +1113,7 @@ export const fr = {
     colAction: "Ce qui est fait automatiquement",
     colWhere: "Où le voir",
     automations: [
+      { area: "Réception", trigger: "Modification d'une fiche de réception importée", action: "Fiches d'anomalie de la fiche mises à jour : fournisseur, date, référence (si documents modifiés), produits, quantité (écart facturé / contrôlé), prix et montant réclamé ; écarts de pesée recalculés. Fiches consolidées non touchées.", where: "Anomalies" },
       { area: "Réception", trigger: "Photo du BL confirmée (étape 1)", action: "Lecture automatique du BL : fournisseur, n° de document et lignes produits pré-remplis.", where: "Étape 2 et 3 de la saisie" },
       { area: "Réception", trigger: "Passage à l'étape 2", action: "Brouillon enregistré sur le serveur (repris depuis Réceptions > Brouillons en cours).", where: "Réceptions" },
       { area: "Réception", trigger: "Saisie de la T° camion, T° produit, DLC (étape 3)", action: "Conformité produit proposée : Acceptée si tout est conforme, Refus si T° au-delà du seuil + marge acceptable ou DLC dépassée ; motif proposé. Un choix manuel n'est jamais remplacé.", where: "Étape 3 · Conformité produit" },
