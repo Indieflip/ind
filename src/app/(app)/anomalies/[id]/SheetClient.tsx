@@ -11,6 +11,7 @@ import { Icon } from "@/components/Icon";
 import { MoneyInput } from "@/components/MoneyInput";
 import { UnitSelect } from "@/components/UnitSelect";
 import { ProductCombo } from "@/components/ProductCombo";
+import { Paren } from "@/components/Paren";
 
 export interface Item { productId: number | null; name: string; qty: string; unit: string; price: string }
 interface Values {
@@ -98,7 +99,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
       {!editable && <p className="text-xs text-stone-500">{s.readOnly}</p>}
       {supplier && (
         <dl className="grid gap-3 rounded-lg bg-stone-50 p-3 text-sm sm:grid-cols-3">
-          <div><dt className="label">{t.common.supplier}</dt><dd className="font-medium">{supplier.id ? <Link href={`/mercurial/fournisseurs/${supplier.id}`} className="text-brand-700 hover:underline">{supplier.name}</Link> : supplier.name}</dd></div>
+          <div><dt className="label">{t.common.supplier}</dt><dd className="font-medium">{supplier.id ? <Link href={`/mercurial/fournisseurs/${supplier.id}`} className="text-brand-700 hover:underline"><Paren text={supplier.name} /></Link> : <Paren text={supplier.name} />}</dd></div>
           <div><dt className="label">{a.blInvoice}</dt><dd className="font-medium">{document?.href ? <Link href={document.href} className="text-brand-700 hover:underline">{document.label}</Link> : document?.label || "—"}</dd></div>
           <div>
             <dt className="label">{s.docDate}</dt>

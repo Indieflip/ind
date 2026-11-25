@@ -2,6 +2,7 @@ import { fmtNo } from "@/lib/numbering";
 import { anomalyNumbers } from "@/lib/server/savings";
 import Link from "next/link";
 import { BackLink } from "@/components/BackLink";
+import { Paren } from "@/components/Paren";
 import { claimMailHref } from "@/lib/claimMail";
 
 /** Réclamation par mail : ouverte dans Outlook (web), dans un nouvel onglet, déjà rédigée */
@@ -152,7 +153,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
     const ref = (o.receptionId ? lineDocLabel(documents as never, null, blNumber) : null) ?? o.reference;
     return {
       id: o.id, amount: num(o.claimedAmount),
-      label: `${fmtNo("anomaly", anoNums.get(o.id)?.n)} · ${o.problemType || t.anomalies.types[o.type]}${o.productName ? ` · ${o.productName}` : ""}${ref ? ` · ${ref}` : ""}`,
+      label: `${fmtNo("anomaly", anoNums.get(o.id)?.n)} · ${o.problemType || t.anomalies.types[o.type]}${o.productName ? ` · ${sentence(o.productName)}` : ""}${ref ? ` · ${ref}` : ""}`,
       delivery: shortDate(deliveredAt ?? o.createdAt), doc: docOnly(ref), docDate: shortDate(o.docDate),
       products: mailProducts(o),
     };
@@ -163,7 +164,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
     to: claimEmail, subject: M.subject, hello: M.hello, intro: M.intro, deliveryOf: M.deliveryOf, docOf: M.docOf, total: M.total, ask: M.ask, bye: M.bye,
     signature: [user.name, restaurant].filter(Boolean).join("\n"), compose: OUTLOOK_COMPOSE,
   };
-  const itemsLabel = a.items?.length ? a.items.map((x) => x.name).join(" · ") : a.productName ?? line?.productName ?? "";
+  const itemsLabel = a.items?.length ? a.items.map((x) => sentence(x.name)).join(" · ") : sentence(a.productName ?? line?.productName ?? "");
   const stageCls: Record<string, string> = { a_traiter: "bg-red-100 text-red-800", en_attente: "bg-amber-100 text-amber-900", cloturee: "bg-emerald-100 text-emerald-800", annulee: "bg-stone-200 text-stone-700" };
   const fold = "group rounded-xl border border-stone-200 bg-white";
   const summary = "flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3.5 text-[15px] hover:bg-stone-50";
@@ -181,8 +182,9 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
         <div className="flex flex-wrap items-start justify-between gap-4 bg-gradient-to-r from-rose-700 to-rose-600 px-6 py-5 text-white">
           <div className="min-w-0 space-y-1">
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/80"><Icon name="alert" className="h-4 w-4" /> {s.title} · {fmtNo("anomaly", number)} - {fmtDate(a.createdAt ?? rec?.deliveredAt, locale)}</p>
-            <h1 className="text-2xl font-bold leading-tight sm:text-3xl">{sentence(supplier?.name ?? a.supplierName)} — {problemType}</h1>
-            {itemsLabel && problemType !== t.anomalies.types.missing_bl && problemType !== WEIGH_TYPE && <p className="text-base text-white/90">{itemsLabel}</p>}
+            {/* Nom du fournisseur sans majuscules, police un peu plus petite ; indications entre parenthèses en plus petit */}
+            <h1 className="text-xl font-bold leading-tight sm:text-2xl"><Paren text={sentence(supplier?.name ?? a.supplierName)} /> — <Paren text={problemType} /></h1>
+            {itemsLabel && problemType !== t.anomalies.types.missing_bl && problemType !== WEIGH_TYPE && <p className="text-sm text-white/90"><Paren text={itemsLabel} /></p>}
             <div className="flex flex-col items-start gap-0.5 pt-1 text-sm">
               {rec && <Link href={`/receptions/${rec.id}`} className="font-medium text-white underline decoration-white/50 hover:decoration-white">{t.receptions.sheetLink} {fmtNo("reception", numbers.get(rec.id))}</Link>}
               {a.claimNo && <Link href={`/anomalies/reclamations?n=${a.claimNo}${claimYear ? `&y=${claimYear}` : ""}`} className="font-medium text-white underline decoration-white/50 hover:decoration-white">{t.claims.title} {fmtNo("claim", a.claimNo)}</Link>}

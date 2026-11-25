@@ -1,4 +1,5 @@
 "use client";
+import { Paren } from "@/components/Paren";
 import { claimMailHref, type MailFiche, type MailParts } from "@/lib/claimMail";
 import { DateField } from "@/components/DateField";
 import { useRouter } from "next/navigation";
@@ -114,7 +115,7 @@ export function ActionCard({ id, stage, resolution, editable, claimed, phone, su
               <li key={o.id}>
                 <label className="flex items-start gap-2">
                   <input type="checkbox" className="mt-0.5 h-4 w-4 accent-brand-600" checked={withOthers.includes(o.id)} onChange={(e) => setWithOthers(e.target.checked ? [...withOthers, o.id] : withOthers.filter((x) => x !== o.id))} />
-                  <span>{o.label}{o.amount != null ? ` · ${fmt(o.amount)}` : ""}</span>
+                  <span><Paren text={o.label} />{o.amount != null ? ` · ${fmt(o.amount)}` : ""}</span>
                 </label>
               </li>
             ))}

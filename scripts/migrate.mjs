@@ -1121,6 +1121,12 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v2
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v25', '1') on conflict (key) do nothing`);
 }
 
+// Dev : en-tête de la fiche d'anomalie (police réduite, parenthèses en petit), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v26'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = rule || ${" Nom du fournisseur et des produits sans majuscules, police réduite ; indications entre parenthèses en plus petit."} where form = 'anomaly' and field = 'En-tête'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v26', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
