@@ -17,3 +17,17 @@ export function categoryCodeFromNature(nature: string | null | undefined): strin
   if (n.includes("hygiene") || n.includes("consommable") || n.includes("ustensile")) return "hygiene";
   return "grocery";
 }
+
+/** Nature du Mercurial (colonne « Nature ») d'un produit créé dans l'application, d'après sa catégorie */
+export const NATURE_BY_CATEGORY: Record<string, string> = {
+  produce: "Fruits & légumes",
+  fish: "Poisson",
+  frozen: "Surgelès",
+  grocery: "Epicerie",
+  drinks: "Boisson",
+  hygiene: "Hygiène",
+  dairy: "BOF",
+  meat: "Viande",
+  deli: "Traiteur",
+};
+export const natureOfCategory = (code: string | null | undefined) => (code ? NATURE_BY_CATEGORY[code] ?? null : null);

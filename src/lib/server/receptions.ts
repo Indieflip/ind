@@ -11,6 +11,7 @@ import { checkPrice, fvRange, parisMonth, type PriceCheck, type PriceRef } from 
 const fmtEuro = (n: number | null | undefined) => (n == null ? "—" : `${n.toFixed(2).replace(".", ",")} €`);
 import { dictFor } from "@/lib/i18n";
 import { docLabel } from "@/lib/documents";
+import { natureOfCategory } from "@/lib/nature";
 import type { SessionUser } from "@/lib/auth";
 
 const lineSchema = z.object({
@@ -230,7 +231,7 @@ async function writeContent(
       if (!product) {
         [product] = await tx
           .insert(schema.products)
-          .values({ supplierId, name: l.productName, unit: l.unit || "Kg", categoryId: l.categoryId, price: l.unitPrice != null ? String(l.unitPrice) : null })
+          .values({ supplierId, name: l.productName, unit: l.unit || "Kg", categoryId: l.categoryId, nature: natureOfCategory(cats.find((c) => c.id === l.categoryId)?.code), price: l.unitPrice != null ? String(l.unitPrice) : null })
           .returning();
         if (l.unitPrice != null) {
           await tx.insert(schema.priceChanges).values({
@@ -337,14 +338,18 @@ async function writeContent(
       { qtyOrdered: l.qtyOrdered, qtyReceived: l.qtyReceived, temperature: l.temperature, dlc: l.dlc, categoryId: l.categoryId },
       cat ? { ...cat, conformMax: cat.conformMax, reserveMax: cat.reserveMax } : undefined,
       date,
-    ).issues.filter((i) => i !== "temp_missing" && i !== "temp_limit" && i !== "dlc_short" && !(unitName(l.unit) === "Kg" && (i === "qty_less" || i === "qty_more")));
+    ).issues.filter((i) => i !== "temp_missing" && i !== "temp_limit" && i !== "dlc_short" && !(unitName(l.unit) === "Kg" && (i === "qty_less" || (i === "qty_more" && !kgExtra(l)))));
     // (T° dans la marge acceptable et DLC courte : tolérées, pas d'anomalie)
-    // (au kg, un écart de poids va dans la fiche « Écart de pesée » du bon)
+    // (au kg, un poids manquant va dans la fiche « Écart de pesée » du bon ; un poids en trop, au-delà de la marge, est une quantité en trop)
+    // Quantité en trop : à vérifier sur la facture (type de suivi « Sans relance »), montant pour information
+    const extraOnly = detected.length > 0 && detected.every((i) => i === "qty_more");
     // Texte clair : « manque 50 pièces (facturé 100, contrôlé 50) », « température 8 °C (maximum 4 °C) »…
     const facts = describeLine(l, detected, cat, t);
     if (l.decision === "conform" && detected.length && !keep.products.has(l.productName.toLowerCase())) {
       const first = detected[0];
-      if (!silent) await tx.insert(schema.anomalies).values({
+      // Ancienne fiche : seule la quantité en trop d'un produit sans fiche d'anomalie crée une fiche
+      if (!silent || extraOnly) await tx.insert(schema.anomalies).values({
+        ...(extraOnly ? { mode: "verification" as const } : {}),
         receptionId: recId, lineId: line.id, supplierId, supplierName, productName: l.productName,
         nature: natureOf(l.categoryId), reference: lineRef(l),
         type: first.startsWith("temp") ? "temperature" : first.startsWith("dlc") ? "dlc" : first === "qty_less" ? "missing" : "quantity",
@@ -518,6 +523,8 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
       else if (a.type === "temperature" && !a.productName) keep.truck = true;
       else if (a.productName) keep.products.add(a.productName.toLowerCase());
     }
+    // Ancienne fiche : un produit qui a déjà sa fiche d'anomalie n'en reçoit pas d'autre
+    if (rec.importedFrom) for (const a of anomalies) for (const n of [a.productName, ...(a.items ?? []).map((it) => it.name)]) if (n) keep.products.add(n.toLowerCase());
     // Anomalies importées (fichier de suivi, écarts de pesée) : jamais supprimées par une modification du bon
     const drop = rec.importedFrom ? [] : anomalies.filter((a) => !touched(a) && a.source !== "file" && a.source !== "weigh").map((a) => a.id);
     if (drop.length) await tx.delete(schema.anomalies).where(inArray(schema.anomalies.id, drop));
@@ -588,6 +595,13 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
     }
     return id;
   });
+}
+
+/** Produit au kg reçu en trop au-delà de la marge des pesées (10 g ou 0,10 €) */
+function kgExtra(l: { qtyOrdered: number | null; qtyReceived: number | null; unitPrice: number | null }) {
+  if (l.qtyOrdered == null || l.qtyReceived == null) return false;
+  const extra = Math.round((l.qtyReceived - l.qtyOrdered) * 1000) / 1000;
+  return extra > 0.01 || (l.unitPrice != null && extra > 0 && extra * l.unitPrice > 0.1);
 }
 
 /** Quantité lisible : « 50 pièces », « 2,5 kg », « 1 carton » */

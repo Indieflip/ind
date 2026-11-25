@@ -1305,6 +1305,25 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v3
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v33', '1') on conflict (key) do nothing`);
 }
 
+// Produits créés dans l'application sans nature : nature déduite de la catégorie (Mercurial), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'nature_from_category_v1'`)).rows.length) {
+  const map = { produce: "Fruits & légumes", fish: "Poisson", frozen: "Surgelès", grocery: "Epicerie", drinks: "Boisson", hygiene: "Hygiène", dairy: "BOF", meat: "Viande", deli: "Traiteur" };
+  let n = 0;
+  for (const [code, nature] of Object.entries(map)) {
+    n += (await db.execute(sql`update products p set nature = ${nature} from categories c where c.id = p.category_id and c.code = ${code} and coalesce(trim(p.nature), '') = ''`)).rowCount ?? 0;
+  }
+  console.log(`[migrate] nature reprise de la catégorie : ${n} produit(s)`);
+  await db.execute(sql`insert into app_settings (key, value) values ('nature_from_category_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev : nature des produits créés + quantité en trop, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v34'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Produits', 'Nature (produit créé)', false, ${"Produit créé depuis une fiche de réception ou un compte fournisseur : nature du Mercurial déduite de la catégorie (Viande, Poisson, BOF, Surgelès, Fruits & légumes, Epicerie, Boisson, Hygiène, Traiteur)."}, '', ${pos})`);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Produits', 'Quantité en trop', false, ${"Q Contrôlée > Q Facturée (au kg : au-delà de 10 g ou 0,10 €) : fiche d'anomalie « Quantité » en trop, type de suivi Sans relance (à vérifier en facturation), montant pour information hors économies. Ancienne fiche : créée seulement si le produit n'a pas déjà sa fiche d'anomalie."}, '', ${pos + 1})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v34', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

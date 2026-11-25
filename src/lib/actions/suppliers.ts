@@ -1,4 +1,5 @@
 "use server";
+import { natureOfCategory } from "@/lib/nature";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { unitName } from "@/lib/units";
 import { revalidatePath } from "next/cache";
@@ -95,7 +96,8 @@ export async function addProductAction(_p: R, form: FormData): Promise<R> {
   const categoryId = Number(form.get("categoryId")) || null;
   const price = num(form.get("price"));
   if (!supplierId || !name || !unit || !categoryId) return { error: "invalid" };
-  await getDb().insert(schema.products).values({ supplierId, name, unit, categoryId, price: price != null ? String(price) : null });
+  const code = (await getDb().query.categories.findFirst({ where: eq(schema.categories.id, categoryId) }))?.code;
+  await getDb().insert(schema.products).values({ supplierId, name, unit, categoryId, nature: natureOfCategory(code), price: price != null ? String(price) : null });
   revalidatePath("/mercurial", "layout");
   return { ok: true };
 }
@@ -166,7 +168,8 @@ export async function importCatalogAction(_p: R, form: FormData): Promise<R> {
       }).where(eq(schema.products.id, existing.id));
       updated++;
     } else {
-      await db.insert(schema.products).values({ supplierId, name: productName, unit: unit || "kg", categoryId, price: price != null ? String(price) : null });
+      const code = categoryId ? (await db.query.categories.findFirst({ where: eq(schema.categories.id, categoryId) }))?.code : null;
+      await db.insert(schema.products).values({ supplierId, name: productName, unit: unit || "kg", categoryId, nature: natureOfCategory(code), price: price != null ? String(price) : null });
       created++;
     }
   }
