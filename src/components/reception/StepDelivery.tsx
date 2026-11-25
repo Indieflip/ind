@@ -177,6 +177,11 @@ function Documents({ draft, setDraft, editId }: { draft: Draft; setDraft: (fn: (
       <button type="button" className="btn-ghost px-2 py-1 text-sm text-brand-700" onClick={() => update([...docs, { type: "facture", number: "" }])}>
         <Icon name="plus" className="h-4 w-4" /> {w.addDocument}
       </button>
+      {/* BL / facture non remis : crée la fiche d'anomalie « Bon de livraison manquant » */}
+      <label className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${draft.missingBl ? "border-red-300 bg-red-50 text-red-800" : "border-stone-200 bg-white"}`}>
+        <input type="checkbox" className="h-5 w-5 accent-brand-600" checked={!!draft.missingBl} onChange={(e) => setDraft((d) => ({ ...d, missingBl: e.target.checked }))} />
+        <span><span className="font-medium">{w.missingBlBox}</span> <span className="text-xs text-stone-500">{w.missingBlBoxHint}</span></span>
+      </label>
     </div>
   );
 }

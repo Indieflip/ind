@@ -102,6 +102,8 @@ export interface Draft {
   /** Étape 1 : qualité de la photo confirmée, ou livraison sans BL */
   photoOk?: boolean;
   noBl?: boolean;
+  /** Case « BL / Facture manquant » (anomalie BL manquant) */
+  missingBl?: boolean;
   /** Fiche générée depuis les anomalies importées : aucun champ obligatoire */
   imported?: boolean;
   blRead: "idle" | "running" | "done" | "none" | "unavailable" | "error";
@@ -135,6 +137,7 @@ export interface ReceptionPayload {
   blPhotos: string[];
   labelPhotos?: string[];
   bakery?: { baguette: number | null; hamburger: number | null; rolls: number | null; painDeMie: number | null } | null;
+  missingBl?: boolean;
   lines: {
     productId: number | null;
     productName: string;

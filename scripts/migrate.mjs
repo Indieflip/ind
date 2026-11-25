@@ -1324,6 +1324,21 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v3
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v34', '1') on conflict (key) do nothing`);
 }
 
+// Type d'anomalie « Produit - Quantité » renommé « Quantité produit », une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'type_missing_rename_v2'`)).rows.length) {
+  await db.execute(sql`update anomalies set problem_type = 'Quantité produit' where problem_type in ('Produit - Quantité', 'Produit manquant')`);
+  await db.execute(sql`update app_settings set value = replace(replace(value, '"Produit - Quantité"', '"Quantité produit"'), '"Produit manquant"', '"Quantité produit"') where key = 'anomaly_problem_types'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('type_missing_rename_v2', '1') on conflict (key) do nothing`);
+}
+
+// Dev : case BL / Facture manquant, anciennes fiches (produit sans fiche d'anomalie), type Quantité produit, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v35'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Livraison', 'BL / Facture manquant', false, ${"Case dans les documents de la fiche (saisie et modification) : crée la fiche d'anomalie « Bon de livraison manquant » (une seule par fiche) ; cochée d'office si la fiche a déjà cette anomalie. Sans BL ni photo, l'anomalie reste créée automatiquement (sauf anciennes fiches)."}, '', ${pos})`);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Modification', 'Fiche importée : produits', false, ${"Ancienne fiche modifiée : un produit qui a déjà sa fiche d'anomalie la met à jour (même renommé) ; un produit sans fiche d'anomalie reçoit la sienne (manque, trop, T°, DLC, prix, écart de pesée…). Type « Produit - Quantité » renommé « Quantité produit »."}, '', ${pos + 1})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v35', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

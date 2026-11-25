@@ -69,7 +69,7 @@ export async function syncWeighAnomalies() {
       const own = await db.select().from(schema.anomalies).where(and(eq(schema.anomalies.receptionId, first.receptionId), isNull(schema.anomalies.consolidatedAt)));
       const names = new Set(lines.map((g) => g.product.trim().toLowerCase()));
       const hit = (a: (typeof own)[number]) => names.has((a.productName ?? "").trim().toLowerCase()) || !!a.items?.some((it) => names.has(it.name.trim().toLowerCase()));
-      const target = own.find(hit) ?? (own.length === 1 ? own[0] : own.find((a) => a.type === "missing" || a.type === "quantity"));
+      const target = own.find(hit);
       if (target) {
         await db.update(schema.anomalies).set({
           ...values, claimedAmount: values.claimedAmount ?? target.claimedAmount,
@@ -78,8 +78,9 @@ export async function syncWeighAnomalies() {
           type: "quantity", problemType: WEIGH_TYPE, source: "weigh", groupKey: key,
         }).where(eq(schema.anomalies.id, target.id));
         byKey.set(key, { ...target, groupKey: key });
+        continue;
       }
-      continue;
+      // Produit sans fiche d'anomalie sur l'ancienne fiche : nouvelle fiche « Écart de pesée » (ci-dessous)
     }
     // Étape de départ (lignes du fichier) d'après la colonne « Réclamation »
     const claimDates = lines.map((g) => g.claimDate).filter((d): d is string => !!d);

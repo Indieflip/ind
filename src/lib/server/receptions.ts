@@ -56,6 +56,8 @@ export const payloadSchema = z.object({
     .object({ baguette: z.number().nullable(), hamburger: z.number().nullable(), rolls: z.number().nullable(), painDeMie: z.number().nullable() })
     .nullable()
     .optional(),
+  /** Case « BL / Facture manquant » : crée la fiche d'anomalie BL manquant */
+  missingBl: z.boolean().optional(),
   lines: z.array(lineSchema).max(300),
 });
 export type Payload = z.infer<typeof payloadSchema>;
@@ -126,7 +128,7 @@ async function writeContent(
   claims: Map<number, string> = new Map(),
   /** Modification : produits dont le prix du bon n'a pas changé → ni écart ni mercurial touchés (prix de référence d'origine conservé) */
   unchanged: Map<number, PriceRef> = new Map(),
-  /** Fiche importée modifiée : aucune nouvelle fiche d'anomalie, les fiches existantes sont mises à jour */
+  /** Fiche importée modifiée : pas de « BL manquant » automatique (seulement par la case « BL / Facture manquant ») */
   silent = false,
 ) {
   const { supplierId, supplierName } = supplier;
@@ -283,7 +285,7 @@ async function writeContent(
         await setBound(check.kind === "increase" ? "max" : "min", l.unitPrice);
         // Prix facturé au moins 10 % au-dessus du mercurial : anomalie de prix (à vérifier / réclamer)
         if (check.kind === "increase" && check.pct >= 10 && !keep.products.has(l.productName.toLowerCase())) {
-          if (!silent) await tx.insert(schema.anomalies).values({
+          await tx.insert(schema.anomalies).values({
             receptionId: recId, supplierId, supplierName, productName: l.productName, type: "price", nature: natureOf(l.categoryId), reference: lineRef(l),
             description: `${t.anomalies.types.price} : ${fmtEuro(l.unitPrice)} ${t.anomalies.texts.insteadOf} ${fmtEuro(check.bound)} (+${String(check.pct).replace(".", ",")} %)`,
             claimedAmount: money((l.unitPrice - check.bound) * (l.qtyReceived ?? l.qtyOrdered ?? 0)),
@@ -292,7 +294,7 @@ async function writeContent(
         }
       } else if (check.kind === "locked" && !keep.locked?.has(productId)) {
         // Prix bloqué : pas de variation, une anomalie à réclamer au fournisseur
-        if (!silent) await tx.insert(schema.anomalies).values({
+        await tx.insert(schema.anomalies).values({
           receptionId: recId, supplierId, supplierName, productName: l.productName, type: "locked_price", nature: natureOf(l.categoryId), reference: lineRef(l),
           claimedAmount: money(l.unitPrice != null && (ref.min ?? ref.max) != null ? (l.unitPrice - (ref.min ?? ref.max)!) * (l.qtyReceived ?? l.qtyOrdered ?? 0) : null),
           description: `${t.anomalies.types.locked_price} : ${fmtEuro(l.unitPrice)} ${t.anomalies.texts.insteadOf} ${fmtEuro(ref.min ?? ref.max)}${ref.min != null && ref.max != null && ref.min !== ref.max ? ` – ${fmtEuro(ref.max)}` : ""} (${check.pct > 0 ? "+" : ""}${String(check.pct).replace(".", ",")} %)`,
@@ -347,8 +349,7 @@ async function writeContent(
     const facts = describeLine(l, detected, cat, t);
     if (l.decision === "conform" && detected.length && !keep.products.has(l.productName.toLowerCase())) {
       const first = detected[0];
-      // Ancienne fiche : seule la quantité en trop d'un produit sans fiche d'anomalie crée une fiche
-      if (!silent || extraOnly) await tx.insert(schema.anomalies).values({
+      await tx.insert(schema.anomalies).values({
         ...(extraOnly ? { mode: "verification" as const } : {}),
         receptionId: recId, lineId: line.id, supplierId, supplierName, productName: l.productName,
         nature: natureOf(l.categoryId), reference: lineRef(l),
@@ -362,7 +363,7 @@ async function writeContent(
       const reasonLabel = l.reason ? (t.reasons as Record<string, string>)[l.reason] ?? l.reason : "";
       const qtyFacts = describeLine(l, ["qty_less", "qty_more"], cat, t);
       const why = [reasonLabel.toLowerCase(), ...(facts.length ? facts : qtyFacts)].filter(Boolean);
-      if (!silent) await tx.insert(schema.anomalies).values({
+      await tx.insert(schema.anomalies).values({
         receptionId: recId,
         lineId: line.id,
         supplierId,
@@ -381,17 +382,18 @@ async function writeContent(
   }
 
   // Un bon sans BL (ni numéro ni photo) est une anomalie
-  if (!p.blNumber?.trim() && p.blPhotos.length === 0 && !keep.missingBl) {
-    if (!silent) await tx.insert(schema.anomalies).values({
+  // ou case « BL / Facture manquant » cochée sur la fiche
+  if ((p.missingBl || (!silent && !p.blNumber?.trim() && p.blPhotos.length === 0)) && !keep.missingBl) {
+    await tx.insert(schema.anomalies).values({
       receptionId: recId, supplierId, supplierName, type: "missing_bl", reference: docRef,
-      description: t.anomalies.autoMissingBl, createdBy: user.id, createdAt: date,
+      description: p.missingBl ? t.anomalies.boxMissingBl : t.anomalies.autoMissingBl, createdBy: user.id, createdAt: date,
     });
   }
 
   // Température du camion : sert à proposer la décision des produits frais, sans fiche d'anomalie à part
 
   if (p.vehicleClean === false && !keep.hygiene) {
-    if (!silent) await tx.insert(schema.anomalies).values({
+    await tx.insert(schema.anomalies).values({
       receptionId: recId, supplierId, supplierName, type: "hygiene", reference: docRef,
       description: `${t.wizard.vehicleClean} ${t.common.no}`, createdBy: user.id, createdAt: date,
     });
@@ -523,8 +525,6 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
       else if (a.type === "temperature" && !a.productName) keep.truck = true;
       else if (a.productName) keep.products.add(a.productName.toLowerCase());
     }
-    // Ancienne fiche : un produit qui a déjà sa fiche d'anomalie n'en reçoit pas d'autre
-    if (rec.importedFrom) for (const a of anomalies) for (const n of [a.productName, ...(a.items ?? []).map((it) => it.name)]) if (n) keep.products.add(n.toLowerCase());
     // Anomalies importées (fichier de suivi, écarts de pesée) : jamais supprimées par une modification du bon
     const drop = rec.importedFrom ? [] : anomalies.filter((a) => !touched(a) && a.source !== "file" && a.source !== "weigh").map((a) => a.id);
     if (drop.length) await tx.delete(schema.anomalies).where(inArray(schema.anomalies.id, drop));
@@ -537,6 +537,23 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
       const items = a.items?.length ? a.items : [{ productId: a.productId, name: a.productName ?? "", qty: null, unit: "", price: null }];
       return { a, items, lineIds: items.map((it, k) => (k === 0 && !a.items?.length && a.lineId) || oldLines.find((o) => norm(o.productName) === norm(it.name))?.id || null) };
     });
+
+    // Ancienne fiche : un produit qui a déjà sa fiche d'anomalie (même renommé sur la fiche de réception) n'en reçoit pas d'autre,
+    // elle est mise à jour ; un produit sans fiche d'anomalie reçoit la sienne
+    if (rec.importedFrom) {
+      const coveredOld = new Set<number>();
+      for (const a of anomalies) {
+        if (a.lineId) coveredOld.add(a.lineId);
+        for (const n of [a.productName, ...(a.items ?? []).map((it) => it.name)]) {
+          if (!n) continue;
+          keep.products.add(n.toLowerCase());
+          for (const o of oldLines) if (norm(o.productName) === norm(n)) coveredOld.add(o.id);
+        }
+        if (a.type === "missing_bl") keep.missingBl = true;
+        if (a.type === "hygiene" && !a.productName) keep.hygiene = true;
+      }
+      for (const pl of p.lines) if (pl.ref && coveredOld.has(pl.ref)) { keep.products.add(pl.productName.toLowerCase()); if (pl.productId) keep.locked.add(pl.productId); }
+    }
 
     // 3. Réécrire le contenu
     await tx.delete(schema.receptionPhotos).where(eq(schema.receptionPhotos.receptionId, id));

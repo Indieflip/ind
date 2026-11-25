@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -37,6 +37,8 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     db.query.bakeryEntries.findFirst({ where: eq(schema.bakeryEntries.receptionId, id) }),
   ]);
 
+  // Case « BL / Facture manquant » : cochée si la fiche a déjà son anomalie BL manquant
+  const missingBlAnomaly = !!(await db.query.anomalies.findFirst({ where: and(eq(schema.anomalies.receptionId, id), eq(schema.anomalies.type, "missing_bl")), columns: { id: true } }));
   const draftLines: DraftLine[] = lines.map((l) => ({
     key: `line-${l.id}`,
     productId: l.productId,
@@ -80,6 +82,7 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     receiverSignature: rec.receiverSignatureUrl ?? "",
     blRead: "idle",
     imported: !!rec.importedFrom,
+    missingBl: missingBlAnomaly,
     photoOk: photos.some((p) => p.kind === "bl"),
     noBl: !photos.some((p) => p.kind === "bl"),
     lines: draftLines,

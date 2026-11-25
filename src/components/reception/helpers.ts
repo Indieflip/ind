@@ -226,6 +226,7 @@ export function toPayload(d: Draft): ReceptionPayload {
     receiverName: d.receiverName?.trim() || null,
     receiverSignature: d.receiverSignature || null,
     blPhotos: d.blPhotos,
+    missingBl: !!d.missingBl,
     labelPhotos: d.labelPhotos ?? [],
     bakery: d.bakery
       ? { baguette: num(d.bakery.baguette), hamburger: num(d.bakery.hamburger), rolls: num(d.bakery.rolls), painDeMie: num(d.bakery.painDeMie) }
