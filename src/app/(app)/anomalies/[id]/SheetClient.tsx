@@ -28,6 +28,9 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
   const [v, setV] = useState(initial);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  // Retour fournisseur (note) et détail « Sans suite », comme les boutons du haut de la fiche
+  const [reply, setReply] = useState<string | null>(null);
+  const [noFollow, setNoFollow] = useState("");
   const [note, setNote] = useState("");
   const [noteDay, setNoteDay] = useState(() => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" }));
   const [pending, start] = useTransition();
@@ -80,8 +83,12 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
       try {
         const { productName: _n, productId: _p, items, ...rest } = v;
         void _n; void _p;
+        // Sans suite choisi ici : le détail est ajouté à l'historique, daté du jour
+        const d = new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "2-digit", year: "2-digit" });
+        const noFollowLine = rest.resolution === "sans_suite" && initial.resolution !== "sans_suite" ? `${d} : ${t.resolutions.sans_suite}${noFollow.trim() ? ` : ${noFollow.trim()}` : ""}` : "";
         const res = await updateAnomalyAction(id, {
           ...rest,
+          ...(noFollowLine ? { followUp: [rest.followUp, noFollowLine].filter(Boolean).join("\n") } : {}),
           ...(amountFromItems ? { claimedAmount: itemsTotal ? itemsTotal.toFixed(2) : "" } : {}),
           items: items.map((x) => ({ productId: x.productId, name: x.name, qty: n(x.qty), unit: x.unit, price: n(x.price) })),
         });
@@ -209,12 +216,17 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
         </div>
       </div>
 
-      {/* Résolution : toujours visible ; en choisir une clôture la fiche */}
-      {(
+      {/* Résolution : mêmes règles que les boutons du haut de la fiche.
+          À traiter : Avoir / Régul, Sans suite ; En attente : Avoir / Régul, Livraison différée, Retour marchandise, Sans suite
+          (+ Retour fournisseur) ; Clôturée : toutes, pour corriger ; Annulée : aucune. En choisir une clôture la fiche. */}
+      {stage !== "annulee" && (
         <div>
           <span className="label">{s.resolution}</span>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {RESOLUTIONS.map((r) => (
+            {stage === "en_attente" && (
+              <button type="button" disabled={!editable || dirty} title={dirty ? s.saveFirst : undefined} onClick={() => setReply(reply == null ? "" : null)} className={`rounded-lg border-2 px-2 py-2 text-sm font-semibold ${reply != null ? "border-brand-600 bg-brand-50 text-brand-800" : "border-stone-200 bg-white text-stone-500"}`}>✉ {s.card.mailReply}</button>
+            )}
+            {RESOLUTIONS.filter((r) => stage === "cloturee" || (stage === "a_traiter" ? r === "avoir" || r === "sans_suite" : true)).map((r) => (
               <button
                 key={r}
                 type="button"
@@ -222,10 +234,25 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
                 onClick={() => { setV({ ...v, resolution: r, stage: "cloturee" }); setSaved(false); }}
                 className={`rounded-lg border-2 px-2 py-2 text-sm font-semibold ${v.resolution === r ? "border-emerald-600 bg-emerald-50 text-emerald-800" : "border-stone-200 bg-white text-stone-500"}`}
               >
-                {t.resolutions[r]}
+                {r === "avoir" ? s.card.creditRegul : t.resolutions[r]}
               </button>
             ))}
           </div>
+          {/* Retour fournisseur : réponse notée tout de suite dans l'historique (la fiche reste « En attente ») */}
+          {reply != null && stage === "en_attente" && (
+            <div className="mt-2 space-y-2 rounded-lg border border-stone-200 bg-stone-50 p-3">
+              <span className="label">{s.card.mailReplyDetail}</span>
+              <textarea className="input" rows={2} value={reply} onChange={(e) => setReply(e.target.value)} placeholder={s.card.mailReplyPlaceholder} />
+              <button type="button" className="btn-secondary py-1.5 text-sm" disabled={pending} onClick={() => start(async () => { await followUpTodayAction(id, `${s.card.mailReply}${reply.trim() ? ` : ${reply.trim()}` : ""}`); setReply(null); router.refresh(); })}>{t.common.save}</button>
+            </div>
+          )}
+          {/* Sans suite : le détail est demandé, comme depuis le bouton du haut */}
+          {v.resolution === "sans_suite" && stage === "cloturee" && (
+            <label className="mt-2 block">
+              <span className="label">{s.card.noFollowDetail}</span>
+              <textarea className="input" rows={2} value={noFollow} onChange={(e) => { setNoFollow(e.target.value); setSaved(false); }} placeholder={s.card.noFollowPlaceholder} disabled={!editable} />
+            </label>
+          )}
           {closedWithout && <p className="mt-1 text-xs text-amber-700">{s.resolutionNeeded}</p>}
           {v.resolution === "avoir" && (
             <div id="avoir" className="mt-3 grid gap-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 sm:grid-cols-3">

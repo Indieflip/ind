@@ -1127,6 +1127,12 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v2
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v26', '1') on conflict (key) do nothing`);
 }
 
+// Dev : résolutions du suivi de la réclamation selon le statut (mêmes règles que les boutons du haut), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v27'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = ${"Mêmes règles que les boutons du haut de la fiche : À traiter → Avoir / Régul, Sans suite ; En attente → Retour fournisseur (réponse notée), Avoir / Régul, Livraison différée, Retour marchandise, Sans suite ; Clôturée → toutes (pour corriger) ; Annulée → aucune. Choisir une résolution clôture la fiche ; Sans suite demande le détail."} where form = 'anomaly' and section = 'Suivi de la réclamation' and field = 'Résolution'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v27', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
