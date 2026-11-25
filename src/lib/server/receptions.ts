@@ -544,7 +544,8 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
     // Fiche importée (générée depuis les anomalies importées) : ses fiches d'anomalie suivent la modification.
     // Lignes d'origine de chaque produit de la fiche, repérées avant la réécriture
     const norm = (x: string | null | undefined) => (x ?? "").trim().replace(/\s+/g, " ").toLowerCase();
-    const linked = rec.importedFrom ? anomalies.filter((a) => !a.consolidatedAt && (a.source === "file" || a.source === "weigh")) : [];
+    // (fiches d'anomalie jamais verrouillées : consolidées comprises)
+    const linked = rec.importedFrom ? anomalies.filter((a) => a.source === "file" || a.source === "weigh") : [];
     const fileLinks = linked.filter((a) => a.source === "file").map((a) => {
       const items = a.items?.length ? a.items : [{ productId: a.productId, name: a.productName ?? "", qty: null, unit: "", price: null }];
       return { a, items, lineIds: items.map((it, k) => (k === 0 && !a.items?.length && a.lineId) || oldLines.find((o) => norm(o.productName) === norm(it.name))?.id || null) };

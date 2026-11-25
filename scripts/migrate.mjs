@@ -1360,6 +1360,13 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v3
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v38', '1') on conflict (key) do nothing`);
 }
 
+// Dev : modifier un produit d'une fiche de réception (ancienne comprise), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v39'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Produits', 'Modifier le produit', false, ${"Sur chaque ligne : produit rattaché → « Changer » (autre produit du Mercurial du fournisseur) ou « Modifier le nom » (saisie libre) ; produit non rattaché (ancienne fiche) → « Choisir dans le Mercurial ». Quantités, T°, DLC, lot et prix gardés. Ancienne fiche : la fiche d'anomalie du produit suit (nom, compte produit), même consolidée."}, '', ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v39', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

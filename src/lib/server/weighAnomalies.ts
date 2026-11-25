@@ -59,7 +59,8 @@ export async function syncWeighAnomalies() {
     };
     const cur = byKey.get(key);
     if (cur) {
-      if (cur.consolidatedAt) continue;
+      // Fiche consolidée : figée, sauf sur une ancienne fiche (importée) modifiée
+      if (cur.consolidatedAt && !(first.receptionId && imported.has(first.receptionId))) continue;
       // Sans prix sur les lignes, le montant saisi à la main est gardé
       if (values.claimedAmount == null) values.claimedAmount = cur.claimedAmount;
       // Produits saisis à la main sur la fiche : gardés ; sinon le détail des écarts est repris
@@ -70,7 +71,7 @@ export async function syncWeighAnomalies() {
       continue;
     }
     if (first.receptionId && imported.has(first.receptionId)) {
-      const own = await db.select().from(schema.anomalies).where(and(eq(schema.anomalies.receptionId, first.receptionId), isNull(schema.anomalies.consolidatedAt)));
+      const own = await db.select().from(schema.anomalies).where(eq(schema.anomalies.receptionId, first.receptionId));
       const names = new Set(lines.map((g) => g.product.trim().toLowerCase()));
       const hit = (a: (typeof own)[number]) => names.has((a.productName ?? "").trim().toLowerCase()) || !!a.items?.some((it) => names.has(it.name.trim().toLowerCase()));
       const target = own.find(hit);

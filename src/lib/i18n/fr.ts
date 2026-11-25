@@ -252,6 +252,8 @@ export const fr = {
     missingBlBoxHint: "(crée la fiche d'anomalie BL manquant)",
     docTypes: { bl: "Bon de livraison", facture: "Facture", autre: "Autre document" },
     changeProduct: "Changer",
+    renameProduct: "Modifier le nom",
+    pickProduct: "Choisir dans le Mercurial",
     changeProductHint: "Mauvais produit ? Choisissez le bon : les quantités, températures, DLC, lot et prix saisis sont conservés.",
     viewPhoto: "Voir la photo en grand",
     chooseDecision: "Choisissez la décision",

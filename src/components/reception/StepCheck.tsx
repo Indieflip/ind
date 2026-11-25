@@ -127,9 +127,15 @@ function LineCard({
             <h3 className="font-semibold leading-tight">
               {line.productName}
               <button type="button" className="ml-2 text-xs font-normal text-brand-700 underline" onClick={() => setSwap((v) => !v)}>{t.wizard.changeProduct}</button>
+              {/* Nom à corriger à la main : le produit n'est plus rattaché (un produit de ce nom est cherché, sinon créé au Mercurial) */}
+              <button type="button" className="ml-2 text-xs font-normal text-stone-500 underline" onClick={() => onChange({ productId: null })}>{t.wizard.renameProduct}</button>
             </h3>
           ) : (
-            <input className="input py-1.5 font-semibold" value={line.productName} placeholder={t.wizard.productName} onChange={(e) => onChange({ productName: e.target.value })} />
+            <div className="flex items-center gap-2">
+              <input className="input py-1.5 font-semibold" value={line.productName} placeholder={t.wizard.productName} onChange={(e) => onChange({ productName: e.target.value })} />
+              {/* Produit pas encore rattaché (ancienne fiche, produit hors liste) : le choisir dans le Mercurial du fournisseur */}
+              <button type="button" className="shrink-0 text-xs text-brand-700 underline" onClick={() => setSwap((v) => !v)}>{t.wizard.pickProduct}</button>
+            </div>
           )}
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-stone-500">
             {line.productId ? (

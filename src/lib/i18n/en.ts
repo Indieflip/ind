@@ -254,6 +254,8 @@ export const en: Dict = {
     missingBlBoxHint: "(creates the missing delivery note anomaly)",
     docTypes: { bl: "Delivery note", facture: "Invoice", autre: "Other document" },
     changeProduct: "Change",
+    renameProduct: "Edit name",
+    pickProduct: "Pick from catalogue",
     changeProductHint: "Wrong product? Pick the right one: entered quantities, temperatures, dates, batch and price are kept.",
     viewPhoto: "View full size",
     chooseDecision: "Choose the decision",
