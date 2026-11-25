@@ -2,7 +2,7 @@
 import { appConfirm } from "@/components/Confirm";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { addNoteAction, consolidateImportedAction } from "@/lib/actions/consolidation";
+import { addNoteAction, consolidateImportedAction, unconsolidateImportedAction } from "@/lib/actions/consolidation";
 import { deleteReceptionAction } from "@/lib/actions/receptions";
 import { Icon } from "@/components/Icon";
 import { updateAnomalyAction } from "@/lib/actions/anomalies";
@@ -27,6 +27,17 @@ export function ConsolidateImportedButton({ id, label, confirmText }: { id: numb
   return (
     <button className="btn-secondary" disabled={pending} onClick={async () => await appConfirm(confirmText) && start(async () => { await consolidateImportedAction(id); router.refresh(); })}>
       <Icon name="check" className="h-4 w-4" /> {label}
+    </button>
+  );
+}
+
+/** Ancienne fiche (importée) consolidée : enlever la consolidation */
+export function UnconsolidateImportedButton({ id, label, confirmText }: { id: number; label: string; confirmText: string }) {
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  return (
+    <button className="btn-secondary" disabled={pending} onClick={async () => await appConfirm(confirmText) && start(async () => { await unconsolidateImportedAction(id); router.refresh(); })}>
+      <Icon name="edit" className="h-4 w-4" /> {label}
     </button>
   );
 }

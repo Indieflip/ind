@@ -42,7 +42,7 @@ export const stageOf = (v: string | null | undefined): Stage => (v === "reclamee
 export const isOpenStage = (s: Stage) => s === "a_traiter" || s === "en_attente";
 export const OPEN_STAGES = ["a_traiter", "en_attente"] as const;
 /** « En attente » de quoi : réponse du fournisseur, avoir / régul, livraison, retour marchandise */
-export const WAITING = ["reponse", "avoir", "livraison", "retour"] as const;
+export const WAITING = ["reponse", "avoir", "livraison", "retour", "facturation"] as const;
 export type Waiting = (typeof WAITING)[number];
 export const waitingOf = (v: string | null | undefined): Waiting | null => (WAITING.includes(v as Waiting) ? (v as Waiting) : null);
 

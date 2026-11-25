@@ -130,6 +130,8 @@ export const fr = {
   },
   receptions: {
     consolidateImported: "Consolider",
+    unconsolidateImported: "Enlever la consolidation",
+    unconsolidateImportedConfirm: "Enlever la consolidation de cette ancienne fiche ? Elle redeviendra modifiable.",
     consolidateImportedConfirm: "Consolider cette ancienne fiche ? Elle ne sera plus modifiable (ses fiches d'anomalie restent modifiables).",
     draftStatus: "Brouillon",
     actions: "Actions",
@@ -448,6 +450,13 @@ export const fr = {
     empty: "Aucun fournisseur. Importez votre mercurial ou ajoutez un fournisseur.",
   },
   anomalies: {
+    deleteSheet: {
+      confirm: "Supprimer la fiche d'anomalie",
+      noClaim: "Aucune réclamation n'est rattachée à cette fiche.",
+      claimDeleted: "La réclamation {r} est rattachée à cette fiche : elle sera supprimée avec elle.",
+      claimShared: "La réclamation {r} est rattachée à cette fiche et à {n} autre(s) fiche(s) : cette fiche en sera retirée, la réclamation reste pour les autres.",
+      weigh: "Écart de pesée : la fiche ne sera pas recréée automatiquement.",
+    },
     sheetsLabel: "fiches",
     frequency: "Fréquence",
     periods: { mois: "Mois", trimestre: "Trimestre", annee: "Année", perso: "Personnalisé" },
@@ -852,7 +861,7 @@ export const fr = {
     created: "Créée le",
     open: "Ouvrir la fiche",
   },
-  waiting: { label: "En attente de", reponse: "Retour fournisseur", avoir: "Avoir / Régul", livraison: "Livraison", retour: "Retour marchandise" },
+  waiting: { label: "En attente de", reponse: "Retour fournisseur", avoir: "Avoir / Régul", livraison: "Livraison", retour: "Retour marchandise", facturation: "Vérification facturation" },
   stages: { a_traiter: "À traiter", en_attente: "En attente", cloturee: "Clôturée", annulee: "Annulée" },
   resolutions: { avoir: "Avoir / régularisation reçu(e)", livraison: "Livraison différée", retour: "Retour marchandise", sans_suite: "Sans suite" },
   modes: { reclamation: "Réclamation avec relances", verification_reclamation: "Avec relance", verification: "Sans relance" },

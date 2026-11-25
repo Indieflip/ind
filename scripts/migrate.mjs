@@ -1339,6 +1339,20 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v3
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v35', '1') on conflict (key) do nothing`);
 }
 
+// Dev : suppression d'une fiche d'anomalie + déconsolidation des anciennes fiches, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v36'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('anomaly', 'Fiche', 'Supprimer', false, ${"Bouton Supprimer (droit Gérer les anomalies), avec confirmation indiquant la réclamation rattachée : N° R propre à la fiche → supprimé avec elle ; N° R partagé → la fiche en est retirée, la réclamation reste pour les autres ; lignes de réclamation rattachées supprimées. Écart de pesée supprimé : jamais recréé automatiquement."}, '', ${pos})`);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Fiche de réception', 'Enlever la consolidation (ancienne fiche)', false, ${"Ancienne fiche (importée) consolidée : bouton « Enlever la consolidation » avec confirmation (droit Consolidation) ; la fiche redevient modifiable. Les fiches des vraies livraisons restent verrouillées."}, '', ${pos + 1})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v36', '1') on conflict (key) do nothing`);
+}
+
+// Dev : « En attente de » — Vérification facturation, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v37'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = replace(rule, 'Livraison ou Retour marchandise', 'Livraison, Retour marchandise ou Vérification facturation') where field = 'En attente de'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v37', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

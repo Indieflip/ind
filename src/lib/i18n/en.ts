@@ -132,6 +132,8 @@ export const en: Dict = {
   },
   receptions: {
     consolidateImported: "Consolidate",
+    unconsolidateImported: "Remove consolidation",
+    unconsolidateImportedConfirm: "Remove the consolidation of this old sheet? It will be editable again.",
     consolidateImportedConfirm: "Consolidate this old sheet? It will no longer be editable (its anomaly sheets stay editable).",
     draftStatus: "Draft",
     actions: "Actions",
@@ -446,6 +448,13 @@ export const en: Dict = {
     empty: "No suppliers yet. Import your price list or add a supplier.",
   },
   anomalies: {
+    deleteSheet: {
+      confirm: "Delete anomaly sheet",
+      noClaim: "No claim is linked to this sheet.",
+      claimDeleted: "Claim {r} is linked to this sheet: it will be deleted with it.",
+      claimShared: "Claim {r} is linked to this sheet and {n} other sheet(s): this sheet will be removed from it, the claim stays for the others.",
+      weigh: "Weight gap: the sheet will not be recreated automatically.",
+    },
     sheetsLabel: "sheets",
     frequency: "Frequency",
     periods: { mois: "Month", trimestre: "Quarter", annee: "Year", perso: "Custom" },
@@ -850,7 +859,7 @@ export const en: Dict = {
     created: "Created on",
     open: "Open the sheet",
   },
-  waiting: { label: "Waiting for", reponse: "Supplier reply", avoir: "Credit / adjustment", livraison: "Delivery", retour: "Goods return" },
+  waiting: { label: "Waiting for", reponse: "Supplier reply", avoir: "Credit / adjustment", livraison: "Delivery", retour: "Goods return", facturation: "Invoice check" },
   stages: { a_traiter: "To process", en_attente: "Waiting", cloturee: "Closed", annulee: "Cancelled" },
   resolutions: { avoir: "Credit / adjustment received", livraison: "Delivered later", retour: "Goods returned", sans_suite: "No follow-up" },
   modes: { reclamation: "Claim with reminders", verification_reclamation: "With reminder", verification: "Without reminder" },

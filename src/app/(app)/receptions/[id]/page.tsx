@@ -14,7 +14,7 @@ import { Icon } from "@/components/Icon";
 import { receptionNumbers } from "@/lib/server/queries";
 import { anomalyNumbers } from "@/lib/server/savings";
 import { outcomeOf, outcomeStyles } from "@/lib/anomaly";
-import { AnomalyActionField, PrintButton, DeleteReceptionButton, AddNote, ConsolidateImportedButton } from "./Actions";
+import { AnomalyActionField, PrintButton, DeleteReceptionButton, AddNote, ConsolidateImportedButton, UnconsolidateImportedButton } from "./Actions";
 
 const isPdf = (url: string) => /\.pdf($|\?)/i.test(url) || url.startsWith("data:application/pdf");
 
@@ -71,6 +71,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
             <Link href={`/anomalies?reception=${rec.id}#new`} className="btn-secondary"><Icon name="alert" className="h-4 w-4" /> {t.receptions.reportAnomaly}</Link>
           )}
           {!locked && rec.importedFrom && can.consolidate(user.role) && <ConsolidateImportedButton id={rec.id} label={t.receptions.consolidateImported} confirmText={t.receptions.consolidateImportedConfirm} />}
+          {locked && rec.importedFrom && can.consolidate(user.role) && <UnconsolidateImportedButton id={rec.id} label={t.receptions.unconsolidateImported} confirmText={t.receptions.unconsolidateImportedConfirm} />}
           <PrintButton label={t.common.print} />
           {!locked && can.deleteDraftReception(user.role) && <DeleteReceptionButton id={rec.id} label={t.common.delete} confirmText={t.receptions.deleteConfirm} />}
         </div>

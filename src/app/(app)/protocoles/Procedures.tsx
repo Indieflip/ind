@@ -189,7 +189,7 @@ const STATUS: { label: string; color: string }[] = [
 const CLAIMS: Step[] = [
   { title: "Nouvelle anomalie · À traiter", icon: "alert", you: ["Ouvrir la fiche depuis l'Accueil ou le tableau de bord", "Vérifier le montant réclamé et le type de suivi"], app: ["Crée l'anomalie à la réception, avec photo et montant", "Affiche le process du fournisseur (encadré orange)"] },
   { title: "Réclamer · En attente", icon: "inbox", you: ["« Envoyer la réclamation » (Outlook) ou « Téléphone » (noter le détail de l'appel ou du SMS)", "Les autres fiches « À traiter » du fournisseur partent dans le même mail"], app: ["Prépare le mail avec l'adresse « Réclamation » du fournisseur, regroupe les fiches sous un même N° R, passe en « En attente »"] },
-  { title: "Suivre · En attente", icon: "layers", you: ["Réponse du fournisseur : « Retour fournisseur » (noter la réponse)", "Sans réponse : relancer par « Téléphone » ; erreur : « ← À traiter »", "Indiquer « En attente de » : Retour fournisseur, Avoir / Régul, Livraison ou Retour marchandise"], app: ["Rappel sur l'Accueil après le délai du fournisseur (3 jours par défaut)"] },
+  { title: "Suivre · En attente", icon: "layers", you: ["Réponse du fournisseur : « Retour fournisseur » (noter la réponse)", "Sans réponse : relancer par « Téléphone » ; erreur : « ← À traiter »", "Indiquer « En attente de » : Retour fournisseur, Avoir / Régul, Livraison, Retour marchandise ou Vérification facturation"], app: ["Rappel sur l'Accueil après le délai du fournisseur (3 jours par défaut)"] },
   { title: "Clôturer · Clôturée", icon: "check", you: ["Avoir / Régul (montant, N°, date), Livraison différée, Retour marchandise ou Sans suite"], app: ["Compte l'économie dans Reporting › Économies"] },
 ];
 

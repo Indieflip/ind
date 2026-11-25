@@ -21,7 +21,7 @@ import { receptionNumbers } from "@/lib/server/queries";
 import { Icon } from "@/components/Icon";
 import { claimStyles, isInformative } from "@/lib/anomaly";
 import { AnomalySheetForm } from "./SheetClient";
-import { ActionCard, ReviewButtons } from "./CardClient";
+import { ActionCard, DeleteAnomalyButton, ReviewButtons } from "./CardClient";
 import { ensureClaimNumbers } from "@/lib/server/claimNumbers";
 import { supplierProcesses } from "@/lib/server/followup";
 import { problemTypes } from "@/lib/server/problemTypes";
@@ -49,6 +49,22 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   // N° de fiche (FA…) : par année de création
   const number = anoNums.get(a.id)?.n ?? a.number ?? null;
   const claimYear = anoNums.get(a.id)?.year;
+  // Suppression : réclamation rattachée (N° R de la fiche, partagé ou non avec d'autres fiches, lignes de réclamation)
+  const [sameClaim, claimRows] = await Promise.all([
+    a.claimNo != null
+      ? getDb().select({ id: schema.anomalies.id }).from(schema.anomalies).where(and(eq(schema.anomalies.claimNo, a.claimNo), ne(schema.anomalies.id, a.id), sql`extract(year from ${schema.anomalies.createdAt} at time zone 'Europe/Paris') = extract(year from ${a.createdAt}::timestamptz at time zone 'Europe/Paris')`))
+      : Promise.resolve([]),
+    getDb().select({ id: schema.claims.id }).from(schema.claims).where(eq(schema.claims.anomalyId, a.id)),
+  ]);
+  const D = t.anomalies.deleteSheet;
+  const claimLabel = a.claimNo != null ? fmtNo("claim", a.claimNo) : "";
+  const deleteText = [
+    `${D.confirm} ${fmtNo("anomaly", anoNums.get(a.id)?.n ?? a.number)} ?`,
+    a.claimNo == null && !claimRows.length ? D.noClaim
+      : sameClaim.length ? `${D.claimShared.replace("{r}", claimLabel).replace("{n}", String(sameClaim.length))}`
+      : `${D.claimDeleted.replace("{r}", claimLabel)}`,
+    a.source === "weigh" ? D.weigh : "",
+  ].filter(Boolean).join("\n\n");
   // Type de problème (liste modifiable) et produits du fournisseur pour le rattachement
   const typeLabel = t.anomalies.types[a.type];
   const problemType = a.problemType || typeLabel;
@@ -173,7 +189,10 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="no-print flex flex-wrap items-center justify-between gap-2">
         <BackLink href="/anomalies?view=liste" label={t.anomalies.title} />
-        <ReviewButtons id={a.id} value={a.review ?? null} editable={can.manageAnomalies(user.role)} />
+        <div className="flex flex-wrap items-center gap-2">
+          <ReviewButtons id={a.id} value={a.review ?? null} editable={can.manageAnomalies(user.role)} />
+          {can.manageAnomalies(user.role) && <DeleteAnomalyButton id={a.id} label={t.common.delete} confirmText={deleteText} backHref="/anomalies?view=liste" />}
+        </div>
       </div>
 
       {/* La carte : l'essentiel, la prochaine étape et les actions */}

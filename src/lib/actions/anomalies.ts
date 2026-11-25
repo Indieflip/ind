@@ -251,6 +251,31 @@ export async function deleteSupplierGroupAction(supplierName: string) {
   return { ok: true };
 }
 
+/**
+ * Supprimer une fiche d'anomalie : sa réclamation part avec elle (N° R propre à la fiche, lignes de réclamation rattachées) ;
+ * une réclamation partagée avec d'autres fiches reste pour celles-ci. Écart de pesée : le regroupement n'est plus recréé.
+ */
+export async function deleteAnomalyAction(id: number) {
+  await assertUser(can.manageAnomalies);
+  const db = getDb();
+  const a = await db.query.anomalies.findFirst({ where: eq(schema.anomalies.id, id) });
+  if (!a) return { error: "not_found" };
+  await db.transaction(async (tx) => {
+    await tx.delete(schema.claims).where(eq(schema.claims.anomalyId, id));
+    if (a.source === "weigh" && a.groupKey) {
+      const key = "weigh_dismissed";
+      const cur = (await tx.query.appSettings.findFirst({ where: eq(schema.appSettings.key, key) }))?.value;
+      const list: string[] = cur ? JSON.parse(cur) : [];
+      if (!list.includes(a.groupKey)) list.push(a.groupKey);
+      await tx.insert(schema.appSettings).values({ key, value: JSON.stringify(list) }).onConflictDoUpdate({ target: schema.appSettings.key, set: { value: JSON.stringify(list) } });
+    }
+    await tx.delete(schema.anomalies).where(eq(schema.anomalies.id, id));
+  });
+  revalidatePath("/anomalies", "layout");
+  revalidatePath("/receptions", "layout");
+  return { ok: true };
+}
+
 /** Réclamations : regrouper plusieurs anomalies / écarts sous un même N° (le plus petit) */
 export async function groupClaimsAction(ids: number[]) {
   await assertUser(can.manageAnomalies);

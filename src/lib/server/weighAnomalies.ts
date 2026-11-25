@@ -23,6 +23,9 @@ export async function syncWeighAnomalies() {
   // Anciennes fiches (générées depuis les anomalies importées) : jamais de nouvelle fiche d'anomalie,
   // l'écart de pesée est reporté sur la fiche d'anomalie existante de la réception
   const imported = new Set(importedRecs.map((r) => r.id));
+  // Fiches « Écart de pesée » supprimées à la main : jamais recréées
+  const dismissedRaw = (await db.query.appSettings.findFirst({ where: eq(schema.appSettings.key, "weigh_dismissed") }))?.value;
+  const dismissed = new Set<string>(dismissedRaw ? JSON.parse(dismissedRaw) : []);
   const groups = new Map<string, (typeof gaps)[number][]>();
   for (const g of gaps) {
     const q = num(g.gapQty);
@@ -34,6 +37,7 @@ export async function syncWeighAnomalies() {
   }
   const byKey = new Map(existing.map((a) => [a.groupKey ?? "", a]));
   for (const [key, lines] of groups) {
+    if (dismissed.has(key)) continue;
     lines.sort((a, b) => a.product.localeCompare(b.product, "fr"));
     const total = lines.reduce((s, g) => s + (num(g.gapAmount) ?? 0), 0);
     const totalKg = lines.reduce((s, g) => s + (num(g.gapQty) ?? 0), 0);

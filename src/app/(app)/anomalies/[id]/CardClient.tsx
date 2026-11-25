@@ -1,10 +1,11 @@
 "use client";
+import { Icon } from "@/components/Icon";
 import { Paren } from "@/components/Paren";
 import { claimMailHref, type MailFiche, type MailParts } from "@/lib/claimMail";
 import { DateField } from "@/components/DateField";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { followUpTodayAction, groupClaimsAction, moveAnomalyAction, setAnomalyReviewAction, updateAnomalyAction } from "@/lib/actions/anomalies";
+import { deleteAnomalyAction, followUpTodayAction, groupClaimsAction, moveAnomalyAction, setAnomalyReviewAction, updateAnomalyAction } from "@/lib/actions/anomalies";
 import { useI18n } from "@/lib/i18n/client";
 import { WAITING } from "@/lib/anomaly";
 import { appAlert, appConfirm } from "@/components/Confirm";
@@ -18,6 +19,28 @@ export const reviewStyles: Record<string, string> = {
 };
 
 /** Contrôle de la fiche par l'utilisateur : À vérifier / Vérifiée / À voir (un nouveau clic efface) */
+/** Supprimer la fiche d'anomalie : le message indique la réclamation rattachée, supprimée avec la fiche */
+export function DeleteAnomalyButton({ id, label, confirmText, backHref }: { id: number; label: string; confirmText: string; backHref: string }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  return (
+    <button
+      type="button"
+      className="btn-ghost px-2 py-1.5 text-sm text-red-600 hover:bg-red-50"
+      disabled={pending}
+      onClick={async () => {
+        if (!(await appConfirm(confirmText, { danger: true }))) return;
+        start(async () => {
+          const r = await deleteAnomalyAction(id);
+          if (r?.ok) { router.push(backHref); router.refresh(); } else await appAlert(String(r?.error ?? "erreur"));
+        });
+      }}
+    >
+      <Icon name="trash" className="h-4 w-4" /> {label}
+    </button>
+  );
+}
+
 export function ReviewButtons({ id, value, editable }: { id: number; value: string | null; editable: boolean }) {
   const { t } = useI18n();
   const router = useRouter();

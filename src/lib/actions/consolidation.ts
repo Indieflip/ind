@@ -18,6 +18,19 @@ export async function consolidateImportedAction(receptionId: number) {
   return { ok: done.length > 0 };
 }
 
+/** Ancienne fiche (importée) : enlever la consolidation, la fiche redevient modifiable */
+export async function unconsolidateImportedAction(receptionId: number) {
+  await assertUser(can.consolidate);
+  const r = schema.receptions;
+  const done = await getDb()
+    .update(r)
+    .set({ consolidatedAt: null, consolidatedBy: null })
+    .where(and(eq(r.id, receptionId), isNotNull(r.importedFrom), isNotNull(r.consolidatedAt)))
+    .returning({ id: r.id });
+  revalidatePath("/receptions", "layout");
+  return { ok: done.length > 0 };
+}
+
 /** Note complémentaire sur un bon consolidé (horodatée, non modifiable) */
 export async function addNoteAction(receptionId: number, text: string) {
   const user = await assertUser(can.addNote);
