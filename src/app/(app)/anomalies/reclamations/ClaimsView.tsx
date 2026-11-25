@@ -6,14 +6,14 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { groupClaimsAction, ungroupClaimAction, updateAnomalyAction } from "@/lib/actions/anomalies";
 import { MoneyInput } from "@/components/MoneyInput";
-import { stageStyles, type Stage, modeIcon } from "@/lib/anomaly";
+import { waitingOf, stageStyles, type Stage, modeIcon } from "@/lib/anomaly";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtMoney, sentence } from "@/lib/format";
 import { DataTable, type Col } from "@/components/table/DataTable";
 
 export interface ClaimViewRow {
   id: number; claimNo: number; year?: number; consolidated: boolean; date: string; dateIso: string; supplier: string; supplierId: number | null; reference: string; product: string; subject: string;
-  mode: string; lastActionAt?: string; lastActionLabel?: string; stage: Stage; resolution: string | null; claimed: number | null; credit: number | null; days: number; due: boolean; source: string;
+  mode: string; waitingFor?: string | null; lastActionAt?: string; lastActionLabel?: string; stage: Stage; resolution: string | null; claimed: number | null; credit: number | null; days: number; due: boolean; source: string;
 }
 
 /** Vignettes Réclamée / À vérifier sur facture / Clôturée / Annulée + tableau (clic → fiche d'anomalie) */
@@ -64,6 +64,7 @@ export function ClaimsView({ rows: allRows, canManage, initialFilter, claimNo = 
       render: (r) => (
         <div className="space-y-0.5">
           <span className={`badge ${stageStyles[r.stage]}`}>{t.stages[r.stage]}</span>
+          {r.stage === "en_attente" && waitingOf(r.waitingFor) && <div className="text-[11px] font-medium text-amber-800">{t.waiting[waitingOf(r.waitingFor)!]}</div>}
           {r.stage === "cloturee" && r.resolution && <div className="text-[11px] text-emerald-800">{t.resolutions[r.resolution as "avoir"]}</div>}
           {r.stage === "en_attente" && <div className={`text-[11px] ${r.due ? "font-semibold text-red-700" : "text-stone-500"}`}>{r.days} {t.kanban.days}</div>}
         </div>

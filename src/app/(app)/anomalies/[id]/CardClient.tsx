@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { followUpTodayAction, groupClaimsAction, moveAnomalyAction, setAnomalyReviewAction, updateAnomalyAction } from "@/lib/actions/anomalies";
 import { useI18n } from "@/lib/i18n/client";
+import { WAITING } from "@/lib/anomaly";
 import { appAlert, appConfirm } from "@/components/Confirm";
 import { MoneyInput } from "@/components/MoneyInput";
 
@@ -50,8 +51,8 @@ export function ReviewButtons({ id, value, editable }: { id: number; value: stri
  * À traiter : Envoyer la réclamation (Outlook, en regroupant les autres fiches « À traiter » du fournisseur), Téléphone, Avoir / Régul.
  * En attente : Avoir / Régul, Retour mail, Livraison différée, Retour marchandise (+ Téléphone, retour à « À traiter »).
  */
-export function ActionCard({ id, stage, resolution, editable, claimed, phone, supplier, nextDate, missingBl = false, mail, self, others = [] }: {
-  missingBl?: boolean; id: number; stage: string; resolution: string | null; editable: boolean; claimed: string; phone: string; supplier: string; nextDate: string | null;
+export function ActionCard({ id, stage, resolution, editable, claimed, phone, supplier, nextDate, missingBl = false, mail, self, others = [], waitingFor = null }: {
+  waitingFor?: string | null; missingBl?: boolean; id: number; stage: string; resolution: string | null; editable: boolean; claimed: string; phone: string; supplier: string; nextDate: string | null;
   mail: MailParts; self: MailFiche; others?: MailFiche[];
 }) {
   const { t } = useI18n();
@@ -106,6 +107,18 @@ export function ActionCard({ id, stage, resolution, editable, claimed, phone, su
         <span aria-hidden="true" className="text-lg">➜</span>
         <p className="text-[15px] leading-relaxed"><strong>{c.nextStep} :</strong> {next}</p>
       </div>
+      {/* En attente de quoi : visible d'un coup d'œil, modifiable d'un clic */}
+      {st === "en_attente" && (
+        <div className="flex flex-wrap items-center gap-1.5 text-sm">
+          <span className="font-semibold text-amber-900">{t.waiting.label} :</span>
+          {WAITING.map((w) => (
+            <button key={w} type="button" disabled={!editable || pending} onClick={() => run(() => updateAnomalyAction(id, { waitingFor: w }))}
+              className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${waitingFor === w ? "border-amber-500 bg-amber-100 text-amber-900" : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"}`}>
+              {t.waiting[w]}
+            </button>
+          ))}
+        </div>
+      )}
       {/* Autres fiches à traiter chez ce fournisseur : regroupées dans la même réclamation (un seul mail) */}
       {editable && st === "a_traiter" && others.length > 0 && !credit && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">

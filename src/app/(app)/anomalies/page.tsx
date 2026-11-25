@@ -110,6 +110,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     type: t.anomalies.types[x.type],
     nextActionAt: x.nextActionAt ?? "",
     stage: x.stage,
+    waitingFor: x.waitingFor,
     resolution: x.resolution,
     mode: x.mode,
     claimed: num(x.claimedAmount),

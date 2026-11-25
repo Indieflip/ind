@@ -41,6 +41,10 @@ export const stageStyles: Record<Stage, string> = {
 export const stageOf = (v: string | null | undefined): Stage => (v === "reclamee" || v === "a_verifier" ? "en_attente" : STAGES.includes(v as Stage) ? (v as Stage) : "a_traiter");
 export const isOpenStage = (s: Stage) => s === "a_traiter" || s === "en_attente";
 export const OPEN_STAGES = ["a_traiter", "en_attente"] as const;
+/** « En attente » de quoi : réponse du fournisseur, avoir / régul, livraison, retour marchandise */
+export const WAITING = ["reponse", "avoir", "livraison", "retour"] as const;
+export type Waiting = (typeof WAITING)[number];
+export const waitingOf = (v: string | null | undefined): Waiting | null => (WAITING.includes(v as Waiting) ? (v as Waiting) : null);
 
 /** Résolution d'une anomalie clôturée : par un avoir, ou par la marchandise livrée plus tard */
 /** Résolutions : avoir / régularisation, livraison différée, retour de la marchandise au fournisseur, sans suite */

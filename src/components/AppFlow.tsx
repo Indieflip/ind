@@ -35,7 +35,7 @@ const AUTO: { title: string; items: string[] }[] = [
 
 const STAGES: { label: string; text: string; color: string }[] = [
   { label: "À traiter", text: "Créée, rien n'est encore fait", color: "border-t-red-500" },
-  { label: "En attente", text: "Réclamation envoyée (mail Outlook regroupant les fiches du fournisseur, ou téléphone) ; retour fournisseur, avoir / régul, livraison ou retour marchandise ; relance au délai du fournisseur", color: "border-t-amber-500" },
+  { label: "En attente", text: "Réclamation envoyée (mail Outlook regroupant les fiches du fournisseur, ou téléphone) ; retour fournisseur, avoir / régul, livraison ou retour marchandise ; relance au délai du fournisseur ; « En attente de » (retour fournisseur, avoir, livraison, retour marchandise) visible d'un coup d'œil sur la fiche et dans les listes", color: "border-t-amber-500" },
   { label: "Clôturée", text: "Avec sa résolution", color: "border-t-brand-600" },
 ];
 

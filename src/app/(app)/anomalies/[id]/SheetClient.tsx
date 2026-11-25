@@ -5,7 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { followUpTodayAction, updateAnomalyAction } from "@/lib/actions/anomalies";
 import { saveProblemTypesAction } from "@/lib/actions/problemTypes";
-import { MODES, RESOLUTIONS, STAGES, stageOf, stageStyles, modeIcon } from "@/lib/anomaly";
+import { WAITING, MODES, RESOLUTIONS, STAGES, stageOf, stageStyles, modeIcon } from "@/lib/anomaly";
 import { useI18n } from "@/lib/i18n/client";
 import { Icon } from "@/components/Icon";
 import { MoneyInput } from "@/components/MoneyInput";
@@ -17,7 +17,7 @@ export interface Item { productId: number | null; name: string; qty: string; uni
 interface Values {
   items: Item[];
   problemType: string; productId: number | null; productName: string; note: string; description: string; followUp: string; lastActionAt: string; nextActionAt: string;
-  creditAmount: string; claimedAmount: string; stage: string; resolution: string; mode: string; creditNumber: string; creditDate: string; creditKind: string; docDate: string;
+  creditAmount: string; claimedAmount: string; stage: string; resolution: string; mode: string; creditNumber: string; creditDate: string; creditKind: string; docDate: string; waitingFor: string;
 }
 
 export function AnomalySheetForm({ id, initial, editable, informative, types, products, assistant = [], showAssistant = true, units = [], supplier, document, missingBlType }: { supplier?: { id: number | null; name: string }; document?: { label: string; href: string | null } | null; missingBlType?: string; units?: string[]; id: number; initial: Values; editable: boolean; informative?: boolean; types: string[]; products: { id: number; name: string; unit?: string; price?: number | null }[]; assistant?: { date: string | null; text: string }[]; showAssistant?: boolean }) {
@@ -198,6 +198,20 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
         </div>
       </div>
 
+      {/* En attente de quoi : d'un coup d'œil */}
+      {stage === "en_attente" && (
+        <div>
+          <span className="label">{t.waiting.label}</span>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {WAITING.map((w) => (
+              <button key={w} type="button" disabled={!editable} onClick={() => { setV({ ...v, waitingFor: w }); setSaved(false); }}
+                className={`rounded-lg border-2 px-2 py-2 text-sm font-semibold ${v.waitingFor === w ? "border-amber-500 bg-amber-50 text-amber-900" : "border-stone-200 bg-white text-stone-500"}`}>
+                {t.waiting[w]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {/* Type de suivi : en deuxième, juste après le statut */}
       <div>
         <span className="label">{s.mode}</span>

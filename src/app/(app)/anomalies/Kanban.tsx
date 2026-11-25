@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { moveAnomalyAction } from "@/lib/actions/anomalies";
-import { stageOf, stageStyles, type Stage, modeIcon } from "@/lib/anomaly";
+import { waitingOf, stageOf, stageStyles, type Stage, modeIcon } from "@/lib/anomaly";
 import { useI18n } from "@/lib/i18n/client";
 import { fmtMoney, sentence } from "@/lib/format";
 import type { AnomalyRow } from "./AnomalyClient";
@@ -127,6 +127,7 @@ export function Kanban({ rows, canManage }: { rows: AnomalyRow[]; canManage: boo
                       {s === "cloturee" && r.resolution && <span className="badge bg-emerald-50 text-emerald-800">{t.resolutions[r.resolution as "avoir"]}</span>}
                     </div>
                     <p className="mt-0.5 font-semibold leading-tight">{sentence(r.supplier)}</p>
+                    {s === "en_attente" && waitingOf(r.waitingFor) && <p className="text-[11px] font-semibold text-amber-800">{t.waiting.label} : {t.waiting[waitingOf(r.waitingFor)!]}</p>}
                     <p className="text-xs text-stone-600">{r.product || r.type}</p>
                     {r.review && <span className={`mt-1 inline-block rounded-full border px-1.5 text-[10px] font-semibold ${r.review === "verifiee" ? "border-emerald-300 bg-emerald-50 text-emerald-800" : r.review === "a_voir" ? "border-sky-300 bg-sky-50 text-sky-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}>{t.sheet.reviews[r.review as "a_verifier"]}</span>}
                     <p className="mt-1 line-clamp-2 text-xs text-stone-500">{r.problem}</p>

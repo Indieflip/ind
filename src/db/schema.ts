@@ -181,6 +181,8 @@ export const receptions = pgTable(
     consolidatedBy: integer("consolidated_by").references(() => users.id),
     /** Fiche générée à partir des anomalies importées (fichier de suivi, écarts de pesée) : jamais consolidée ni exportée automatiquement */
     importedFrom: text("imported_from"),
+    /** N° de fiche de réception dans l'année (RCP…), attribué par date de livraison ; les nouvelles fiches prennent la suite */
+    seq: integer("seq"),
   },
   (t) => [uniqueIndex("receptions_client_uuid_idx").on(t.clientUuid), index("receptions_delivered_idx").on(t.deliveredAt)],
 );
@@ -295,8 +297,8 @@ export const anomalies = pgTable(
     photoUrl: text("photo_url"),
     /** Ligne reprise du fichier « Suivi contrôle » (remplacée à chaque nouvel import) */
     imported: boolean("imported").notNull().default(false),
-    /** N° définitif, attribué par ordre à la consolidation (unique) */
-    number: integer("number").unique(),
+    /** N° de fiche (ANO) par année de création, dans l'ordre des dates ; attribué à la consolidation pour les nouvelles fiches */
+    number: integer("number"),
     /**
      * Suivi unique : a_traiter → reclamee (en attente du fournisseur) → a_verifier (sur facture) → cloturee | annulee
      */
@@ -305,6 +307,8 @@ export const anomalies = pgTable(
     resolution: text("resolution"),
     /** reclamation (démarche active, relances) | verification (on vérifie seulement l'avoir / la facture) */
     mode: text("mode").notNull().default("verification_reclamation"),
+    /** « En attente » : ce qu'on attend du fournisseur (reponse, avoir, livraison, retour) */
+    waitingFor: text("waiting_for"),
     /** Montant en jeu (réclamé) ; l'avoir obtenu est creditAmount (Économie HT) */
     claimedAmount: numeric("claimed_amount", { precision: 12, scale: 2 }),
     /** reception | manual | file | weigh */

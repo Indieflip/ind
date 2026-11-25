@@ -493,7 +493,7 @@ export const fr = {
     descriptionPlaceholder: "Ex. : 2 produits manquants sur la livraison",
     type: "Type",
     types: {
-      missing: "Produit manquant",
+      missing: "Produit - Quantité",
       damaged: "Produit abîmé",
       temperature: "Température",
       dlc: "DLC",
@@ -846,6 +846,7 @@ export const fr = {
     created: "Créée le",
     open: "Ouvrir la fiche",
   },
+  waiting: { label: "En attente de", reponse: "Retour fournisseur", avoir: "Avoir / Régul", livraison: "Livraison", retour: "Retour marchandise" },
   stages: { a_traiter: "À traiter", en_attente: "En attente", cloturee: "Clôturée", annulee: "Annulée" },
   resolutions: { avoir: "Avoir / régularisation reçu(e)", livraison: "Livraison différée", retour: "Retour marchandise", sans_suite: "Sans suite" },
   modes: { reclamation: "Réclamation avec relances", verification_reclamation: "Avec relance", verification: "Sans relance" },

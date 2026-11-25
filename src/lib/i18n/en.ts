@@ -491,7 +491,7 @@ export const en: Dict = {
     descriptionPlaceholder: "E.g. 2 products missing from the delivery",
     type: "Type",
     types: {
-      missing: "Missing product",
+      missing: "Product - Quantity",
       damaged: "Damaged product",
       temperature: "Temperature",
       dlc: "Use-by date",
@@ -844,6 +844,7 @@ export const en: Dict = {
     created: "Created on",
     open: "Open the sheet",
   },
+  waiting: { label: "Waiting for", reponse: "Supplier reply", avoir: "Credit / adjustment", livraison: "Delivery", retour: "Goods return" },
   stages: { a_traiter: "To process", en_attente: "Waiting", cloturee: "Closed", annulee: "Cancelled" },
   resolutions: { avoir: "Credit / adjustment received", livraison: "Delivered later", retour: "Goods returned", sans_suite: "No follow-up" },
   modes: { reclamation: "Claim with reminders", verification_reclamation: "With reminder", verification: "Without reminder" },

@@ -33,13 +33,19 @@ export function receptionWhere(f: ReceptionFilters) {
   return conds.length ? and(...conds) : undefined;
 }
 
-/** Numéro d'ordre : 1, 2, 3… dans l'ordre de création. Recalculé à chaque affichage,
- *  il se renumérote donc tout seul après une suppression. */
-/** N° de fiche de réception (FP001…) : par année de livraison, dans l'ordre d'enregistrement ; remise à zéro le 01/01 */
+/**
+ * N° de fiche de réception (RCP001…) par année de livraison, remise à zéro le 01/01 : numéro enregistré (attribué par date de livraison),
+ * les nouvelles fiches prennent la suite dans l'ordre d'enregistrement.
+ */
 export async function receptionNumbers() {
-  const rows = await getDb().select({ id: schema.receptions.id, at: schema.receptions.deliveredAt }).from(schema.receptions).orderBy(schema.receptions.id);
-  const perYear = new Map<number, number>();
-  return new Map(rows.map((r) => { const y = parisYear(r.at); const n = (perYear.get(y) ?? 0) + 1; perYear.set(y, n); return [r.id, n] as [number, number]; }));
+  const rows = await getDb().select({ id: schema.receptions.id, at: schema.receptions.deliveredAt, seq: schema.receptions.seq }).from(schema.receptions).orderBy(schema.receptions.id);
+  const maxByYear = new Map<number, number>();
+  for (const r of rows) if (r.seq != null) { const y = parisYear(r.at); maxByYear.set(y, Math.max(maxByYear.get(y) ?? 0, r.seq)); }
+  return new Map(rows.map((r) => {
+    if (r.seq != null) return [r.id, r.seq] as [number, number];
+    const y = parisYear(r.at); const n = (maxByYear.get(y) ?? 0) + 1; maxByYear.set(y, n);
+    return [r.id, n] as [number, number];
+  }));
 }
 
 export async function listReceptions(f: ReceptionFilters, limit = 1000) {

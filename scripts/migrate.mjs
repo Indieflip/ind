@@ -1212,6 +1212,41 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v2
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v28', '1') on conflict (key) do nothing`);
 }
 
+// Renumérotation par date (une fois) : fiches de réception (RCP, date de livraison), anomalies (ANO, date de création),
+// réclamations (R, date de la première anomalie ; les anomalies regroupées gardent le même N°) — remise à zéro le 01/01
+if (!(await db.execute(sql`select 1 from app_settings where key = 'renumber_by_date_v1'`)).rows.length) {
+  await db.execute(sql`update receptions r set seq = x.n from (
+      select id, row_number() over (partition by extract(year from delivered_at at time zone 'Europe/Paris') order by delivered_at, id) as n from receptions
+    ) x where r.id = x.id`);
+  // Toutes les fiches d'anomalie reçoivent leur N° (ANO) dans l'ordre des dates (index unique retiré par la migration 0037)
+  await db.execute(sql`update anomalies set number = null`);
+  await db.execute(sql`update anomalies a set number = x.n from (
+      select id, row_number() over (partition by extract(year from created_at at time zone 'Europe/Paris') order by created_at, id) as n from anomalies
+    ) x where a.id = x.id`);
+  await db.execute(sql`update anomalies a set claim_no = x.n from (
+      select g.old, g.y, row_number() over (partition by g.y order by g.first, g.old) as n
+      from (select claim_no as old, extract(year from created_at at time zone 'Europe/Paris') as y, min(created_at) as first from anomalies where claim_no is not null group by 1, 2) g
+    ) x where a.claim_no = x.old and extract(year from a.created_at at time zone 'Europe/Paris') = x.y`);
+  console.log("[migrate] numéros RCP / ANO / R remis dans l'ordre des dates");
+  await db.execute(sql`insert into app_settings (key, value) values ('renumber_by_date_v1', '1') on conflict (key) do nothing`);
+}
+
+// Type d'anomalie « Produit manquant » renommé « Produit - Quantité », une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'type_missing_rename_v1'`)).rows.length) {
+  await db.execute(sql`update anomalies set problem_type = 'Produit - Quantité' where problem_type = 'Produit manquant'`);
+  await db.execute(sql`update app_settings set value = replace(value, '"Produit manquant"', '"Produit - Quantité"') where key = 'anomaly_problem_types'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('type_missing_rename_v1', '1') on conflict (key) do nothing`);
+}
+
+// « En attente de » : fiches déjà en attente → Retour fournisseur (Avec relance) ou Avoir / Régul (Sans relance), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v29'`)).rows.length) {
+  await db.execute(sql`update anomalies set waiting_for = case when mode = 'verification' then 'avoir' else 'reponse' end where stage = 'en_attente' and waiting_for is null`);
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('anomaly', 'Suivi de la réclamation', 'En attente de', false, ${"Statut « En attente » : Retour fournisseur, Avoir / Régul, Livraison ou Retour marchandise ; visible sur la fiche (bandeau, boutons), dans les listes des anomalies et des réclamations et dans le tableau de bord. « Retour fournisseur » par défaut à l'envoi de la réclamation."}, '', ${pos})`);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('anomaly', 'Fiche', 'N° (renumérotation)', false, ${"RCP par date de livraison, ANO par date de création, R par date de la première anomalie (regroupements conservés), par année ; les nouvelles fiches prennent la suite. Type « Produit manquant » renommé « Produit - Quantité »."}, '', ${pos + 1})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v29', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

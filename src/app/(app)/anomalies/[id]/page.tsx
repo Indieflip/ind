@@ -7,7 +7,7 @@ import { claimMailHref } from "@/lib/claimMail";
 
 /** Réclamation par mail : ouverte dans Outlook (web), dans un nouvel onglet, déjà rédigée */
 const OUTLOOK_COMPOSE = "https://outlook.live.com/mail/0/deeplink/compose";
-import { WEIGH_TYPE, stageOf } from "@/lib/anomaly";
+import { WEIGH_TYPE, stageOf, waitingOf } from "@/lib/anomaly";
 import { notFound } from "next/navigation";
 import { and, asc, eq, isNull, lt, max, sql, ne } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -191,7 +191,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
             </div>
           </div>
           <div className="flex flex-col items-end gap-1.5 text-right">
-            <span className={`rounded-full px-3 py-1 text-sm font-semibold ${stageCls[stageOf(a.stage)] ?? "bg-stone-100"}`}>{t.stages[stageOf(a.stage)]}</span>
+            <span className={`rounded-full px-3 py-1 text-sm font-semibold ${stageCls[stageOf(a.stage)] ?? "bg-stone-100"}`}>{t.stages[stageOf(a.stage)]}{stageOf(a.stage) === "en_attente" && waitingOf(a.waitingFor) ? ` · ${t.waiting[waitingOf(a.waitingFor)!]}` : ""}</span>
 {problemType !== t.anomalies.types.missing_bl && (<>
             <p className="text-3xl font-bold tabular-nums">{a.claimedAmount ? fmtMoney(num(a.claimedAmount), locale) : "—"}</p>
             <p className="text-xs text-white/80">{s.claimed}</p>
@@ -199,7 +199,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
           </div>
         </div>
         <div className="border-t border-stone-100 p-6 pt-4">
-          <ActionCard id={a.id} stage={a.stage} resolution={a.resolution} editable={editable} claimed={a.claimedAmount != null ? String(num(a.claimedAmount)).replace(".", ",") : ""} mail={mailParts} self={mailSelf} others={mailOthers} phone={claimPhone} supplier={sentence(supplier?.name ?? a.supplierName)} nextDate={nextDue} missingBl={problemType === t.anomalies.types.missing_bl} />
+          <ActionCard id={a.id} stage={a.stage} resolution={a.resolution} editable={editable} claimed={a.claimedAmount != null ? String(num(a.claimedAmount)).replace(".", ",") : ""} mail={mailParts} self={mailSelf} others={mailOthers} waitingFor={a.waitingFor} phone={claimPhone} supplier={sentence(supplier?.name ?? a.supplierName)} nextDate={nextDue} missingBl={problemType === t.anomalies.types.missing_bl} />
         </div>
       </section>
 
@@ -256,6 +256,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
           creditNumber: a.creditNumber ?? "",
           creditDate: a.creditDate ?? "",
           creditKind: a.creditKind ?? "avoir",
+          waitingFor: a.waitingFor ?? "",
           docDate: a.docDate ?? docDateFallback,
         }}
       />

@@ -1,5 +1,6 @@
 "use server";
 import { invalidate } from "@/lib/server/throttle";
+import { parisYear } from "@/lib/numbering";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "@/db";
@@ -8,7 +9,7 @@ import { can } from "@/lib/permissions";
 import { num } from "@/lib/format";
 import { storeFile, parseDataUrl } from "@/lib/storage";
 import { matchProduct } from "@/lib/server/maj";
-import { legacyOf, MODES, outcomeOf, RESOLUTIONS, stageOf, STAGES, type Stage } from "@/lib/anomaly";
+import { WAITING, legacyOf, MODES, outcomeOf, RESOLUTIONS, stageOf, STAGES, type Stage } from "@/lib/anomaly";
 
 const TYPES = schema.anomalyTypeEnum.enumValues;
 const STATUSES = schema.anomalyStatusEnum.enumValues;
@@ -48,7 +49,7 @@ export async function updateAnomalyAction(
   id: number,
   data: {
     status?: string; creditAmount?: string; followUp?: string; description?: string; nature?: string; result?: string; lastActionAt?: string; nextActionAt?: string;
-    stage?: string; resolution?: string; mode?: string; claimedAmount?: string; creditNumber?: string; creditDate?: string; creditKind?: string; docDate?: string;
+    stage?: string; resolution?: string; mode?: string; claimedAmount?: string; creditNumber?: string; creditDate?: string; creditKind?: string; docDate?: string; waitingFor?: string;
     problemType?: string; productId?: number | null; note?: string;
     items?: { productId: number | null; name: string; qty: number | null; unit: string; price: number | null }[];
   },
@@ -95,6 +96,7 @@ export async function updateAnomalyAction(
   }
   if (data.creditNumber !== undefined) set.creditNumber = data.creditNumber.trim() || null;
   if (data.creditKind !== undefined) set.creditKind = data.creditKind === "facture" ? "facture" : data.creditKind === "avoir" ? "avoir" : null;
+  if (data.waitingFor !== undefined) set.waitingFor = WAITING.includes(data.waitingFor as (typeof WAITING)[number]) ? data.waitingFor : null;
   if (data.docDate !== undefined) set.docDate = /^\d{4}-\d{2}-\d{2}$/.test(data.docDate) ? data.docDate : null;
   if (data.creditDate !== undefined) set.creditDate = /^\d{4}-\d{2}-\d{2}$/.test(data.creditDate) ? data.creditDate : null;
   if (data.mode !== undefined && MODES.includes(data.mode as (typeof MODES)[number])) set.mode = data.mode;
@@ -120,14 +122,17 @@ export async function consolidateAnomaliesAction(ids: number[]) {
   const done = await getDb().transaction(async (tx) => {
     await tx.execute(sql`lock table anomalies in share row exclusive mode`);
     const rows = await tx
-      .select({ id: schema.anomalies.id })
+      .select({ id: schema.anomalies.id, number: schema.anomalies.number, createdAt: schema.anomalies.createdAt })
       .from(schema.anomalies)
       .where(and(inArray(schema.anomalies.id, clean), isNull(schema.anomalies.consolidatedAt)))
       .orderBy(asc(schema.anomalies.createdAt), asc(schema.anomalies.id));
-    const [{ max }] = await tx.select({ max: sql<number>`coalesce(max(${schema.anomalies.number}), 0)::int` }).from(schema.anomalies);
-    let n = max;
+    // N° déjà attribué gardé ; sinon à la suite du dernier numéro de l'année de création (remise à zéro le 01/01)
+    const maxByYear = new Map<number, number>();
+    for (const r of (await tx.execute<{ y: number; m: number }>(sql`select extract(year from ${schema.anomalies.createdAt} at time zone 'Europe/Paris')::int as y, coalesce(max(${schema.anomalies.number}), 0)::int as m from ${schema.anomalies} group by 1`)).rows) maxByYear.set(Number(r.y), Number(r.m));
     for (const r of rows) {
-      await tx.update(schema.anomalies).set({ consolidatedAt: new Date(), consolidatedBy: user.id, number: ++n }).where(eq(schema.anomalies.id, r.id));
+      let number = r.number;
+      if (number == null) { const y = parisYear(r.createdAt); number = (maxByYear.get(y) ?? 0) + 1; maxByYear.set(y, number); }
+      await tx.update(schema.anomalies).set({ consolidatedAt: new Date(), consolidatedBy: user.id, number }).where(eq(schema.anomalies.id, r.id));
     }
     return rows;
   });
@@ -218,7 +223,9 @@ export async function followUpTodayAction(id: number, note: string, day?: string
   const line = `${label} : ${note.trim() || "relance"}`;
   const stage = stageOf(cur.stage) === "a_traiter" ? "en_attente" : stageOf(cur.stage);
   await db.update(schema.anomalies).set({
-    followUp: [cur.followUp, line].filter(Boolean).join("\n"), lastActionAt: cur.lastActionAt && cur.lastActionAt > iso ? cur.lastActionAt : iso, stage, ...legacyOf(stage, cur.resolution),
+    followUp: [cur.followUp, line].filter(Boolean).join("\n"), lastActionAt: cur.lastActionAt && cur.lastActionAt > iso ? cur.lastActionAt : iso, stage,
+    // Réclamation envoyée : on attend d'abord le retour du fournisseur
+    ...(stage === "en_attente" && !cur.waitingFor ? { waitingFor: "reponse" } : {}), ...legacyOf(stage, cur.resolution),
   }).where(eq(schema.anomalies.id, id));
   revalidatePath("/anomalies", "layout");
   return { ok: true };
