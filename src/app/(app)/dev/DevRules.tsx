@@ -59,7 +59,7 @@ export function AnomalyRules() {
         <table className="table text-sm">
           <thead><tr><th>{r.type}</th><th>{r.createdWhen}</th></tr></thead>
           <tbody>
-            {(Object.keys(t.anomalies.types) as (keyof typeof t.anomalies.types)[]).map((k) => (
+            {(Object.keys(t.anomalies.types) as (keyof typeof t.anomalies.types)[]).filter((k) => k !== "quantity").map((k) => (
               <tr key={k}>
                 <td className="font-medium">{t.anomalies.types[k]}</td>
                 <td className="text-stone-700">{(r.typeText as Record<string, string>)[k] ?? "—"}</td>
@@ -87,7 +87,7 @@ export function FollowUpCharacteristics({ points }: { points: Record<string, str
     ...MODES.map((m) => ({ id: `mode-${m}`, characteristic: r.charMode, post: t.modes[m], detail: `${t.sheet.modeHints[m]}. ${r.modeSavings[m]}`, steps: r.followSteps[m] as unknown as [string, string][], reminder: r.modeReminder[m] })),
     ...STAGES.map((st) => ({ id: `stage-${st}`, characteristic: r.charStage, post: t.stages[st], detail: r.stageText[st], steps: [] as [string, string][], reminder: r.stageReminder[st] })),
     // Types d'anomalie : quand la fiche est créée automatiquement, et le rappel qui s'applique
-    ...(Object.keys(t.anomalies.types) as (keyof typeof t.anomalies.types)[]).map((k) => ({ id: `type-${k}`, characteristic: r.charType, post: t.anomalies.types[k], detail: `${r.createdWhen} ${(r.typeText as Record<string, string>)[k] ?? "—"}`, steps: [] as [string, string][], reminder: (r.typeReminder as Record<string, string>)[k] ?? r.typeReminderDefault })),
+    ...(Object.keys(t.anomalies.types) as (keyof typeof t.anomalies.types)[]).filter((k) => k !== "quantity").map((k) => ({ id: `type-${k}`, characteristic: r.charType, post: t.anomalies.types[k], detail: `${r.createdWhen} ${(r.typeText as Record<string, string>)[k] ?? "—"}`, steps: [] as [string, string][], reminder: (r.typeReminder as Record<string, string>)[k] ?? r.typeReminderDefault })),
     { id: "type-weigh", characteristic: r.charType, post: WEIGH_TYPE, detail: `${r.createdWhen} ${r.weighTypeText}`, steps: [], reminder: r.typeReminderDefault },
     // Numéro incrémentation : format de chaque fiche / compte (tiré de src/lib/numbering.ts)
     ...(Object.keys(NUM_FORMAT) as NumKind[]).map((k) => ({

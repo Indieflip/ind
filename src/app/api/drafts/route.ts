@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { assertUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
@@ -32,4 +33,20 @@ export async function POST(req: Request) {
     .returning({ id: schema.receptionDrafts.id });
   revalidatePath("/receptions");
   return Response.json({ id: row.id });
+}
+
+/** « Abandonner la réception » : le brouillon enregistré sur le serveur est supprimé (le sien, ou tous avec le droit de suppression) */
+export async function DELETE(req: Request) {
+  let user;
+  try {
+    user = await assertUser(can.receive);
+  } catch {
+    return Response.json({ error: "forbidden" }, { status: 403 });
+  }
+  const uuid = new URL(req.url).searchParams.get("uuid") ?? "";
+  if (uuid.length < 8) return Response.json({ error: "invalid" }, { status: 400 });
+  const d = schema.receptionDrafts;
+  await getDb().delete(d).where(can.deleteDraftReception(user.role) ? eq(d.clientUuid, uuid) : and(eq(d.clientUuid, uuid), eq(d.createdBy, user.id)));
+  revalidatePath("/receptions");
+  return Response.json({ ok: true });
 }

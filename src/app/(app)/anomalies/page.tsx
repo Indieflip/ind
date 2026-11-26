@@ -129,7 +129,8 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
   // Récap par type d'anomalie sur une période (mois, trimestre, année en cours ou dates choisies) : nombre de fiches et montant réclamé
   const typeOf = (x: (typeof active)[number]) => x.problemType || t.anomalies.types[x.type];
   const parisDay = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
-  const allTypes = await problemTypes(Object.values(t.anomalies.types));
+  // (type « Quantité » supprimé : remplacé par « Quantité produit »)
+  const allTypes = await problemTypes(Object.entries(t.anomalies.types).filter(([k]) => k !== "quantity").map(([, v]) => v));
   const recapItems = active.map((x) => ({ d: parisDay(x.createdAt), k: typeOf(x), amt: num(x.claimedAmount) ?? 0 }));
   const typeFilter = one(sp.type) ?? "";
   const shown = typeFilter ? active.filter((x) => typeOf(x) === typeFilter) : active;

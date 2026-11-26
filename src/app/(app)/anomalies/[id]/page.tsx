@@ -69,7 +69,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   const typeLabel = t.anomalies.types[a.type];
   const problemType = a.problemType || typeLabel;
   const [types, supplierProducts, unitRows] = await Promise.all([
-    problemTypes(Object.values(t.anomalies.types)),
+    problemTypes(Object.entries(t.anomalies.types).filter(([k]) => k !== "quantity").map(([, v]) => v)),
     a.supplierId ? db.select({ id: schema.products.id, name: schema.products.name, unit: schema.products.unit, price: sql<number | null>`${schema.products.price}::float` }).from(schema.products).where(and(eq(schema.products.supplierId, a.supplierId), eq(schema.products.active, true))).orderBy(asc(schema.products.name)) : Promise.resolve([] as { id: number; name: string; unit: string; price: number | null }[]),
     db.select({ name: schema.units.name }).from(schema.units).orderBy(asc(schema.units.position), asc(schema.units.name)),
   ]);

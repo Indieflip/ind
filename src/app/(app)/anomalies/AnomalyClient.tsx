@@ -64,7 +64,7 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
         <label>
           <span className="label">{t.anomalies.type}</span>
           <select name="type" className="input" defaultValue="missing">
-            {Object.entries(t.anomalies.types).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {Object.entries(t.anomalies.types).filter(([k]) => k !== "quantity").map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </label>
         <label><span className="label">{t.common.product}</span><input name="productName" className="input" defaultValue={pre.product ?? ""} /></label>

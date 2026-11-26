@@ -1393,6 +1393,20 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'detected_item
   await db.execute(sql`insert into app_settings (key, value) values ('detected_items_v1', '1') on conflict (key) do nothing`);
 }
 
+// Type d'anomalie « Quantité » supprimé : fiches restantes et liste des types → « Quantité produit » (écarts de pesée inchangés), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'type_quantity_removed_v1'`)).rows.length) {
+  await db.execute(sql`update anomalies set problem_type = 'Quantité produit' where problem_type = 'Quantité' or (type = 'quantity' and coalesce(problem_type, '') = '')`);
+  const row = (await db.execute(sql`select value from app_settings where key = 'anomaly_problem_types'`)).rows[0];
+  if (row) {
+    try {
+      const list = JSON.parse(row.value).filter((x) => x !== "Quantité");
+      await db.execute(sql`update app_settings set value = ${JSON.stringify([...new Set(list)])} where key = 'anomaly_problem_types'`);
+    } catch { /* liste illisible : laissée telle quelle */ }
+  }
+  await db.execute(sql`update dev_fields set rule = replace(rule, 'fiche d''anomalie « Quantité » en trop', 'fiche d''anomalie « Quantité produit » (en trop)') where field = 'Quantité en trop'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('type_quantity_removed_v1', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

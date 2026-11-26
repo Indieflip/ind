@@ -365,6 +365,8 @@ async function writeContent(
         receptionId: recId, lineId: line.id, supplierId, supplierName, productName: l.productName,
         nature: natureOf(l.categoryId), reference: lineRef(l),
         type: first.startsWith("temp") ? "temperature" : first.startsWith("dlc") ? "dlc" : first === "qty_less" ? "missing" : "quantity",
+        // Type « Quantité » supprimé : quantité en trop affichée « Quantité produit »
+        ...(first.startsWith("qty") ? { problemType: t.anomalies.types.missing } : {}),
         description: `${t.anomalies.detected} : ${facts.join(" ; ")}`,
         claimedAmount: money(gapValue(l)),
         // Produit de la fiche : quantité en trop / manquante (écart Q Contrôlée – Q Facturée)
@@ -383,6 +385,7 @@ async function writeContent(
         receptionId: recId, lineId: line.id, supplierId, supplierName, productName: l.productName,
         nature: natureOf(l.categoryId), reference: lineRef(l),
         type: (l.reason && reasonToAnomaly[l.reason]) || (l.qtyReceived != null && l.qtyOrdered != null && l.qtyReceived < l.qtyOrdered ? ("missing" as const) : ("other" as const)),
+        ...(l.reason && reasonToAnomaly[l.reason] === "quantity" ? { problemType: t.anomalies.types.missing } : {}),
         photoUrl: l.photos[0] ?? null, createdBy: user.id, createdAt: date,
       };
       // Refus (produit refusé ou quantité refusée) ou réserve : une fiche d'anomalie, avec la quantité refusée

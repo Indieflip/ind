@@ -1,5 +1,5 @@
 "use client";
-import { appConfirm } from "@/components/Confirm";
+import { appAlert, appConfirm } from "@/components/Confirm";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -376,14 +376,23 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
             )}
           </div>
         )}
-        {draft.step === 0 && !editId && (
+        {!editId && (
           <button
             type="button"
             className="btn-ghost w-full text-red-600"
             onClick={async () => {
               if (!await appConfirm(t.wizard.discardConfirm)) return;
+              // Brouillon supprimé sur le serveur aussi (sinon il reste dans la liste des fiches de réception)
+              try {
+                const r = await fetch(`/api/drafts?uuid=${encodeURIComponent(draft.clientUuid)}`, { method: "DELETE" });
+                if (!r.ok && r.status !== 400) throw new Error(String(r.status));
+              } catch {
+                await appAlert(t.wizard.discardFailed);
+                return;
+              }
               await clearDraft();
               router.push("/receptions");
+              router.refresh();
             }}
           >
             {t.wizard.discard}
