@@ -674,6 +674,8 @@ export const fr = {
     confirmOne: "Ce bon ne pourra plus être modifié ni supprimé. Consolider ?",
   },
   fv: {
+    priceMinMonth: "Prix − (mois)",
+    priceMaxMonth: "Prix + (mois)",
     month: "Mois affiché",
     current: "en cours",
     allMonths: "Les 12 mois",

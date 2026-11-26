@@ -7,6 +7,7 @@ import { can } from "@/lib/permissions";
 import { num } from "@/lib/format";
 import { syncFvProducts } from "@/lib/server/fv";
 import { unitName } from "@/lib/units";
+import { parisMonth } from "@/lib/pricing";
 
 /** Unité rattachée à la liste des unités (créée si nouvelle) */
 async function unitOf(u: string) {
@@ -36,7 +37,13 @@ export async function addFvAction(_p: { ok?: boolean; error?: string } | undefin
   const product = String(form.get("product") ?? "").trim();
   const year = Number(form.get("year"));
   if (!supplier || !product || !year) return { error: "invalid" };
-  await getDb().insert(schema.fvItems).values({ supplier, product, unit: await unitOf(String(form.get("unit") ?? "")), year, prices: Array(24).fill(null), position: 100000, locked: form.get("locked") === "on" });
+  // Prix du mois en cours (− / +) saisis à l'ajout ; un seul renseigné : il vaut pour les deux
+  const prices: (number | null)[] = Array(24).fill(null);
+  const pMin = num(form.get("priceMin") as string | null), pMax = num(form.get("priceMax") as string | null);
+  const m = parisMonth(new Date());
+  prices[m * 2] = pMin ?? pMax;
+  prices[m * 2 + 1] = pMax ?? pMin;
+  await getDb().insert(schema.fvItems).values({ supplier, product, unit: await unitOf(String(form.get("unit") ?? "")), year, prices, position: 100000, locked: form.get("locked") === "on" });
   await syncFvProducts();
   revalidatePath("/mercurial/fruits-legumes");
   return { ok: true };

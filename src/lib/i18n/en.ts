@@ -672,6 +672,8 @@ export const en: Dict = {
     confirmOne: "This delivery can no longer be edited or deleted. Consolidate?",
   },
   fv: {
+    priceMinMonth: "Price − (month)",
+    priceMaxMonth: "Price + (month)",
     month: "Month shown",
     current: "current",
     allMonths: "All 12 months",

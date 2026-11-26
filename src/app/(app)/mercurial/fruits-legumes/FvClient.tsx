@@ -169,11 +169,14 @@ export function AddFv({ year, suppliers, units }: { year: number; suppliers: str
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => { if (state?.ok) ref.current?.reset(); }, [state]);
   return (
-    <form ref={ref} action={action} className="card mb-4 grid gap-2 p-4 sm:grid-cols-[1fr_2fr_0.7fr_auto_auto] sm:items-end">
+    <form ref={ref} action={action} className="card mb-4 grid gap-2 p-4 sm:grid-cols-[1fr_2fr_0.7fr_0.6fr_0.6fr_auto_auto] sm:items-end">
       <input type="hidden" name="year" value={year} />
       <label><span className="label">{t.fv.supplier} *</span><input name="supplier" list="fv-suppliers" className="input" required /></label>
       <label><span className="label">{t.common.product} *</span><input name="product" className="input" required /></label>
       <label><span className="label">{t.common.unit}</span><UnitSelect name="unit" value={newUnit} units={units} onChange={setNewUnit} /></label>
+      {/* Prix du mois en cours : minimum « − » et maximum « + » (un seul renseigné : les deux) */}
+      <label><span className="label">{t.fv.priceMinMonth}</span><MoneyInput name="priceMin" className="input text-right" /></label>
+      <label><span className="label">{t.fv.priceMaxMonth}</span><MoneyInput name="priceMax" className="input text-right" /></label>
       <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" name="locked" className="h-4 w-4 accent-brand-600" /> 🔒 {t.fv.locked}</label>
       <button className="btn-primary" disabled={pending}><Icon name="plus" className="h-4 w-4" />{t.common.add}</button>
       <datalist id="fv-suppliers">{[...suppliers].sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" })).map((s) => <option key={s} value={s} />)}</datalist>
