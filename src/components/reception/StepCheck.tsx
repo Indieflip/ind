@@ -2,7 +2,7 @@
 import { DateField } from "@/components/DateField";
 import { MoneyInput } from "@/components/MoneyInput";
 import { appConfirm } from "@/components/Confirm";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useI18n } from "@/lib/i18n/client";
 import { REASONS, type Catalog, type Draft, type DraftLine } from "@/lib/reception-types";
 import type { Decision } from "@/lib/rules";
@@ -119,6 +119,11 @@ function LineCard({
     </div>
   );
 
+  // APERÇU DESIGN (temporaire) : ?design=1..4
+  const [design, setDesign] = useState("0");
+  useEffect(() => { setDesign(new URLSearchParams(window.location.search).get("design") ?? "0"); }, []);
+  const active = !!(line.refuseOn || line.returnOn);
+  const summary = [line.refuseOn ? `${t.decision.refuse} ${line.refuseQty || line.qtyOrdered || ""} ${line.refuseUnit || line.unit}` : "", line.returnOn ? `${t.wizard.returnBtn} ${line.returnQty || line.qtyOrdered || ""} ${line.returnUnit || line.unit}` : ""].filter(Boolean);
   // Motif du refus / retour, et photo
   const reasonSelect = (
     <select className="input" value={line.reason} onChange={(e) => onChange({ reason: e.target.value as DraftLine["reason"] })}>
@@ -136,11 +141,18 @@ function LineCard({
   );
   const reasonBlock = <div className="mt-3 space-y-2">{reasonSelect}{photoBlock}</div>;
   return (
-    <article id={`line-${line.key}`} className={`card scroll-mt-32 border-l-4 ${style.border} p-4 ${!line.decision ? "ring-2 ring-amber-300" : ""}`}>
+    <article id={`line-${line.key}`} className={`card scroll-mt-32 border-l-4 ${style.border} p-4 ${!line.decision ? "ring-2 ring-amber-300" : ""} ${design === "2" && active ? (line.refuseOn ? "!border-l-8 !border-l-red-600 bg-red-50/70" : "!border-l-8 !border-l-amber-500 bg-amber-50/70") : ""}`}>
+      {design === "2" && active && (
+        <div className={`-mx-4 -mt-4 mb-3 rounded-t-xl px-4 py-2 text-sm font-bold uppercase tracking-wide text-white ${line.refuseOn ? "bg-red-600" : "bg-amber-500"}`}>
+          {line.refuseOn ? "⛔" : "↩"} {summary.join(" · ")}{line.reason ? ` · ${t.reasons[line.reason as keyof typeof t.reasons] ?? ""}` : ""}
+        </div>
+      )}
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="min-w-0">
           {line.productId ? (
             <h3 className="font-semibold leading-tight">
+              {design === "4" && line.refuseOn && <span className="mr-1.5 inline-block rounded-full bg-red-600 px-2 py-0.5 align-middle text-[11px] font-bold text-white">⛔ {summary[0]}</span>}
+              {design === "4" && line.returnOn && <span className="mr-1.5 inline-block rounded-full bg-amber-500 px-2 py-0.5 align-middle text-[11px] font-bold text-white">↩ {summary[line.refuseOn ? 1 : 0]}</span>}
               {line.productName}
               <button type="button" className="ml-2 text-xs font-normal text-brand-700 underline" onClick={() => setSwap((v) => !v)}>{t.wizard.changeProduct}</button>
               {/* Nom à corriger à la main : le produit n'est plus rattaché (un produit de ce nom est cherché, sinon créé au Mercurial) */}
@@ -301,23 +313,51 @@ function LineCard({
             </div>
           </div>
         );
+        const detail = (
+          <>
+            {reasonSelect}
+            {line.refuseOn && fields("refuse")}
+            {line.returnOn && fields("return")}
+            <p className="text-[11px] text-stone-500">{t.wizard.returnHint}</p>
+            {photoBlock}
+          </>
+        );
+        if (design === "1") return (
+          <div className="mt-3">
+            <div className="grid grid-cols-2 gap-1.5">
+              <button type="button" onClick={() => toggle("refuse")} className={btn(!!line.refuseOn, decisionStyles.refuse.badge)}>{t.decision.refuse}</button>
+              <button type="button" onClick={() => toggle("return")} className={btn(!!line.returnOn, decisionStyles.reserve.badge)}>{t.wizard.returnBtn}</button>
+            </div>
+            {active && (
+              <div className={`mt-2 space-y-2 rounded-xl border-[3px] p-3 shadow-md ${line.refuseOn ? "border-red-500 bg-red-50" : "border-amber-500 bg-amber-50"}`}>
+                <p className={`flex items-center gap-1.5 text-sm font-extrabold uppercase tracking-wide ${line.refuseOn ? "text-red-700" : "text-amber-700"}`}>{line.refuseOn ? "⛔" : "↩"} {[line.refuseOn ? t.decision.refuse : "", line.returnOn ? t.wizard.returnBtn : ""].filter(Boolean).join(" + ")}</p>
+                {detail}
+              </div>
+            )}
+          </div>
+        );
+        if (design === "3") return (
+          <div className="mt-3">
+            <div className="grid grid-cols-2">
+              <button type="button" onClick={() => toggle("refuse")} className={`rounded-t-xl border-2 border-b-0 px-2 py-3 text-base font-bold ${line.refuseOn ? "border-red-600 bg-red-600 text-white" : "border-stone-200 bg-stone-50 text-stone-500"}`}>⛔ {t.decision.refuse}</button>
+              <button type="button" onClick={() => toggle("return")} className={`rounded-t-xl border-2 border-b-0 px-2 py-3 text-base font-bold ${line.returnOn ? "border-amber-500 bg-amber-500 text-white" : "border-stone-200 bg-stone-50 text-stone-500"}`}>↩ {t.wizard.returnBtn}</button>
+            </div>
+            <div className={`space-y-2 rounded-b-xl border-2 p-3 ${active ? (line.refuseOn ? "border-red-600 bg-red-50" : "border-amber-500 bg-amber-50") : "border-stone-200 bg-white"}`}>
+              {active ? detail : <p className="text-xs text-stone-400">Cliquez sur Refus ou Retour pour saisir une quantité refusée ou retournée.</p>}
+            </div>
+          </div>
+        );
         return (
           <div className="mt-3">
             <div className="grid grid-cols-2 gap-1.5">
               <button type="button" onClick={() => toggle("refuse")} className={btn(!!line.refuseOn, decisionStyles.refuse.badge)}>{t.decision.refuse}</button>
               <button type="button" onClick={() => toggle("return")} className={btn(!!line.returnOn, decisionStyles.reserve.badge)}>{t.wizard.returnBtn}</button>
             </div>
-            {(line.refuseOn || line.returnOn) && (
-              <div className="mt-2 space-y-2">
-                {/* Motif juste avant les champs Quantité / Unité */}
-                {reasonSelect}
-                {line.refuseOn && fields("refuse")}
-                {line.returnOn && fields("return")}
-                <p className="text-[11px] text-stone-500">{t.wizard.returnHint}</p>
+            {active && (
+              <div className={`mt-2 space-y-2 ${design === "4" ? `rounded-xl border-2 border-dashed p-3 ${line.refuseOn ? "border-red-400" : "border-amber-400"}` : ""}`}>
+                {detail}
               </div>
             )}
-            {/* Photo du Refus / Retour : avant la conformité */}
-            {(line.refuseOn || line.returnOn) && <div className="mt-2 space-y-2">{photoBlock}</div>}
           </div>
         );
       })()}
