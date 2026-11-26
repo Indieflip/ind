@@ -1493,6 +1493,12 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v5
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v52', '1') on conflict (key) do nothing`);
 }
 
+// Dev : motif de refus / retour = type d'anomalie, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v53'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = ${"Motif = type d'anomalie : la liste proposée est celle des types d'anomalie (gérée dans la fiche d'anomalie, « Gérer les types »), rangée A-Z, dans un cadre qui défile. Le motif choisi devient le type d'anomalie de la fiche créée (Refus) ; Retour : type « Retour marchandise », motif dans le détail."} where field = 'Motif (Refus / Retour)'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v53', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

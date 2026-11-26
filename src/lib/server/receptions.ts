@@ -67,6 +67,12 @@ export const payloadSchema = z.object({
 });
 export type Payload = z.infer<typeof payloadSchema>;
 
+/** Type d'anomalie (clé) d'un motif choisi dans la liste des types d'anomalie (libellé) */
+function typeOfLabel(label: string, t: Dict) {
+  const hit = Object.entries(t.anomalies.types).find(([, v]) => v.toLowerCase() === label.toLowerCase())?.[0];
+  return hit && (schema.anomalyTypeEnum.enumValues as readonly string[]).includes(hit) ? (hit as (typeof schema.anomalyTypeEnum.enumValues)[number]) : undefined;
+}
+
 const reasonToAnomaly: Record<string, (typeof schema.anomalyTypeEnum.enumValues)[number]> = {
   missing: "missing",
   quantity: "quantity",
@@ -386,8 +392,9 @@ async function writeContent(
       const base = {
         receptionId: recId, lineId: line.id, supplierId, supplierName, productName: l.productName,
         nature: natureOf(l.categoryId), reference: lineRef(l),
-        type: (l.reason && reasonToAnomaly[l.reason]) || (l.qtyReceived != null && l.qtyOrdered != null && l.qtyReceived < l.qtyOrdered ? ("missing" as const) : ("other" as const)),
-        ...(l.reason && reasonToAnomaly[l.reason] === "quantity" ? { problemType: t.anomalies.types.missing } : {}),
+        type: (l.reason && (reasonToAnomaly[l.reason] ?? typeOfLabel(l.reason, t))) || (l.qtyReceived != null && l.qtyOrdered != null && l.qtyReceived < l.qtyOrdered ? ("missing" as const) : ("other" as const)),
+        // Motif = type d'anomalie de la fiche (ancien motif « Quantité non conforme » → « Quantité produit »)
+        ...(l.reason ? { problemType: reasonToAnomaly[l.reason] === "quantity" ? t.anomalies.types.missing : reasonToAnomaly[l.reason] ? (t.anomalies.types as Record<string, string>)[reasonToAnomaly[l.reason]] ?? l.reason : l.reason } : {}),
         photoUrl: l.photos[0] ?? null, createdBy: user.id, createdAt: date,
       };
       // Refus (produit refusé ou quantité refusée) ou réserve : une fiche d'anomalie, avec la quantité refusée

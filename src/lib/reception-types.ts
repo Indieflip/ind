@@ -28,7 +28,7 @@ export interface Catalog {
   units?: string[];
   /** Nom du fournisseur dont les bons comportent le suivi boulangerie */
   bakerySupplier?: string;
-  /** Motifs de refus / retour ajoutés par les utilisateurs (en plus de la liste de base) */
+  /** Motifs de refus / retour : les types d'anomalie (même liste que la fiche d'anomalie) */
   reasons?: string[];
   fetchedAt: string;
 }

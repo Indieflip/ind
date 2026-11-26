@@ -3,7 +3,9 @@ import { getDb, schema } from "@/db";
 import { getUser } from "@/lib/auth";
 import { num } from "@/lib/format";
 import { fvRange, parisMonth } from "@/lib/pricing";
-import { REASONS, type Catalog } from "@/lib/reception-types";
+import type { Catalog } from "@/lib/reception-types";
+import { problemTypes } from "@/lib/server/problemTypes";
+import { dictFor } from "@/lib/i18n";
 import { getBakerySupplier } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -42,13 +44,8 @@ export async function GET() {
     categories: categories.map((c) => ({ id: c.id, code: c.code, nameFr: c.nameFr, nameEn: c.nameEn, tempRequired: c.tempRequired, conformMax: c.conformMax, reserveMax: c.reserveMax })),
     units: units.map((u) => u.name),
     bakerySupplier: await getBakerySupplier(),
-    // Motifs ajoutés (liste enregistrée + motifs déjà saisis hors liste de base)
-    reasons: await (async () => {
-      let saved: string[] = [];
-      try { saved = JSON.parse((await db.query.appSettings.findFirst({ where: eq(schema.appSettings.key, "refusal_reasons_extra") }))?.value ?? "[]"); } catch { /* liste vide */ }
-      const used = (await db.execute<{ reason: string }>(sql`select distinct reason from reception_lines where reason is not null and reason <> ''`)).rows.map((r) => r.reason);
-      return [...new Set([...saved, ...used])].filter((r) => !(REASONS as readonly string[]).includes(r));
-    })(),
+    // Motifs de refus / retour = types d'anomalie (liste gérée dans la fiche d'anomalie, « Gérer les types »)
+    reasons: await problemTypes(Object.entries(dictFor("fr").anomalies.types).filter(([k]) => k !== "quantity").map(([, v]) => v)),
     fetchedAt: new Date().toISOString(),
   };
   return Response.json(catalog);

@@ -120,23 +120,12 @@ function LineCard({
   );
 
   // Motif du refus / retour, et photo
-  // Motifs : liste de base + motifs ajoutés, rangés A-Z ; « + Nouveau motif… » en ajoute un (gardé pour toutes les fiches)
-  const [extraReasons, setExtraReasons] = useState<string[]>([]);
-  const reasonOptions = [
-    ...REASONS.map((r) => ({ value: r as string, label: t.reasons[r] })),
-    ...[...new Set([...(catalog?.reasons ?? []), ...extraReasons, ...(line.reason && !(REASONS as readonly string[]).includes(line.reason) ? [line.reason] : [])])].map((r) => ({ value: r, label: r })),
-  ].sort((x, y) => x.label.localeCompare(y.label, "fr", { sensitivity: "base" }));
-  // Liste complète des motifs dans un cadre qui défile (monter / descendre), ouverte sous le champ
+  // Motifs = types d'anomalie (liste gérée dans la fiche d'anomalie) ; un ancien motif déjà saisi reste affiché
+  const legacy = line.reason && !(catalog?.reasons ?? []).includes(line.reason) ? [{ value: line.reason, label: (t.reasons as Record<string, string>)[line.reason] ?? line.reason }] : [];
+  const reasonOptions = [...(catalog?.reasons ?? []).map((r) => ({ value: r, label: r })), ...legacy]
+    .sort((x, y) => x.label.localeCompare(y.label, "fr", { sensitivity: "base" }));
+  // Liste complète dans un cadre qui défile (monter / descendre), ouverte sous le champ
   const [reasonOpen, setReasonOpen] = useState(false);
-  const addReason = async () => {
-    const label = window.prompt(t.wizard.newReasonPrompt)?.trim();
-    if (!label) return;
-    const res = await fetch("/api/reasons", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ label }) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    const saved = (res?.label as string | undefined) ?? label;
-    setExtraReasons((l) => [...l, saved]);
-    onChange({ reason: saved });
-    setReasonOpen(false);
-  };
   const reasonLabel = reasonOptions.find((r) => r.value === line.reason)?.label;
   const reasonSelect = (
     <div>
@@ -153,7 +142,6 @@ function LineCard({
               {r.label}
             </button>
           ))}
-          <button type="button" onClick={addReason} className="block w-full px-3 py-2.5 text-left text-sm font-medium text-brand-700 hover:bg-brand-50">+ {t.wizard.newReason}</button>
         </div>
       )}
     </div>
