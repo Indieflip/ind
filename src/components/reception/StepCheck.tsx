@@ -126,25 +126,37 @@ function LineCard({
     ...REASONS.map((r) => ({ value: r as string, label: t.reasons[r] })),
     ...[...new Set([...(catalog?.reasons ?? []), ...extraReasons, ...(line.reason && !(REASONS as readonly string[]).includes(line.reason) ? [line.reason] : [])])].map((r) => ({ value: r, label: r })),
   ].sort((x, y) => x.label.localeCompare(y.label, "fr", { sensitivity: "base" }));
-  const NEW_REASON = "__new__";
+  // Liste complète des motifs dans un cadre qui défile (monter / descendre), ouverte sous le champ
+  const [reasonOpen, setReasonOpen] = useState(false);
+  const addReason = async () => {
+    const label = window.prompt(t.wizard.newReasonPrompt)?.trim();
+    if (!label) return;
+    const res = await fetch("/api/reasons", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ label }) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const saved = (res?.label as string | undefined) ?? label;
+    setExtraReasons((l) => [...l, saved]);
+    onChange({ reason: saved });
+    setReasonOpen(false);
+  };
+  const reasonLabel = reasonOptions.find((r) => r.value === line.reason)?.label;
   const reasonSelect = (
-    <select
-      className="input"
-      value={line.reason}
-      onChange={async (e) => {
-        if (e.target.value !== NEW_REASON) return onChange({ reason: e.target.value });
-        const label = window.prompt(t.wizard.newReasonPrompt)?.trim();
-        if (!label) return;
-        const res = await fetch("/api/reasons", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ label }) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-        const saved = (res?.label as string | undefined) ?? label;
-        setExtraReasons((l) => [...l, saved]);
-        onChange({ reason: saved });
-      }}
-    >
-      <option value="">{t.wizard.chooseReason}</option>
-      {reasonOptions.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-      <option value={NEW_REASON}>+ {t.wizard.newReason}</option>
-    </select>
+    <div>
+      <button type="button" onClick={() => setReasonOpen((o) => !o)} className={`input flex w-full items-center justify-between text-left ${reasonLabel ? "text-stone-900" : "text-stone-500"}`} aria-expanded={reasonOpen}>
+        <span className="truncate">{reasonLabel ?? t.wizard.chooseReason}</span>
+        <span className={`ml-2 text-stone-400 transition ${reasonOpen ? "rotate-180" : ""}`}>▾</span>
+      </button>
+      {reasonOpen && (
+        <div className="mt-1 max-h-56 overflow-y-scroll rounded-lg border border-stone-300 bg-white shadow-md [scrollbar-gutter:stable]" role="listbox">
+          {reasonOptions.map((r) => (
+            <button key={r.value} type="button" role="option" aria-selected={line.reason === r.value}
+              onClick={() => { onChange({ reason: r.value }); setReasonOpen(false); }}
+              className={`block w-full border-b border-stone-100 px-3 py-2.5 text-left text-sm last:border-b-0 ${line.reason === r.value ? "bg-brand-50 font-semibold text-brand-800" : "hover:bg-stone-50"}`}>
+              {r.label}
+            </button>
+          ))}
+          <button type="button" onClick={addReason} className="block w-full px-3 py-2.5 text-left text-sm font-medium text-brand-700 hover:bg-brand-50">+ {t.wizard.newReason}</button>
+        </div>
+      )}
+    </div>
   );
   const photoBlock = (
     <>
