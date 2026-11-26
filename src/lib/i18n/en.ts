@@ -365,7 +365,7 @@ export const en: Dict = {
     quantity: "Wrong quantity",
     temperature: "Temperature out of range",
     dlc: "Use-by date passed or too short",
-    damaged: "Damaged or open packaging",
+    damaged: "Damaged product",
     label: "Missing or unreadable label",
     aspect: "Abnormal smell or appearance",
     not_ordered: "Not ordered",

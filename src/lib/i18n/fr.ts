@@ -367,7 +367,7 @@ export const fr = {
     quantity: "Quantité non conforme",
     temperature: "Température non conforme",
     dlc: "DLC dépassée ou trop courte",
-    damaged: "Emballage abîmé ou ouvert",
+    damaged: "Produit abîmé",
     label: "Étiquette absente ou illisible",
     aspect: "Odeur ou aspect anormal",
     not_ordered: "Produit non commandé",

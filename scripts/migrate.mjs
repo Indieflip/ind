@@ -1473,6 +1473,13 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v5
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v50', '1') on conflict (key) do nothing`);
 }
 
+// Motif « Emballage abîmé ou ouvert » renommé « Produit abîmé » (textes déjà enregistrés), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'reason_damaged_rename_v1'`)).rows.length) {
+  await db.execute(sql`update anomalies set description = replace(replace(description, 'emballage abîmé ou ouvert', 'produit abîmé'), 'Emballage abîmé ou ouvert', 'Produit abîmé') where description ilike '%emballage abîmé ou ouvert%'`);
+  await db.execute(sql`update receptions set reserves_text = replace(replace(reserves_text, 'Emballage abîmé ou ouvert', 'Produit abîmé'), 'emballage abîmé ou ouvert', 'produit abîmé') where reserves_text ilike '%emballage abîmé ou ouvert%'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('reason_damaged_rename_v1', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
