@@ -255,10 +255,8 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
         initial={{
           // Liste vidée à la main : la fiche reste sans produit (pas de produits proposés par défaut)
           items: (a.items != null ? a.items : itemsDefault).map((x) => {
-            // Prix du Mercurial repris par erreur sur une ligne d'une autre unité (ex. Kg au Mercurial, Pièce ici) : retiré
-            const p = x.productId ? supplierProducts.find((y) => y.id === x.productId) : undefined;
-            const wrongPrice = !!p && !!x.unit && !!p.unit && unitKey(x.unit) !== unitKey(p.unit) && x.price != null && p.price != null && Math.abs(x.price - p.price) < 0.0001;
-            return { productId: x.productId, name: x.name, qty: x.qty != null ? String(x.qty).replace(".", ",") : "", unit: canonUnit(x.unit ?? ""), price: x.price != null && !wrongPrice ? String(x.price).replace(".", ",") : "" };
+            // Unité différente du Mercurial : simplement signalée sur la fiche, le prix enregistré est gardé
+            return { productId: x.productId, name: x.name, qty: x.qty != null ? String(x.qty).replace(".", ",") : "", unit: canonUnit(x.unit ?? ""), price: x.price != null ? String(x.price).replace(".", ",") : "" };
           }),
           problemType,
           productId,

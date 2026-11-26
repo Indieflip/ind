@@ -60,7 +60,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
   const changeUnit = (i: number, u: string) => {
     const it = v.items[i];
     const p = productOf(it);
-    if (p && key(u) !== key(p.unit ?? "") && it.price === priceStr(p)) return setItem(i, { unit: u, price: "" });
+    // (unité différente du Mercurial : signalée, le prix saisi n'est jamais effacé)
     if (p && key(u) === key(p.unit ?? "") && !it.price) return setItem(i, { unit: u, price: priceStr(p) });
     setItem(i, { unit: u });
   };
