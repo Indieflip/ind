@@ -1458,6 +1458,13 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v4
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v48', '1') on conflict (key) do nothing`);
 }
 
+// Dev : produits Fruits et légumes modifiables depuis le compte produit, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v49'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('mercurial', 'Fruits et légumes', 'Modification', false, ${"Produit des Fruits et légumes modifié dans le compte produit (nom, unité, prix bloqué, fournisseur) : la ligne de l'onglet Fruits et légumes est mise à jour aussi (plus d'écrasement à la synchronisation) ; nature choisie gardée. Modifier une ligne de l'onglet ne resynchronise que ce produit."}, '', ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v49', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

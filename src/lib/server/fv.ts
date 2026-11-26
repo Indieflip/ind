@@ -11,10 +11,11 @@ type Tx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
  * prestataire : ils sont proposés pendant la saisie des bons et comparés au prix du mois.
  * Ils n'apparaissent pas dans Mercurial > Produits (ils se gèrent dans Fruits et légumes).
  */
-export async function syncFvProducts(tx?: Tx) {
+export async function syncFvProducts(tx?: Tx, only?: number[]) {
   const db = tx ?? getDb();
   const year = new Date().getFullYear();
-  const items = await db.select().from(schema.fvItems).where(eq(schema.fvItems.year, year));
+  // Modification d'une ligne : seule cette ligne est recopiée (rapide, pas de course entre deux enregistrements)
+  const items = (await db.select().from(schema.fvItems).where(eq(schema.fvItems.year, year))).filter((i) => !only || only.includes(i.id));
   const produce = await db.query.categories.findFirst({ where: eq(schema.categories.code, "produce") });
   // Fournisseurs rapprochés par nom (accents, majuscules, pluriels ignorés) ; on privilégie le plus ancien
   const allSuppliers = await db.select().from(schema.suppliers).orderBy(schema.suppliers.id);
@@ -43,9 +44,11 @@ export async function syncFvProducts(tx?: Tx) {
       fvItemId: it.id,
     };
     const p = linked.get(it.id);
-    if (p) await db.update(schema.products).set(values).where(eq(schema.products.id, p.id));
+    // Nature choisie dans le compte produit : gardée (« Fruits & légumes » seulement par défaut)
+    if (p) await db.update(schema.products).set({ ...values, nature: p.nature || values.nature, categoryId: p.nature ? p.categoryId : values.categoryId }).where(eq(schema.products.id, p.id));
     else await db.insert(schema.products).values(values);
   }
+  if (only) return;
   for (const u of new Set(items.map((i) => unitName(i.unit)).filter(Boolean))) {
     await db.insert(schema.units).values({ name: u }).onConflictDoNothing();
   }

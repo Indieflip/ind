@@ -25,8 +25,9 @@ export async function updateFvAction(id: number, data: { supplier?: string; prod
   if (data.locked !== undefined) set.locked = data.locked;
   if (data.prices) set.prices = Array.from({ length: 24 }, (_, i) => num(data.prices![i] ?? null));
   await getDb().update(schema.fvItems).set(set).where(eq(schema.fvItems.id, id));
-  if (data.supplier !== undefined || data.product || data.unit !== undefined || data.locked !== undefined) await syncFvProducts();
+  if (data.supplier !== undefined || data.product || data.unit !== undefined || data.locked !== undefined) await syncFvProducts(undefined, [id]);
   revalidatePath("/mercurial/fruits-legumes");
+  revalidatePath("/mercurial", "layout");
 }
 
 export async function addFvAction(_p: { ok?: boolean; error?: string } | undefined, form: FormData) {

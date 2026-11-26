@@ -119,6 +119,16 @@ export async function updateMercurialRowAction(
     }
   }
   if (Object.keys(set).length) await db.update(schema.products).set(set).where(eq(schema.products.id, id));
+  // Produit des Fruits et légumes : sa ligne de l'onglet est la référence (recopiée à chaque synchronisation) → mise à jour aussi
+  if (product.fvItemId) {
+    const fv: Partial<typeof schema.fvItems.$inferInsert> = {};
+    if (set.name) fv.product = set.name;
+    if (set.unit) fv.unit = set.unit;
+    if (set.priceLocked !== undefined) fv.locked = set.priceLocked;
+    if (set.supplierId) { const sup = await db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, set.supplierId), columns: { name: true } }); if (sup) fv.supplier = sup.name; }
+    if (Object.keys(fv).length) await db.update(schema.fvItems).set(fv).where(eq(schema.fvItems.id, product.fvItemId));
+    revalidatePath("/mercurial/fruits-legumes");
+  }
   refresh();
   revalidatePath("/reporting/prix");
   return { ok: true };
