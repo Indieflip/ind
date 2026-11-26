@@ -2,7 +2,7 @@
 import { fmtNo } from "@/lib/numbering";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { deleteReceptionsAction } from "@/lib/actions/receptions";
 import { useI18n } from "@/lib/i18n/client";
 import { DataTable, type Col } from "@/components/table/DataTable";
@@ -19,6 +19,8 @@ export interface ReceptionRow {
   day?: string; // AAAA-MM-JJ (heure de Paris), pour le filtre par calendrier
   supplierName: string;
   lineCount: number;
+  /** Produits non rattachés au Mercurial */
+  unlinkedCount?: number;
   /** Fiche générée à partir des anomalies importées : jamais consolidée automatiquement */
   imported?: boolean;
   anomalyCount?: number;
@@ -35,6 +37,12 @@ export function ReceptionsTable({ rows, canDelete, canEdit = false }: { rows: Re
   const router = useRouter();
   const [sel, setSel] = useState<Set<string | number>>(new Set());
   const [pending, start] = useTransition();
+  // Onglets : toutes les fiches / anciennes fiches dont un produit n'est pas rattaché au Mercurial (tri des anciennes fiches)
+  const [tab, setTab] = useState<"all" | "unlinked">("all");
+  useEffect(() => { try { if (sessionStorage.getItem("receptions-tab") === "unlinked") setTab("unlinked"); } catch { /* onglet par défaut */ } }, []);
+  const pick = (v: "all" | "unlinked") => { setTab(v); setSel(new Set()); try { sessionStorage.setItem("receptions-tab", v); } catch { /* préférence non gardée */ } };
+  const unlinkedRows = rows.filter((r) => r.imported && !r.draftId && (r.unlinkedCount ?? 0) > 0);
+  const shownRows = tab === "unlinked" ? unlinkedRows : rows;
   const stateLabel = (r: ReceptionRow) => (r.draftId ? "—" : r.consolidated ? t.receptions.consolidated : r.imported ? t.receptions.importedState : t.receptions.toConsolidate);
   const href = (r: ReceptionRow) => (r.draftId ? `/receptions/new?draft=${r.draftId}` : `/receptions/${r.id}`);
   const cols: Col<ReceptionRow>[] = [
@@ -45,6 +53,10 @@ export function ReceptionsTable({ rows, canDelete, canEdit = false }: { rows: Re
     // Anomalie : nombre de fiches d'anomalie identifiées sur le bon
     { key: "anomalies", label: t.receptions.anomalyCol, align: "right", text: (r) => String(r.anomalyCount ?? 0), sort: (r) => r.anomalyCount ?? 0,
       render: (r) => (r.anomalyCount ? <span className="badge bg-red-100 font-semibold text-red-800">{r.anomalyCount}</span> : <span className="text-stone-400">0</span>) },
+    // Hors Mercurial : produits de la fiche non rattachés à un compte produit (filtre Oui / Non pour trier les anciennes fiches)
+    { key: "unlinked", label: t.receptions.unlinkedCol, align: "center", options: [t.common.yes, t.common.no],
+      text: (r) => (r.draftId ? "" : r.unlinkedCount ? t.common.yes : t.common.no), sort: (r) => r.unlinkedCount ?? 0,
+      render: (r) => (r.draftId ? null : r.unlinkedCount ? <span className="badge bg-amber-100 font-semibold text-amber-900" title={t.receptions.unlinkedHint}>{r.unlinkedCount}/{r.lineCount}</span> : <span className="text-stone-400">—</span>) },
     { key: "status", label: t.common.status, text: (r) => r.statusLabel, options: Object.values(t.receptionStatus), render: (r) => <StatusBadge status={r.status} label={r.statusLabel} /> },
     {
       key: "state", label: t.nav.consolidation, text: stateLabel, options: [t.receptions.consolidated, t.receptions.toConsolidate, t.receptions.importedState],
@@ -95,8 +107,16 @@ export function ReceptionsTable({ rows, canDelete, canEdit = false }: { rows: Re
           <button className="btn-ghost px-2 py-1.5" onClick={() => setSel(new Set())}>{t.consolidation.selectNone}</button>
         </div>
       )}
+      <div className="no-print mb-3 flex flex-wrap gap-1.5 text-sm">
+        {([["all", t.receptions.tabAll, rows.filter((r) => !r.draftId).length], ["unlinked", t.receptions.tabUnlinked, unlinkedRows.length]] as const).map(([k, label, n]) => (
+          <button key={k} type="button" onClick={() => pick(k)} className={`rounded-lg border px-3 py-1.5 font-medium ${tab === k ? "border-red-500 bg-white text-stone-900" : "border-stone-200 bg-white text-stone-600 hover:bg-stone-50"}`}>
+            {label} <span className={`ml-1 rounded-full px-1.5 text-xs ${k === "unlinked" && n ? "bg-amber-100 text-amber-900" : "bg-stone-100 text-stone-600"}`}>{n}</span>
+          </button>
+        ))}
+      </div>
+      {tab === "unlinked" && <p className="mb-2 text-xs text-stone-500">{t.receptions.tabUnlinkedHint}</p>}
       <DataTable
-        rows={rows}
+        rows={shownRows}
         cols={cols}
         rowKey={(r) => r.id}
         empty={t.receptions.empty}

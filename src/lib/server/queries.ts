@@ -69,6 +69,8 @@ function listRaw(f: ReceptionFilters, limit: number) {
       consolidatedAt: r.consolidatedAt,
       importedFrom: r.importedFrom,
       lineCount: sql<number>`(select count(*)::int from reception_lines l where l.reception_id = ${r.id})`,
+      // Produits non rattachés au Mercurial (à trier sur les anciennes fiches)
+      unlinkedCount: sql<number>`(select count(*)::int from reception_lines l where l.reception_id = ${r.id} and l.product_id is null)`,
       anomalyCount: sql<number>`(select count(*)::int from anomalies a where a.reception_id = ${r.id})`,
       createdByName: schema.users.name,
     })

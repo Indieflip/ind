@@ -25,7 +25,7 @@ export default async function MercurialPage() {
   const s = schema.suppliers;
   const [all, units, supplierRows, fvItems] = await Promise.all([
     db
-      .select({ id: p.id, supplierId: p.supplierId, supplier: s.name, nature: p.nature, name: p.name, unit: p.unit, priceMin: p.priceMin, price: p.price, priceLocked: p.priceLocked, duplicateFlag: p.duplicateFlag, active: p.active, fvItemId: p.fvItemId, updated: productUpdatedAt })
+      .select({ id: p.id, supplierId: p.supplierId, supplier: s.name, nature: p.nature, name: p.name, unit: p.unit, priceMin: p.priceMin, price: p.price, priceLocked: p.priceLocked, duplicateFlag: p.duplicateFlag, active: p.active, fvItemId: p.fvItemId, updated: productUpdatedAt, createdAt: p.createdAt })
       .from(p)
       .innerJoin(s, eq(s.id, p.supplierId))
       .orderBy(asc(s.name), asc(p.name)),
@@ -39,7 +39,7 @@ export default async function MercurialPage() {
   const rows = all.map((r) => {
     const fv = r.fvItemId ? fvById.get(r.fvItemId) : undefined;
     const range = fv ? fvRange(fv.prices, month) : { min: num(r.priceMin), max: num(r.price) };
-    return { ...r, priceMin: range.min, price: range.max, priceLocked: fv ? fv.locked : r.priceLocked, fv: !!fv };
+    return { ...r, createdAt: undefined, created: r.createdAt.toISOString(), priceMin: range.min, price: range.max, priceLocked: fv ? fv.locked : r.priceLocked, fv: !!fv };
   });
   const split = (v: string | null) => (v ?? "").split(/,\s*/).filter(Boolean);
   const natures = [...new Set(rows.filter((r) => r.active).flatMap((r) => split(r.nature)))].sort((a, b) => a.localeCompare(b, "fr"));

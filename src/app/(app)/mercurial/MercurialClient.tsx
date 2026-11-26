@@ -18,6 +18,9 @@ import { SupplierCombo } from "@/components/SupplierCombo";
 import { FilterInput, Pager, ResetFilters } from "@/components/table/FilterInput";
 import { useTable, type ColumnDef } from "@/components/table/useTable";
 import { SortTh } from "@/components/table/DataTable";
+import { DateRangeFilter } from "@/components/table/DateRangeFilter";
+
+const parisDayOf = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Europe/Paris" });
 
 interface Opt { id: number; name: string }
 interface Row {
@@ -29,6 +32,8 @@ interface Row {
   fv: boolean;
   /** Dernière mise à jour du produit (création, variation de prix, ligne de l'historique du Mercurial) */
   updated?: string | null;
+  /** Date de création du produit (ISO) */
+  created?: string;
 }
 
 export function AddRow({ suppliers, units, natures, fixedSupplier, existing = [] }: { suppliers: Opt[]; units: string[]; natures: string[]; fixedSupplier?: Opt; existing?: { supplierId: number; name: string }[] }) {
@@ -203,6 +208,8 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
       { key: "priceMin", text: (r) => money(r.priceMin), sort: (r) => r.priceMin },
       { key: "price", text: (r) => money(r.price), sort: (r) => r.price },
       { key: "dup", text: (r) => dupLabel(r), options: [m.dupYes, m.dupCheck] },
+      // Date de création du produit (filtre « période »)
+      { key: "created", text: (r) => (r.created ? fmtDate(r.created, locale) : ""), sort: (r) => r.created ?? "", date: (r) => (r.created ? parisDayOf(r.created) : null) },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [suppliers, natures, units, locale, rows, dups, toCheck],
@@ -211,7 +218,7 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
   const tb = useTable(base, cols, { pageSize: 1000 });
   const labels: Record<string, [string, "right" | undefined]> = {
     id: ["N°", "right"], supplier: [t.common.supplier, undefined], nature: [m.nature, undefined], name: [m.products, undefined], unit: [t.common.unit, undefined],
-    priceMin: [m.priceMin, "right"], price: [m.priceMax, "right"], updated: [m.updated, undefined], dup: [m.duplicate, undefined],
+    priceMin: [m.priceMin, "right"], price: [m.priceMax, "right"], updated: [m.updated, undefined], dup: [m.duplicate, undefined], created: [m.createdCol, undefined],
   };
   return (
     <>
@@ -228,7 +235,7 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
         <div className="max-h-[75vh] overflow-y-auto">
           <table className="table">
             <colgroup>
-              <col className="w-[15%]" /><col className="w-[12%]" /><col /><col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[7%]" /><col className="w-[9%]" />
+              <col className="w-[15%]" /><col className="w-[12%]" /><col /><col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[7%]" /><col className="w-[8%]" /><col className="w-[9%]" />
             </colgroup>
             <thead className="sticky top-0 z-10">
               <tr>
@@ -238,7 +245,9 @@ export function MercurialTable({ rows, suppliers, units, natures, editable }: {
               <tr>
                 {cols.map((c) => (
                   <th key={c.key} className="bg-white py-1.5">
-                    <FilterInput value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} options={tb.options[c.key]} />
+                    {c.date
+                      ? <DateRangeFilter value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} />
+                      : <FilterInput value={tb.filters[c.key] ?? ""} onChange={(v) => tb.setFilter(c.key, v)} options={tb.options[c.key]} />}
                   </th>
                 ))}
                 <th className="bg-white py-1.5 text-right"><ResetFilters onClick={tb.reset} active={tb.active} /></th>
@@ -297,6 +306,7 @@ function MercurialRow({ r, dup = "", suppliers, units, natures, editable }: { r:
             </select>
           ) : dup && <span className={`badge ${dup === m.dupYes ? "bg-amber-100 text-amber-900" : "bg-sky-100 text-sky-800"}`}>{dup}</span>}
         </td>
+        <td className="whitespace-nowrap text-stone-600">{r.created ? fmtDate(r.created, locale) : ""}</td>
         <td className="text-right">
           {editable && !r.fv && <button className="btn-ghost px-1.5 py-1 text-xs" onClick={() => setEdit(true)} title={t.common.edit}><Icon name="edit" className="h-3.5 w-3.5" /> <span className="hidden xl:inline">{t.common.edit}</span></button>}
           {editable && r.fv && <Link href="/mercurial/fruits-legumes" className="btn-ghost px-1.5 py-1 text-xs" title={m.fvEdit}><Icon name="leaf" className="h-3.5 w-3.5" /> <span className="hidden xl:inline">{t.common.edit}</span></Link>}
@@ -322,6 +332,7 @@ function MercurialRow({ r, dup = "", suppliers, units, natures, editable }: { r:
       <td><MoneyInput className="input py-1.5 text-right" defaultValue={str(r.priceMin)} onBlur={(e) => e.target.value !== str(r.priceMin) && save({ priceMin: e.target.value })} /></td>
       <td><MoneyInput className="input py-1.5 text-right" defaultValue={str(r.price)} onBlur={(e) => e.target.value !== str(r.price) && save({ price: e.target.value })} /></td>
       <td>{dup && <span className={`badge ${dup === m.dupYes ? "bg-amber-100 text-amber-900" : "bg-sky-100 text-sky-800"}`}>{dup}</span>}</td>
+      <td className="whitespace-nowrap text-stone-600">{r.created ? fmtDate(r.created, locale) : ""}</td>
       <td className="text-right">
         <button
           type="button"
