@@ -10,6 +10,7 @@ import { fmtDate, fmtMoney, fmtNum, num, sentence } from "@/lib/format";
 import { fvRange, parisMonth } from "@/lib/pricing";
 import { Icon } from "@/components/Icon";
 import { ProductEditor } from "./ProductEditor";
+import { ProductPriceEvolution } from "@/components/prices/PriceEvolution";
 import { ProductHistory, type HistoryRow } from "./ProductHistory";
 import { anomalyNumbers } from "@/lib/server/savings";
 import { receptionNumbers } from "@/lib/server/queries";
@@ -131,6 +132,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         {tile(P.receptions, String(new Set(lines.map((x) => x.receptionId)).size))}
         {tile(P.anomalies, String(anomalies.length), `${changes.length} ${P.priceChanges.toLowerCase()}`)}
       </div>
+
+      {/* Évolution du prix payé (fiches de réception) */}
+      <ProductPriceEvolution points={lines.filter((x) => num(x.unitPrice) != null).map((x) => ({ date: x.deliveredAt.toISOString(), price: num(x.unitPrice)!, href: `/receptions/${x.receptionId}` }))} />
 
       <div className="grid items-start gap-5">
         <section className="card p-4">

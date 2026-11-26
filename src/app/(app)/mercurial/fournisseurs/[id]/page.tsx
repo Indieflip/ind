@@ -18,6 +18,7 @@ import { stageOf } from "@/lib/anomaly";
 import { SupplierAnomalies, SupplierInfo, SupplierReceptions, SupplierSearch, DeleteSupplier } from "../SupplierClient";
 import { AddRow, MercurialTable } from "../../MercurialClient";
 import { productUpdatedAt } from "@/lib/server/productUpdates";
+import { SupplierPriceEvolution } from "@/components/prices/PriceEvolution";
 
 export default async function SupplierPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SP> }) {
   await ensureSupplierProcesses();
@@ -141,6 +142,16 @@ export default async function SupplierPage({ params, searchParams }: { params: P
           </Link>
         )}
       </div>
+      {/* Évolution des prix du fournisseur : indice et plus fortes variations (prix payés sur les fiches de réception) */}
+      <SupplierPriceEvolution
+        rows={(await db
+          .select({ productId: schema.receptionLines.productId, name: schema.products.name, date: schema.receptions.deliveredAt, price: schema.receptionLines.unitPrice })
+          .from(schema.receptionLines)
+          .innerJoin(schema.receptions, eq(schema.receptions.id, schema.receptionLines.receptionId))
+          .innerJoin(schema.products, eq(schema.products.id, schema.receptionLines.productId))
+          .where(sql`${schema.products.supplierId} = ${id} and ${schema.receptionLines.unitPrice} is not null and ${schema.receptions.deliveredAt} >= now() - interval '13 months'`))
+          .map((x) => ({ productId: x.productId!, name: x.name, date: x.date.toISOString(), price: num(x.price)! }))}
+      />
       {/* Process de réclamation du fournisseur : toujours visible dans son compte */}
       {supplier.claimProcess && (
         <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">

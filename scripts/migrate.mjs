@@ -1465,6 +1465,14 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v4
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v49', '1') on conflict (key) do nothing`);
 }
 
+// Dev : évolution des prix (compte produit, compte fournisseur), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v50'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('mercurial', 'Compte produit', 'Évolution du prix', false, ${"Courbe du prix payé (fiches de réception) sur 1 / 3 / 6 mois / 1 an : dernier prix, évolution, min · max, moyenne ; clic sur un point : la fiche de réception ; détail des prix avec variations."}, '', ${pos})`);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('mercurial', 'Compte fournisseur', 'Évolution des prix', false, ${"Indice mensuel des prix (base 100 au 1er mois de la période, chaîné : produits achetés deux mois de suite), produits en hausse / en baisse, 10 plus fortes variations avec tendance ; période 3 / 6 mois / 1 an."}, '', ${pos + 1})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v50', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

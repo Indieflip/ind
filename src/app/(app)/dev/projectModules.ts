@@ -7,7 +7,7 @@ export const MODULES_LIVE: { icon: string; title: string; items: string[] }[] = 
   { icon: "alert", title: "Anomalies", items: ["Créées automatiquement (refus, manque, T°, DLC, prix)", "Écarts de pesée avec tares", "Une fiche par anomalie, avec son historique"] },
   { icon: "inbox", title: "Réclamations", items: ["Relances au délai de chaque fournisseur", "Avoirs et régularisations vérifiés", "Rappels sur l'Accueil"] },
   { icon: "chart", title: "Économies et Reporting", items: ["Économies justifiées, par fournisseur et par mois", "Achats par fournisseur (semaine, mois, trimestre, année)", "Suivi des prix", "Viandes et poissons"] },
-  { icon: "list", title: "Mercurial", items: ["Fiche produit : prix, anomalies, modifications, réceptions", "Prix bloqués, fruits et légumes au prix du mois, boulangerie", "Comptes fournisseurs et process de réclamation"] },
+  { icon: "list", title: "Mercurial", items: ["Fiche produit : prix, anomalies, modifications, réceptions", "Prix bloqués, fruits et légumes au prix du mois, boulangerie", "Comptes fournisseurs et process de réclamation", "Évolution des prix : courbe par produit, indice par fournisseur"] },
   { icon: "file", title: "Fiche de réception (DDPP)", items: ["Exportée chaque soir à 23 h, PDF et Excel", "Figée, N° annuel, archivée 5 ans", "Export manuel à la demande"] },
   { icon: "book", title: "Procédures", items: ["Réception (contrôles, refus, pesée, conformité)", "Réclamation", "Réglementation"] },
   { icon: "gear", title: "Administration", items: ["Récap de chaque fournisseur (coordonnées, natures, chiffres)", "Rôles et droits", "Sauvegardes automatiques", "Demandes à l'administrateur"] },
