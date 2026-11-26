@@ -64,7 +64,8 @@ export async function syncWeighAnomalies() {
       // Sans prix sur les lignes, le montant saisi à la main est gardé
       if (values.claimedAmount == null) values.claimedAmount = cur.claimedAmount;
       // Produits saisis à la main sur la fiche : gardés ; sinon le détail des écarts est repris
-      const keepItems = !!cur.items?.length;
+      // (liste vidée à la main : fiche gardée sans produit)
+      const keepItems = cur.items != null;
       if (cur.description !== values.description || cur.claimedAmount !== values.claimedAmount || cur.supplierId !== values.supplierId || cur.reference !== values.reference || !keepItems) {
         await db.update(schema.anomalies).set(keepItems ? { ...values, items: cur.items } : values).where(eq(schema.anomalies.id, cur.id));
       }

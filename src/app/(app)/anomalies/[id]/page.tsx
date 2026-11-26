@@ -253,7 +253,8 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
         document={reference ? { label: reference.replace(/\s+du \d{2}\/\d{2}\/\d{2}$/, ""), href: rec ? `/receptions/${rec.id}` : null } : null}
         missingBlType={t.anomalies.types.missing_bl}
         initial={{
-          items: (a.items?.length ? a.items : itemsDefault).map((x) => {
+          // Liste vidée à la main : la fiche reste sans produit (pas de produits proposés par défaut)
+          items: (a.items != null ? a.items : itemsDefault).map((x) => {
             // Prix du Mercurial repris par erreur sur une ligne d'une autre unité (ex. Kg au Mercurial, Pièce ici) : retiré
             const p = x.productId ? supplierProducts.find((y) => y.id === x.productId) : undefined;
             const wrongPrice = !!p && !!x.unit && !!p.unit && unitKey(x.unit) !== unitKey(p.unit) && x.price != null && p.price != null && Math.abs(x.price - p.price) < 0.0001;

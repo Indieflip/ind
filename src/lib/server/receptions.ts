@@ -571,7 +571,8 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
     const norm = (x: string | null | undefined) => (x ?? "").trim().replace(/\s+/g, " ").toLowerCase();
     // (fiches d'anomalie jamais verrouillées : consolidées comprises)
     const linked = rec.importedFrom ? anomalies.filter((a) => a.source === "file" || a.source === "weigh") : [];
-    const fileLinks = linked.filter((a) => a.source === "file").map((a) => {
+    // (fiche enregistrée sans produit : seuls fournisseur, référence et date suivent)
+    const fileLinks = linked.filter((a) => a.source === "file" && !(Array.isArray(a.items) && a.items.length === 0)).map((a) => {
       const items = a.items?.length ? a.items : [{ productId: a.productId, name: a.productName ?? "", qty: null, unit: "", price: null }];
       return { a, items, lineIds: items.map((it, k) => (k === 0 && !a.items?.length && a.lineId) || oldLines.find((o) => norm(o.productName) === norm(it.name))?.id || null) };
     });
@@ -646,9 +647,14 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
           lineId,
         }).where(eq(schema.anomalies.id, a.id));
       }
+      // Fiches enregistrées sans produit : fournisseur, référence et date seulement
+      for (const a of linked.filter((x) => x.source === "file" && Array.isArray(x.items) && x.items.length === 0)) {
+        await tx.update(schema.anomalies).set(common(a)).where(eq(schema.anomalies.id, a.id));
+      }
       // Écarts de pesée : détail des produits recalculé depuis les pesées de la fiche (syncWeighAnomalies, juste après)
       for (const a of linked.filter((x) => x.source === "weigh")) {
-        await tx.update(schema.anomalies).set({ ...common(a), items: null, groupKey: `rec:${id}` }).where(eq(schema.anomalies.id, a.id));
+        // (fiche vidée à la main de ses produits : gardée sans produit)
+        await tx.update(schema.anomalies).set({ ...common(a), ...(Array.isArray(a.items) && a.items.length === 0 ? {} : { items: null }), groupKey: `rec:${id}` }).where(eq(schema.anomalies.id, a.id));
       }
     }
     return id;

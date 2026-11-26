@@ -73,7 +73,8 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     const out: string[] = [];
     if (!x.supplierId) out.push(M.supplier);
     if (!x.receptionId && !(x.reference ?? "").trim()) out.push(M.reference);
-    if (!x.items?.length && !(x.productName ?? "").trim()) out.push(M.product);
+    // Fiche enregistrée volontairement sans produit (liste vide) : rien à compléter
+    if (x.items == null && !(x.productName ?? "").trim()) out.push(M.product);
     else if (x.items?.some((i) => i.productId == null)) out.push(M.productLink);
     // Montant : manquant seulement si un prix est connu (sur le bon ou sur un produit de la fiche) ;
     // un bon sans prix (« Non indiqué sur le bon ») ne permet pas de chiffrer : rien à compléter

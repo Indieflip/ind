@@ -75,9 +75,11 @@ export async function updateAnomalyAction(
       .map((x) => ({ productId: x.productId ?? null, name: String(x.name ?? "").trim().slice(0, 300), qty: x.qty != null && Number.isFinite(x.qty) ? x.qty : null, unit: String(x.unit ?? "").trim().slice(0, 30), price: x.price != null && Number.isFinite(x.price) ? x.price : null }))
       .filter((x) => x.name)
       .slice(0, 100);
-    set.items = items.length ? items : null;
-    // Le premier produit reste le produit principal de la fiche
+    // Liste vide = fiche enregistrée volontairement sans produit (gardée vide, jamais recalculée)
+    set.items = items;
+    // Le premier produit reste le produit principal de la fiche ; sans produit, la fiche n'en a plus
     if (items[0]) { set.productName = items[0].name; set.productId = items[0].productId; }
+    else { set.productName = null; set.productId = null; }
   }
   if (data.productId !== undefined) {
     const p = data.productId ? await getDb().query.products.findFirst({ where: eq(schema.products.id, data.productId), columns: { id: true, name: true } }) : undefined;
