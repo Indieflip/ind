@@ -357,7 +357,8 @@ async function writeContent(
     const extraOnly = detected.length > 0 && detected.every((i) => i === "qty_more");
     // Texte clair : « manque 50 pièces (facturé 100, contrôlé 50) », « température 8 °C (maximum 4 °C) »…
     const facts = describeLine(l, detected, cat, t);
-    if (l.decision === "conform" && detected.length && !keep.products.has(l.productName.toLowerCase())) {
+    // (Refus / Retour saisis : leurs fiches d'anomalie remplacent l'anomalie détectée)
+    if (l.decision === "conform" && l.refuseQty == null && l.returnQty == null && detected.length && !keep.products.has(l.productName.toLowerCase())) {
       const first = detected[0];
       await tx.insert(schema.anomalies).values({
         ...(extraOnly ? { mode: "verification" as const } : {}),
@@ -369,7 +370,7 @@ async function writeContent(
         photoUrl: l.photos[0] ?? null, createdBy: user.id, createdAt: date,
       });
     }
-    if (l.decision !== "conform" && !keep.products.has(l.productName.toLowerCase())) {
+    if ((l.decision !== "conform" || l.refuseQty != null || l.returnQty != null) && !keep.products.has(l.productName.toLowerCase())) {
       const reasonLabel = l.reason ? (t.reasons as Record<string, string>)[l.reason] ?? l.reason : "";
       const qtyFacts = describeLine(l, ["qty_less", "qty_more"], cat, t);
       // Montant d'une quantité refusée / retournée : quantité × prix (seulement dans l'unité de la ligne)
@@ -380,14 +381,14 @@ async function writeContent(
         type: (l.reason && reasonToAnomaly[l.reason]) || (l.qtyReceived != null && l.qtyOrdered != null && l.qtyReceived < l.qtyOrdered ? ("missing" as const) : ("other" as const)),
         photoUrl: l.photos[0] ?? null, createdBy: user.id, createdAt: date,
       };
-      // Refus (ou réserve sans retour) : une fiche d'anomalie, avec la quantité refusée
-      if (l.decision === "refuse" || l.returnQty == null) {
-        const fq = l.decision === "refuse" ? l.refuseQty ?? l.qtyOrdered ?? l.qtyReceived : null;
+      // Refus (produit refusé ou quantité refusée) ou réserve : une fiche d'anomalie, avec la quantité refusée
+      if (l.decision !== "conform" || l.refuseQty != null) {
+        const fq = l.refuseQty ?? (l.decision === "refuse" ? l.qtyOrdered ?? l.qtyReceived : null);
         const fu = l.refuseUnit || l.unit;
         const why = [fq != null ? qtyText(fq, fu) : "", reasonLabel.toLowerCase(), ...(facts.length ? facts : qtyFacts)].filter(Boolean);
         await tx.insert(schema.anomalies).values({
           ...base,
-          description: `${t.decision[l.decision]}${why.length ? ` : ${[...new Set(why)].join(" ; ")}` : ""}`,
+          description: `${l.refuseQty != null ? t.decision.refuse : t.decision[l.decision]}${why.length ? ` : ${[...new Set(why)].join(" ; ")}` : ""}`,
           claimedAmount: money(fq != null ? valueOf(fq, fu) : gapValue(l)),
           ...(fq != null ? { items: [{ productId, name: l.productName, qty: fq, unit: fu, price: l.unitPrice }] } : {}),
         });
@@ -395,10 +396,10 @@ async function writeContent(
       // Retour : une fiche « Retour marchandise », avec la quantité retournée
       if (l.returnQty != null) {
         const ru = l.returnUnit || l.unit;
-        const why = [qtyText(l.returnQty, ru), l.decision === "refuse" ? "" : reasonLabel.toLowerCase()].filter(Boolean);
+        const why = [qtyText(l.returnQty, ru), l.decision !== "conform" || l.refuseQty != null ? "" : reasonLabel.toLowerCase()].filter(Boolean);
         await tx.insert(schema.anomalies).values({
           ...base,
-          ...(l.decision === "refuse" ? { type: "other" as const } : {}),
+          ...(l.decision !== "conform" || l.refuseQty != null ? { type: "other" as const } : {}),
           problemType: t.wizard.returnProblem,
           description: `${t.wizard.returnBtn} : ${why.join(" ; ")}`,
           claimedAmount: money(valueOf(l.returnQty, ru)),
@@ -620,8 +621,8 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
           const { pl, nl } = m;
           const gap = pl.qtyOrdered != null && pl.qtyReceived != null ? Math.round(Math.abs(pl.qtyOrdered - pl.qtyReceived) * 1000) / 1000 : null;
           // Refus / Retour saisis sur la ligne : leur quantité et leur unité priment sur l'écart facturé / contrôlé
-          const rq = pl.decision === "refuse" ? pl.refuseQty : pl.returnQty;
-          const ru = pl.decision === "refuse" ? pl.refuseUnit : pl.returnUnit;
+          const rq = pl.refuseQty ?? pl.returnQty;
+          const ru = pl.refuseQty != null ? pl.refuseUnit : pl.returnUnit;
           next.push({ productId: nl.productId ?? it.productId, name: pl.productName, qty: rq ?? (gap || it.qty), unit: (rq != null && ru) || pl.unit || it.unit, price: pl.unitPrice ?? it.price });
           lineId ??= nl.id;
         });

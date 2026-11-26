@@ -1375,6 +1375,12 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v4
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v40', '1') on conflict (key) do nothing`);
 }
 
+// Dev : Refus / Retour au-dessus de la conformité, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v41'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = ${"Boutons « Refus » et « Retour » juste au-dessus de « Conformité produit » (Acceptée / Refus), indépendants et cumulables : chacun ouvre Quantité (Q Facturée par défaut) + Unité (celle de la ligne par défaut), puis motif et photo. Fiches d'anomalie : une « Refus » avec la quantité refusée, une « Retour marchandise » avec la quantité retournée ; montant = quantité × prix (si même unité que la ligne). Ancienne fiche : la fiche d'anomalie existante du produit prend la quantité et l'unité. Réserves et fiche FPM : « Refusé 2 Kg · Retour 1 Pièce »."} where field = 'Refus / Retour'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v41', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

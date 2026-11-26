@@ -62,6 +62,7 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     doc: l.document ?? undefined,
     note: l.note ?? "",
     priceNotShown: l.priceNotShown,
+    refuseOn: l.refuseQty != null,
     refuseQty: str(l.refuseQty),
     refuseUnit: l.refuseUnit ?? "",
     returnOn: l.returnQty != null,

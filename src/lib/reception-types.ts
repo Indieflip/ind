@@ -74,6 +74,8 @@ export interface DraftLine {
   /** Note libre sur le produit */
   note?: string;
   /** Boutons « Refus » et « Retour » (indépendants) : quantité et unité de chacun */
+  /** Bouton « Refus » activé (au-dessus de la conformité, indépendant de la décision) */
+  refuseOn?: boolean;
   refuseQty?: string;
   refuseUnit?: string;
   /** Bouton « Retour » activé */

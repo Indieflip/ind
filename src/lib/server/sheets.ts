@@ -68,9 +68,8 @@ export async function buildSheetData(receptionIds: number[], locale = "fr") {
       const fq = q(line.refuseQty ?? legacyRefuse, line.refuseUnit);
       const rq = line.returnKind === "refus" ? "" : q(line.returnQty, line.returnUnit);
       const base = line.decision === "refuse" ? f.refused : line.decision === "reserve" ? f.reserved : f.accepted;
-      const decision = line.decision === "conform" ? base
-        : line.decision === "refuse" ? [fq ? `${f.refused} ${fq}` : f.refused, rq ? `${f.returned} ${rq}` : ""].filter(Boolean).join(" · ")
-        : rq ? `${f.returned} ${rq}` : base;
+      // Décision, puis quantités refusées / retournées (boutons Refus / Retour)
+      const decision = [base, fq ? `${f.refused} ${fq}` : "", rq ? `${f.returned} ${rq}` : ""].filter(Boolean).filter((x, i, arr) => !(i === 0 && x === f.refused && arr.length > 1 && fq)).join(" · ");
       return [
         time(rec.deliveredAt),
         rec.supplierName,

@@ -140,7 +140,7 @@ export function suggestedReason(line: DraftLine, catalog: Catalog | undefined, t
  */
 export function withAutoDecision(line: DraftLine, catalog: Catalog | undefined, truckTemp?: string): DraftLine {
   // Choix fait à la main (Refus / Retour compris) : jamais remplacé par la proposition automatique
-  if (line.decisionManual || line.returnOn || !line.productName.trim()) return line;
+  if (line.decisionManual || !line.productName.trim()) return line;
   const ev = evaluate(line, catalog, truckTemp);
   const missing = ev.issues.includes("temp_missing") || (dlcRequired(line, catalog) && !line.dlc);
   const decision = ev.decision === "refuse" ? "refuse" : missing ? null : "conform";
@@ -184,6 +184,11 @@ export function needsTemp(line: DraftLine, catalog: Catalog | undefined) {
 export function buildReservesText(d: Draft, t: Dict, catalog: Catalog | undefined): string {
   const parts: string[] = [];
   for (const l of d.lines) {
+    // Refus / Retour (boutons au-dessus de la conformité) : quantité et unité de chacun
+    const fq = l.refuseOn ? num(l.refuseQty ?? "") ?? num(l.qtyOrdered) ?? num(l.qtyReceived) : null;
+    const rq = l.returnOn ? num(l.returnQty ?? "") ?? num(l.qtyOrdered) ?? num(l.qtyReceived) : null;
+    if (fq != null) parts.push(`${t.decision.refuse.toUpperCase()} – ${l.productName} : ${fq} ${l.refuseUnit || l.unit}`);
+    if (rq != null) parts.push(`${t.wizard.returnBtn.toUpperCase()} – ${l.productName} : ${rq} ${l.returnUnit || l.unit}`);
     if (!l.decision) continue;
     const ev = evaluate(l, catalog);
     if (l.decision === "conform") {
@@ -201,14 +206,7 @@ export function buildReservesText(d: Draft, t: Dict, catalog: Catalog | undefine
     const temp = num(l.temperature);
     if (temp != null && (ev.issues.includes("temp_over") || ev.issues.includes("temp_limit"))) bits.push(`${temp} °C`);
     if (l.dlc && (ev.issues.includes("dlc_expired") || ev.issues.includes("dlc_short"))) bits.push(`DLC ${fmtDate(l.dlc)}`);
-    // Refus / Retour : quantité et unité de chacun
-    const fq = l.decision === "refuse" ? num(l.refuseQty ?? "") ?? qo ?? qr : null;
-    if (fq != null) bits.unshift(`${fq} ${l.refuseUnit || l.unit}`);
-    const label = l.decision === "refuse" ? t.decision.refuse : l.returnOn ? t.wizard.returnBtn : t.decision.reserve;
-    parts.push(`${label.toUpperCase()} – ${l.productName} : ${[...new Set(bits)].join(", ")}`);
-    const rq = l.returnOn ? num(l.returnQty ?? "") ?? qo ?? qr : null;
-    if (l.decision === "refuse" && rq != null) parts.push(`${t.wizard.returnBtn.toUpperCase()} – ${l.productName} : ${rq} ${l.returnUnit || l.unit}`);
-    else if (rq != null && l.decision !== "refuse") parts[parts.length - 1] += `${bits.length ? ", " : ""}${rq} ${l.returnUnit || l.unit}`;
+    parts.push(`${l.decision === "refuse" ? t.decision.refuse.toUpperCase() : t.decision.reserve.toUpperCase()} – ${l.productName} : ${[...new Set(bits)].join(", ")}`);
   }
   const truck = num(d.truckTemp);
   if (d.vehicleClean === false) parts.push(`${t.wizard.vehicleClean} ${t.common.no}`);
@@ -260,10 +258,10 @@ export function toPayload(d: Draft): ReceptionPayload {
         note: l.note?.trim() || null,
         ref: /^line-\d+$/.test(l.key) ? Number(l.key.slice(5)) : null,
         // Refus / Retour : quantité (Q Facturée par défaut) et unité (celle de la ligne par défaut)
-        refuseQty: l.decision === "refuse" ? num(l.refuseQty ?? "") ?? num(l.qtyOrdered) ?? num(l.qtyReceived) : null,
-        refuseUnit: l.decision === "refuse" ? l.refuseUnit || l.unit || null : null,
-        returnQty: l.returnOn && l.decision !== "conform" ? num(l.returnQty ?? "") ?? num(l.qtyOrdered) ?? num(l.qtyReceived) : null,
-        returnUnit: l.returnOn && l.decision !== "conform" ? l.returnUnit || l.unit || null : null,
+        refuseQty: l.refuseOn ? num(l.refuseQty ?? "") ?? num(l.qtyOrdered) ?? num(l.qtyReceived) : null,
+        refuseUnit: l.refuseOn ? l.refuseUnit || l.unit || null : null,
+        returnQty: l.returnOn ? num(l.returnQty ?? "") ?? num(l.qtyOrdered) ?? num(l.qtyReceived) : null,
+        returnUnit: l.returnOn ? l.returnUnit || l.unit || null : null,
       })),
   };
 }
