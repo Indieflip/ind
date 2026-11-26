@@ -367,6 +367,10 @@ async function writeContent(
         type: first.startsWith("temp") ? "temperature" : first.startsWith("dlc") ? "dlc" : first === "qty_less" ? "missing" : "quantity",
         description: `${t.anomalies.detected} : ${facts.join(" ; ")}`,
         claimedAmount: money(gapValue(l)),
+        // Produit de la fiche : quantité en trop / manquante (écart Q Contrôlée – Q Facturée)
+        ...(l.qtyOrdered != null && l.qtyReceived != null && l.qtyOrdered !== l.qtyReceived
+          ? { items: [{ productId, name: l.productName, qty: Math.round(Math.abs(l.qtyReceived - l.qtyOrdered) * 1000) / 1000, unit: l.unit, price: l.unitPrice }] }
+          : {}),
         photoUrl: l.photos[0] ?? null, createdBy: user.id, createdAt: date,
       });
     }

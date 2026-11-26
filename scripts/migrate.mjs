@@ -1381,6 +1381,18 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v4
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v41', '1') on conflict (key) do nothing`);
 }
 
+// Anomalies détectées à l'enregistrement (quantité en trop / manquante) sans produit : produit et écart repris de la ligne, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'detected_items_v1'`)).rows.length) {
+  const r = await db.execute(sql`update anomalies a set items = jsonb_build_array(jsonb_build_object(
+      'productId', l.product_id, 'name', l.product_name, 'qty', round(abs(l.qty_received - l.qty_ordered), 3), 'unit', l.unit, 'price', l.unit_price))
+    from reception_lines l
+    where l.id = a.line_id and a.source = 'reception' and a.type in ('quantity', 'missing')
+      and (a.items is null or jsonb_array_length(a.items) = 0)
+      and l.qty_ordered is not null and l.qty_received is not null and l.qty_ordered <> l.qty_received`);
+  console.log(`[migrate] anomalies quantité : produit et écart repris (${r.rowCount ?? 0})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('detected_items_v1', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
