@@ -28,6 +28,8 @@ export interface Catalog {
   units?: string[];
   /** Nom du fournisseur dont les bons comportent le suivi boulangerie */
   bakerySupplier?: string;
+  /** Motifs de refus / retour ajoutés par les utilisateurs (en plus de la liste de base) */
+  reasons?: string[];
   fetchedAt: string;
 }
 
@@ -66,7 +68,8 @@ export interface DraftLine {
   decision: Decision | null;
   /** Ancien champ, conservé pour les brouillons existants */
   decisionManual?: boolean;
-  reason: Reason | "";
+  /** Motif de la liste de base, ou motif ajouté (texte) */
+  reason: Reason | "" | (string & {});
   photos: string[]; // data URL ou URL déjà envoyée
   fromBl?: boolean;
   /** Numéro du document (BL / facture) auquel le produit est rattaché */

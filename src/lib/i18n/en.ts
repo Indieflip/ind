@@ -211,6 +211,8 @@ export const en: Dict = {
   wizard: {
     accepted: "Accepted",
     refuseReturnIdle: "Click Refusal or Return to enter a refused or returned quantity.",
+    newReason: "New reason…",
+    newReasonPrompt: "New refusal / return reason:",
     returnBtn: "Return",
     returnProblem: "Goods return",
     returnProduct: "Product concerned",

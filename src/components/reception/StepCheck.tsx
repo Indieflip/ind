@@ -120,12 +120,30 @@ function LineCard({
   );
 
   // Motif du refus / retour, et photo
+  // Motifs : liste de base + motifs ajoutés, rangés A-Z ; « + Nouveau motif… » en ajoute un (gardé pour toutes les fiches)
+  const [extraReasons, setExtraReasons] = useState<string[]>([]);
+  const reasonOptions = [
+    ...REASONS.map((r) => ({ value: r as string, label: t.reasons[r] })),
+    ...[...new Set([...(catalog?.reasons ?? []), ...extraReasons, ...(line.reason && !(REASONS as readonly string[]).includes(line.reason) ? [line.reason] : [])])].map((r) => ({ value: r, label: r })),
+  ].sort((x, y) => x.label.localeCompare(y.label, "fr", { sensitivity: "base" }));
+  const NEW_REASON = "__new__";
   const reasonSelect = (
-    <select className="input" value={line.reason} onChange={(e) => onChange({ reason: e.target.value as DraftLine["reason"] })}>
+    <select
+      className="input"
+      value={line.reason}
+      onChange={async (e) => {
+        if (e.target.value !== NEW_REASON) return onChange({ reason: e.target.value });
+        const label = window.prompt(t.wizard.newReasonPrompt)?.trim();
+        if (!label) return;
+        const res = await fetch("/api/reasons", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ label }) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        const saved = (res?.label as string | undefined) ?? label;
+        setExtraReasons((l) => [...l, saved]);
+        onChange({ reason: saved });
+      }}
+    >
       <option value="">{t.wizard.chooseReason}</option>
-      {[...REASONS].sort((x, y) => t.reasons[x].localeCompare(t.reasons[y], "fr")).map((r) => (
-        <option key={r} value={r}>{t.reasons[r]}</option>
-      ))}
+      {reasonOptions.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+      <option value={NEW_REASON}>+ {t.wizard.newReason}</option>
     </select>
   );
   const photoBlock = (
