@@ -118,7 +118,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
         <div>
           <span className="label flex items-center justify-between">{s.problemType}{editable && <button type="button" className="text-xs font-normal text-brand-700 underline" onClick={() => setManaging((m) => !m)}>{managing ? t.common.close : `⚙ ${s.manageTypes}`}</button>}</span>
           <select className="input" value={v.problemType} onChange={set("problemType")} disabled={!editable}>
-            {typeOptions.map((x) => <option key={x} value={x}>{x}</option>)}
+            {[...typeOptions].sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" })).map((x) => <option key={x} value={x}>{x}</option>)}
           </select>
           {managing && <TypesManager list={typeList} onSaved={(l) => { setTypeList(l); if (!l.includes(v.problemType) && l.length) setV({ ...v, problemType: l[0] }); }} />}
         </div>
@@ -203,7 +203,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
         <div>
           <span className="label">{t.waiting.label}</span>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {WAITING.map((w) => (
+            {[...WAITING].sort((x, y) => t.waiting[x].localeCompare(t.waiting[y], "fr")).map((w) => (
               <button key={w} type="button" disabled={!editable} onClick={() => { setV({ ...v, waitingFor: w }); setSaved(false); }}
                 className={`rounded-lg border-2 px-2 py-2 text-sm font-semibold ${v.waitingFor === w ? "border-amber-500 bg-amber-50 text-amber-900" : "border-stone-200 bg-white text-stone-500"}`}>
                 {t.waiting[w]}

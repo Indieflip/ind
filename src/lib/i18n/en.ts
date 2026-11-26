@@ -873,7 +873,7 @@ export const en: Dict = {
     created: "Created on",
     open: "Open the sheet",
   },
-  waiting: { label: "Waiting for", reponse: "Supplier reply", avoir: "Credit / adjustment", livraison: "Delivery", retour: "Goods return", facturation: "Invoice check" },
+  waiting: { label: "Waiting for", reponse: "Supplier reply", avoir: "Credit / adjustment", livraison: "Delivery", retour: "Goods return", facturation: "Invoice check", retour_nyny: "Return NY NY" },
   stages: { a_traiter: "To process", en_attente: "Waiting", cloturee: "Closed", annulee: "Cancelled" },
   resolutions: { avoir: "Credit / adjustment received", livraison: "Delivered later", retour: "Goods returned", sans_suite: "No follow-up" },
   modes: { reclamation: "Claim with reminders", verification_reclamation: "With reminder", verification: "Without reminder" },

@@ -145,7 +145,7 @@ function LineCard({
                 <span className="badge bg-sky-100 text-sky-800">{t.wizard.newProduct}</span>
                 <select className="rounded border border-stone-300 px-1 py-0.5" value={line.categoryId ?? ""} onChange={(e) => onChange({ categoryId: e.target.value ? Number(e.target.value) : null })}>
                   <option value="">{t.common.category} *</option>
-                  {catalog?.categories.map((c) => (
+                  {[...(catalog?.categories ?? [])].sort((x, y) => (locale === "en" ? x.nameEn : x.nameFr).localeCompare(locale === "en" ? y.nameEn : y.nameFr, "fr")).map((c) => (
                     <option key={c.id} value={c.id}>{locale === "en" ? c.nameEn : c.nameFr}</option>
                   ))}
                 </select>
@@ -308,7 +308,7 @@ function LineCard({
           <button
             key={d}
             type="button"
-            onClick={() => onChange({ decision: d, decisionManual: true, reason: d === "conform" ? "" : line.reason || suggestedReason(line, catalog, truckTemp) })}
+            onClick={() => onChange({ decision: d, decisionManual: true, reason: d === "conform" ? (line.refuseOn || line.returnOn ? line.reason : "") : line.reason || suggestedReason(line, catalog, truckTemp) })}
             className={`rounded-lg border px-2 py-2 text-sm font-semibold ${line.decision === d ? decisionStyles[d].badge + " border-transparent" : "border-stone-200 bg-white text-stone-500"}`}
           >
             {d === "conform" ? t.wizard.accepted : t.decision[d]}
@@ -321,7 +321,7 @@ function LineCard({
         <div className="mt-3 space-y-2">
           <select className="input" value={line.reason} onChange={(e) => onChange({ reason: e.target.value as DraftLine["reason"] })}>
             <option value="">{t.wizard.chooseReason}</option>
-            {REASONS.map((r) => (
+            {[...REASONS].sort((x, y) => t.reasons[x].localeCompare(t.reasons[y], "fr")).map((r) => (
               <option key={r} value={r}>{t.reasons[r]}</option>
             ))}
           </select>
@@ -407,7 +407,7 @@ function AddProduct({ draft, setDraft, catalog, doc }: { draft: Draft; setDraft:
             <UnitSelect value={custom.unit} units={catalog?.units ?? DEFAULT_UNITS} onChange={(unit) => setCustom({ ...custom, unit })} />
             <select className="input" value={custom.categoryId} onChange={(e) => setCustom({ ...custom, categoryId: e.target.value })}>
               <option value="">{t.common.category} *</option>
-              {catalog?.categories.map((c) => (
+              {[...(catalog?.categories ?? [])].sort((x, y) => (locale === "en" ? x.nameEn : x.nameFr).localeCompare(locale === "en" ? y.nameEn : y.nameFr, "fr")).map((c) => (
                 <option key={c.id} value={c.id}>{locale === "en" ? c.nameEn : c.nameFr}</option>
               ))}
             </select>

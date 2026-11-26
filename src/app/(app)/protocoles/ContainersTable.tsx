@@ -79,7 +79,7 @@ export function ContainersTable({ rows, editable }: { rows: ContainerRow[]; edit
             <button type="button" className="btn-secondary py-1.5" onClick={() => { setAdding(false); setEdit(null); }}>{t.common.cancel}</button>
             <button type="button" className="btn-primary py-1.5" disabled={pending || (!form.product.trim() && !form.container.trim())} onClick={save}>{t.common.save}</button>
           </div>
-          <datalist id="container-suppliers">{[...new Set(rows.map((r) => r.supplier).filter(Boolean))].map((s) => <option key={s} value={s} />)}</datalist>
+          <datalist id="container-suppliers">{[...new Set(rows.map((r) => r.supplier).filter(Boolean))].sort((a: string, b: string) => a.localeCompare(b, "fr", { sensitivity: "base" })).map((s) => <option key={s} value={s} />)}</datalist>
         </div>
       )}
       <DataTable rows={rows} cols={cols} rowKey={(r) => r.id} defaultSort={{ key: "supplier", dir: "asc" }} dense fixed maxHeight="max-h-[70vh]"

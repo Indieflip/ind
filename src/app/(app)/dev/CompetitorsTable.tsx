@@ -63,7 +63,7 @@ export function CompetitorsTable({ rows: initial }: { rows: Competitor[] }) {
               )}
             </label>
           ))}
-          <datalist id="competitor-cats">{[...new Set(rows.map((r) => r.cat).filter(Boolean))].map((c) => <option key={c} value={c} />)}</datalist>
+          <datalist id="competitor-cats">{[...new Set(rows.map((r) => r.cat).filter(Boolean))].sort((a: string, b: string) => a.localeCompare(b, "fr", { sensitivity: "base" })).map((c) => <option key={c} value={c} />)}</datalist>
           <div className="flex gap-2 sm:col-span-2 lg:col-span-3">
             <button type="button" className="btn-primary" disabled={pending || !edit.v.name.trim()} onClick={() => {
               const url = edit.v.url?.trim() ? (/^https?:\/\//i.test(edit.v.url.trim()) ? edit.v.url.trim() : `https://${edit.v.url.trim()}`) : "";

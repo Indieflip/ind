@@ -144,7 +144,8 @@ export function withAutoDecision(line: DraftLine, catalog: Catalog | undefined, 
   const ev = evaluate(line, catalog, truckTemp);
   const missing = ev.issues.includes("temp_missing") || (dlcRequired(line, catalog) && !line.dlc);
   const decision = ev.decision === "refuse" ? "refuse" : missing ? null : "conform";
-  const reason = decision === "refuse" ? line.reason || suggestedReason(line, catalog, truckTemp) : "";
+  // Motif gardé tant qu'un Refus / Retour (quantité) est saisi, même si le produit reste « Acceptée »
+  const reason = decision === "refuse" ? line.reason || suggestedReason(line, catalog, truckTemp) : line.refuseOn || line.returnOn ? line.reason : "";
   return decision === line.decision && reason === line.reason ? line : { ...line, decision, reason };
 }
 

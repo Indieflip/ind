@@ -168,7 +168,7 @@ export function AddProduct({ supplierId, categories, units }: { supplierId: numb
         <span className="label">{t.common.category} *</span>
         <select name="categoryId" className="input" required defaultValue="">
           <option value="" />
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {[...categories].sort((x, y) => x.name.localeCompare(y.name, "fr")).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </label>
       <label><span className="label">{t.common.price} HT</span><MoneyInput name="price" /></label>
@@ -244,7 +244,7 @@ export function DeleteSupplier({ id, name, others }: { id: number; name: string;
         <span className="label">{s.transferTo}</span>
         <select className="input" value={target} onChange={(e) => setTarget(e.target.value)}>
           <option value="">{s.noTransfer}</option>
-          {others.filter((o) => o.id !== id).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          {others.filter((o) => o.id !== id).sort((x, y) => x.name.localeCompare(y.name, "fr")).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
         </select>
         <span className="mt-1 block text-xs text-stone-600">{target ? s.transferHint : s.noTransferHint}</span>
       </label>

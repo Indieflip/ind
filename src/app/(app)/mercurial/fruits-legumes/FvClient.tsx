@@ -176,7 +176,7 @@ export function AddFv({ year, suppliers, units }: { year: number; suppliers: str
       <label><span className="label">{t.common.unit}</span><UnitSelect name="unit" value={newUnit} units={units} onChange={setNewUnit} /></label>
       <label className="flex items-center gap-2 pb-2 text-sm"><input type="checkbox" name="locked" className="h-4 w-4 accent-brand-600" /> 🔒 {t.fv.locked}</label>
       <button className="btn-primary" disabled={pending}><Icon name="plus" className="h-4 w-4" />{t.common.add}</button>
-      <datalist id="fv-suppliers">{suppliers.map((s) => <option key={s} value={s} />)}</datalist>
+      <datalist id="fv-suppliers">{[...suppliers].sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" })).map((s) => <option key={s} value={s} />)}</datalist>
     </form>
   );
 }

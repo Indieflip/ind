@@ -12,6 +12,7 @@ const fmtEuro = (n: number | null | undefined) => (n == null ? "—" : `${n.toFi
 import { dictFor } from "@/lib/i18n";
 import { docLabel } from "@/lib/documents";
 import { natureOfCategory } from "@/lib/nature";
+import { WEIGH_TYPE } from "@/lib/anomaly";
 import type { SessionUser } from "@/lib/auth";
 
 const lineSchema = z.object({
@@ -366,7 +367,8 @@ async function writeContent(
         nature: natureOf(l.categoryId), reference: lineRef(l),
         type: first.startsWith("temp") ? "temperature" : first.startsWith("dlc") ? "dlc" : first === "qty_less" ? "missing" : "quantity",
         // Type « Quantité » supprimé : quantité en trop affichée « Quantité produit »
-        ...(first.startsWith("qty") ? { problemType: t.anomalies.types.missing } : {}),
+        // Au kg, un poids reçu en trop est un écart de pesée positif : pour information (hors réclamations et économies)
+        ...(first.startsWith("qty") ? { problemType: unitName(l.unit) === "Kg" ? WEIGH_TYPE : t.anomalies.types.missing } : {}),
         description: `${t.anomalies.detected} : ${facts.join(" ; ")}`,
         claimedAmount: money(gapValue(l)),
         // Produit de la fiche : quantité en trop / manquante (écart Q Contrôlée – Q Facturée)

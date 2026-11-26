@@ -20,7 +20,8 @@ export function UnitSelect({
   required?: boolean;
 }) {
   const { t } = useI18n();
-  const list = value && !units.includes(value) ? [...units, value] : units;
+  // Liste de mots : toujours rangée de A à Z
+  const list = [...new Set(value && !units.includes(value) ? [...units, value] : units)].sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base", numeric: true }));
   return (
     <select
       name={name}

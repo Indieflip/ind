@@ -59,12 +59,12 @@ export function AnomalyForm({ receptions, preselect }: { receptions: { id: numbe
         <label>
           <span className="label">{t.anomalies.nature}</span>
           <input name="nature" className="input" list="anomaly-natures" defaultValue={pre.nature ?? ""} />
-          <datalist id="anomaly-natures">{NATURES.map((n) => <option key={n} value={n} />)}</datalist>
+          <datalist id="anomaly-natures">{[...NATURES].sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" })).map((n) => <option key={n} value={n} />)}</datalist>
         </label>
         <label>
           <span className="label">{t.anomalies.type}</span>
           <select name="type" className="input" defaultValue="missing">
-            {Object.entries(t.anomalies.types).filter(([k]) => k !== "quantity").map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            {Object.entries(t.anomalies.types).filter(([k]) => k !== "quantity").sort((x, y) => x[1].localeCompare(y[1], "fr")).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </label>
         <label><span className="label">{t.common.product}</span><input name="productName" className="input" defaultValue={pre.product ?? ""} /></label>

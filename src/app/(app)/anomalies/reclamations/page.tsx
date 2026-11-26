@@ -1,3 +1,4 @@
+import { isInformative } from "@/lib/anomaly";
 import { parisYear, parseNo } from "@/lib/numbering";
 import { throttled } from "@/lib/server/throttle";
 import { desc, eq } from "drizzle-orm";
@@ -48,7 +49,8 @@ export default async function ClaimsPage({ searchParams }: { searchParams: Promi
         initialFilter={f === "sans-montant" ? "missing" : undefined}
         claimNo={claimNo}
         claimYear={claimYear}
-        rows={rows.map(({ a: x, supplier, documents, blNumber, lineDoc }) => {
+        // Quantités reçues en trop (dont écarts de pesée positifs) : pour information, pas des réclamations
+        rows={rows.filter(({ a: x }) => !isInformative(x)).map(({ a: x, supplier, documents, blNumber, lineDoc }) => {
           const delay = processes.find(x.supplierId, x.supplierName)?.delay ?? 3;
           const days = daysSince(x.lastActionAt, x.createdAt, now);
           const stage = stageOf(x.stage);
