@@ -1480,6 +1480,12 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'reason_damage
   await db.execute(sql`insert into app_settings (key, value) values ('reason_damaged_rename_v1', '1') on conflict (key) do nothing`);
 }
 
+// Dev : consolidation d'une ancienne fiche sans confirmation, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v51'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = replace(rule, 'non consolidée, avec confirmation,', 'non consolidée, sans confirmation,') where field = 'Consolider (ancienne fiche)'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v51', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

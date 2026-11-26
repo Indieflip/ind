@@ -21,11 +21,12 @@ export function DeleteReceptionButton({ id, label, confirmText }: { id: number; 
 }
 
 /** Ancienne fiche (importée) : consolidation à la main */
-export function ConsolidateImportedButton({ id, label, confirmText }: { id: number; label: string; confirmText: string }) {
+export function ConsolidateImportedButton({ id, label }: { id: number; label: string; confirmText?: string }) {
   const [pending, start] = useTransition();
   const router = useRouter();
+  // Consolidation directe, sans confirmation (réversible avec « Enlever la consolidation »)
   return (
-    <button className="btn-secondary" disabled={pending} onClick={async () => await appConfirm(confirmText) && start(async () => { await consolidateImportedAction(id); router.refresh(); })}>
+    <button className="btn-secondary" disabled={pending} onClick={() => start(async () => { await consolidateImportedAction(id); router.refresh(); })}>
       <Icon name="check" className="h-4 w-4" /> {label}
     </button>
   );
