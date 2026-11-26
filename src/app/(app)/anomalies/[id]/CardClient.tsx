@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteAnomalyAction, followUpTodayAction, groupClaimsAction, moveAnomalyAction, setAnomalyReviewAction, updateAnomalyAction } from "@/lib/actions/anomalies";
 import { useI18n } from "@/lib/i18n/client";
-import { WAITING } from "@/lib/anomaly";
+import { WAITING, toggleWaiting, waitingList } from "@/lib/anomaly";
 import { appAlert, appConfirm } from "@/components/Confirm";
 import { MoneyInput } from "@/components/MoneyInput";
 
@@ -135,8 +135,8 @@ export function ActionCard({ id, stage, resolution, editable, claimed, phone, su
         <div className="flex flex-wrap items-center gap-1.5 text-sm">
           <span className="font-semibold text-amber-900">{t.waiting.label} :</span>
           {[...WAITING].sort((x, y) => t.waiting[x].localeCompare(t.waiting[y], "fr")).map((w) => (
-            <button key={w} type="button" disabled={!editable || pending} onClick={() => run(() => updateAnomalyAction(id, { waitingFor: w }))}
-              className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${waitingFor === w ? "border-amber-500 bg-amber-100 text-amber-900" : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"}`}>
+            <button key={w} type="button" disabled={!editable || pending} onClick={() => run(() => updateAnomalyAction(id, { waitingFor: toggleWaiting(waitingFor, w) }))}
+              className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${waitingList(waitingFor).includes(w) ? "border-amber-500 bg-amber-100 text-amber-900" : "border-stone-200 bg-white text-stone-500 hover:border-stone-300"}`}>
               {t.waiting[w]}
             </button>
           ))}

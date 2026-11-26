@@ -1439,6 +1439,13 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v4
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v45', '1') on conflict (key) do nothing`);
 }
 
+// Dev : « En attente de » à choix multiples, motif avant Quantité / Unité, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v46'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = replace(rule, 'Statut « En attente » :', 'Statut « En attente », plusieurs choix possibles :') where field = 'En attente de'`);
+  await db.execute(sql`update dev_fields set rule = replace(rule, 'chacun ouvre Quantité (Q Facturée par défaut) + Unité (celle de la ligne par défaut), puis motif et photo', 'motif juste avant Quantité (Q Facturée par défaut) + Unité (celle de la ligne par défaut), puis photo') where field = 'Refus / Retour'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v46', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

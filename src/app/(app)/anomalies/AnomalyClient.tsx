@@ -15,7 +15,7 @@ import { appConfirm } from "@/components/Confirm";
 import { DataTable, type Col } from "@/components/table/DataTable";
 import { PhotoButton, Thumbs } from "@/components/reception/PhotoButton";
 import { PasteRowButton } from "@/components/table/RowMenu";
-import { waitingOf, isOpenStage, outcomeOf, outcomeStyles, stageOf, stageStyles } from "@/lib/anomaly";
+import { waitingOf, waitingText, isOpenStage, outcomeOf, outcomeStyles, stageOf, stageStyles } from "@/lib/anomaly";
 import { copyRow, type RowFields } from "@/lib/client/rowClipboard";
 
 const NATURES = ["Viande", "Poisson", "Fruits & Légumes", "Crèmerie", "Épicerie", "Boisson", "Boulangerie", "Autre"];
@@ -152,11 +152,11 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
   // Suivi unique : l'étape (et les jours depuis la dernière action)
   const edit = shownCols.findIndex((c) => c.key === "edit");
   shownCols.splice(edit < 0 ? shownCols.length : edit, 0, {
-    key: "stage", width: "8.5rem", label: t.common.status, text: (r) => `${t.stages[stageOf(r.stage)]}${stageOf(r.stage) === "en_attente" && waitingOf(r.waitingFor) ? ` · ${t.waiting[waitingOf(r.waitingFor)!]}` : ""}`, options: Object.values(t.stages),
+    key: "stage", width: "8.5rem", label: t.common.status, text: (r) => `${t.stages[stageOf(r.stage)]}${stageOf(r.stage) === "en_attente" && waitingOf(r.waitingFor) ? ` · ${waitingText(r.waitingFor, t.waiting)}` : ""}`, options: Object.values(t.stages),
     render: (r) => (
       <div className="space-y-0.5">
         <span className={`badge ${stageStyles[stageOf(r.stage)]}`}>{t.stages[stageOf(r.stage)]}</span>
-        {stageOf(r.stage) === "en_attente" && waitingOf(r.waitingFor) && <div className="text-[11px] font-medium text-amber-800">{t.waiting[waitingOf(r.waitingFor)!]}</div>}
+        {stageOf(r.stage) === "en_attente" && waitingOf(r.waitingFor) && <div className="text-[11px] font-medium text-amber-800">{waitingText(r.waitingFor, t.waiting)}</div>}
         {isOpenStage(stageOf(r.stage)) && <div className={`text-[11px] ${r.due ? "font-semibold text-red-700" : "text-stone-500"}`}>{r.days} {t.kanban.days}</div>}
       </div>
     ),

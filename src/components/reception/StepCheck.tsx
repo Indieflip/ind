@@ -119,19 +119,22 @@ function LineCard({
     </div>
   );
 
-  // Motif + photo du refus / retour
-  const reasonBlock = (
-        <div className="mt-3 space-y-2">
-          <select className="input" value={line.reason} onChange={(e) => onChange({ reason: e.target.value as DraftLine["reason"] })}>
-            <option value="">{t.wizard.chooseReason}</option>
-            {[...REASONS].sort((x, y) => t.reasons[x].localeCompare(t.reasons[y], "fr")).map((r) => (
-              <option key={r} value={r}>{t.reasons[r]}</option>
-            ))}
-          </select>
-          <Thumbs photos={line.photos} onRemove={async (i) => await appConfirm(t.wizard.removePhotoConfirm) && onChange({ photos: line.photos.filter((_, j) => j !== i) })} />
-          <PhotoButton label={t.common.photo} className="btn-secondary w-full" onPhotos={(urls) => onChange({ photos: [...line.photos, ...urls] })} />
-        </div>
+  // Motif du refus / retour, et photo
+  const reasonSelect = (
+    <select className="input" value={line.reason} onChange={(e) => onChange({ reason: e.target.value as DraftLine["reason"] })}>
+      <option value="">{t.wizard.chooseReason}</option>
+      {[...REASONS].sort((x, y) => t.reasons[x].localeCompare(t.reasons[y], "fr")).map((r) => (
+        <option key={r} value={r}>{t.reasons[r]}</option>
+      ))}
+    </select>
   );
+  const photoBlock = (
+    <>
+      <Thumbs photos={line.photos} onRemove={async (i) => await appConfirm(t.wizard.removePhotoConfirm) && onChange({ photos: line.photos.filter((_, j) => j !== i) })} />
+      <PhotoButton label={t.common.photo} className="btn-secondary w-full" onPhotos={(urls) => onChange({ photos: [...line.photos, ...urls] })} />
+    </>
+  );
+  const reasonBlock = <div className="mt-3 space-y-2">{reasonSelect}{photoBlock}</div>;
   return (
     <article id={`line-${line.key}`} className={`card scroll-mt-32 border-l-4 ${style.border} p-4 ${!line.decision ? "ring-2 ring-amber-300" : ""}`}>
       <div className="mb-3 flex items-start justify-between gap-2">
@@ -306,13 +309,15 @@ function LineCard({
             </div>
             {(line.refuseOn || line.returnOn) && (
               <div className="mt-2 space-y-2">
+                {/* Motif juste avant les champs Quantité / Unité */}
+                {reasonSelect}
                 {line.refuseOn && fields("refuse")}
                 {line.returnOn && fields("return")}
                 <p className="text-[11px] text-stone-500">{t.wizard.returnHint}</p>
               </div>
             )}
-            {/* Motif (et photo) du Refus / Retour : avant la conformité */}
-            {(line.refuseOn || line.returnOn) && reasonBlock}
+            {/* Photo du Refus / Retour : avant la conformité */}
+            {(line.refuseOn || line.returnOn) && <div className="mt-2 space-y-2">{photoBlock}</div>}
           </div>
         );
       })()}

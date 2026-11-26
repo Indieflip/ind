@@ -98,7 +98,8 @@ export async function updateAnomalyAction(
   }
   if (data.creditNumber !== undefined) set.creditNumber = data.creditNumber.trim() || null;
   if (data.creditKind !== undefined) set.creditKind = data.creditKind === "facture" ? "facture" : data.creditKind === "avoir" ? "avoir" : null;
-  if (data.waitingFor !== undefined) set.waitingFor = WAITING.includes(data.waitingFor as (typeof WAITING)[number]) ? data.waitingFor : null;
+  // Plusieurs choix possibles (« reponse,avoir »), seuls les choix connus sont gardés
+  if (data.waitingFor !== undefined) { const l = [...new Set(String(data.waitingFor).split(",").map((x) => x.trim()).filter((x) => WAITING.includes(x as (typeof WAITING)[number])))]; set.waitingFor = l.length ? l.join(",") : null; }
   if (data.docDate !== undefined) set.docDate = /^\d{4}-\d{2}-\d{2}$/.test(data.docDate) ? data.docDate : null;
   if (data.creditDate !== undefined) set.creditDate = /^\d{4}-\d{2}-\d{2}$/.test(data.creditDate) ? data.creditDate : null;
   if (data.mode !== undefined && MODES.includes(data.mode as (typeof MODES)[number])) set.mode = data.mode;

@@ -44,7 +44,13 @@ export const OPEN_STAGES = ["a_traiter", "en_attente"] as const;
 /** « En attente » de quoi : réponse du fournisseur, avoir / régul, livraison, retour marchandise */
 export const WAITING = ["reponse", "avoir", "livraison", "retour", "facturation", "retour_nyny"] as const;
 export type Waiting = (typeof WAITING)[number];
-export const waitingOf = (v: string | null | undefined): Waiting | null => (WAITING.includes(v as Waiting) ? (v as Waiting) : null);
+export const waitingOf = (v: string | null | undefined): Waiting | null => waitingList(v)[0] ?? null;
+/** « En attente de » : plusieurs choix possibles, enregistrés « reponse,avoir » */
+export const waitingList = (v: string | null | undefined): Waiting[] => [...new Set((v ?? "").split(",").map((x) => x.trim()).filter((x): x is Waiting => WAITING.includes(x as Waiting)))];
+/** Libellés des choix « En attente de », rangés A-Z et séparés par « · » */
+export const waitingText = (v: string | null | undefined, labels: Record<Waiting, string>) => waitingList(v).map((w) => labels[w]).sort((a, b) => a.localeCompare(b, "fr")).join(" · ");
+/** Ajoute ou retire un choix « En attente de » */
+export const toggleWaiting = (v: string | null | undefined, w: Waiting) => { const l = waitingList(v); return (l.includes(w) ? l.filter((x) => x !== w) : [...l, w]).join(","); };
 
 /** Résolution d'une anomalie clôturée : par un avoir, ou par la marchandise livrée plus tard */
 /** Résolutions : avoir / régularisation, livraison différée, retour de la marchandise au fournisseur, sans suite */

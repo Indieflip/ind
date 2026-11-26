@@ -7,7 +7,7 @@ import { claimMailHref } from "@/lib/claimMail";
 
 /** Réclamation par mail : ouverte dans Outlook (web), dans un nouvel onglet, déjà rédigée */
 const OUTLOOK_COMPOSE = "https://outlook.live.com/mail/0/deeplink/compose";
-import { WEIGH_TYPE, stageOf, waitingOf } from "@/lib/anomaly";
+import { WEIGH_TYPE, stageOf, waitingOf, waitingText } from "@/lib/anomaly";
 import { notFound } from "next/navigation";
 import { and, asc, eq, isNull, lt, max, sql, ne } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -210,7 +210,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
             </div>
           </div>
           <div className="flex flex-col items-end gap-1.5 text-right">
-            <span className={`rounded-full px-3 py-1 text-sm font-semibold ${stageCls[stageOf(a.stage)] ?? "bg-stone-100"}`}>{t.stages[stageOf(a.stage)]}{stageOf(a.stage) === "en_attente" && waitingOf(a.waitingFor) ? ` · ${t.waiting[waitingOf(a.waitingFor)!]}` : ""}</span>
+            <span className={`rounded-full px-3 py-1 text-sm font-semibold ${stageCls[stageOf(a.stage)] ?? "bg-stone-100"}`}>{t.stages[stageOf(a.stage)]}{stageOf(a.stage) === "en_attente" && waitingOf(a.waitingFor) ? ` · ${waitingText(a.waitingFor, t.waiting)}` : ""}</span>
 {problemType !== t.anomalies.types.missing_bl && (<>
             <p className="text-3xl font-bold tabular-nums">{a.claimedAmount ? fmtMoney(num(a.claimedAmount), locale) : "—"}</p>
             <p className="text-xs text-white/80">{s.claimed}</p>

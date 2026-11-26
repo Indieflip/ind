@@ -5,7 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { followUpTodayAction, updateAnomalyAction } from "@/lib/actions/anomalies";
 import { saveProblemTypesAction } from "@/lib/actions/problemTypes";
-import { WAITING, MODES, RESOLUTIONS, STAGES, stageOf, stageStyles, modeIcon } from "@/lib/anomaly";
+import { WAITING, MODES, RESOLUTIONS, STAGES, stageOf, stageStyles, modeIcon, toggleWaiting, waitingList } from "@/lib/anomaly";
 import { useI18n } from "@/lib/i18n/client";
 import { Icon } from "@/components/Icon";
 import { MoneyInput } from "@/components/MoneyInput";
@@ -204,8 +204,8 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
           <span className="label">{t.waiting.label}</span>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[...WAITING].sort((x, y) => t.waiting[x].localeCompare(t.waiting[y], "fr")).map((w) => (
-              <button key={w} type="button" disabled={!editable} onClick={() => { setV({ ...v, waitingFor: w }); setSaved(false); }}
-                className={`rounded-lg border-2 px-2 py-2 text-sm font-semibold ${v.waitingFor === w ? "border-amber-500 bg-amber-50 text-amber-900" : "border-stone-200 bg-white text-stone-500"}`}>
+              <button key={w} type="button" disabled={!editable} onClick={() => { setV({ ...v, waitingFor: toggleWaiting(v.waitingFor, w) }); setSaved(false); }}
+                className={`rounded-lg border-2 px-2 py-2 text-sm font-semibold ${waitingList(v.waitingFor).includes(w) ? "border-amber-500 bg-amber-50 text-amber-900" : "border-stone-200 bg-white text-stone-500"}`}>
                 {t.waiting[w]}
               </button>
             ))}
