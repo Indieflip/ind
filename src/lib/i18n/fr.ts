@@ -208,6 +208,7 @@ export const fr = {
   },
   wizard: {
     accepted: "Acceptée",
+    refuseReturnIdle: "Cliquez sur Refus ou Retour pour saisir une quantité refusée ou retournée.",
     returnBtn: "Retour",
     returnProblem: "Retour marchandise",
     returnProduct: "Produit concerné",

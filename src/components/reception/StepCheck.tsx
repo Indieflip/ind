@@ -301,27 +301,29 @@ function LineCard({
             </div>
           </div>
         );
-        // Mise en évidence : grand cadre coloré à bord épais (rouge pour Refus, orange pour Retour seul), titré
+        // Mise en évidence : Refus et Retour en gros onglets (actif plein, rouge / orange), détail collé dessous
+        const active = !!(line.refuseOn || line.returnOn);
         return (
           <div className="mt-3">
-            <div className="grid grid-cols-2 gap-1.5">
-              <button type="button" onClick={() => toggle("refuse")} className={btn(!!line.refuseOn, decisionStyles.refuse.badge)}>{t.decision.refuse}</button>
-              <button type="button" onClick={() => toggle("return")} className={btn(!!line.returnOn, decisionStyles.reserve.badge)}>{t.wizard.returnBtn}</button>
+            <div className="grid grid-cols-2">
+              <button type="button" onClick={() => toggle("refuse")} className={`rounded-tl-xl border-2 border-b-0 px-2 py-3 text-base font-bold ${line.refuseOn ? "border-red-600 bg-red-600 text-white" : "border-stone-200 bg-stone-50 text-stone-500"}`}>⛔ {t.decision.refuse}</button>
+              <button type="button" onClick={() => toggle("return")} className={`rounded-tr-xl border-2 border-b-0 px-2 py-3 text-base font-bold ${line.returnOn ? "border-amber-500 bg-amber-500 text-white" : "border-stone-200 bg-stone-50 text-stone-500"}`}>↩ {t.wizard.returnBtn}</button>
             </div>
-            {(line.refuseOn || line.returnOn) && (
-              <div className={`mt-2 space-y-2 rounded-xl border-[3px] p-3 shadow-md ${line.refuseOn ? "border-red-500 bg-red-50" : "border-amber-500 bg-amber-50"}`}>
-                <p className={`flex items-center gap-1.5 text-sm font-extrabold uppercase tracking-wide ${line.refuseOn ? "text-red-700" : "text-amber-700"}`}>
-                  {line.refuseOn ? "⛔" : "↩"} {[line.refuseOn ? t.decision.refuse : "", line.returnOn ? t.wizard.returnBtn : ""].filter(Boolean).join(" + ")}
-                </p>
-                {/* Motif juste avant les champs Quantité / Unité */}
-                {reasonSelect}
-                {line.refuseOn && fields("refuse")}
-                {line.returnOn && fields("return")}
-                <p className="text-[11px] text-stone-500">{t.wizard.returnHint}</p>
-                {/* Photo : pour un Refus seulement (pas pour un Retour) */}
-                {line.refuseOn && photoBlock}
-              </div>
-            )}
+            <div className={`space-y-2 rounded-b-xl border-2 p-3 ${active ? (line.refuseOn ? "border-red-600 bg-red-50" : "border-amber-500 bg-amber-50") : "border-stone-200 bg-white"}`}>
+              {active ? (
+                <>
+                  {/* Motif juste avant les champs Quantité / Unité */}
+                  {reasonSelect}
+                  {line.refuseOn && fields("refuse")}
+                  {line.returnOn && fields("return")}
+                  <p className="text-[11px] text-stone-500">{t.wizard.returnHint}</p>
+                  {/* Photo : pour un Refus seulement (pas pour un Retour) */}
+                  {line.refuseOn && photoBlock}
+                </>
+              ) : (
+                <p className="text-xs text-stone-400">{t.wizard.refuseReturnIdle}</p>
+              )}
+            </div>
           </div>
         );
       })()}

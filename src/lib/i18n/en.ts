@@ -210,6 +210,7 @@ export const en: Dict = {
   },
   wizard: {
     accepted: "Accepted",
+    refuseReturnIdle: "Click Refusal or Return to enter a refused or returned quantity.",
     returnBtn: "Return",
     returnProblem: "Goods return",
     returnProduct: "Product concerned",

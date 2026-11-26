@@ -1452,6 +1452,12 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v4
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v47', '1') on conflict (key) do nothing`);
 }
 
+// Dev : Refus / Retour en onglets, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v48'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = replace(rule, 'dans un cadre coloré à bord épais (rouge Refus, orange Retour)', 'en gros onglets (actif plein : rouge Refus, orange Retour), détail collé dessous') where field = 'Refus / Retour'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v48', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
