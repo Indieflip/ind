@@ -140,7 +140,7 @@ export function suggestedReason(line: DraftLine, catalog: Catalog | undefined, t
  */
 export function withAutoDecision(line: DraftLine, catalog: Catalog | undefined, truckTemp?: string): DraftLine {
   // Choix fait à la main (Refus / Retour compris) : jamais remplacé par la proposition automatique
-  if (line.decisionManual || line.returnKind || !line.productName.trim()) return line;
+  if (line.decisionManual || line.returnOn || !line.productName.trim()) return line;
   const ev = evaluate(line, catalog, truckTemp);
   const missing = ev.issues.includes("temp_missing") || (dlcRequired(line, catalog) && !line.dlc);
   const decision = ev.decision === "refuse" ? "refuse" : missing ? null : "conform";
@@ -201,11 +201,14 @@ export function buildReservesText(d: Draft, t: Dict, catalog: Catalog | undefine
     const temp = num(l.temperature);
     if (temp != null && (ev.issues.includes("temp_over") || ev.issues.includes("temp_limit"))) bits.push(`${temp} °C`);
     if (l.dlc && (ev.issues.includes("dlc_expired") || ev.issues.includes("dlc_short"))) bits.push(`DLC ${fmtDate(l.dlc)}`);
-    // Refus / Retour : quantité et produit concernés
-    const rq = num(l.returnQty ?? "") ?? qo ?? qr;
-    if (l.returnKind && rq != null) bits.unshift(`${rq} ${l.unit}${l.returnProduct?.trim() && l.returnProduct.trim() !== l.productName ? ` ${l.returnProduct.trim()}` : ""}`);
-    const label = l.returnKind === "retour" ? t.wizard.returnBtn : l.decision === "refuse" ? t.decision.refuse : t.decision.reserve;
+    // Refus / Retour : quantité et unité de chacun
+    const fq = l.decision === "refuse" ? num(l.refuseQty ?? "") ?? qo ?? qr : null;
+    if (fq != null) bits.unshift(`${fq} ${l.refuseUnit || l.unit}`);
+    const label = l.decision === "refuse" ? t.decision.refuse : l.returnOn ? t.wizard.returnBtn : t.decision.reserve;
     parts.push(`${label.toUpperCase()} – ${l.productName} : ${[...new Set(bits)].join(", ")}`);
+    const rq = l.returnOn ? num(l.returnQty ?? "") ?? qo ?? qr : null;
+    if (l.decision === "refuse" && rq != null) parts.push(`${t.wizard.returnBtn.toUpperCase()} – ${l.productName} : ${rq} ${l.returnUnit || l.unit}`);
+    else if (rq != null && l.decision !== "refuse") parts[parts.length - 1] += `${bits.length ? ", " : ""}${rq} ${l.returnUnit || l.unit}`;
   }
   const truck = num(d.truckTemp);
   if (d.vehicleClean === false) parts.push(`${t.wizard.vehicleClean} ${t.common.no}`);
@@ -256,10 +259,11 @@ export function toPayload(d: Draft): ReceptionPayload {
         document: lineDoc(d, l) || null,
         note: l.note?.trim() || null,
         ref: /^line-\d+$/.test(l.key) ? Number(l.key.slice(5)) : null,
-        // Refus / Retour : produit (celui de la ligne par défaut) et quantité (facturée par défaut)
-        returnKind: l.decision === "conform" || !l.decision ? null : l.returnKind || (l.decision === "refuse" ? "refus" : null),
-        returnProduct: l.decision === "conform" || !l.decision ? null : l.returnProduct?.trim() || l.productName.trim(),
-        returnQty: l.decision === "conform" || !l.decision ? null : num(l.returnQty ?? "") ?? num(l.qtyOrdered) ?? num(l.qtyReceived),
+        // Refus / Retour : quantité (Q Facturée par défaut) et unité (celle de la ligne par défaut)
+        refuseQty: l.decision === "refuse" ? num(l.refuseQty ?? "") ?? num(l.qtyOrdered) ?? num(l.qtyReceived) : null,
+        refuseUnit: l.decision === "refuse" ? l.refuseUnit || l.unit || null : null,
+        returnQty: l.returnOn && l.decision !== "conform" ? num(l.returnQty ?? "") ?? num(l.qtyOrdered) ?? num(l.qtyReceived) : null,
+        returnUnit: l.returnOn && l.decision !== "conform" ? l.returnUnit || l.unit || null : null,
       })),
   };
 }

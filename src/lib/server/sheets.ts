@@ -62,9 +62,15 @@ export async function buildSheetData(receptionIds: number[], locale = "fr") {
     header: [f.colDate, t.common.supplier, t.common.product, f.colTruck, f.colProduct, f.colPackaging, f.colDlc, f.colLabel, f.colDecision, f.colVisa],
     rows: rows.map(({ rec, line, by }) => {
       const why = reason(line.reason);
-      const rq = line.returnQty != null ? `${String(Number(line.returnQty)).replace(".", ",")} ${line.unit ?? ""}`.trim() : "";
-      const base = line.returnKind === "retour" ? f.returned : line.decision === "refuse" ? f.refused : line.decision === "reserve" ? f.reserved : f.accepted;
-      const decision = rq && line.decision !== "conform" ? `${base} ${rq}` : base;
+      // Refus / Retour : quantité et unité de chacun (« Refusé 2 Kg · Retour 1 Pièce »)
+      const q = (n: string | null, u: string | null) => (n != null ? `${String(Number(n)).replace(".", ",")} ${u ?? line.unit ?? ""}`.trim() : "");
+      const legacyRefuse = line.returnKind === "refus" ? line.returnQty : null;
+      const fq = q(line.refuseQty ?? legacyRefuse, line.refuseUnit);
+      const rq = line.returnKind === "refus" ? "" : q(line.returnQty, line.returnUnit);
+      const base = line.decision === "refuse" ? f.refused : line.decision === "reserve" ? f.reserved : f.accepted;
+      const decision = line.decision === "conform" ? base
+        : line.decision === "refuse" ? [fq ? `${f.refused} ${fq}` : f.refused, rq ? `${f.returned} ${rq}` : ""].filter(Boolean).join(" · ")
+        : rq ? `${f.returned} ${rq}` : base;
       return [
         time(rec.deliveredAt),
         rec.supplierName,

@@ -1367,6 +1367,14 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v3
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v39', '1') on conflict (key) do nothing`);
 }
 
+// Refus / Retour indépendants : reprise de l'ancien modèle (un seul bouton), règle Dev mise à jour, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v40'`)).rows.length) {
+  await db.execute(sql`update reception_lines set refuse_qty = return_qty, refuse_unit = unit, return_qty = null, return_kind = null where return_kind = 'refus'`);
+  await db.execute(sql`update reception_lines set return_unit = unit, return_kind = null where return_kind = 'retour'`);
+  await db.execute(sql`update dev_fields set rule = ${"Conformité du produit : Accepté, ou Refus et / ou Retour (boutons indépendants, cumulables). Chacun ouvre Quantité (Q Facturée par défaut) + Unité (celle de la ligne par défaut), + motif et photo. Fiches d'anomalie : une pour le Refus, une « Retour marchandise » pour le Retour ; montant = quantité × prix (si même unité que la ligne). Ancienne fiche : la fiche d'anomalie existante du produit prend la quantité et l'unité. Texte des réserves et fiche FPM : « Refusé 2 Kg · Retour 1 Pièce »."} where field = 'Refus / Retour'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v40', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

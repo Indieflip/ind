@@ -264,44 +264,56 @@ function LineCard({
       )}
 
       <p className="mt-3 mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{t.wizard.productConformity} <span className="text-red-600">*</span></p>
-      {/* Accepté / Refus / Retour : Refus et Retour ouvrent « Produit concerné » et « Quantité » */}
-      <div className="grid grid-cols-3 gap-1.5">
-        {(["conform", "refus", "retour"] as const).map((k) => {
-          const d: Decision = k === "conform" ? "conform" : k === "refus" ? "refuse" : "reserve";
-          const active = k === "conform" ? line.decision === "conform" : k === "retour" ? line.returnKind === "retour" && line.decision === "reserve" : line.decision === "refuse";
-          return (
-            <button
-              key={k}
-              type="button"
-              onClick={() => onChange({
-                decision: d, decisionManual: true,
-                reason: d === "conform" ? "" : line.reason || suggestedReason(line, catalog, truckTemp),
-                returnKind: k === "conform" ? "" : k,
-                returnProduct: k === "conform" ? "" : line.returnProduct || line.productName,
-                returnQty: k === "conform" ? "" : line.returnQty || line.qtyOrdered || line.qtyReceived,
-              })}
-              className={`rounded-lg border px-2 py-2 text-sm font-semibold ${active ? decisionStyles[d].badge + " border-transparent" : "border-stone-200 bg-white text-stone-500"}`}
-            >
-              {k === "conform" ? t.wizard.accepted : k === "refus" ? t.decision.refuse : t.wizard.returnBtn}
-            </button>
-          );
-        })}
-      </div>
-      <p className="mt-1 text-[11px] text-stone-500">{t.wizard.autoDecisionHint}</p>
+      {/* Accepté, ou Refus et / ou Retour (indépendants) : chacun ouvre Quantité + Unité */}
+      {(() => {
+        const refuseOn = line.decision === "refuse";
+        const returnOn = !!line.returnOn && line.decision !== "conform";
+        const units = catalog?.units ?? DEFAULT_UNITS;
+        const set = (refuse: boolean, ret: boolean) => onChange({
+          decision: refuse ? "refuse" : ret ? "reserve" : "conform",
+          decisionManual: true,
+          reason: refuse || ret ? line.reason || suggestedReason(line, catalog, truckTemp) : "",
+          returnOn: ret,
+          ...(refuse && !refuseOn ? { refuseQty: line.refuseQty || line.qtyOrdered || line.qtyReceived, refuseUnit: line.refuseUnit || line.unit } : {}),
+          ...(ret && !returnOn ? { returnQty: line.returnQty || line.qtyOrdered || line.qtyReceived, returnUnit: line.returnUnit || line.unit } : {}),
+        });
+        const btn = (on: boolean, cls: string) => `rounded-lg border px-2 py-2 text-sm font-semibold ${on ? cls + " border-transparent" : "border-stone-200 bg-white text-stone-500"}`;
+        const fields = (kind: "refuse" | "return") => (
+          <div className={`grid grid-cols-2 gap-2 rounded-lg border p-2 ${kind === "refuse" ? "border-red-200 bg-red-50/60" : "border-amber-200 bg-amber-50/60"}`}>
+            <p className="col-span-2 text-xs font-semibold text-stone-700">{kind === "refuse" ? t.decision.refuse : t.wizard.returnBtn}</p>
+            <label>
+              <span className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.returnQty}</span>
+              <input className="input py-2" inputMode="decimal" value={(kind === "refuse" ? line.refuseQty : line.returnQty) ?? ""} placeholder={line.qtyOrdered || line.qtyReceived}
+                onChange={(e) => onChange(kind === "refuse" ? { refuseQty: e.target.value } : { returnQty: e.target.value })} />
+            </label>
+            <div>
+              <span className="mb-0.5 block text-xs font-medium text-stone-600">{t.common.unit}</span>
+              <UnitSelect className="input py-2" value={(kind === "refuse" ? line.refuseUnit : line.returnUnit) || line.unit} units={units}
+                onChange={(u) => onChange(kind === "refuse" ? { refuseUnit: u } : { returnUnit: u })} />
+            </div>
+          </div>
+        );
+        return (
+          <>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button type="button" onClick={() => set(false, false)} className={btn(line.decision === "conform", decisionStyles.conform.badge)}>{t.wizard.accepted}</button>
+              <button type="button" onClick={() => set(!refuseOn, returnOn)} className={btn(refuseOn, decisionStyles.refuse.badge)}>{t.decision.refuse}</button>
+              <button type="button" onClick={() => set(refuseOn, !returnOn)} className={btn(returnOn, decisionStyles.reserve.badge)}>{t.wizard.returnBtn}</button>
+            </div>
+            <p className="mt-1 text-[11px] text-stone-500">{t.wizard.autoDecisionHint}</p>
+            {(refuseOn || returnOn) && (
+              <div className="mt-2 space-y-2">
+                {refuseOn && fields("refuse")}
+                {returnOn && fields("return")}
+                <p className="text-[11px] text-stone-500">{t.wizard.returnHint}</p>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {line.decision && line.decision !== "conform" && (
         <div className="mt-3 space-y-2">
-          <div className="grid grid-cols-3 gap-2">
-            <label className="col-span-2">
-              <span className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.returnProduct}</span>
-              <input className="input py-2" value={line.returnProduct ?? ""} placeholder={line.productName} onChange={(e) => onChange({ returnProduct: e.target.value })} />
-            </label>
-            <label>
-              <span className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.returnQty} ({line.unit})</span>
-              <input className="input py-2" inputMode="decimal" value={line.returnQty ?? ""} placeholder={line.qtyOrdered || line.qtyReceived} onChange={(e) => onChange({ returnQty: e.target.value })} />
-            </label>
-          </div>
-          <p className="text-[11px] text-stone-500">{t.wizard.returnHint}</p>
           <select className="input" value={line.reason} onChange={(e) => onChange({ reason: e.target.value as DraftLine["reason"] })}>
             <option value="">{t.wizard.chooseReason}</option>
             {REASONS.map((r) => (

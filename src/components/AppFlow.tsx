@@ -18,7 +18,7 @@ const PHONE_STEPS: { title: string; items: string[]; gate?: string; auto?: strin
   },
   {
     title: "Contrôle des produits",
-    items: ["Q facturée, Q contrôlée, unité", "T° produit, DLC / DDM, lot, note", "Prix unitaire (obligatoire)", "Acceptée / Refus proposé automatiquement", "Refus / Retour : produit concerné + quantité"],
+    items: ["Q facturée, Q contrôlée, unité", "T° produit, DLC / DDM, lot, note", "Prix unitaire (obligatoire)", "Acceptée / Refus proposé automatiquement", "Refus et / ou Retour : quantité + unité"],
   },
   {
     title: "Validation",

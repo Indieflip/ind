@@ -73,10 +73,13 @@ export interface DraftLine {
   doc?: string;
   /** Note libre sur le produit */
   note?: string;
-  /** Bouton « Refus » / « Retour » : produit concerné et quantité */
-  returnKind?: "refus" | "retour" | "";
-  returnProduct?: string;
+  /** Boutons « Refus » et « Retour » (indépendants) : quantité et unité de chacun */
+  refuseQty?: string;
+  refuseUnit?: string;
+  /** Bouton « Retour » activé */
+  returnOn?: boolean;
   returnQty?: string;
+  returnUnit?: string;
 }
 
 export type DocType = "bl" | "facture" | "autre";
@@ -160,9 +163,10 @@ export interface ReceptionPayload {
     document?: string | null;
     note?: string | null;
     /** Modification : id de la ligne d'origine (pour reporter les changements sur les fiches d'anomalie) */
-    returnKind?: "refus" | "retour" | null;
-    returnProduct?: string | null;
+    refuseQty?: number | null;
+    refuseUnit?: string | null;
     returnQty?: number | null;
+    returnUnit?: string | null;
     ref?: number | null;
   }[];
 }

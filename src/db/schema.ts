@@ -216,10 +216,14 @@ export const receptionLines = pgTable(
     note: text("note"),
     /** Prix unitaire non indiqué sur le bon (case cochée à la saisie, simple information) */
     priceNotShown: boolean("price_not_shown").notNull().default(false),
-    /** Bouton « Refus » ou « Retour » du produit : produit concerné et quantité refusée / retournée */
+    /** Boutons « Refus » et « Retour » du produit (indépendants) : quantité et unité de chacun */
+    refuseQty: numeric("refuse_qty", { precision: 12, scale: 3 }),
+    refuseUnit: text("refuse_unit"),
+    returnQty: numeric("return_qty", { precision: 12, scale: 3 }),
+    returnUnit: text("return_unit"),
+    /** Ancien modèle (un seul bouton Refus / Retour) : repris dans les champs ci-dessus */
     returnKind: text("return_kind"),
     returnProduct: text("return_product"),
-    returnQty: numeric("return_qty", { precision: 12, scale: 3 }),
     position: integer("position").notNull().default(0),
   },
   (t) => [index("lines_reception_idx").on(t.receptionId), index("lines_product_idx").on(t.productId)],

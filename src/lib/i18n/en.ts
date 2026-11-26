@@ -209,7 +209,7 @@ export const en: Dict = {
     returnProblem: "Goods return",
     returnProduct: "Product concerned",
     returnQty: "Quantity",
-    returnHint: "Product and quantity refused / returned (default: the line product and the invoiced quantity).",
+    returnHint: "Quantity and unit refused / returned (default: invoiced quantity and line unit). Refusal and Return can both be chosen; each creates its anomaly sheet.",
     saveNow: "Save the sheet",
     missingPrice: "product(s) without unit price: enter the price or tick “Not shown on the delivery note”.",
     noDriverSignature: "Driver signature: —",

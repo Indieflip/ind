@@ -62,9 +62,11 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     doc: l.document ?? undefined,
     note: l.note ?? "",
     priceNotShown: l.priceNotShown,
-    returnKind: (l.returnKind ?? "") as DraftLine["returnKind"],
-    returnProduct: l.returnProduct ?? "",
+    refuseQty: str(l.refuseQty),
+    refuseUnit: l.refuseUnit ?? "",
+    returnOn: l.returnQty != null,
     returnQty: str(l.returnQty),
+    returnUnit: l.returnUnit ?? "",
     photos: photos.filter((p) => p.lineId === l.id).map((p) => p.url),
   }));
 

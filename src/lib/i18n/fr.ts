@@ -207,7 +207,7 @@ export const fr = {
     returnProblem: "Retour marchandise",
     returnProduct: "Produit concerné",
     returnQty: "Quantité",
-    returnHint: "Produit et quantité refusés / retournés (par défaut : le produit de la ligne et la Q Facturée).",
+    returnHint: "Quantité et unité refusées / retournées (par défaut : la Q Facturée et l'unité de la ligne). Refus et Retour peuvent être choisis ensemble ; chacun crée sa fiche d'anomalie.",
     saveNow: "Enregistrer la fiche",
     missingPrice: "produit(s) sans prix unitaire : saisir le prix ou cocher « Non indiqué sur le bon ».",
     noDriverSignature: "Signature du livreur : —",
