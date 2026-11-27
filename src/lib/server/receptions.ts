@@ -228,24 +228,34 @@ async function writeContent(
 
   // Unités saisies pendant le bon : ajoutées à la liste des unités
   for (const l of p.lines) l.unit = unitName(l.unit) || "Pièce";
-  for (const unit of new Set(p.lines.map((l) => l.unit).filter(Boolean))) {
-    await tx.insert(schema.units).values({ name: unit }).onConflictDoNothing();
-  }
+  const units = [...new Set(p.lines.map((l) => l.unit).filter(Boolean))];
+  if (units.length) await tx.insert(schema.units).values(units.map((name) => ({ name }))).onConflictDoNothing();
+
+  // Rapidité : produits du fournisseur, produits cités et lignes fruits et légumes chargés une seule fois (pas une requête par ligne)
+  const cited = [...new Set(p.lines.map((l) => l.productId).filter((x): x is number => !!x))];
+  const [supplierProducts, citedProducts] = await Promise.all([
+    tx.select().from(schema.products).where(eq(schema.products.supplierId, supplierId)),
+    cited.length ? tx.select().from(schema.products).where(inArray(schema.products.id, cited)) : Promise.resolve([] as (typeof schema.products.$inferSelect)[]),
+  ]);
+  const productById = new Map([...supplierProducts, ...citedProducts].map((x) => [x.id, x]));
+  const fvIds = [...new Set([...productById.values()].map((x) => x.fvItemId).filter((x): x is number => !!x))];
+  const fvById = new Map((fvIds.length ? await tx.select().from(schema.fvItems).where(inArray(schema.fvItems.id, fvIds)) : []).map((f) => [f.id, f]));
 
   let position = 0;
   for (const l of p.lines) {
-    let product = l.productId ? await tx.query.products.findFirst({ where: eq(schema.products.id, l.productId) }) : undefined;
+    let product = l.productId ? productById.get(l.productId) : undefined;
 
     if (!product) {
       // Produit hors liste : on le cherche chez ce fournisseur, sinon on l'ajoute au mercurial
       // (accents, majuscules et ponctuation ignorés pour ne pas créer de doublon)
-      const sameSupplier = await tx.select().from(schema.products).where(eq(schema.products.supplierId, supplierId));
-      product = sameSupplier.find((x) => normalize(x.name) === normalize(l.productName));
+      product = supplierProducts.find((x) => normalize(x.name) === normalize(l.productName));
       if (!product) {
         [product] = await tx
           .insert(schema.products)
           .values({ supplierId, name: l.productName, unit: l.unit || "Kg", categoryId: l.categoryId, nature: natureOfCategory(cats.find((c) => c.id === l.categoryId)?.code), price: l.unitPrice != null ? String(l.unitPrice) : null })
           .returning();
+        supplierProducts.push(product);
+        productById.set(product.id, product);
         if (l.unitPrice != null) {
           await tx.insert(schema.priceChanges).values({
             supplierId, supplierName, productId: product.id, productName: product.name, unit: product.unit,
@@ -256,7 +266,7 @@ async function writeContent(
       }
     }
     const productId = product.id;
-    const fv = product.fvItemId ? await tx.query.fvItems.findFirst({ where: eq(schema.fvItems.id, product.fvItemId) }) : undefined;
+    const fv = product.fvItemId ? fvById.get(product.fvItemId) : undefined;
     const month = parisMonth(date);
     // Tranche de référence : mercurial (min « - » / max « + ») ou fruits et légumes du mois de livraison
     const current: PriceRef = fv

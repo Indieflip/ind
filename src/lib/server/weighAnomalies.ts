@@ -13,11 +13,13 @@ const eur = (n: number) => `${n.toFixed(2).replace(".", ",")} €`;
  * forment une seule anomalie, avec le total en €. Elle suit ensuite le même parcours que les autres anomalies.
  * Reprise du fichier : écarts de fruits et légumes réclamés le 12/10/26 → clôturés ; autre date de réclamation → « Réclamée ».
  */
-export async function syncWeighAnomalies() {
+export async function syncWeighAnomalies(opts: { receptionId?: number } = {}) {
   const db = getDb();
+  // Enregistrement d'une fiche de réception : seuls ses écarts de pesée sont recalculés (rapide)
+  const only = opts.receptionId;
   const [gaps, existing, importedRecs] = await Promise.all([
-    db.select().from(schema.weighGaps),
-    db.select().from(schema.anomalies).where(eq(schema.anomalies.source, "weigh")),
+    only ? db.select().from(schema.weighGaps).where(eq(schema.weighGaps.receptionId, only)) : db.select().from(schema.weighGaps),
+    only ? db.select().from(schema.anomalies).where(and(eq(schema.anomalies.source, "weigh"), eq(schema.anomalies.groupKey, `rec:${only}`))) : db.select().from(schema.anomalies).where(eq(schema.anomalies.source, "weigh")),
     db.select({ id: schema.receptions.id }).from(schema.receptions).where(isNotNull(schema.receptions.importedFrom)),
   ]);
   // Anciennes fiches (générées depuis les anomalies importées) : jamais de nouvelle fiche d'anomalie,
