@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addNoteAction, consolidateImportedAction, unconsolidateImportedAction } from "@/lib/actions/consolidation";
 import { deleteReceptionAction } from "@/lib/actions/receptions";
+import { convertReceptionToReturnSlipAction } from "@/lib/actions/returns";
 import { Icon } from "@/components/Icon";
 import { updateAnomalyAction } from "@/lib/actions/anomalies";
 
@@ -39,6 +40,20 @@ export function UnconsolidateImportedButton({ id, label, confirmText }: { id: nu
   return (
     <button className="btn-secondary" disabled={pending} onClick={async () => await appConfirm(confirmText) && start(async () => { await unconsolidateImportedAction(id); router.refresh(); })}>
       <Icon name="edit" className="h-4 w-4" /> {label}
+    </button>
+  );
+}
+
+/** Fiche saisie par erreur (c'était un bon de reprise) : conversion en bon de reprise, avec confirmation */
+export function ConvertToReturnSlipButton({ id, label, confirmText }: { id: number; label: string; confirmText: string }) {
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  return (
+    <button className="btn-ghost text-amber-700" disabled={pending} onClick={async () => {
+      if (!(await appConfirm(confirmText, { danger: true }))) return;
+      start(async () => { const r = await convertReceptionToReturnSlipAction(id); if (r && "ok" in r) { router.push(`/receptions/reprise/${r.id}`); router.refresh(); } });
+    }}>
+      ↩ {label}
     </button>
   );
 }

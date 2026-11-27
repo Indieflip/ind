@@ -37,6 +37,7 @@ export default async function ReturnSlipPage({ params }: { params: Promise<{ id:
           <h1 className="text-xl font-bold">{slip.supplierName} · {fmtDate(slip.date, locale)}</h1>
         </div>
         <div className="space-y-2 p-4 text-sm">
+          {slip.note && <p className="text-xs text-stone-500">{slip.note}</p>}
           {rec && <p>{R.origin} : <Link href={`/receptions/${rec.id}`} className="font-medium text-brand-700 hover:underline">{fmtNo("reception", recNums.get(rec.id))}{rec.blNumber ? ` · ${rec.blNumber}` : ""} · {fmtDate(rec.deliveredAt, locale)}</Link></p>}
           <table className="table text-sm">
             <thead><tr><th>{t.common.product}</th><th className="text-right">{t.wizard.returnQty}</th><th>{t.wizard.chooseReason}</th><th>{R.anomaly}</th></tr></thead>

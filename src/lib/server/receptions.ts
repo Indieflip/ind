@@ -67,6 +67,12 @@ export const payloadSchema = z.object({
 });
 export type Payload = z.infer<typeof payloadSchema>;
 
+/** « Type d'anomalie » affiché d'un motif (ancien motif de base → libellé du type ; « Quantité non conforme » → « Quantité produit ») */
+function motifLabel(r: string, t: Dict) {
+  const k = reasonToAnomaly[r];
+  return k === "quantity" ? t.anomalies.types.missing : k ? (t.anomalies.types as Record<string, string>)[k] ?? r : r;
+}
+
 /** Type d'anomalie (clé) d'un motif choisi dans la liste des types d'anomalie (libellé) */
 function typeOfLabel(label: string, t: Dict) {
   const hit = Object.entries(t.anomalies.types).find(([, v]) => v.toLowerCase() === label.toLowerCase())?.[0];
@@ -375,7 +381,10 @@ async function writeContent(
     // Texte clair : « manque 50 pièces (facturé 100, contrôlé 50) », « température 8 °C (maximum 4 °C) »…
     const facts = describeLine(l, detected, cat, t);
     // (Refus / Retour saisis : leurs fiches d'anomalie remplacent l'anomalie détectée)
-    if (l.decision === "conform" && l.refuseQty == null && l.returnQty == null && detected.length && !keep.products.has(l.productName.toLowerCase())) {
+    // Boutons Refus / Retour activés (quantité ou unité renseignée, même sans quantité)
+    const refused = l.refuseQty != null || !!l.refuseUnit;
+    const returned = l.returnQty != null || !!l.returnUnit;
+    if (l.decision === "conform" && !refused && !returned && detected.length && !keep.products.has(l.productName.toLowerCase())) {
       const first = detected[0];
       await tx.insert(schema.anomalies).values({
         ...(extraOnly ? { mode: "verification" as const } : {}),
@@ -394,7 +403,7 @@ async function writeContent(
         photoUrl: l.photos[0] ?? null, createdBy: user.id, createdAt: date,
       });
     }
-    if ((l.decision !== "conform" || l.refuseQty != null || l.returnQty != null) && !keep.products.has(l.productName.toLowerCase())) {
+    if ((l.decision !== "conform" || refused || returned) && !keep.products.has(l.productName.toLowerCase())) {
       const reasonLabel = l.reason ? (t.reasons as Record<string, string>)[l.reason] ?? l.reason : "";
       const qtyFacts = describeLine(l, ["qty_less", "qty_more"], cat, t);
       // Montant d'une quantité refusée / retournée : quantité × prix (seulement dans l'unité de la ligne)
@@ -404,32 +413,33 @@ async function writeContent(
         nature: natureOf(l.categoryId), reference: lineRef(l),
         type: (l.reason && (reasonToAnomaly[l.reason] ?? typeOfLabel(l.reason, t))) || (l.qtyReceived != null && l.qtyOrdered != null && l.qtyReceived < l.qtyOrdered ? ("missing" as const) : ("other" as const)),
         // Motif = type d'anomalie de la fiche (ancien motif « Quantité non conforme » → « Quantité produit »)
-        ...(l.reason ? { problemType: reasonToAnomaly[l.reason] === "quantity" ? t.anomalies.types.missing : reasonToAnomaly[l.reason] ? (t.anomalies.types as Record<string, string>)[reasonToAnomaly[l.reason]] ?? l.reason : l.reason } : {}),
+        ...(l.reason ? { problemType: motifLabel(l.reason, t) } : {}),
         photoUrl: l.photos[0] ?? null, createdBy: user.id, createdAt: date,
       };
       // Refus (produit refusé ou quantité refusée) ou réserve : une fiche d'anomalie, avec la quantité refusée
-      if (l.decision !== "conform" || l.refuseQty != null) {
+      if (l.decision !== "conform" || refused) {
         const fq = l.refuseQty ?? (l.decision === "refuse" ? l.qtyOrdered ?? l.qtyReceived : null);
         const fu = l.refuseUnit || l.unit;
         const why = [fq != null ? qtyText(fq, fu) : "", reasonLabel.toLowerCase(), ...(facts.length ? facts : qtyFacts)].filter(Boolean);
         await tx.insert(schema.anomalies).values({
           ...base,
-          description: `${l.refuseQty != null ? t.decision.refuse : t.decision[l.decision]}${why.length ? ` : ${[...new Set(why)].join(" ; ")}` : ""}`,
+          description: `${refused ? t.decision.refuse : t.decision[l.decision]}${why.length ? ` : ${[...new Set(why)].join(" ; ")}` : ""}`,
           claimedAmount: money(fq != null ? valueOf(fq, fu) : gapValue(l)),
           ...(fq != null ? { items: [{ productId, name: l.productName, qty: fq, unit: fu, price: l.unitPrice }] } : {}),
         });
       }
       // Retour : une fiche « Retour marchandise », avec la quantité retournée
-      if (l.returnQty != null) {
+      if (returned) {
+        const rqty = l.returnQty;
         const ru = l.returnUnit || l.unit;
-        const why = [qtyText(l.returnQty, ru), l.decision !== "conform" || l.refuseQty != null ? "" : reasonLabel.toLowerCase()].filter(Boolean);
+        const why = [rqty != null ? qtyText(rqty, ru) : "", l.decision !== "conform" || refused ? "" : reasonLabel.toLowerCase()].filter(Boolean);
         await tx.insert(schema.anomalies).values({
           ...base,
-          ...(l.decision !== "conform" || l.refuseQty != null ? { type: "other" as const } : {}),
+          ...(l.decision !== "conform" || refused ? { type: "other" as const } : {}),
           problemType: t.wizard.returnProblem,
           description: `${t.wizard.returnBtn} : ${why.join(" ; ")}`,
-          claimedAmount: money(valueOf(l.returnQty, ru)),
-          items: [{ productId, name: l.productName, qty: l.returnQty, unit: ru, price: l.unitPrice }],
+          claimedAmount: money(rqty != null ? valueOf(rqty, ru) : null),
+          items: [{ productId, name: l.productName, qty: rqty ?? null, unit: ru, price: l.unitPrice }],
         });
       }
     }
@@ -587,9 +597,11 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
     // Lignes d'origine de chaque produit de la fiche, repérées avant la réécriture
     const norm = (x: string | null | undefined) => (x ?? "").trim().replace(/\s+/g, " ").toLowerCase();
     // (fiches d'anomalie jamais verrouillées : consolidées comprises)
-    const linked = rec.importedFrom ? anomalies.filter((a) => a.source === "file" || a.source === "weigh") : [];
+    // Toutes les fiches de réception : une fiche d'anomalie gardée (déjà suivie, ou ancienne fiche) suit la modification de son produit
+    // (nom, quantité, unité, prix, montant, motif) ; les fiches sans produit (BL manquant, hygiène, T° camion) et de prix ne sont pas concernées
+    const linked = anomalies.filter((a) => (rec.importedFrom || touched(a)) && !["missing_bl", "hygiene", "price", "locked_price"].includes(a.type) && !(a.type === "temperature" && !a.productName));
     // (fiche enregistrée sans produit : seuls fournisseur, référence et date suivent)
-    const fileLinks = linked.filter((a) => a.source === "file" && !(Array.isArray(a.items) && a.items.length === 0)).map((a) => {
+    const fileLinks = linked.filter((a) => a.source !== "weigh" && !(Array.isArray(a.items) && a.items.length === 0)).map((a) => {
       const items = a.items?.length ? a.items : [{ productId: a.productId, name: a.productName ?? "", qty: null, unit: "", price: null }];
       return { a, items, lineIds: items.map((it, k) => (k === 0 && !a.items?.length && a.lineId) || oldLines.find((o) => norm(o.productName) === norm(it.name))?.id || null) };
     });
@@ -640,6 +652,7 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
       for (const { a, items, lineIds } of fileLinks) {
         const next: NonNullable<typeof a.items> = [];
         let lineId: number | null = null;
+        let firstPl: Payload["lines"][number] | null = null;
         items.forEach((it, k) => {
           const old = lineIds[k];
           if (old == null) return void next.push(it);
@@ -652,7 +665,13 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
           const ru = pl.refuseQty != null ? pl.refuseUnit : pl.returnUnit;
           next.push({ productId: nl.productId ?? it.productId, name: pl.productName, qty: rq ?? (gap || it.qty), unit: (rq != null && ru) || pl.unit || it.unit, price: pl.unitPrice ?? it.price });
           lineId ??= nl.id;
+          firstPl ??= pl;
         });
+        // Motif changé sur la fiche de réception → type d'anomalie de la fiche (sauf « Retour marchandise »)
+        const motif = (firstPl as Payload["lines"][number] | null)?.reason;
+        const motifSet = motif && a.problemType !== t.wizard.returnProblem
+          ? { problemType: motifLabel(motif, t), type: reasonToAnomaly[motif] ?? typeOfLabel(motif, t) ?? a.type }
+          : {};
         // Montant réclamé = somme des produits (quantité × prix) quand tout est connu ; sinon le montant saisi est gardé
         const amount = next.length && next.every((x) => x.qty != null && x.price != null) ? Math.round(next.reduce((s, x) => s + x.qty! * x.price!, 0) * 100) / 100 : null;
         await tx.update(schema.anomalies).set({
@@ -662,10 +681,11 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
           productId: next[0]?.productId ?? a.productId,
           claimedAmount: amount != null ? String(amount) : a.claimedAmount,
           lineId,
+          ...motifSet,
         }).where(eq(schema.anomalies.id, a.id));
       }
       // Fiches enregistrées sans produit : fournisseur, référence et date seulement
-      for (const a of linked.filter((x) => x.source === "file" && Array.isArray(x.items) && x.items.length === 0)) {
+      for (const a of linked.filter((x) => x.source !== "weigh" && Array.isArray(x.items) && x.items.length === 0)) {
         await tx.update(schema.anomalies).set(common(a)).where(eq(schema.anomalies.id, a.id));
       }
       // Écarts de pesée : détail des produits recalculé depuis les pesées de la fiche (syncWeighAnomalies, juste après)

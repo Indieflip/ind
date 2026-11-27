@@ -1530,6 +1530,14 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'waiting_avoir
   await db.execute(sql`insert into app_settings (key, value) values ('waiting_avoir_claimed_v1', '1') on conflict (key) do nothing`);
 }
 
+// Dev : fiche de réception ↔ fiche d'anomalie toujours reliées ; conversion en bon de reprise, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v57'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Modification', 'Lien avec les fiches d''anomalie', false, ${"Toute fiche de réception modifiée : chaque fiche d'anomalie gardée (déjà suivie, ou ancienne fiche) suit son produit — nom, compte produit, quantité (Refus / Retour, sinon écart facturé / contrôlé), unité, prix, montant et motif (= type d'anomalie, sauf « Retour marchandise »). Fiches non suivies : recalculées. Écarts de pesée : recalculés. Non concernées : BL manquant, hygiène, T° camion, prix."}, '', ${pos})`);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Bon de reprise / retour', 'Convertir une fiche de réception', false, ${"Bouton « Convertir en bon de reprise » (fiche non consolidée, avec confirmation) : bon BR créé avec les produits et quantités (Retour / Refus en priorité), fiches d'anomalie gardées et rattachées au bon (note datée), puis la fiche de réception est supprimée."}, '', ${pos + 1})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v57', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

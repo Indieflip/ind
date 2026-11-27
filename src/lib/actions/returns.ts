@@ -76,3 +76,54 @@ export async function createReturnSlipAction(input: Input) {
     return { ok: true as const, id: slip.id, no };
   });
 }
+
+/**
+ * Fiche de réception saisie par erreur (c'était un bon de reprise) : convertie en bon de reprise BR.
+ * Produits et quantités repris des lignes (Retour / Refus saisis en priorité), fiches d'anomalie gardées et rattachées au bon ;
+ * la fiche de réception est supprimée (non consolidée seulement).
+ */
+export async function convertReceptionToReturnSlipAction(receptionId: number) {
+  const user = await assertUser(can.editReception);
+  const t = dictFor(user.locale);
+  const db = getDb();
+  const res = await db.transaction(async (tx) => {
+    const rec = await tx.query.receptions.findFirst({ where: eq(schema.receptions.id, receptionId) });
+    if (!rec) return { error: "not_found" as const };
+    if (rec.consolidatedAt) return { error: "consolidated" as const };
+    const lines = await tx.select().from(schema.receptionLines).where(eq(schema.receptionLines.receptionId, rec.id));
+    const anomalies = await tx.select().from(schema.anomalies).where(eq(schema.anomalies.receptionId, rec.id));
+    const day = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(rec.deliveredAt);
+    await tx.execute(sql`lock table return_slips in share row exclusive mode`);
+    const year = Number(day.slice(0, 4));
+    const [{ next }] = (await tx.execute<{ next: number }>(sql`select coalesce(max(seq), 0)::int + 1 as next from return_slips where year = ${year}`)).rows;
+    const no = fmtNo("returnSlip", Number(next));
+    const norm = (x: string | null | undefined) => (x ?? "").trim().toLowerCase();
+    const items: (typeof schema.returnSlips.$inferInsert)["items"] = lines.map((l) => {
+      const qty = num(l.returnQty) ?? num(l.refuseQty) ?? num(l.qtyReceived) ?? num(l.qtyOrdered) ?? 0;
+      const unit = (num(l.returnQty) != null ? l.returnUnit : num(l.refuseQty) != null ? l.refuseUnit : null) || l.unit || "Pièce";
+      const a = anomalies.find((x) => x.lineId === l.id || norm(x.productName) === norm(l.productName) || (x.items ?? []).some((i) => norm(i.name) === norm(l.productName)));
+      return { lineId: null, productId: l.productId, name: l.productName, qty, unit, reason: l.reason ? (t.reasons as Record<string, string>)[l.reason] ?? l.reason : null, anomalyId: a?.id ?? null };
+    });
+    const [slip] = await tx.insert(schema.returnSlips).values({
+      year, seq: Number(next), date: day, receptionId: null, supplierId: rec.supplierId, supplierName: rec.supplierName, items,
+      note: `${t.returnSlip.convertedNote} ${rec.blNumber ?? ""}`.trim(), createdBy: user.id,
+    }).returning({ id: schema.returnSlips.id });
+    // Fiches d'anomalie gardées : note datée ; écart de pesée figé (plus recalculé depuis une fiche qui n'existe plus)
+    const ddmmyy = `${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice(2, 4)}`;
+    for (const a of anomalies) {
+      await tx.update(schema.anomalies).set({
+        followUp: [a.followUp, `${ddmmyy} : ${t.returnSlip.convertedFollow} ${no}`].filter(Boolean).join("\n"),
+        ...(a.source === "weigh" ? { groupKey: null } : {}),
+      }).where(eq(schema.anomalies.id, a.id));
+    }
+    // Anomalies gardées : détachées des lignes supprimées (sinon la suppression est refusée)
+    await tx.update(schema.anomalies).set({ lineId: null }).where(eq(schema.anomalies.receptionId, rec.id));
+    await tx.delete(schema.weighGaps).where(eq(schema.weighGaps.receptionId, rec.id));
+    await tx.update(schema.priceChanges).set({ receptionId: null }).where(eq(schema.priceChanges.receptionId, rec.id));
+    await tx.delete(schema.receptions).where(eq(schema.receptions.id, rec.id));
+    return { ok: true as const, id: slip.id, no };
+  });
+  revalidatePath("/receptions", "layout");
+  revalidatePath("/anomalies", "layout");
+  return res;
+}

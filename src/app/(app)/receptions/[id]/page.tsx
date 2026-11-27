@@ -14,7 +14,7 @@ import { Icon } from "@/components/Icon";
 import { receptionNumbers } from "@/lib/server/queries";
 import { anomalyNumbers } from "@/lib/server/savings";
 import { outcomeOf, outcomeStyles } from "@/lib/anomaly";
-import { AnomalyActionField, PrintButton, DeleteReceptionButton, AddNote, ConsolidateImportedButton, UnconsolidateImportedButton } from "./Actions";
+import { AnomalyActionField, PrintButton, DeleteReceptionButton, AddNote, ConsolidateImportedButton, UnconsolidateImportedButton, ConvertToReturnSlipButton } from "./Actions";
 
 const isPdf = (url: string) => /\.pdf($|\?)/i.test(url) || url.startsWith("data:application/pdf");
 
@@ -76,6 +76,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
           {locked && rec.importedFrom && can.consolidate(user.role) && <UnconsolidateImportedButton id={rec.id} label={t.receptions.unconsolidateImported} confirmText={t.receptions.unconsolidateImportedConfirm} />}
           {can.receive(user.role) && <Link href={`/receptions/reprise/new?reception=${rec.id}`} className="btn-secondary">↩ {t.returnSlip.button}</Link>}
           <PrintButton label={t.common.print} />
+          {!locked && can.editReception(user.role) && <ConvertToReturnSlipButton id={rec.id} label={t.returnSlip.convert} confirmText={t.returnSlip.convertConfirm} />}
           {!locked && can.deleteDraftReception(user.role) && <DeleteReceptionButton id={rec.id} label={t.common.delete} confirmText={t.receptions.deleteConfirm} />}
         </div>
       </div>
@@ -196,7 +197,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
                 )}
               </dl>
               {l.reason && <p className="mt-1 text-xs text-stone-600">{(t.reasons as Record<string, string>)[l.reason] ?? l.reason}</p>}
-              {(l.refuseQty != null || l.returnQty != null || l.returnKind) && <p className="mt-1 text-xs font-medium text-red-700">{[l.refuseQty != null ? `${t.decision.refuse} : ${fmtNum(num(l.refuseQty))} ${l.refuseUnit ?? l.unit ?? ""}` : l.returnKind === "refus" && l.returnQty != null ? `${t.decision.refuse} : ${fmtNum(num(l.returnQty))} ${l.unit ?? ""}` : "", l.returnQty != null && l.returnKind !== "refus" ? `${t.wizard.returnBtn} : ${fmtNum(num(l.returnQty))} ${l.returnUnit ?? l.unit ?? ""}` : ""].filter(Boolean).join(" · ")}</p>}
+              {(l.refuseQty != null || l.returnQty != null || l.returnKind || l.refuseUnit || l.returnUnit) && <p className="mt-1 text-xs font-medium text-red-700">{[l.refuseQty != null ? `${t.decision.refuse} : ${fmtNum(num(l.refuseQty))} ${l.refuseUnit ?? l.unit ?? ""}` : l.returnKind === "refus" && l.returnQty != null ? `${t.decision.refuse} : ${fmtNum(num(l.returnQty))} ${l.unit ?? ""}` : l.refuseUnit ? t.decision.refuse : "", l.returnQty != null && l.returnKind !== "refus" ? `${t.wizard.returnBtn} : ${fmtNum(num(l.returnQty))} ${l.returnUnit ?? l.unit ?? ""}` : l.returnUnit ? t.wizard.returnBtn : ""].filter(Boolean).join(" · ")}</p>}
               {l.note && <p className="mt-1 text-xs italic text-stone-600">{t.wizard.note} : {l.note}</p>}
               <div className="mt-1 flex gap-2">
                 {photos.filter((p) => p.lineId === l.id).map((p) => (
@@ -248,7 +249,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
                   <td>
                     <span className={`badge ${decisionStyles[l.decision].badge}`}>{t.decision[l.decision]}</span>
                     {l.reason && <div className="mt-1 text-xs text-stone-600">{(t.reasons as Record<string, string>)[l.reason] ?? l.reason}</div>}
-                    {(l.refuseQty != null || l.returnQty != null || l.returnKind) && <div className="mt-1 text-xs font-medium text-red-700">{[l.refuseQty != null ? `${t.decision.refuse} : ${fmtNum(num(l.refuseQty))} ${l.refuseUnit ?? l.unit ?? ""}` : l.returnKind === "refus" && l.returnQty != null ? `${t.decision.refuse} : ${fmtNum(num(l.returnQty))} ${l.unit ?? ""}` : "", l.returnQty != null && l.returnKind !== "refus" ? `${t.wizard.returnBtn} : ${fmtNum(num(l.returnQty))} ${l.returnUnit ?? l.unit ?? ""}` : ""].filter(Boolean).join(" · ")}</div>}
+                    {(l.refuseQty != null || l.returnQty != null || l.returnKind || l.refuseUnit || l.returnUnit) && <div className="mt-1 text-xs font-medium text-red-700">{[l.refuseQty != null ? `${t.decision.refuse} : ${fmtNum(num(l.refuseQty))} ${l.refuseUnit ?? l.unit ?? ""}` : l.returnKind === "refus" && l.returnQty != null ? `${t.decision.refuse} : ${fmtNum(num(l.returnQty))} ${l.unit ?? ""}` : l.refuseUnit ? t.decision.refuse : "", l.returnQty != null && l.returnKind !== "refus" ? `${t.wizard.returnBtn} : ${fmtNum(num(l.returnQty))} ${l.returnUnit ?? l.unit ?? ""}` : l.returnUnit ? t.wizard.returnBtn : ""].filter(Boolean).join(" · ")}</div>}
                     {l.note && <div className="mt-1 text-xs italic text-stone-600">{t.wizard.note} : {l.note}</div>}
                     {linePhotos.map((p) => (
                       <a key={p.id} href={p.url} target="_blank" className="mt-1 block"><img src={p.url} alt="" className="h-14 w-14 rounded object-cover" /></a>

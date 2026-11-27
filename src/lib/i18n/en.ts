@@ -877,6 +877,10 @@ export const en: Dict = {
     open: "Open the sheet",
   },
   returnSlip: {
+    convertedNote: "Reception sheet converted into a return slip",
+    convertedFollow: "reception sheet converted into return slip",
+    convert: "Convert into a return slip",
+    convertConfirm: "Convert this reception sheet into a return slip?\n\nA return slip is created with its products and quantities, its anomaly sheets are kept and linked to the slip, then the reception sheet is deleted. This cannot be undone.",
     button: "Return slip",
     title: "Return slip",
     noteOn: "Return slip",

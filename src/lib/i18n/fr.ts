@@ -879,6 +879,10 @@ export const fr = {
     open: "Ouvrir la fiche",
   },
   returnSlip: {
+    convertedNote: "Fiche de réception convertie en bon de reprise",
+    convertedFollow: "fiche de réception convertie en bon de reprise",
+    convert: "Convertir en bon de reprise",
+    convertConfirm: "Convertir cette fiche de réception en bon de reprise ?\n\nUn bon BR est créé avec ses produits et quantités (Retour / Refus saisis en priorité), ses fiches d'anomalie sont gardées et rattachées au bon, puis la fiche de réception est supprimée. Action définitive.",
     button: "Bon de reprise / retour",
     title: "Bon de reprise / retour",
     noteOn: "Bon de reprise",
