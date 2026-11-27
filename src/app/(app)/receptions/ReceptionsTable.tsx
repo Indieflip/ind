@@ -30,6 +30,8 @@ export interface ReceptionRow {
   author: string | null;
   /** Brouillon (réception pas encore enregistrée) : id négatif, lien pour la reprendre */
   draftId?: number;
+  /** Bon de reprise / retour (N° BR) */
+  slipId?: number;
 }
 
 export function ReceptionsTable({ rows, canDelete, canEdit = false }: { rows: ReceptionRow[]; canDelete: boolean; canEdit?: boolean }) {
@@ -43,10 +45,10 @@ export function ReceptionsTable({ rows, canDelete, canEdit = false }: { rows: Re
   const pick = (v: "all" | "unlinked") => { setTab(v); setSel(new Set()); try { sessionStorage.setItem("receptions-tab", v); } catch { /* préférence non gardée */ } };
   const unlinkedRows = rows.filter((r) => r.imported && !r.draftId && (r.unlinkedCount ?? 0) > 0);
   const shownRows = tab === "unlinked" ? unlinkedRows : rows;
-  const stateLabel = (r: ReceptionRow) => (r.draftId ? "—" : r.consolidated ? t.receptions.consolidated : r.imported ? t.receptions.importedState : t.receptions.toConsolidate);
-  const href = (r: ReceptionRow) => (r.draftId ? `/receptions/new?draft=${r.draftId}` : `/receptions/${r.id}`);
+  const stateLabel = (r: ReceptionRow) => (r.draftId || r.slipId ? "—" : r.consolidated ? t.receptions.consolidated : r.imported ? t.receptions.importedState : t.receptions.toConsolidate);
+  const href = (r: ReceptionRow) => (r.draftId ? `/receptions/new?draft=${r.draftId}` : r.slipId ? `/receptions/reprise/${r.slipId}` : `/receptions/${r.id}`);
   const cols: Col<ReceptionRow>[] = [
-    { key: "number", label: t.receptions.numberLong, width: "5rem", text: (r) => (r.draftId ? "" : fmtNo("reception", r.number)), sort: (r) => r.number, href, render: (r) => (r.draftId ? "—" : fmtNo("reception", r.number)) },
+    { key: "number", label: t.receptions.numberLong, width: "5rem", text: (r) => (r.draftId ? "" : fmtNo(r.slipId ? "returnSlip" : "reception", r.number)), sort: (r) => r.number, href, render: (r) => (r.draftId ? "—" : fmtNo(r.slipId ? "returnSlip" : "reception", r.number)) },
     { key: "date", label: t.common.date, text: (r) => r.date, sort: (r) => r.dateSort, date: (r) => r.day, className: "whitespace-nowrap" },
     { key: "supplier", label: t.common.supplier, text: (r) => r.supplierName },
     { key: "bl", label: t.receptions.blInvoice, text: (r) => r.blNumber ?? "", render: (r) => r.blNumber || (r.draftId ? "—" : t.receptions.noBl) },
@@ -57,10 +59,10 @@ export function ReceptionsTable({ rows, canDelete, canEdit = false }: { rows: Re
     { key: "unlinked", label: t.receptions.unlinkedCol, align: "center", options: [t.common.yes, t.common.no],
       text: (r) => (r.draftId ? "" : r.unlinkedCount ? t.common.yes : t.common.no), sort: (r) => r.unlinkedCount ?? 0,
       render: (r) => (r.draftId ? null : r.unlinkedCount ? <span className="badge bg-amber-100 font-semibold text-amber-900" title={t.receptions.unlinkedHint}>{r.unlinkedCount}/{r.lineCount}</span> : <span className="text-stone-400">—</span>) },
-    { key: "status", label: t.common.status, text: (r) => r.statusLabel, options: Object.values(t.receptionStatus), render: (r) => <StatusBadge status={r.status} label={r.statusLabel} /> },
+    { key: "status", label: t.common.status, text: (r) => r.statusLabel, options: [...Object.values(t.receptionStatus), t.returnSlip.badge], render: (r) => (r.slipId ? <span className="badge bg-amber-100 font-semibold text-amber-900">↩ {r.statusLabel}</span> : <StatusBadge status={r.status} label={r.statusLabel} />) },
     {
       key: "state", label: t.nav.consolidation, text: stateLabel, options: [t.receptions.consolidated, t.receptions.toConsolidate, t.receptions.importedState],
-      render: (r) => r.draftId
+      render: (r) => r.draftId || r.slipId
         ? <span className="text-xs text-stone-400">—</span>
         : r.consolidated
         ? <span className="badge bg-emerald-50 text-emerald-800"><Icon name="check" className="mr-0.5 h-3 w-3" />{t.receptions.consolidated}</span>
@@ -74,13 +76,13 @@ export function ReceptionsTable({ rows, canDelete, canEdit = false }: { rows: Re
       key: "edit", label: "", sortable: false, filterable: false, width: "3rem", text: () => "",
       render: (r: ReceptionRow) => (r.draftId
         ? <Link href={`/receptions/new?draft=${r.draftId}`} className="btn-ghost p-1.5 text-brand-700" title={t.receptions.resumeDraft} aria-label={t.receptions.resumeDraft}><Icon name="edit" className="h-4 w-4" /></Link>
-        : !r.consolidated
+        : !r.consolidated && !r.slipId
         ? <Link href={`/receptions/${r.id}/edit`} className="btn-ghost p-1.5 text-brand-700" title={t.receptions.edit} aria-label={t.receptions.edit}><Icon name="edit" className="h-4 w-4" /></Link>
         : null),
     } as Col<ReceptionRow>] : []),
   ];
   const selectedRows = rows.filter((r) => sel.has(r.id));
-  const deletable = selectedRows.filter((r) => !r.consolidated);
+  const deletable = selectedRows.filter((r) => !r.consolidated && !r.slipId);
   const drafts = deletable.filter((r) => r.draftId);
 
   return (

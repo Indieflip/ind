@@ -65,6 +65,8 @@ export function DraftBanner() {
         >
           <Icon name="plus" /> {t.receptions.new}
         </button>
+        {/* Bon de reprise / retour : même bouton, en orange */}
+        <Link href="/receptions/reprise/new" className="btn-primary btn-lg !bg-amber-500 hover:!bg-amber-600">↩ {t.returnSlip.button}</Link>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ export const NUM_FORMAT = {
   sheet: { prefix: "FPM", digits: 3, yearly: true },
   anomaly: { prefix: "ANO", digits: 3, yearly: true },
   claim: { prefix: "R", digits: 4, yearly: true },
+  returnSlip: { prefix: "BR", digits: 3, yearly: true },
   supplier: { prefix: "FR", digits: 4, yearly: false },
   product: { prefix: "PR", digits: 4, yearly: false },
 } as const;

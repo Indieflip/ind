@@ -18,13 +18,15 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
   const { t, locale } = await getDict();
   const sp = await searchParams;
   const f = receptionFilters(sp);
-  const [raw, drafts, sheets] = await Promise.all([
+  const [raw, drafts, slips, sheets] = await Promise.all([
     listReceptions(f),
     getDb()
       .select({ id: schema.receptionDrafts.id, supplierName: schema.receptionDrafts.supplierName, blNumber: schema.receptionDrafts.blNumber, updatedAt: schema.receptionDrafts.updatedAt, by: schema.users.name })
       .from(schema.receptionDrafts)
       .leftJoin(schema.users, eq(schema.users.id, schema.receptionDrafts.createdBy))
       .orderBy(desc(schema.receptionDrafts.updatedAt)),
+    // Bons de reprise / retour : dans la même liste, avec leur badge
+    getDb().select().from(schema.returnSlips).orderBy(desc(schema.returnSlips.date)),
     throttled("due-exports", 5 * 60_000, runDueExports).then(async () => { const [[c], last] = await Promise.all([getDb().select({ n: count() }).from(schema.receptionExports), lastAutoExport()]); return { n: c.n, last }; }),
   ]);
   return (
@@ -67,6 +69,16 @@ export default async function ReceptionsPage({ searchParams }: { searchParams: P
                 supplierName: d.supplierName || "—", lineCount: 0, status: "draft", statusLabel: t.receptions.draftStatus, consolidated: false, author: d.by,
               }))
             : [],
+        ).concat(
+          // Bons de reprise / retour
+          slips.map((b): ReceptionRow => {
+            const origin = raw.find((x) => x.id === b.receptionId);
+            return {
+              id: -(1_000_000 + b.id), slipId: b.id, number: b.seq, blNumber: `${t.returnSlip.badge}${origin ? ` · RCP${String(origin.number).padStart(3, "0")}${origin.blNumber ? ` · ${origin.blNumber}` : ""}` : ""}`,
+              date: fmtDateTime(new Date(`${b.date}T12:00:00`), locale).split(" ")[0], dateSort: `${b.date}T12:00:00.000Z`, day: b.date,
+              supplierName: b.supplierName, lineCount: b.items.length, status: "return", statusLabel: t.returnSlip.badge, consolidated: false, author: null,
+            };
+          }),
         )}
       />
 

@@ -1507,6 +1507,14 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v5
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v54', '1') on conflict (key) do nothing`);
 }
 
+// Dev : bon de reprise / retour, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v55'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Bon de reprise / retour', 'Saisie', false, ${"Bouton « ↩ Bon de reprise / retour » (liste des réceptions, accueil, fiche de réception) : 1. choisir la livraison d'origine (6 derniers mois, recherche fournisseur / BL), 2. cocher les produits repris + quantité, unité, motif (types d'anomalie), date du retour. N° BR par année. Pas de preuve (photo / signature)."}, 'Au moins un produit coché avec une quantité', ${pos})`);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', 'Bon de reprise / retour', 'Effet sur les anomalies', false, ${"Chaque produit repris : sa fiche d'anomalie sur la livraison est mise à jour (En attente, « En attente de : Avoir / Régul » ajouté, note datée « Bon de reprise BRxxx : qté ») ; sans fiche, une fiche « Retour marchandise » est créée (montant = qté × prix si même unité). Bon visible dans la liste des réceptions (badge) et sur la fiche de réception d'origine."}, '', ${pos + 1})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v55', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

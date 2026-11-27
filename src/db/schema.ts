@@ -464,6 +464,21 @@ export const protocols = pgTable("protocols", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Bons de reprise / retour : produits repris par le fournisseur, rattachés à la livraison d'origine (N° BR, par année) */
+export const returnSlips = pgTable("return_slips", {
+  id: serial("id").primaryKey(),
+  year: integer("year").notNull(),
+  seq: integer("seq").notNull(),
+  date: date("date").notNull(),
+  receptionId: integer("reception_id").references(() => receptions.id, { onDelete: "set null" }),
+  supplierId: integer("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
+  supplierName: text("supplier_name").notNull(),
+  items: jsonb("items").$type<{ lineId: number | null; productId: number | null; name: string; qty: number; unit: string; reason: string | null; anomalyId: number | null }[]>().notNull(),
+  note: text("note"),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /** Brouillons de bons (enregistrés dès l'étape 1, repris plus tard depuis n'importe quel appareil) */
 export const receptionDrafts = pgTable("reception_drafts", {
   id: serial("id").primaryKey(),

@@ -42,6 +42,8 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
   const multiDoc = new Set(lines.map((l) => l.document).filter(Boolean)).size > 1;
   const consolidator = rec.consolidatedBy ? await db.query.users.findFirst({ where: eq(schema.users.id, rec.consolidatedBy), columns: { name: true } }) : undefined;
   const locked = !!rec.consolidatedAt;
+  // Bons de reprise / retour rattachés à cette livraison
+  const slips = await db.select().from(schema.returnSlips).where(eq(schema.returnSlips.receptionId, rec.id)).orderBy(asc(schema.returnSlips.date));
   const editor = rec.updatedBy ? await db.query.users.findFirst({ where: eq(schema.users.id, rec.updatedBy), columns: { name: true } }) : undefined;
   // Montant HT accepté : quantité reçue × prix, hors produits refusés
   const total = lines.reduce((sum, l) => (l.decision === "refuse" ? sum : sum + (num(l.qtyReceived) ?? 0) * (num(l.unitPrice) ?? 0)), 0);
@@ -72,6 +74,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
           )}
           {!locked && rec.importedFrom && can.consolidate(user.role) && <ConsolidateImportedButton id={rec.id} label={t.receptions.consolidateImported} confirmText={t.receptions.consolidateImportedConfirm} />}
           {locked && rec.importedFrom && can.consolidate(user.role) && <UnconsolidateImportedButton id={rec.id} label={t.receptions.unconsolidateImported} confirmText={t.receptions.unconsolidateImportedConfirm} />}
+          {can.receive(user.role) && <Link href={`/receptions/reprise/new?reception=${rec.id}`} className="btn-secondary">↩ {t.returnSlip.button}</Link>}
           <PrintButton label={t.common.print} />
           {!locked && can.deleteDraftReception(user.role) && <DeleteReceptionButton id={rec.id} label={t.common.delete} confirmText={t.receptions.deleteConfirm} />}
         </div>
@@ -258,6 +261,18 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
         </table>
       </section>
 
+      {slips.length > 0 && (
+        <section className="card overflow-hidden border-l-4 border-l-amber-400">
+          <h2 className="px-4 pt-3 font-semibold">↩ {t.returnSlip.slipsTitle}</h2>
+          <ul className="divide-y divide-stone-100 px-4 pb-3 text-sm">
+            {slips.map((b) => (
+              <li key={b.id} className="py-2">
+                <Link href={`/receptions/reprise/${b.id}`} className="font-semibold text-brand-700 hover:underline">{fmtNo("returnSlip", b.seq)}</Link> · {fmtDate(b.date, locale)} · {b.items.map((i) => `${i.name} ${String(i.qty).replace(".", ",")} ${i.unit}`).join(" · ")}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {(recAnomalies.length > 0 || recGaps.length > 0) && (
         <section className="card overflow-hidden border-l-4 border-l-red-400">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 px-5 py-3">
