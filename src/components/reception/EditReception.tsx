@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/client";
+import { num } from "@/lib/format";
 import type { Catalog, Draft, DraftLine } from "@/lib/reception-types";
 import { fetchCatalog, loadCatalogCache, sendReception } from "@/lib/client/offline";
 import { Icon } from "../Icon";
@@ -61,6 +62,8 @@ export function EditReception({ id, initialDraft, number }: { id: number; initia
     // Fiche importée (générée depuis les anomalies importées) : aucun champ obligatoire ; sans décision = Conforme
     if (draft.kind === "reprise") {
       // Bon de reprise : motif du retour obligatoire
+      const noQty = draft.lines.filter((l) => l.productName.trim() && !((num(l.qtyReceived) ?? num(l.qtyOrdered) ?? 0) > 0));
+      if (noQty.length) { goLine(noQty[0].key); return setError(`${noQty.length} ${t.wizard.qtyRequired}`); }
       const noReason = draft.lines.filter((l) => l.productName.trim() && !l.reason);
       if (noReason.length) { goLine(noReason[0].key); return setError(`${noReason.length} ${t.wizard.reasonRequired}`); }
     }

@@ -697,7 +697,11 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
     }
     // Anomalies importées (fichier de suivi, écarts de pesée) : jamais supprimées par une modification du bon
     const drop = [...dropBl, ...(rec.importedFrom ? [] : anomalies.filter((a) => a.type !== "missing_bl" && !touched(a) && a.source !== "file" && a.source !== "weigh").map((a) => a.id))];
-    if (drop.length) await tx.delete(schema.anomalies).where(inArray(schema.anomalies.id, drop));
+    // Fiches non suivies : recalculées, mais en gardant la même fiche (même N° ANO) — détachées des lignes réécrites,
+    // mises à jour avec le nouveau calcul juste après, supprimées seulement si le problème a disparu
+    if (dropBl.length) await tx.delete(schema.anomalies).where(inArray(schema.anomalies.id, dropBl));
+    const recalc = anomalies.filter((a) => drop.includes(a.id) && !dropBl.includes(a.id));
+    if (recalc.length) await tx.update(schema.anomalies).set({ lineId: null }).where(inArray(schema.anomalies.id, recalc.map((a) => a.id)));
 
     // Fiche importée (générée depuis les anomalies importées) : ses fiches d'anomalie suivent la modification.
     // Lignes d'origine de chaque produit de la fiche, repérées avant la réécriture
@@ -740,6 +744,29 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
     const seqNow = rec.seq ?? (await receptionNumbers()).get(id) ?? null;
     await writeContent(tx, id, supplier, p, user, t, keep, claims, unchanged, !!rec.importedFrom,
       rec.kind === "reprise" ? { no: recNo("reprise", seqNow), originIds: p.noReturnDoc ? [] : [p.originReceptionId, ...(p.originExtraIds ?? [])].filter((x): x is number => !!x) } : null);
+
+    if (recalc.length) {
+      const written = await tx.select({ id: schema.receptionLines.id }).from(schema.receptionLines).where(eq(schema.receptionLines.receptionId, id)).orderBy(asc(schema.receptionLines.position));
+      const refOf = new Map(written.map((l, i) => [l.id, p.lines[i]?.ref ?? null]));
+      const nk = (x: string | null | undefined) => (x ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+      const before = new Set(anomalies.map((a) => a.id));
+      const fresh = (await tx.select().from(schema.anomalies).where(eq(schema.anomalies.receptionId, id)).orderBy(asc(schema.anomalies.id))).filter((a) => !before.has(a.id) && a.type !== "missing_bl");
+      const used = new Set<number>();
+      for (const old of recalc) {
+        // Même ligne de la fiche (avant / après modification), sinon même produit, sinon même type sans produit
+        const n = fresh.find((x) => !used.has(x.id) && old.lineId != null && x.lineId != null && refOf.get(x.lineId) === old.lineId)
+          ?? fresh.find((x) => !used.has(x.id) && !!old.productName && nk(x.productName) === nk(old.productName))
+          ?? fresh.find((x) => !used.has(x.id) && !old.productName && !x.productName && x.type === old.type);
+        if (!n) { await tx.delete(schema.anomalies).where(eq(schema.anomalies.id, old.id)); continue; }
+        used.add(n.id);
+        await tx.delete(schema.anomalies).where(eq(schema.anomalies.id, n.id));
+        await tx.update(schema.anomalies).set({
+          type: n.type, problemType: n.problemType, description: n.description, items: n.items, claimedAmount: n.claimedAmount, lineId: n.lineId,
+          productName: n.productName, productId: n.productId, nature: n.nature, reference: n.reference, photoUrl: n.photoUrl, mode: n.mode,
+          supplierId: n.supplierId, supplierName: n.supplierName, stage: n.stage, waitingFor: n.waitingFor, createdAt: n.createdAt,
+        }).where(eq(schema.anomalies.id, old.id));
+      }
+    }
 
     if (linked.length) {
       const newLines = await tx.select().from(schema.receptionLines).where(eq(schema.receptionLines.receptionId, id)).orderBy(asc(schema.receptionLines.position));
@@ -819,39 +846,48 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
     await tx.update(schema.anomalies).set({ items: blItems, claimedAmount: sumOf(blItems), productName: blItems.length === 1 ? blItems[0].name : null })
       .where(and(eq(schema.anomalies.receptionId, id), eq(schema.anomalies.type, "missing_bl")));
 
-    // Ancienne fiche (importée) : les produits ajoutés sur la fiche vont dans sa fiche d'anomalie existante (pas de nouvelle fiche)
+    // Ancienne fiche (importée) : sa fiche d'anomalie principale reprend TOUS les produits de la fiche de réception
+    // (ajoutés, renommés, supprimés, quantité vide comprise), sauf ceux qui ont leur propre fiche d'anomalie ; pas de nouvelle fiche
     if (rec.importedFrom) {
       const nk = (x: string | null | undefined) => (x ?? "").trim().replace(/\s+/g, " ").toLowerCase();
       const current = await tx.select().from(schema.anomalies).where(eq(schema.anomalies.receptionId, id)).orderBy(asc(schema.anomalies.id));
       const before = new Set(anomalies.map((a) => a.id));
       const main = current.find((a) => before.has(a.id) && !["missing_bl", "hygiene", "price", "locked_price"].includes(a.type));
-      if (main) {
+      // (fiche d'anomalie enregistrée volontairement sans produit : laissée sans produit)
+      const savedEmpty = (x: { items: unknown } | undefined) => Array.isArray(x?.items) && (x!.items as unknown[]).length === 0;
+      if (main && !savedEmpty(anomalies.find((a) => a.id === main.id))) {
         const covered = new Set<string>();
-        for (const a of current) if (a.id !== main.id && a.type !== "missing_bl") for (const n of [a.productName, ...(a.items ?? []).map((it) => it.name)]) if (n) covered.add(nk(n));
-        // Produits déjà rajoutés à la fiche principale lors d'une modification précédente
-        const prevMain = anomalies.find((a) => a.id === main.id);
-        const prevNames = new Set((prevMain?.items ?? []).map((it) => nk(it.name)));
-        const addedNow = new Set(p.lines.filter((pl) => !pl.ref).map((pl) => nk(pl.productName)));
-        const extra = finalLines.filter((l) => !covered.has(nk(l.productName)) && (addedNow.has(nk(l.productName)) || prevNames.has(nk(l.productName))));
+        const coveredLines = new Set<number>();
+        for (const a of current) {
+          if (a.id === main.id || ["missing_bl", "hygiene", "price", "locked_price"].includes(a.type)) continue;
+          if (a.lineId) coveredLines.add(a.lineId);
+          for (const n of [a.productName, ...(a.items ?? []).map((it) => it.name)]) if (n) covered.add(nk(n));
+        }
+        const mine = finalLines.filter((l) => !coveredLines.has(l.id) && !covered.has(nk(l.productName)));
+        let items: { productId: number | null; name: string; qty: number | null; unit: string; price: number | null }[];
         if (main.source === "weigh") {
-          // Écart de pesée : pesées de la fiche + produits ajoutés
+          // Écart de pesée : écarts des pesées de la fiche + les autres produits
           const gaps = await tx.select().from(schema.weighGaps).where(eq(schema.weighGaps.receptionId, id));
           const gapNames = new Set(gaps.map((g) => nk(g.product)));
-          const others = extra.filter((l) => !gapNames.has(nk(l.productName)));
-          if (others.length) {
-            const items = [
-              ...gaps.filter((g) => (num(g.gapQty) ?? 0) > 0).map((g) => ({ productId: g.productId, name: g.product, qty: Math.round(num(g.gapQty)! * 1000) / 1000, unit: "Kg", price: num(g.unitPrice) })),
-              ...others.map((l) => itemOf(l, true)),
-            ];
-            await tx.update(schema.anomalies).set({ items, claimedAmount: sumOf(items), groupKey: `rec:${id}` }).where(eq(schema.anomalies.id, main.id));
-          }
+          items = [
+            ...gaps.filter((g) => (num(g.gapQty) ?? 0) > 0).map((g) => ({ productId: g.productId, name: g.product, qty: Math.round(num(g.gapQty)! * 1000) / 1000, unit: "Kg", price: num(g.unitPrice) })),
+            ...mine.filter((l) => !gapNames.has(nk(l.productName))).map((l) => itemOf(l, true)),
+          ];
         } else {
-          const have = new Set((main.items ?? []).map((it) => nk(it.name)));
-          const add = extra.filter((l) => !have.has(nk(l.productName)));
-          if (add.length) {
-            const items = [...(main.items?.length ? main.items : main.productName ? [{ productId: main.productId, name: main.productName, qty: null, unit: "", price: null }] : []), ...add.map((l) => itemOf(l, true))];
-            await tx.update(schema.anomalies).set({ items, claimedAmount: sumOf(items) ?? main.claimedAmount, productName: items.length === 1 ? items[0].name : main.productName }).where(eq(schema.anomalies.id, main.id));
-          }
+          // Quantité : écart facturé / contrôlé, sinon Refus / Retour, sinon quantité contrôlée (vide gardée vide)
+          items = mine.map((l) => {
+            const it = itemOf(l, true);
+            const rq = num(l.refuseQty) ?? num(l.returnQty);
+            const o = num(l.qtyOrdered), q = num(l.qtyReceived);
+            return rq != null && !(o != null && q != null && o !== q) ? { ...it, qty: rq, unit: (num(l.refuseQty) != null ? l.refuseUnit : l.returnUnit) || it.unit } : it;
+          });
+        }
+        if (items.length || main.source !== "weigh") {
+          await tx.update(schema.anomalies).set({
+            items, claimedAmount: sumOf(items) ?? main.claimedAmount,
+            productName: items[0]?.name ?? main.productName, productId: items[0]?.productId ?? main.productId,
+            lineId: mine[0]?.id ?? null, ...(main.source === "weigh" ? { groupKey: `rec:${id}` } : {}),
+          }).where(eq(schema.anomalies.id, main.id));
         }
       }
     }

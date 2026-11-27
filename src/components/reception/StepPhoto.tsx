@@ -71,10 +71,10 @@ export function StepPhoto({
 
       {!has && !draft.noBl && (
         <button type="button" className="btn-ghost w-full" onClick={onNoBl}>
-          {w.skipNoBl}
+          {draft.kind === "reprise" ? w.manualEntry : w.skipNoBl}
         </button>
       )}
-      {draft.noBl && <p className="flex items-center gap-2 rounded-lg bg-stone-100 p-3 text-sm text-stone-700"><Icon name="check" className="h-4 w-4" /> {w.skipNoBl}</p>}
+      {draft.noBl && <p className="flex items-center gap-2 rounded-lg bg-stone-100 p-3 text-sm text-stone-700"><Icon name="check" className="h-4 w-4" /> {draft.kind === "reprise" ? w.manualEntry : w.skipNoBl}</p>}
 
     </>
   );

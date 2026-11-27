@@ -1714,6 +1714,22 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v6
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v60', '1') on conflict (key) do nothing`);
 }
 
+// Dev : anciennes fiches miroir, même fiche d'anomalie recalculée, bon de reprise (quantité > 0, saisie manuelle), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v61'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = ${"Ancienne fiche (importée) : sa fiche d'anomalie principale reprend tous les produits de la fiche de réception (ajoutés, renommés, supprimés, quantité vide comprise), sauf ceux qui ont leur propre fiche d'anomalie ; écart de pesée : écarts des pesées + autres produits. Fiche d'anomalie enregistrée volontairement sans produit : laissée sans produit."} where form = 'reception' and section = 'Anciennes fiches' and field = 'Produits ajoutés'`);
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  const rows = [
+    ["Modification", "Fiche d'anomalie recalculée", false, "Fiche d'anomalie pas encore suivie (À traiter, sans action) : recalculée à chaque modification de la fiche de réception, en gardant la même fiche (même N° ANO) ; supprimée seulement si le problème a disparu."],
+    ["Bon de reprise / retour", "Quantité reprise", true, "Quantité reprise obligatoire et supérieure à 0 pour chaque produit (message « produit(s) sans quantité reprise »)."],
+    ["Bon de reprise / retour", "Saisie manuelle", false, "Sans photo du bon : bouton « Saisie manuelle » (pas de fiche BL manquant pour un bon de reprise)."],
+  ];
+  let i = 0;
+  for (const [section, field, required, rule] of rows) {
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', ${section}, ${field}, ${required}, ${rule}, '', ${pos + i++})`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v61', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

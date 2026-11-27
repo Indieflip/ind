@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/client";
+import { num } from "@/lib/format";
 import type { Catalog, Draft, DraftLine } from "@/lib/reception-types";
 import { clearDraft, enqueue, fetchCatalog, loadCatalogCache, loadDraft, saveDraft, saveServerDraft, sendReception } from "@/lib/client/offline";
 import { Notice } from "@/components/Notice";
@@ -284,6 +285,9 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
     // Bon de reprise : ni conformité, ni prix, ni DLC obligatoires
     if (d.kind === "reprise") {
       // Bon de reprise : motif du retour obligatoire pour chaque produit
+      // Quantité reprise obligatoire, supérieure à 0
+      const noQty = d.lines.filter((l) => l.productName.trim() && !((num(l.qtyReceived) ?? num(l.qtyOrdered) ?? 0) > 0));
+      if (noQty.length) return { msg: `${noQty.length} ${t.wizard.qtyRequired}`, step: 1, anchor: `line-${noQty[0].key}`, auto: false };
       const noReason = d.lines.filter((l) => l.productName.trim() && !l.reason);
       return noReason.length ? { msg: `${noReason.length} ${t.wizard.reasonRequired}`, step: 1, anchor: `line-${noReason[0].key}`, auto: false } : null;
     }
