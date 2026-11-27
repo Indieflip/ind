@@ -1521,6 +1521,15 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v5
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v56', '1') on conflict (key) do nothing`);
 }
 
+// Réclamations déjà faites (anomalies reprises du fichier, avec date de réclamation) : en attente d'un avoir, pas d'un retour fournisseur, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'waiting_avoir_claimed_v1'`)).rows.length) {
+  const r = await db.execute(sql`update anomalies
+    set waiting_for = array_to_string(array(select distinct x from unnest(string_to_array(replace(waiting_for, 'reponse', 'avoir'), ',')) as x order by x), ',')
+    where stage = 'en_attente' and source in ('file', 'weigh') and last_action_at is not null and waiting_for like '%reponse%'`);
+  console.log(`[migrate] réclamations faites → en attente d'un avoir : ${r.rowCount ?? 0}`);
+  await db.execute(sql`insert into app_settings (key, value) values ('waiting_avoir_claimed_v1', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
