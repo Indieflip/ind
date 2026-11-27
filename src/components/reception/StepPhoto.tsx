@@ -83,7 +83,7 @@ export function StepPhoto({
       {draft.noBl && <p className="flex items-center gap-2 rounded-lg bg-stone-100 p-3 text-sm text-stone-700"><Icon name="check" className="h-4 w-4" /> {w.skipNoBl}</p>}
 
       <section id="label-photos" className="card space-y-3 p-4">
-        <h2 className="font-semibold">2. {w.photoLabelTitle} <span className="text-xs font-normal text-stone-500">({w.labelRequiredFor})</span></h2>
+        <h2 className="font-semibold">2. {w.photoLabelTitle} </h2>
         <p className="text-sm text-stone-600">{w.photoLabelHint}</p>
         <Thumbs
           photos={draft.labelPhotos ?? []}
@@ -95,8 +95,8 @@ export function StepPhoto({
         <PhotoButton multiple className="btn-secondary w-full" label={w.takeLabelPhoto} onPhotos={(urls) => setDraft((d) => ({ ...d, labelPhotos: [...(d.labelPhotos ?? []), ...urls] }))} />
       </section>
 
-      <section id="signature" className={`card space-y-3 p-4 ${!draft.signature && !draft.driverLeft ? "ring-2 ring-amber-300" : ""}`}>
-        <h2 className="font-semibold">3. {w.signTitle} <span className="text-red-600">*</span></h2>
+      <section id="signature" className="card space-y-3 p-4">
+        <h2 className="font-semibold">3. {w.signTitle}</h2>
         <div>
           <label className="label">{w.signerName} <span className="font-normal text-stone-400">({t.common.optional})</span></label>
           <input className="input" value={draft.signerName} onChange={(e) => setDraft((d) => ({ ...d, signerName: e.target.value }))} />
@@ -113,10 +113,10 @@ export function StepPhoto({
         </label>
       </section>
 
-      {receiverRequired && <section id="receiver" className={`card space-y-3 p-4 ${!draft.receiverSignature ? "ring-2 ring-amber-300" : ""}`}>
-        <h2 className="font-semibold">4. {w.receiverTitle} <span className="text-red-600">*</span></h2>
+      {receiverRequired && <section id="receiver" className="card space-y-3 p-4">
+        <h2 className="font-semibold">4. {w.receiverTitle}</h2>
         <div>
-          <label className="label">{w.receiverName} <span className="text-red-600">*</span></label>
+          <label className="label">{w.receiverName}</label>
           {receiverMustType ? (
             <input className={`input ${!draft.receiverName?.trim() ? "border-amber-400 bg-amber-50" : ""}`} value={draft.receiverName ?? ""} placeholder={w.receiverNamePh} onChange={(e) => setDraft((d) => ({ ...d, receiverName: e.target.value }))} />
           ) : (

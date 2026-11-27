@@ -8,8 +8,8 @@ import { Icon } from "./Icon";
 const PHONE_STEPS: { title: string; items: string[]; gate?: string; auto?: string }[] = [
   {
     title: "Photos et signatures",
-    items: ["Photo du BL / facture (ou « Pas de BL »)", "Photo de l'étiquette (lot / DLC), obligatoire pour viandes, poissons, surgelés", "Signature du livreur ou « parti sans signer »", "Signature du réceptionnaire"],
-    gate: "Pas d'étape 2 sans signature du livreur (ou case cochée)",
+    items: ["Photo du BL / facture (ou « Pas de BL »)", "Photo de l'étiquette (lot / DLC), conseillée pour viandes, poissons, surgelés", "Signature du livreur ou « parti sans signer »", "Signature du réceptionnaire"],
+    gate: "Rien d'obligatoire à cette étape",
   },
   {
     title: "Détail de la livraison",
@@ -23,7 +23,7 @@ const PHONE_STEPS: { title: string; items: string[]; gate?: string; auto?: strin
   {
     title: "Validation",
     items: ["Récapitulatif", "Texte des réserves à recopier sur le BL", "Enregistrement (hors ligne possible)"],
-    gate: "Pas d'enregistrement sans prix, décision, DLC obligatoire, photo d'étiquette (viandes, poissons, surgelés) ou signature du réceptionnaire (profil invité seulement) ; une fois l'info complétée, la fiche s'enregistre sans refaire les étapes",
+    gate: "Pas d'enregistrement sans prix, décision ou DLC obligatoire ; une fois l'info complétée, la fiche s'enregistre sans refaire les étapes",
   },
 ];
 

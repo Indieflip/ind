@@ -8,7 +8,7 @@ import type { Catalog, Draft, DraftLine } from "@/lib/reception-types";
 import { clearDraft, enqueue, fetchCatalog, loadCatalogCache, loadDraft, saveDraft, saveServerDraft, sendReception } from "@/lib/client/offline";
 import { Notice } from "@/components/Notice";
 import { Icon } from "../Icon";
-import { buildReservesText, docsOf, labelPhotoRequired, needsDlc, lineFromProduct, newDraft, toPayload, withAutoDecision } from "./helpers";
+import { buildReservesText, docsOf, needsDlc, lineFromProduct, newDraft, toPayload, withAutoDecision } from "./helpers";
 import { StepDelivery } from "./StepDelivery";
 import { StepPhoto } from "./StepPhoto";
 import { ReadingBanner } from "./ReadingBanner";
@@ -217,8 +217,8 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
   };
 
   const supplierOk = (draft.otherSupplier ? draft.supplierName.trim().length > 0 : !!draft.supplierId) && !!draft.deliveredAt;
-  const signed = !!draft.signature || !!draft.driverLeft || !!editId; // anciens bons modifiés : pas de blocage
-  const canContinue = draft.step === 0 ? !!(draft.photoOk || draft.noBl) && signed : draft.step === 1 ? supplierOk : true;
+  // Étape 1 (photo du BL, signatures, photo d'étiquette) : plus rien d'obligatoire
+  const canContinue = draft.step === 1 ? supplierOk : true;
 
   /**
    * Premier point bloquant avant d'enregistrer (étape et endroit où le corriger).
@@ -227,16 +227,12 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
    */
   const receiverRequired = !!receiver?.mustType; // signature du réceptionnaire : profil invité seulement
   function findProblem(d: Draft): null | { msg: string; step: number; anchor: string; auto: boolean } {
-    if (!editId && !d.signature && !d.driverLeft) return { msg: t.wizard.signRequired, step: 0, anchor: "signature", auto: true };
-    if (!editId && receiverRequired && (!d.receiverName?.trim() || !d.receiverSignature)) return { msg: t.wizard.receiverRequired, step: 0, anchor: "receiver", auto: false };
     const undecided = d.lines.filter((l) => !l.decision);
     if (undecided.length) return { msg: `${undecided.length} ${t.wizard.undecided}`, step: 2, anchor: `line-${undecided[0].key}`, auto: true };
     const noPrice = d.lines.filter((l) => l.productName.trim() && !l.unitPrice.trim() && !l.priceNotShown);
     if (noPrice.length) return { msg: `${noPrice.length} ${t.wizard.missingPrice}`, step: 2, anchor: `line-${noPrice[0].key}`, auto: false };
     const noDlc = d.lines.filter((l) => needsDlc(l, catalog));
     if (noDlc.length) return { msg: `${noDlc.length} ${t.wizard.missingDlc}`, step: 2, anchor: `line-${noDlc[0].key}`, auto: false };
-    // Photo d'étiquette obligatoire pour les produits à DLC (nouvelles réceptions)
-    if (!editId && !(d.labelPhotos ?? []).length && labelPhotoRequired(d.lines, catalog)) return { msg: t.wizard.missingLabelPhoto, step: 0, anchor: "label-photos", auto: true };
     return null;
   }
 
@@ -350,14 +346,11 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
               const d = { ...draft, photoOk: true, noBl: false };
               setDraft(() => d);
               void readBl(d);
-              // Signature (ou « parti sans signer ») obligatoire avant l'étape 2
-              if (signed) go(1);
-              else setTimeout(() => document.getElementById("signature")?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
+              go(1);
             }}
             onNoBl={() => {
               setDraft((d) => ({ ...d, noBl: true, photoOk: false, blRead: "idle" }));
-              if (signed) go(1);
-              else setTimeout(() => document.getElementById("signature")?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
+              go(1);
             }}
           />
         )}
