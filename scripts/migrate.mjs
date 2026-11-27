@@ -1643,6 +1643,77 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v5
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v59', '1') on conflict (key) do nothing`);
 }
 
+// Anciennes fiches : le type d'anomalie écrit au début de la note (« Autre — indiqué Q=18… ») devient le champ Type d'anomalie
+// du produit (sauf s'il en a déjà un) et est retiré de la note, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'note_type_split_v1'`)).rows.length) {
+  const legacy = { "Produit manquant": "Quantité produit", "Produit - Quantité": "Quantité produit", "Quantité": "Quantité produit" };
+  const rows = (await db.execute(sql`select l.id, l.note, l.reason from reception_lines l join receptions r on r.id = l.reception_id
+    where r.imported_from is not null and l.note ~ '^[^—]{2,60} — '`)).rows;
+  let n = 0;
+  for (const l of rows) {
+    const i = l.note.indexOf(" — ");
+    const label = l.note.slice(0, i).trim();
+    const rest = l.note.slice(i + 3).trim();
+    await db.execute(sql`update reception_lines set note = ${rest || null}, reason = coalesce(reason, ${legacy[label] ?? label}) where id = ${l.id}`);
+    n++;
+  }
+  console.log(`[migrate] type d'anomalie retiré des notes des anciennes fiches : ${n}`);
+  await db.execute(sql`insert into app_settings (key, value) values ('note_type_split_v1', '1') on conflict (key) do nothing`);
+}
+
+// RCP018 (2026) : type d'anomalie « Erreur fournisseur » (et non « Autre »), ajouté à la liste des types s'il n'y est pas, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'rcp018_supplier_error_v1'`)).rows.length) {
+  const label = "Erreur fournisseur";
+  const cur = (await db.execute(sql`select value from app_settings where key = 'anomaly_problem_types'`)).rows[0];
+  let list = [];
+  try { list = cur ? JSON.parse(cur.value) : []; } catch { list = []; }
+  if (!Array.isArray(list) || !list.length) list = ["Quantité produit", "Produit abîmé", "Température", "DLC", "Mauvais produit", "Prix", "Hygiène / véhicule", "Prix bloqué non respecté", "Bon de livraison manquant", "Autre", "Écart de pesée"];
+  if (!list.includes(label)) {
+    list = [...list, label].sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" }));
+    await db.execute(sql`insert into app_settings (key, value) values ('anomaly_problem_types', ${JSON.stringify(list)}) on conflict (key) do update set value = excluded.value`);
+  }
+  const rec = (await db.execute(sql`select id from receptions where kind = 'livraison' and seq = 18 and extract(year from delivered_at at time zone 'Europe/Paris') = 2026 limit 1`)).rows[0];
+  if (rec) {
+    await db.execute(sql`update reception_lines set reason = ${label} where reception_id = ${rec.id} and (reason is null or reason in ('Autre', 'other'))`);
+    const r = await db.execute(sql`update anomalies set problem_type = ${label}, type = 'other' where reception_id = ${rec.id} and type not in ('missing_bl', 'hygiene', 'price', 'locked_price') and source <> 'weigh' and coalesce(problem_type, 'Autre') in ('Autre', '')`);
+    console.log(`[migrate] RCP018 → Erreur fournisseur : ${r.rowCount ?? 0} fiche(s) d'anomalie`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('rcp018_supplier_error_v1', '1') on conflict (key) do nothing`);
+}
+
+// Fiches « BL manquant » : tous les produits de la fiche de réception repris (fiches sans produit), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'missing_bl_items_v1'`)).rows.length) {
+  const rows = (await db.execute(sql`select id, reception_id from anomalies where type = 'missing_bl' and reception_id is not null and (items is null or jsonb_array_length(items) = 0)`)).rows;
+  let n = 0;
+  for (const a of rows) {
+    const lines = (await db.execute(sql`select product_id, product_name, unit, qty_ordered, qty_received, unit_price from reception_lines where reception_id = ${a.reception_id} order by position`)).rows;
+    if (!lines.length) continue;
+    const items = lines.map((l) => ({ productId: l.product_id, name: l.product_name, qty: l.qty_received != null ? Number(l.qty_received) : l.qty_ordered != null ? Number(l.qty_ordered) : null, unit: l.unit ?? "", price: l.unit_price != null ? Number(l.unit_price) : null }));
+    const amount = items.every((x) => x.qty != null && x.price != null) ? String(Math.round(items.reduce((s, x) => s + x.qty * x.price, 0) * 100) / 100) : null;
+    await db.execute(sql`update anomalies set items = ${JSON.stringify(items)}::jsonb, claimed_amount = coalesce(claimed_amount, ${amount}::numeric) where id = ${a.id}`);
+    n++;
+  }
+  console.log(`[migrate] fiches BL manquant complétées avec les produits : ${n}`);
+  await db.execute(sql`insert into app_settings (key, value) values ('missing_bl_items_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev : type d'anomalie par produit, BL manquant complet, livraisons d'origine par période, blocage nouvelle fiche, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v60'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  const rows = [
+    ["Produits", "Type d'anomalie", false, "Produit accepté avec un écart détecté : champ « Type d'anomalie » à gauche de la Note, pré-calculé (T° → Température, DLC → DLC, quantité → Quantité produit, poids en trop → Écart de pesée), modifiable ; la fiche d'anomalie prend ce type et le suit à chaque modification. Anciennes fiches : le type écrit dans la note en a été retiré."],
+    ["Anomalies", "BL manquant", false, "Fiche « BL manquant » (case ou fiche sans document) : reprend toutes les infos de la fiche, produits compris (quantité, unité, prix, montant) ; suivi d'office « En attente » de « Vérification facturation » ; mise à jour à chaque modification ; case décochée : retirée si personne ne l'a suivie. BL / facture reçu ensuite : saisi sur la fiche d'anomalie, affiché sur la fiche de réception (en violet) sans la modifier ni refaire de fiche des réceptions de marchandises."],
+    ["Anciennes fiches", "Produits ajoutés", false, "Produit ajouté sur une ancienne fiche (importée) : ajouté à la fiche d'anomalie existante (écart de pesée compris), pas de nouvelle fiche."],
+    ["Bon de reprise / retour", "Livraison d'origine", false, "Partie « Livraison d'origine » : bouton « Pas de livraison » ou une ou plusieurs livraisons du fournisseur à cocher, par jour / semaine / mois ; plus de 10 livraisons sur la période : récap par jour (repliable) + recherche. Produits repris à l'étape Contrôle (un par un ou « Tout reprendre ») avec leur document d'origine (N° de fiche, type, N° et date du document)."],
+    ["Saisie", "Fiche / bon en cours", true, "Une fiche ou un bon en cours (non enregistré) doit être enregistré en brouillon ou abandonné avant d'en ouvrir un nouveau : message + boutons « Enregistrement brouillon » / « Abandonner »."],
+  ];
+  let i = 0;
+  for (const [section, field, required, rule] of rows) {
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', ${section}, ${field}, ${required}, ${rule}, '', ${pos + i++})`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v60', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

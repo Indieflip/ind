@@ -73,6 +73,11 @@ export interface DraftLine {
   photos: string[]; // data URL ou URL déjà envoyée
   /** Photo de l'étiquette (lot / DLC), pour les produits dont la nature le demande */
   labelPhotos?: string[];
+  /** Bon de reprise : livraison d'origine du produit et sa référence (« RCP386 · BL 49973 du 26/11/26 ») */
+  originReceptionId?: number | null;
+  originRef?: string;
+  /** Type d'anomalie choisi à la main (sinon celui calculé par le système) */
+  typeManual?: boolean;
   fromBl?: boolean;
   /** Numéro du document (BL / facture) auquel le produit est rattaché */
   doc?: string;
@@ -180,6 +185,8 @@ export interface ReceptionPayload {
     reason: string | null;
     photos: string[];
     labelPhotos?: string[];
+    originReceptionId?: number | null;
+    originRef?: string | null;
     document?: string | null;
     note?: string | null;
     /** Modification : id de la ligne d'origine (pour reporter les changements sur les fiches d'anomalie) */

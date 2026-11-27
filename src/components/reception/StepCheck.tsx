@@ -12,8 +12,10 @@ import { Icon } from "../Icon";
 import { UnitSelect } from "../UnitSelect";
 import { similarity } from "@/lib/fuzzy";
 import { PhotoButton, Thumbs } from "./PhotoButton";
-import { groupProducts, priceRange, dlcRequired, needsDlc, docNumbers, docsOf, evaluate, isBakerySupplier, lineDoc, lineFromProduct, matches, priceCheck, suggestedReason, withAutoDecision } from "./helpers";
+import { WEIGH_TYPE } from "@/lib/anomaly";
+import { detectedType, groupProducts, priceRange, dlcRequired, needsDlc, docNumbers, docsOf, evaluate, isBakerySupplier, lineDoc, lineFromProduct, matches, priceCheck, suggestedReason, withAutoDecision } from "./helpers";
 import { az } from "@/lib/search";
+import { OriginProducts } from "./Origins";
 
 const DEFAULT_UNITS = ["Pièce", "Kg", "Litre", "Sachet"];
 
@@ -41,6 +43,7 @@ export function StepCheck({
   return (
     <>
       {bakery && <BakeryBlock draft={draft} setDraft={setDraft} />}
+      {draft.kind === "reprise" && <OriginProducts draft={draft} setDraft={setDraft} catalog={catalog} />}
       {multi && (
         <section className="card p-3">
           <p className="mb-2 text-xs text-stone-600">{t.wizard.byDocument}</p>
@@ -232,6 +235,8 @@ function LineCard({
         </div>
       )}
 
+      {/* Bon de reprise : document d'origine du produit (N° de fiche, type et N° du document, date) */}
+      {reprise && line.originRef && <p className="mb-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-900"><Icon name="file" className="h-3.5 w-3.5" /> {line.originRef}</p>}
       <div className="grid grid-cols-3 gap-2">
         {field("qtyOrdered", reprise ? t.returnSlip.qtyOnSlip : t.wizard.ordered, { inputMode: "decimal" })}
         {field("qtyReceived", reprise ? t.returnSlip.qtyTaken : t.wizard.received, { inputMode: "decimal", ...(reprise ? { placeholder: line.qtyOrdered } : {}) })}
@@ -294,10 +299,29 @@ function LineCard({
         </div>
       )}
 
-      <div className="mt-2">
-        <label className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.note}</label>
-        <input className="input py-2" value={line.note ?? ""} placeholder={t.wizard.notePh} onChange={(e) => onChange({ note: e.target.value })} />
-      </div>
+      {/* Type d'anomalie (si le système détecte un écart, ou choisi à la main) à gauche de la Note : pré-calculé, modifiable */}
+      {(() => {
+        const auto = !reprise && line.decision === "conform" && !line.refuseOn && !line.returnOn ? detectedType(line, catalog, t.anomalies.types, WEIGH_TYPE) : null;
+        const showType = !reprise && line.decision === "conform" && !line.refuseOn && !line.returnOn && (auto || (line.typeManual && line.reason));
+        const value = line.typeManual && line.reason ? line.reason : auto ?? "";
+        const opts = [...new Set([...(catalog?.reasons ?? []), ...(value ? [value] : [])])].sort((x, y) => x.localeCompare(y, "fr", { sensitivity: "base" }));
+        return (
+          <div className={`mt-2 grid gap-2 ${showType ? "grid-cols-2" : ""}`}>
+            {showType && (
+              <div>
+                <label className="mb-0.5 block text-xs font-medium text-orange-700">{t.wizard.anomalyType}{!line.typeManual && <span className="ml-1 font-normal text-stone-400">({t.wizard.autoShort})</span>}</label>
+                <select className="input border-orange-300 bg-orange-50 py-2" value={value} onChange={(e) => onChange({ reason: e.target.value, typeManual: true })}>
+                  {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.note}</label>
+              <input className="input py-2" value={line.note ?? ""} placeholder={t.wizard.notePh} onChange={(e) => onChange({ note: e.target.value })} />
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Bon de reprise : motif du retour et photo, à la place des contrôles de livraison */}
       {reprise && (

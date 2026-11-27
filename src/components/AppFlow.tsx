@@ -13,7 +13,7 @@ const PHONE_STEPS: { title: string; items: string[]; gate?: string; auto?: strin
   },
   {
     title: "2. Contrôle des produits",
-    items: ["Q facturée, Q contrôlée, unité", "T° produit, DLC / DDM, lot, note", "Photo de l'étiquette (lot / DLC) par produit dont la nature la demande", "Prix unitaire (obligatoire)", "Acceptée / Refus proposé automatiquement", "Refus et / ou Retour : motif (= type d'anomalie), quantité + unité"],
+    items: ["Q facturée, Q contrôlée, unité", "T° produit, DLC / DDM, lot, note", "Photo de l'étiquette (lot / DLC) par produit dont la nature la demande", "Type d'anomalie pré-calculé à côté de la Note si un écart est détecté (modifiable)", "Prix unitaire (obligatoire)", "Acceptée / Refus proposé automatiquement", "Refus et / ou Retour : motif (= type d'anomalie), quantité + unité"],
   },
   {
     title: "3. Validation",
@@ -23,7 +23,7 @@ const PHONE_STEPS: { title: string; items: string[]; gate?: string; auto?: strin
 ];
 
 const AUTO: { title: string; items: string[] }[] = [
-  { title: "Anomalies créées", items: ["Refus, retour marchandise, manque, quantité en trop", "Bon de reprise BR (même formulaire, 3 étapes) : chaque produit repris → fiche d'anomalie du type du motif, en attente d'avoir, ou mise à jour de celle de la livraison d'origine", "T° au-delà du seuil + marge, DLC dépassée", "Prix ≥ +10 % au-dessus du mercurial, prix bloqué", "Véhicule sale, BL manquant"] },
+  { title: "Anomalies créées", items: ["Refus, retour marchandise, manque, quantité en trop", "Bon de reprise BR (même formulaire, 3 étapes ; livraisons d'origine par jour / semaine / mois ou « Pas de livraison ») : chaque produit repris → fiche d'anomalie du type du motif, en attente d'avoir, ou mise à jour de celle de la livraison d'origine", "BL manquant : fiche avec tous les produits, En attente · Vérification facturation", "T° au-delà du seuil + marge, DLC dépassée", "Prix ≥ +10 % au-dessus du mercurial, prix bloqué", "Véhicule sale, BL manquant"] },
   { title: "Prix et mercurial", items: ["Mercurial mis à jour avec le prix du bon", "Variation de prix enregistrée", "Historique du Mercurial repris dans le Suivi des prix"] },
   { title: "Pesée et suivis", items: ["Écarts de pesée (au kg, tares et perte acceptable du produit déduites), une anomalie « Écart de pesée » par bon", "Suivi viande / poisson, boulangerie", "N° d'anomalie et de réclamation"] },
 ];

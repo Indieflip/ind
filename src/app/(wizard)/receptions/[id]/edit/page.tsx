@@ -59,6 +59,8 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     decisionManual: l.decision !== "conform",
 
     reason: (l.reason ?? "") as DraftLine["reason"],
+    // Type d'anomalie choisi sur un produit accepté (sans Refus / Retour) : gardé tel quel
+    typeManual: l.decision === "conform" && !!l.reason && l.refuseQty == null && !l.refuseUnit && l.returnQty == null && !l.returnUnit,
     doc: l.document ?? undefined,
     note: l.note ?? "",
     priceNotShown: l.priceNotShown,
@@ -70,6 +72,8 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     returnUnit: l.returnUnit ?? "",
     photos: photos.filter((p) => p.lineId === l.id && p.kind !== "label").map((p) => p.url),
     labelPhotos: photos.filter((p) => p.lineId === l.id && p.kind === "label").map((p) => p.url),
+    originReceptionId: l.originReceptionId,
+    originRef: l.originRef ?? undefined,
   }));
 
   const draft: Draft = {

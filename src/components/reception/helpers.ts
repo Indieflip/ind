@@ -147,12 +147,24 @@ export function withAutoDecision(line: DraftLine, catalog: Catalog | undefined, 
   const missing = ev.issues.includes("temp_missing") || (dlcRequired(line, catalog) && !line.dlc);
   const decision = ev.decision === "refuse" ? "refuse" : missing ? null : "conform";
   // Motif gardé tant qu'un Refus / Retour (quantité) est saisi, même si le produit reste « Acceptée »
-  const reason = decision === "refuse" ? line.reason || suggestedReason(line, catalog, truckTemp) : line.refuseOn || line.returnOn ? line.reason : "";
+  const reason = decision === "refuse" ? line.reason || suggestedReason(line, catalog, truckTemp) : line.refuseOn || line.returnOn || line.typeManual ? line.reason : "";
   return decision === line.decision && reason === line.reason ? line : { ...line, decision, reason };
 }
 
 
 /** Comparaison du prix saisi avec la tranche min – max (ou le prix bloqué) */
+/**
+ * Type d'anomalie pré-calculé par le système pour un produit accepté avec un écart détecté (comme sur la fiche d'anomalie créée) :
+ * T° → Température, DLC dépassée → DLC, quantité → Quantité produit (au kg, poids en trop → Écart de pesée) ; null si rien à signaler.
+ */
+export function detectedType(line: DraftLine, catalog: Catalog | undefined, labels: { temperature: string; dlc: string; missing: string }, weighType: string) {
+  const kg = (line.unit || "").toLowerCase() === "kg";
+  const issues = evaluate(line, catalog).issues.filter((i) => i !== "temp_missing" && i !== "temp_limit" && i !== "dlc_short" && !(kg && i === "qty_less"));
+  const first = issues[0];
+  if (!first) return null;
+  return first.startsWith("temp") || first === "truck_over" ? labels.temperature : first.startsWith("dlc") ? labels.dlc : kg && first === "qty_more" ? weighType : labels.missing;
+}
+
 export function priceCheck(line: DraftLine) {
   return checkPrice(num(line.unitPrice), { min: line.mercurialMin ?? null, max: line.mercurialPrice, locked: !!line.priceLocked });
 }
@@ -257,7 +269,8 @@ export function toPayload(d: Draft): ReceptionPayload {
     missingBl: d.kind === "reprise" ? false : !!d.missingBl,
     kind: d.kind === "reprise" ? "reprise" : "livraison",
     originReceptionId: d.kind === "reprise" ? (d.noReturnDoc ? null : d.originReceptionId ?? null) : null,
-    originExtraIds: d.kind === "reprise" && !d.noReturnDoc ? (d.originExtraIds ?? []).filter((x) => x && x !== d.originReceptionId) : [],
+    // (livraisons d'origine des produits repris comprises)
+    originExtraIds: d.kind === "reprise" && !d.noReturnDoc ? [...new Set([...(d.originExtraIds ?? []), ...d.lines.map((l) => l.originReceptionId ?? 0)])].filter((x) => x && x !== d.originReceptionId) : [],
     noReturnDoc: d.kind === "reprise" ? !!d.noReturnDoc : false,
     labelPhotos: d.labelPhotos ?? [],
     bakery: d.bakery
@@ -281,6 +294,8 @@ export function toPayload(d: Draft): ReceptionPayload {
         reason: l.reason || null,
         photos: l.photos,
         labelPhotos: l.labelPhotos ?? [],
+        originReceptionId: d.kind === "reprise" ? l.originReceptionId ?? null : null,
+        originRef: d.kind === "reprise" ? l.originRef || null : null,
         document: lineDoc(d, l) || null,
         note: l.note?.trim() || null,
         ref: /^line-\d+$/.test(l.key) ? Number(l.key.slice(5)) : null,

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useI18n } from "@/lib/i18n/client";
-import { clearDraft, getOutbox, loadDraft, syncOutbox } from "@/lib/client/offline";
+import { getOutbox, loadDraft, syncOutbox } from "@/lib/client/offline";
 import type { Draft } from "@/lib/reception-types";
 import { Icon } from "../Icon";
 
@@ -46,28 +46,27 @@ export function DraftBanner() {
           </button>
         </div>
       )}
-      <div className="grid gap-2 sm:flex">
-        {draft && (
-          <Link href={draft.kind === "reprise" ? "/receptions/new?kind=reprise" : "/receptions/new"} className="btn-primary btn-lg">
-            <Icon name="truck" /> {t.receptions.resume}
-            {draft.supplierName && <span className="font-normal opacity-80">· {draft.supplierName}</span>}
-          </Link>
-        )}
-        <button
-          className={`${draft ? "btn-secondary" : "btn-primary"} btn-lg`}
-          onClick={async () => {
-            if (draft) {
-              if (!await appConfirm(t.wizard.discardConfirm)) return;
-              await clearDraft();
-            }
-            router.push("/receptions/new?new=1");
-          }}
-        >
-          <Icon name="plus" /> {t.receptions.new}
-        </button>
-        {/* Bon de reprise / retour : même bouton, en orange */}
-        <Link href="/receptions/new?kind=reprise" className="btn-primary btn-lg !bg-amber-500 hover:!bg-amber-600">↩ {t.returnSlip.button}</Link>
-      </div>
+      {/* Une ligne par type de fiche : bouton « nouvelle » + la fiche / le bon en cours sur le téléphone, à reprendre */}
+      {([
+        { kind: "livraison" as const, href: "/receptions/new?new=1", resume: "/receptions/new", label: t.receptions.new, icon: <Icon name="plus" />, cls: "btn-primary", tag: t.wizard.inProgressFiche, tone: "border-brand-200 bg-brand-50 text-brand-800" },
+        { kind: "reprise" as const, href: "/receptions/new?new=1&kind=reprise", resume: "/receptions/new?kind=reprise", label: t.returnSlip.button, icon: <span aria-hidden>↩</span>, cls: "btn-primary !bg-amber-500 hover:!bg-amber-600", tag: t.wizard.inProgressBr, tone: "border-amber-300 bg-amber-50 text-amber-900" },
+      ]).map((row) => {
+        const cur = draft && (draft.kind ?? "livraison") === row.kind ? draft : null;
+        return (
+          <div key={row.kind} className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+            <Link href={row.href} className={`${row.cls} btn-lg w-full justify-start sm:w-auto sm:min-w-[16rem]`}>{row.icon} {row.label}</Link>
+            {cur && (
+              <Link href={row.resume} className={`flex min-w-0 items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm sm:flex-1 ${row.tone}`}>
+                <span className="min-w-0">
+                  <span className="block text-[11px] font-semibold uppercase tracking-wide opacity-80">{row.tag}</span>
+                  <span className="block truncate font-semibold">{cur.supplierName || "—"}{cur.lines.length ? ` · ${cur.lines.length} ${t.returnSlip.products}` : ""}</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1 font-semibold underline">{t.wizard.resumeLine} <Icon name="chevronRight" className="h-4 w-4" /></span>
+              </Link>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

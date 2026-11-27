@@ -29,6 +29,9 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
   const [readCount, setReadCount] = useState(0);
   // Enregistrement en attente : une info manquait, l'utilisateur est allé la compléter
   const [retry, setRetry] = useState(false);
+  // Fiche / bon en cours non enregistré : à enregistrer en brouillon ou abandonner avant d'en ouvrir un autre
+  const [blocked, setBlocked] = useState<null | { current: Draft; next: Draft }>(null);
+  const [blockBusy, setBlockBusy] = useState(false);
   const topRef = useRef<HTMLDivElement>(null);
 
   // Chargement : catalogue (cache puis réseau) + réception en cours
@@ -45,20 +48,25 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
         if (alive) setDraftState(upgradeDraft(initialDraft));
         return;
       }
+      // Fiche / bon en cours sur le téléphone (pas encore enregistré) : il doit être enregistré en brouillon ou abandonné
+      // avant d'en ouvrir un autre (sinon il serait écrasé)
+      const loaded = await loadDraft();
+      const saved = loaded ? upgradeDraft(loaded) : undefined;
+      const inProgress = saved && (saved.supplierName || saved.lines.length || saved.blPhotos.length) ? saved : undefined;
+      const open = (next: Draft) => {
+        if (!alive) return;
+        if (inProgress && inProgress.clientUuid !== next.clientUuid) setBlocked({ current: inProgress, next });
+        else setDraftState(next);
+      };
       const serverDraft = params.get("draft");
       if (serverDraft) {
         const res = await fetch(`/api/drafts/${serverDraft}`).catch(() => null);
-        if (res?.ok && alive) {
-          setDraftState(upgradeDraft({ ...newDraft(), ...((await res.json()).data as Draft) }));
-          return;
-        }
+        if (res?.ok) return open(upgradeDraft({ ...newDraft(), ...((await res.json()).data as Draft) }));
       }
-      // Bon de reprise / retour (?kind=reprise) : même formulaire, la fiche en cours n'est reprise que si elle est de la même sorte
+      // Bon de reprise / retour (?kind=reprise) : même formulaire ; la fiche en cours est reprise si elle est de la même sorte
       const kind = params.get("kind") === "reprise" ? "reprise" : "livraison";
       const origin = Number(params.get("origin")) || null;
-      const loaded = params.get("new") ? undefined : await loadDraft();
-      const saved = loaded ? upgradeDraft(loaded) : undefined;
-      const existing = saved && (saved.kind ?? "livraison") === kind && (!origin || saved.originReceptionId === origin) ? saved : undefined;
+      const existing = !params.get("new") && saved && (saved.kind ?? "livraison") === kind && (!origin || saved.originReceptionId === origin) ? saved : undefined;
       let fresh = existing ?? newDraft(kind, origin);
       // Bon de reprise ouvert depuis une livraison : fournisseur de la livraison d'origine repris
       if (!existing && origin) {
@@ -66,7 +74,7 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
         const o = res?.ok ? ((await res.json()).deliveries as { id: number; supplierId: number | null; supplierName: string }[]).find((x) => x.id === origin) : undefined;
         if (o) fresh = { ...fresh, supplierId: o.supplierId, supplierName: o.supplierName, otherSupplier: !o.supplierId };
       }
-      if (alive) setDraftState(fresh);
+      open(fresh);
     })();
     return () => {
       alive = false;
@@ -190,6 +198,45 @@ export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEn
       if (/^(signature|label-photos|line-)/.test(prev)) void finish();
     } else if (prev && key !== prev) setError(blocking.msg);
   });
+
+  if (blocked) {
+    const cur = blocked.current;
+    const isBr = cur.kind === "reprise";
+    const resolve = async (keep: boolean) => {
+      setBlockBusy(true);
+      setError("");
+      try {
+        if (keep) await saveServerDraft(cur);
+        else {
+          const r = await fetch(`/api/drafts?uuid=${encodeURIComponent(cur.clientUuid)}`, { method: "DELETE" });
+          if (!r.ok && r.status !== 400) throw new Error(String(r.status));
+        }
+        await clearDraft();
+        setBlocked(null);
+        setDraftState(blocked.next);
+      } catch {
+        setError(keep ? t.wizard.draftError : t.wizard.discardFailed);
+      } finally {
+        setBlockBusy(false);
+      }
+    };
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-6">
+        <div className={`rounded-2xl border p-5 shadow-sm ${isBr ? "border-amber-300 bg-amber-50" : "border-brand-200 bg-white"}`}>
+          <p className="flex items-center gap-2 text-lg font-bold"><Icon name="alert" className="h-5 w-5 text-amber-600" /> {isBr ? t.wizard.blockedTitleBr : t.wizard.blockedTitle}</p>
+          <p className="mt-2 text-sm text-stone-700">
+            {isBr ? t.wizard.blockedTextBr : t.wizard.blockedText}
+            {cur.supplierName && <> <strong>{cur.supplierName}</strong>{cur.lines.length ? ` · ${cur.lines.length} ${t.returnSlip.products}` : ""}.</>}
+          </p>
+          <div className="mt-4 grid gap-2">
+            <button type="button" className="btn-primary btn-lg" disabled={blockBusy} onClick={() => resolve(true)}><Icon name="file" /> {t.wizard.saveDraft}</button>
+            <button type="button" className="btn-secondary btn-lg text-red-700" disabled={blockBusy} onClick={() => resolve(false)}>{t.wizard.blockedDiscard}</button>
+          </div>
+          {error && <p className="mt-3 text-sm font-medium text-red-700">{error}</p>}
+        </div>
+      </div>
+    );
+  }
 
   if (!draft) {
     return <div className="p-8 text-center text-stone-500">{t.common.loading}</div>;

@@ -1,9 +1,10 @@
 "use client";
 import { useI18n } from "@/lib/i18n/client";
-import { fmtDate, fmtDateTime } from "@/lib/format";
+import { fmtDate, fmtDateTime, fmtMoney, num } from "@/lib/format";
+import { WEIGH_TYPE } from "@/lib/anomaly";
 import type { Catalog, Draft } from "@/lib/reception-types";
 import { decisionStyles } from "../DecisionBadge";
-import { docNumbers, docsOf, linesMissingLabel, lineDoc, needsDlc, needsTemp, priceGap } from "./helpers";
+import { detectedType, docNumbers, docsOf, linesMissingLabel, lineDoc, needsDlc, needsTemp, priceGap } from "./helpers";
 
 export function StepValidate({
   draft,
@@ -35,68 +36,74 @@ export function StepValidate({
   const w = t.wizard;
   const multiDoc = docNumbers(draft).length > 1;
   const dash = (v: string | null | undefined) => (v && String(v).trim() ? v : "—");
+  // Récap : en-tête (fournisseur, date, documents), chiffres clés, puis produits en cartes
+  const named = draft.lines.filter((l) => l.productName.trim());
+  const price = (l: (typeof named)[number]) => num(l.unitPrice);
+  const qty = (l: (typeof named)[number]) => num(l.qtyReceived) ?? num(l.qtyOrdered);
+  const total = named.reduce((s, l) => s + (l.decision === "refuse" ? 0 : (qty(l) ?? 0) * (price(l) ?? 0)), 0);
+  const flagged = reprise ? named.length : named.filter((l) => l.decision !== "conform" || l.refuseOn || l.returnOn || detectedType(l, catalog, t.anomalies.types, WEIGH_TYPE)).length + (draft.missingBl ? 1 : 0) + (draft.vehicleClean === false ? 1 : 0);
+  const docsShown = docsOf(draft).filter((x) => x.number.trim());
+  const ordered = multiDoc ? docNumbers(draft).flatMap((n) => draft.lines.filter((l) => lineDoc(draft, l) === n)) : draft.lines;
+  const tile = (value: string | number, label: string, cls: string) => (
+    <div className={`rounded-xl px-3 py-2 ${cls}`}><p className="text-xl font-bold leading-tight tabular-nums">{value}</p><p className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{label}</p></div>
+  );
   return (
     <>
-      <section className="card p-4">
-        <h2 className="font-semibold">{w.recap}</h2>
-        <p className="mb-3 text-xs text-stone-500">{w.recapHint}</p>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-          <div><dt className="text-stone-500">{t.common.supplier}</dt><dd className="font-semibold">{dash(draft.supplierName)}</dd></div>
-          <div><dt className="text-stone-500">{reprise ? w.dateTimeReturn : w.dateTime}</dt><dd className="font-medium">{fmtDateTime(draft.deliveredAt)}</dd></div>
-          <div className="col-span-2"><dt className="text-stone-500">{w.docType}</dt><dd className="font-medium">{docsOf(draft).filter((x) => x.number.trim()).map((x) => `${w.docTypes[x.type]} ${x.number}${x.date ? ` du ${fmtDate(x.date)}` : ""}`).join(" · ") || "—"}</dd></div>
-          {!reprise && <div><dt className="text-stone-500">{t.receptions.truckTemp}</dt><dd className="font-medium">{draft.truckTemp ? `${draft.truckTemp} °C` : "—"}</dd></div>}
-          {!reprise && <div><dt className="text-stone-500">{t.receptions.vehicleClean}</dt><dd className="font-medium">{draft.vehicleClean == null ? "—" : draft.vehicleClean ? t.common.yes : t.common.no}</dd></div>}
-          <div className="col-span-2"><dt className="text-stone-500">{t.receptions.blPhotos}</dt><dd className="font-medium">{draft.blPhotos.length || (draft.noBl ? t.receptions.noBl : "—")}</dd></div>
-        </dl>
+      <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+        <div className={`px-4 py-4 text-white ${reprise ? "bg-gradient-to-r from-amber-600 to-amber-500" : "bg-gradient-to-r from-brand-700 to-brand-600"}`}>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-white/75">{reprise ? `↩ ${t.returnSlip.detail}` : w.recap}</p>
+          <p className="mt-0.5 text-xl font-bold leading-tight">{dash(draft.supplierName)}</p>
+          <p className="mt-0.5 text-sm text-white/85">{fmtDateTime(draft.deliveredAt)}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {docsShown.length ? docsShown.map((x) => (
+              <span key={x.number} className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium">{w.docTypes[x.type]} {x.number}{x.date ? ` · ${fmtDate(x.date)}` : ""}</span>
+            )) : <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium">{draft.missingBl ? w.missingBlBox : t.receptions.noBl}</span>}
+            {draft.blPhotos.length > 0 && <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium">📎 {draft.blPhotos.length}</span>}
+            {!reprise && draft.truckTemp && <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-medium">🌡 {draft.truckTemp} °C</span>}
+            {!reprise && draft.vehicleClean != null && <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${draft.vehicleClean ? "bg-white/20" : "bg-red-500"}`}>{t.receptions.vehicleClean} : {draft.vehicleClean ? t.common.yes : t.common.no}</span>}
+          </div>
+        </div>
+        <div className={`grid gap-2 p-3 ${reprise ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-4"}`}>
+          {tile(named.length, t.returnSlip.products, "bg-stone-100 text-stone-800")}
+          {tile(total ? fmtMoney(total) : "—", reprise ? t.returnSlip.totalTaken : t.receptions.total, "bg-stone-100 text-stone-800")}
+          {!reprise && tile(count("refuse"), t.decision.refuse, decisionStyles.refuse.badge)}
+          {!reprise && tile(flagged, w.anomalyTile, "bg-orange-100 text-orange-800")}
+        </div>
         {draft.bakery && (
-          <p className="mt-2 text-sm text-stone-700">
+          <p className="px-4 pb-2 text-sm text-stone-700">
             {t.wizard.bakery} : {(["baguette", "hamburger", "rolls", "painDeMie"] as const).filter((k) => draft.bakery?.[k]).map((k) => `${t.bakery[k]} ${draft.bakery![k]}`).join(" · ") || "—"}
           </p>
         )}
-        <div className="mt-3 overflow-x-auto">
-          {draft.lines.length === 0 ? (
-            <p className="text-sm text-stone-500">{w.noLines}</p>
-          ) : (
-            <table className="w-full text-left text-xs">
-              <thead className="text-stone-500">
-                <tr>{multiDoc && <th className="py-1 pr-2">{t.receptions.blInvoice}</th>}<th className="py-1 pr-2">{t.common.product}</th><th className="px-1 text-right">{reprise ? t.returnSlip.qtyTaken : w.received}</th>{!reprise && <><th className="px-1 text-right">°C</th><th className="px-1">DLC</th></>}<th className="px-1 text-right">{t.common.price}</th><th className="pl-1">{reprise ? t.returnSlip.reasonTitle : t.common.status}</th></tr>
-              </thead>
-              <tbody>
-                {(multiDoc ? docNumbers(draft).flatMap((n) => draft.lines.filter((l) => lineDoc(draft, l) === n)) : draft.lines).map((l) => (
-                  <tr key={l.key} className="border-t border-stone-100">
-                    {multiDoc && <td className="py-1.5 pr-2 whitespace-nowrap text-stone-600">{lineDoc(draft, l)}</td>}
-                    <td className="py-1.5 pr-2 font-medium">{l.productName}</td>
-                    <td className="px-1 text-right tabular-nums">{dash(l.qtyReceived)}{l.qtyOrdered && l.qtyOrdered !== l.qtyReceived ? ` / ${l.qtyOrdered}` : ""} {l.unit}</td>
-                    {!reprise && <><td className="px-1 text-right tabular-nums">{dash(l.temperature)}</td>
-                    <td className="px-1 whitespace-nowrap">{l.dlc ? fmtDate(l.dlc) : "—"}</td></>}
-                    <td className="px-1 text-right tabular-nums">{dash(l.unitPrice)}{l.priceNotShown && <span className="block text-[10px] text-stone-500">{t.wizard.priceNotShown}</span>}</td>
-                    <td className="pl-1">{reprise ? (l.reason ? (t.reasons as Record<string, string>)[l.reason] ?? l.reason : "—") : l.decision ? <span className={`badge ${decisionStyles[l.decision].badge}`}>{t.decision[l.decision]}</span> : <span className="badge bg-amber-100 text-amber-900">{w.toDecide}</span>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        {named.length === 0 ? <p className="px-4 pb-4 text-sm text-stone-500">{w.noLines}</p> : (
+          <ul className="divide-y divide-stone-100 border-t border-stone-100">
+            {ordered.filter((l) => l.productName.trim()).map((l) => {
+              const type = !reprise && l.decision === "conform" && !l.refuseOn && !l.returnOn ? (l.typeManual && l.reason ? l.reason : detectedType(l, catalog, t.anomalies.types, WEIGH_TYPE)) : null;
+              const reason = l.reason ? (t.reasons as Record<string, string>)[l.reason] ?? l.reason : "";
+              return (
+                <li key={l.key} className="flex items-start justify-between gap-3 px-4 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{l.productName}</p>
+                    <p className="text-xs text-stone-500">
+                      {dash(reprise ? l.qtyReceived || l.qtyOrdered : l.qtyReceived)}{!reprise && l.qtyOrdered && l.qtyOrdered !== l.qtyReceived ? ` / ${l.qtyOrdered}` : ""} {l.unit}
+                      {l.unitPrice ? ` · ${l.unitPrice} €` : l.priceNotShown ? ` · ${w.priceNotShown}` : ""}
+                      {!reprise && l.temperature ? ` · ${l.temperature} °C` : ""}{!reprise && l.dlc ? ` · DLC ${fmtDate(l.dlc)}` : ""}
+                      {multiDoc && ` · ${lineDoc(draft, l)}`}
+                    </p>
+                    {reprise && l.originRef && <p className="text-xs text-amber-800">↩ {l.originRef}</p>}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {reprise ? <span className={`badge ${reason ? "bg-amber-100 text-amber-900" : "bg-red-100 text-red-800"}`}>{reason || t.wizard.reasonMissingShort}</span>
+                      : l.decision ? <span className={`badge ${decisionStyles[l.decision].badge}`}>{l.decision === "conform" ? w.accepted : t.decision[l.decision]}</span> : <span className="badge bg-amber-100 text-amber-900">{w.toDecide}</span>}
+                    {(l.refuseOn || l.returnOn) && <span className="badge bg-red-50 text-red-700">{[l.refuseOn ? t.decision.refuse : "", l.returnOn ? w.returnBtn : ""].filter(Boolean).join(" · ")}{reason ? ` · ${reason}` : ""}</span>}
+                    {type && <span className="badge bg-orange-100 text-orange-800">{type}</span>}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {gaps > 0 && <p className="border-t border-stone-100 px-4 py-2 text-sm text-stone-700"><strong>{gaps}</strong> {t.wizard.priceGaps}</p>}
       </section>
-
-      {reprise ? (
-        <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          <strong>{draft.lines.filter((l) => l.productName.trim()).length}</strong> {t.returnSlip.products} · {t.returnSlip.autoAnomaly}
-        </section>
-      ) : (
-      <section className="card p-4">
-        <h2 className="mb-3 font-semibold">{t.wizard.summary}</h2>
-        <div className="grid grid-cols-2 gap-2 text-center">
-          {(count("reserve") ? (["conform", "reserve", "refuse"] as const) : (["conform", "refuse"] as const)).map((d) => (
-            <div key={d} className={`rounded-lg p-3 ${decisionStyles[d].badge}`}>
-              <div className="text-2xl font-bold">{count(d)}</div>
-              <div className="text-xs font-semibold">{d === "conform" ? w.accepted : t.decision[d]}</div>
-            </div>
-          ))}
-        </div>
-        {gaps > 0 && <p className="mt-3 text-sm text-stone-700"><strong>{gaps}</strong> {t.wizard.priceGaps}</p>}
-      </section>
-      )}
 
       {undecided.length > 0 && (
         <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">

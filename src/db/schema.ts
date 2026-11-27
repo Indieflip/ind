@@ -230,6 +230,9 @@ export const receptionLines = pgTable(
     refuseUnit: text("refuse_unit"),
     returnQty: numeric("return_qty", { precision: 12, scale: 3 }),
     returnUnit: text("return_unit"),
+    /** Bon de reprise : livraison d'origine du produit et référence de son document (« RCP386 · BL 49973 du 26/11/26 ») */
+    originReceptionId: integer("origin_reception_id").references((): AnyPgColumn => receptions.id, { onDelete: "set null" }),
+    originRef: text("origin_ref"),
     /** Ancien modèle (un seul bouton Refus / Retour) : repris dans les champs ci-dessus */
     returnKind: text("return_kind"),
     returnProduct: text("return_product"),

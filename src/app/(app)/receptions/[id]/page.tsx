@@ -143,6 +143,13 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
               </ul>
             )}
             {blPhotos.length > 0 && <p className="mt-2 text-xs text-stone-500">📎 {blPhotos.length} {t.receptions.attached}</p>}
+            {/* BL manquant reçu après coup : infos saisies sur la fiche d'anomalie, affichées ici sans modifier la fiche (ni nouvelle fiche des réceptions de marchandises) */}
+            {recAnomalies.filter((x) => x.type === "missing_bl" && (x.reference || x.docDate) && !docs.some((d) => x.reference?.includes(d.number))).map((x) => (
+              <div key={x.id} className="mt-2 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-sm text-violet-900">
+                <p className="font-semibold">{x.reference ?? "—"}{x.docDate ? ` · ${t.receptions.docOf} ${fmtDate(x.docDate, locale)}` : ""}</p>
+                <p className="text-xs">{t.receptions.fromMissingBl} <Link href={`/anomalies/${x.id}`} className="underline">{fmtNo("anomaly", anoNums.get(x.id)?.n ?? x.number)}</Link></p>
+              </div>
+            ))}
           </div>
 
           <div className="bg-white p-4">
@@ -172,14 +179,19 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
 
           <div className="bg-white p-4">
             <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-stone-500"><Icon name="check" className="h-4 w-4" /> {t.receptions.summary}</h2>
-            {!reprise && <div className="mb-2 grid grid-cols-3 gap-1.5 text-center">
-              {(["conform", "reserve", "refuse"] as const).map((d) => (
+            <div className={`mb-2 grid ${reprise ? "grid-cols-1" : "grid-cols-4"} gap-1.5 text-center`}>
+              {!reprise && (["conform", "reserve", "refuse"] as const).map((d) => (
                 <div key={d} className={`rounded-lg py-1.5 ${decisionStyles[d].badge}`}>
                   <p className="text-lg font-bold leading-none">{lines.filter((l) => l.decision === d).length}</p>
                   <p className="text-[10px] font-semibold">{t.decision[d]}</p>
                 </div>
               ))}
-            </div>}
+              {/* Anomalie : fiches d'anomalie de la fiche, en orange */}
+              <div className="rounded-lg bg-orange-100 py-1.5 text-orange-800">
+                <p className="text-lg font-bold leading-none">{recAnomalies.length}</p>
+                <p className="text-[10px] font-semibold">{t.wizard.anomalyTile}</p>
+              </div>
+            </div>
             <dl className="space-y-1 text-xs">
               <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.createdBy}</dt><dd className="text-right font-medium">{author?.name ?? "—"}</dd></div>
               {rec.updatedAt && <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.editedOn}</dt><dd className="text-right font-medium">{fmtDateTime(rec.updatedAt, locale)}{editor ? ` · ${editor.name}` : ""}</dd></div>}
@@ -196,7 +208,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
           return (
             <li key={l.id} className={`card border-l-4 ${decisionStyles[l.decision].border} p-3 text-sm`}>
               <div className="flex items-start justify-between gap-2">
-                <span className="font-semibold">{l.productName}{l.document && multiDoc && <span className="ml-1 text-xs font-normal text-stone-500">· {l.document}</span>}</span>
+                <span className="font-semibold">{l.productName}{l.document && multiDoc && <span className="ml-1 text-xs font-normal text-stone-500">· {l.document}</span>}{l.originRef && <span className="mt-0.5 block text-xs font-medium text-amber-800">↩ {l.originRef}</span>}</span>
                 <span className={`badge ${decisionStyles[l.decision].badge}`}>{t.decision[l.decision]}</span>
               </div>
               <dl className="mt-2 grid grid-cols-3 gap-x-3 gap-y-1 text-xs">
@@ -246,7 +258,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
               return (
                 <tr key={l.id} className={`border-l-4 ${decisionStyles[l.decision].border}`}>
                   {multiDoc && <td className="whitespace-nowrap text-stone-600">{l.document ?? "—"}</td>}
-                  <td className="font-medium">{l.productName}</td>
+                  <td className="font-medium">{l.productName}{l.originRef && <span className="block text-xs font-normal text-amber-800">↩ {l.originRef}</span>}</td>
                   <td className="text-stone-500">{catName(l.categoryId)}</td>
                   <td className="text-right tabular-nums">{fmtNum(l.qtyOrdered, locale)} {l.qtyOrdered ? l.unit : ""}</td>
                   <td className="text-right tabular-nums">{fmtNum(l.qtyReceived, locale)} {l.qtyReceived ? l.unit : ""}</td>
