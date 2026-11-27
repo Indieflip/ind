@@ -14,6 +14,9 @@ import { docLabel } from "@/lib/documents";
 import { natureOfCategory } from "@/lib/nature";
 import { WEIGH_TYPE } from "@/lib/anomaly";
 import type { SessionUser } from "@/lib/auth";
+import { legacyOf, waitingList } from "@/lib/anomaly";
+import { recNo } from "@/lib/numbering";
+import { receptionNumbers } from "@/lib/server/queries";
 
 const lineSchema = z.object({
   productId: z.number().int().nullable(),
@@ -63,6 +66,10 @@ export const payloadSchema = z.object({
     .optional(),
   /** Case « BL / Facture manquant » : crée la fiche d'anomalie BL manquant */
   missingBl: z.boolean().optional(),
+  /** « reprise » : bon de reprise / retour (BR), même formulaire qu'une livraison */
+  kind: z.enum(["livraison", "reprise"]).optional(),
+  /** Bon de reprise : livraison d'origine des produits repris (facultatif) */
+  originReceptionId: z.number().int().nullish(),
   lines: z.array(lineSchema).max(300),
 });
 export type Payload = z.infer<typeof payloadSchema>;
@@ -126,7 +133,26 @@ function headerValues(p: Payload) {
     driverLeftUnsigned: !p.signature && !!p.driverLeftUnsigned,
     receiverName: p.receiverName || null,
     receiverSignatureUrl: p.receiverSignature || null,
+    originReceptionId: p.kind === "reprise" ? p.originReceptionId ?? null : null,
   };
+}
+
+/** Bon de reprise : chaque produit est repris par le fournisseur (quantité reprise = Q Contrôlée, sinon Q sur le bon) */
+function asReprise(p: Payload) {
+  if (p.kind !== "reprise") return p;
+  return {
+    ...p, truckTemp: null, vehicleClean: null, bakery: null, missingBl: false,
+    lines: p.lines.map((l) => ({ ...l, decision: "conform" as const, refuseQty: null, refuseUnit: null, temperature: null,
+      returnQty: l.returnQty ?? l.qtyReceived ?? l.qtyOrdered, returnUnit: l.returnUnit || l.unit })),
+  };
+}
+
+/** N° suivant de la suite (livraisons RCP ou bons de reprise BR) pour l'année de la date */
+export async function nextSeq(tx: Tx, kind: string, at: Date) {
+  await tx.execute(sql`select pg_advisory_xact_lock(4242)`);
+  const res = await tx.execute<{ next: number }>(sql`select coalesce(max(seq), 0)::int + 1 as next from receptions
+    where kind = ${kind} and extract(year from delivered_at at time zone 'Europe/Paris') = extract(year from (${at.toISOString()}::timestamptz) at time zone 'Europe/Paris')`);
+  return Number(res.rows[0].next);
 }
 
 /**
@@ -147,6 +173,8 @@ async function writeContent(
   unchanged: Map<number, PriceRef> = new Map(),
   /** Fiche importée modifiée : pas de « BL manquant » automatique (seulement par la case « BL / Facture manquant ») */
   silent = false,
+  /** Bon de reprise (N° BR…) : ni pesée, ni prix, ni contrôles de livraison ; chaque produit repris → fiche « Retour marchandise » en attente d'avoir */
+  reprise: { no: string; originId: number | null } | null = null,
 ) {
   const { supplierId, supplierName } = supplier;
   const date = new Date(p.deliveredAt);
@@ -181,7 +209,7 @@ async function writeContent(
   for (const l of p.lines) {
     const kind = kindOf(l.categoryId);
     const qty = l.qtyOrdered ?? l.qtyReceived; // quantité facturée (BL / facture)
-    if (!kind || qty == null || qty === 0 || l.decision === "refuse") continue;
+    if (reprise || !kind || qty == null || qty === 0 || l.decision === "refuse") continue;
     await tx.insert(schema.meatFishEntries).values({ kind, date: deliveryDay, product: l.productName, unit: l.unit, qty: String(qty), receptionId: recId, supplierName });
   }
 
@@ -195,7 +223,7 @@ async function writeContent(
   const ids = p.lines.map((l) => l.productId).filter((x): x is number => !!x);
   if (ids.length) for (const r of await tx.select({ id: schema.products.id, pct: schema.products.acceptableLossPct }).from(schema.products).where(inArray(schema.products.id, ids))) if (num(r.pct)) lossPct.set(r.id, num(r.pct)!);
   for (const l of p.lines) {
-    if (unitName(l.unit) !== "Kg" || l.qtyOrdered == null || l.qtyReceived == null) continue;
+    if (reprise || unitName(l.unit) !== "Kg" || l.qtyOrdered == null || l.qtyReceived == null) continue;
     const pct = l.productId ? lossPct.get(l.productId) ?? 0 : 0;
     const loss = pct ? Math.round(l.qtyOrdered * pct * 10) / 1000 : 0;
     const gapQty = Math.round((l.qtyOrdered - l.qtyReceived - loss) * 1000) / 1000;
@@ -225,7 +253,7 @@ async function writeContent(
 
   // Suivi boulangerie : une ligne par bon (date de livraison)
   await tx.delete(schema.bakeryEntries).where(eq(schema.bakeryEntries.receptionId, recId));
-  const b = p.bakery;
+  const b = reprise ? null : p.bakery;
   if (b && Object.values(b).some((v) => v != null)) {
     const s = (v: number | null) => (v != null ? String(v) : null);
     const day = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Paris" }).format(date);
@@ -246,6 +274,14 @@ async function writeContent(
   const productById = new Map([...supplierProducts, ...citedProducts].map((x) => [x.id, x]));
   const fvIds = [...new Set([...productById.values()].map((x) => x.fvItemId).filter((x): x is number => !!x))];
   const fvById = new Map((fvIds.length ? await tx.select().from(schema.fvItems).where(inArray(schema.fvItems.id, fvIds)) : []).map((f) => [f.id, f]));
+  // Bon de reprise rattaché à une livraison : fiches d'anomalie de la livraison d'origine (mises à jour plutôt que recréées)
+  const originId = reprise?.originId ?? null;
+  const [originAnomalies, originLines] = originId
+    ? await Promise.all([
+        tx.select().from(schema.anomalies).where(eq(schema.anomalies.receptionId, originId)),
+        tx.select({ id: schema.receptionLines.id, productName: schema.receptionLines.productName }).from(schema.receptionLines).where(eq(schema.receptionLines.receptionId, originId)),
+      ])
+    : [[], []];
 
   let position = 0;
   for (const l of p.lines) {
@@ -262,7 +298,7 @@ async function writeContent(
           .returning();
         supplierProducts.push(product);
         productById.set(product.id, product);
-        if (l.unitPrice != null) {
+        if (l.unitPrice != null && !reprise) {
           await tx.insert(schema.priceChanges).values({
             supplierId, supplierName, productId: product.id, productName: product.name, unit: product.unit,
             oldPrice: null, newPrice: String(l.unitPrice), pct: null, type: "new_product", source: "reception",
@@ -278,8 +314,9 @@ async function writeContent(
     const current: PriceRef = fv
       ? { ...fvRange(fv.prices, month), locked: fv.locked }
       : { min: num(product.priceMin), max: num(product.price), locked: product.priceLocked };
-    const keepPrice = unchanged.has(productId);
-    const ref: PriceRef = keepPrice ? unchanged.get(productId)! : current;
+    // (bon de reprise : prix affiché pour le montant, le Mercurial n'est pas touché)
+    const keepPrice = unchanged.has(productId) || !!reprise;
+    const ref: PriceRef = unchanged.get(productId) ?? current;
     const check = keepPrice ? ({ kind: "ok" } as PriceCheck) : checkPrice(l.unitPrice, ref);
 
     /** Met à jour la borne min ou max de la référence (mercurial ou mois des fruits et légumes) */
@@ -384,7 +421,7 @@ async function writeContent(
     // Boutons Refus / Retour activés (quantité ou unité renseignée, même sans quantité)
     const refused = l.refuseQty != null || !!l.refuseUnit;
     const returned = l.returnQty != null || !!l.returnUnit;
-    if (l.decision === "conform" && !refused && !returned && detected.length && !keep.products.has(l.productName.toLowerCase())) {
+    if (!reprise && l.decision === "conform" && !refused && !returned && detected.length && !keep.products.has(l.productName.toLowerCase())) {
       const first = detected[0];
       await tx.insert(schema.anomalies).values({
         ...(extraOnly ? { mode: "verification" as const } : {}),
@@ -402,6 +439,39 @@ async function writeContent(
           : {}),
         photoUrl: l.photos[0] ?? null, createdBy: user.id, createdAt: date,
       });
+    }
+    // Bon de reprise : produit repris par le fournisseur → fiche d'anomalie « Retour marchandise », en attente d'avoir.
+    // Produit déjà en anomalie sur la livraison d'origine : cette fiche est mise à jour (note datée) au lieu d'en créer une autre.
+    if (reprise) {
+      if (keep.products.has(l.productName.toLowerCase())) continue;
+      const rq = l.returnQty ?? null;
+      const ru = l.returnUnit || l.unit;
+      const ddmmyy = `${deliveryDay.slice(8, 10)}/${deliveryDay.slice(5, 7)}/${deliveryDay.slice(2, 4)}`;
+      const reasonLabel = l.reason ? motifLabel(l.reason, t) : "";
+      const note = `${ddmmyy} : ${t.returnSlip.noteOn} ${reprise.no}${rq != null ? ` : ${qtyText(rq, ru)}` : ""}${reasonLabel ? ` (${reasonLabel})` : ""}`;
+      const origin = reprise.originId ? originAnomalies.find((a) => a.lineId && originLines.find((o) => o.id === a.lineId && normalize(o.productName) === normalize(l.productName)) || normalize(a.productName ?? "") === normalize(l.productName) || (a.items ?? []).some((x) => normalize(x.name) === normalize(l.productName))) : undefined;
+      if (origin) {
+        if (!(origin.followUp ?? "").includes(reprise.no)) {
+          const followUp = [origin.followUp, note].filter(Boolean).join("\n");
+          const waitingFor = [...new Set([...waitingList(origin.waitingFor), "avoir"])].join(",");
+          await tx.update(schema.anomalies).set({ stage: "en_attente", ...legacyOf("en_attente", origin.resolution), waitingFor, followUp, lastActionAt: deliveryDay }).where(eq(schema.anomalies.id, origin.id));
+          origin.followUp = followUp;
+        }
+        continue;
+      }
+      const price = l.unitPrice != null && unitName(ru) === unitName(l.unit) ? l.unitPrice : null;
+      await tx.insert(schema.anomalies).values({
+        receptionId: recId, lineId: line.id, supplierId, supplierName, productName: l.productName, productId,
+        nature: natureOf(l.categoryId), reference: lineRef(l),
+        type: (l.reason && (reasonToAnomaly[l.reason] ?? typeOfLabel(l.reason, t))) || "other",
+        problemType: t.wizard.returnProblem,
+        description: `${t.returnSlip.noteOn} ${reprise.no}${rq != null ? ` : ${qtyText(rq, ru)}` : ""}${reasonLabel ? ` ; ${reasonLabel.toLowerCase()}` : ""}`,
+        items: [{ productId, name: l.productName, qty: rq, unit: ru, price }],
+        claimedAmount: money(rq != null && price != null ? rq * price : null),
+        stage: "en_attente", ...legacyOf("en_attente", null), waitingFor: "avoir", followUp: note, lastActionAt: deliveryDay,
+        photoUrl: l.photos[0] ?? null, createdBy: user.id, createdAt: date,
+      });
+      continue;
     }
     if ((l.decision !== "conform" || refused || returned) && !keep.products.has(l.productName.toLowerCase())) {
       const reasonLabel = l.reason ? (t.reasons as Record<string, string>)[l.reason] ?? l.reason : "";
@@ -447,7 +517,7 @@ async function writeContent(
 
   // Un bon sans BL (ni numéro ni photo) est une anomalie
   // ou case « BL / Facture manquant » cochée sur la fiche
-  if ((p.missingBl || (!silent && !p.blNumber?.trim() && p.blPhotos.length === 0)) && !keep.missingBl) {
+  if (!reprise && (p.missingBl || (!silent && !p.blNumber?.trim() && p.blPhotos.length === 0)) && !keep.missingBl) {
     await tx.insert(schema.anomalies).values({
       receptionId: recId, supplierId, supplierName, type: "missing_bl", reference: docRef,
       description: p.missingBl ? t.anomalies.boxMissingBl : t.anomalies.autoMissingBl, createdBy: user.id, createdAt: date,
@@ -456,7 +526,7 @@ async function writeContent(
 
   // Température du camion : sert à proposer la décision des produits frais, sans fiche d'anomalie à part
 
-  if (p.vehicleClean === false && !keep.hygiene) {
+  if (!reprise && p.vehicleClean === false && !keep.hygiene) {
     await tx.insert(schema.anomalies).values({
       receptionId: recId, supplierId, supplierName, type: "hygiene", reference: docRef,
       description: `${t.wizard.vehicleClean} ${t.common.no}`, createdBy: user.id, createdAt: date,
@@ -504,13 +574,17 @@ export async function saveReception(p: Payload, user: SessionUser): Promise<numb
   const dup = await findDocDuplicate({ supplierId: p.supplierId, supplierName: p.supplierName, numbers: payloadNumbers(p) });
   if (dup) throw new DuplicateDocError(dup);
 
+  p = asReprise(p);
+  const kind = p.kind ?? "livraison";
   return db.transaction(async (tx) => {
     const supplier = await resolveSupplier(tx, p);
+    // N° enregistré tout de suite (RCP ou BR, suite de l'année) : ne bouge plus si une autre fiche est supprimée
+    const seq = await nextSeq(tx, kind, new Date(p.deliveredAt));
     const [rec] = await tx
       .insert(schema.receptions)
-      .values({ clientUuid: p.clientUuid, ...supplier, ...headerValues(p), createdBy: user.id })
+      .values({ clientUuid: p.clientUuid, ...supplier, ...headerValues(p), kind, seq, createdBy: user.id })
       .returning();
-    await writeContent(tx, rec.id, supplier, p, user, t);
+    await writeContent(tx, rec.id, supplier, p, user, t, undefined, undefined, undefined, false, kind === "reprise" ? { no: recNo(kind, seq), originId: rec.originReceptionId } : null);
     await tx.delete(schema.receptionDrafts).where(eq(schema.receptionDrafts.clientUuid, p.clientUuid));
     return rec.id;
   });
@@ -533,6 +607,8 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
     const rec = await tx.query.receptions.findFirst({ where: eq(schema.receptions.id, id) });
     if (!rec) return null;
     if (rec.consolidatedAt) throw new LockedError("consolidated");
+    // La sorte de fiche (livraison / bon de reprise) ne change pas en modification
+    p = asReprise({ ...p, kind: rec.kind === "reprise" ? "reprise" : "livraison" });
 
     // 1. Prix : on ne revient que sur les produits dont le prix du bon a changé.
     //    Les autres gardent leur écart d'origine et le mercurial n'est pas touché
@@ -631,7 +707,9 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
       .update(schema.receptions)
       .set({ ...supplier, ...headerValues(p), updatedBy: user.id, updatedAt: new Date() })
       .where(eq(schema.receptions.id, id));
-    await writeContent(tx, id, supplier, p, user, t, keep, claims, unchanged, !!rec.importedFrom);
+    const seqNow = rec.seq ?? (await receptionNumbers()).get(id) ?? null;
+    await writeContent(tx, id, supplier, p, user, t, keep, claims, unchanged, !!rec.importedFrom,
+      rec.kind === "reprise" ? { no: recNo("reprise", seqNow), originId: p.originReceptionId ?? null } : null);
 
     if (linked.length) {
       const newLines = await tx.select().from(schema.receptionLines).where(eq(schema.receptionLines.receptionId, id)).orderBy(asc(schema.receptionLines.position));

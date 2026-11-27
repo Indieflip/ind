@@ -8,7 +8,7 @@ import { getDict } from "@/lib/i18n/server";
 import { buildReservesText } from "@/components/reception/helpers";
 import { EditReception } from "@/components/reception/EditReception";
 import { receptionNumbers } from "@/lib/server/queries";
-import { fmtNo } from "@/lib/numbering";
+import { recNo } from "@/lib/numbering";
 import type { Draft, DraftLine } from "@/lib/reception-types";
 
 export const dynamic = "force-dynamic";
@@ -91,6 +91,7 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     blRead: "idle",
     imported: !!rec.importedFrom,
     missingBl: missingBlAnomaly,
+    ...(rec.kind === "reprise" ? { kind: "reprise" as const, originReceptionId: rec.originReceptionId } : {}),
     photoOk: photos.some((p) => p.kind === "bl"),
     noBl: !photos.some((p) => p.kind === "bl"),
     lines: draftLines,
@@ -113,5 +114,5 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
   // Modification : une seule page simple (Livraison, Produits, Réserves), pas le parcours en étapes
   void user;
   const seq = (await receptionNumbers()).get(id);
-  return <EditReception id={id} initialDraft={draft} number={fmtNo("reception", seq)} />;
+  return <EditReception id={id} initialDraft={draft} number={recNo(rec.kind, seq)} />;
 }

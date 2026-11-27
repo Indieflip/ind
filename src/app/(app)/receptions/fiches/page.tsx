@@ -28,6 +28,7 @@ export default async function SheetsPage({ searchParams }: { searchParams: Promi
     db
       .select({ id: r.id, deliveredAt: r.deliveredAt, supplierName: r.supplierName, blNumber: r.blNumber, documents: r.documents, status: r.status, consolidatedAt: r.consolidatedAt })
       .from(r)
+      .where(eq(r.kind, "livraison")) // (bons de reprise : pas dans la fiche de réception des marchandises)
       .orderBy(desc(r.deliveredAt))
       .limit(2000),
     user.role === "admin" ? db.select({ id: schema.users.id, name: schema.users.name, role: schema.users.role }).from(schema.users).where(eq(schema.users.active, true)).orderBy(asc(schema.users.name)) : Promise.resolve([]),

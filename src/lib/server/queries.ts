@@ -1,5 +1,5 @@
 import "server-only";
-import { parisYear } from "@/lib/numbering";
+import { parisYear, recNo } from "@/lib/numbering";
 import { and, desc, eq, isNotNull, isNull, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import { matches } from "@/lib/search";
 import { getDb, schema } from "@/db";
@@ -35,17 +35,29 @@ export function receptionWhere(f: ReceptionFilters) {
 
 /**
  * N° de fiche de réception (RCP001…) par année de livraison, remise à zéro le 01/01 : numéro enregistré (attribué par date de livraison),
- * les nouvelles fiches prennent la suite dans l'ordre d'enregistrement.
+ * les nouvelles fiches prennent la suite dans l'ordre d'enregistrement. Les bons de reprise (BR001…) ont leur propre suite.
  */
 export async function receptionNumbers() {
-  const rows = await getDb().select({ id: schema.receptions.id, at: schema.receptions.deliveredAt, seq: schema.receptions.seq }).from(schema.receptions).orderBy(schema.receptions.id);
-  const maxByYear = new Map<number, number>();
-  for (const r of rows) if (r.seq != null) { const y = parisYear(r.at); maxByYear.set(y, Math.max(maxByYear.get(y) ?? 0, r.seq)); }
-  return new Map(rows.map((r) => {
+  return (await receptionNumbering()).numbers;
+}
+
+/** N° affichés (« RCP012 », « BR003 ») de toutes les fiches, livraisons et bons de reprise */
+export async function receptionNos() {
+  const { numbers, kinds } = await receptionNumbering();
+  return new Map([...numbers].map(([id, n]) => [id, recNo(kinds.get(id), n)] as [number, string]));
+}
+
+async function receptionNumbering() {
+  const rows = await getDb().select({ id: schema.receptions.id, at: schema.receptions.deliveredAt, seq: schema.receptions.seq, kind: schema.receptions.kind }).from(schema.receptions).orderBy(schema.receptions.id);
+  const maxByYear = new Map<string, number>();
+  const key = (r: (typeof rows)[number]) => `${r.kind}|${parisYear(r.at)}`;
+  for (const r of rows) if (r.seq != null) maxByYear.set(key(r), Math.max(maxByYear.get(key(r)) ?? 0, r.seq));
+  const numbers = new Map(rows.map((r) => {
     if (r.seq != null) return [r.id, r.seq] as [number, number];
-    const y = parisYear(r.at); const n = (maxByYear.get(y) ?? 0) + 1; maxByYear.set(y, n);
+    const n = (maxByYear.get(key(r)) ?? 0) + 1; maxByYear.set(key(r), n);
     return [r.id, n] as [number, number];
   }));
+  return { numbers, kinds: new Map(rows.map((r) => [r.id, r.kind])) };
 }
 
 export async function listReceptions(f: ReceptionFilters, limit = 1000) {
@@ -68,6 +80,7 @@ function listRaw(f: ReceptionFilters, limit: number) {
       driverName: r.driverName,
       consolidatedAt: r.consolidatedAt,
       importedFrom: r.importedFrom,
+      kind: r.kind,
       lineCount: sql<number>`(select count(*)::int from reception_lines l where l.reception_id = ${r.id})`,
       // Produits non rattachés au Mercurial (à trier sur les anciennes fiches)
       unlinkedCount: sql<number>`(select count(*)::int from reception_lines l where l.reception_id = ${r.id} and l.product_id is null)`,

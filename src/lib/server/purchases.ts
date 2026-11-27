@@ -31,7 +31,7 @@ export async function loadPurchases(freq: PurchaseFreq, locale: string, labels: 
     join reception_lines l on l.reception_id = r.id
     left join suppliers s on s.id = r.supplier_id
     left join products p on p.id = l.product_id
-    where l.decision <> 'refuse'
+    where l.decision <> 'refuse' and r.kind = 'livraison'
       and r.delivered_at at time zone 'Europe/Paris' >= ${fromDate}::date and r.delivered_at at time zone 'Europe/Paris' < ${endDate}::date
     group by 1, 2, 3, 4, 5
   `);

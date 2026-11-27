@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
 import { fmtDate, fmtDateTime, fmtMoney, num } from "@/lib/format";
-import { one, receptionNumbers, type SP } from "@/lib/server/queries";
+import { one, receptionNos, type SP } from "@/lib/server/queries";
 import { globalSearch } from "@/lib/server/search";
 import { PageHeader } from "@/components/ui";
 import { GlobalSearch } from "@/components/GlobalSearch";
@@ -17,14 +17,14 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const { t, locale } = await getDict();
   const s = t.search;
   const q = (one((await searchParams).q) ?? "").trim();
-  const [res, numbers] = await Promise.all([q ? globalSearch(q) : null, receptionNumbers()]);
+  const [res, numbers] = await Promise.all([q ? globalSearch(q) : null, receptionNos()]);
   const r = user.role;
   const sections = res
     ? [
         can.viewReceptions(r) && res.receptions.length > 0 && (
           <Section key="rec" title={t.nav.receptions} count={res.receptions.length}>
             {res.receptions.map((x) => (
-              <Item key={x.id} href={`/receptions/${x.id}`} title={`${numbers.get(x.id) ?? ""}. ${x.supplierName}`} meta={`${fmtDateTime(x.deliveredAt, locale)} · ${docText(x.documents, x.blNumber)}${x.consolidatedAt ? ` · ${t.receptions.consolidated}` : ""}`} />
+              <Item key={x.id} href={`/receptions/${x.id}`} title={`${numbers.get(x.id) ?? ""} · ${x.supplierName}`} meta={`${fmtDateTime(x.deliveredAt, locale)} · ${docText(x.documents, x.blNumber)}${x.consolidatedAt ? ` · ${t.receptions.consolidated}` : ""}`} />
             ))}
           </Section>
         ),

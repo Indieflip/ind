@@ -66,6 +66,7 @@ export function StepCheck({
           supplierId={draft.supplierId}
           truckTemp={draft.truckTemp}
           optional={!!draft.imported}
+          reprise={draft.kind === "reprise"}
           onChange={(patch) => updateLine(l.key, patch)}
           onRemove={async () => await appConfirm(t.wizard.removeLineConfirm) && setDraft((d) => ({ ...d, lines: d.lines.filter((x) => x.key !== l.key) }))}
         />
@@ -83,6 +84,7 @@ function LineCard({
   onRemove,
   truckTemp,
   optional = false,
+  reprise = false,
 }: {
   line: DraftLine;
   catalog?: Catalog;
@@ -92,6 +94,8 @@ function LineCard({
   truckTemp?: string;
   /** Fiche importée : aucun champ signalé comme obligatoire */
   optional?: boolean;
+  /** Bon de reprise : quantités sur le bon / reprise, motif et photo ; ni T°, ni DLC, ni conformité */
+  reprise?: boolean;
 }) {
   const { t, locale } = useI18n();
   const cat = catalog?.categories.find((c) => c.id === line.categoryId);
@@ -154,7 +158,7 @@ function LineCard({
   );
   const reasonBlock = <div className="mt-3 space-y-2">{reasonSelect}{photoBlock}</div>;
   return (
-    <article id={`line-${line.key}`} className={`card scroll-mt-32 border-l-4 ${style.border} p-4 ${!line.decision ? "ring-2 ring-amber-300" : ""}`}>
+    <article id={`line-${line.key}`} className={`card scroll-mt-32 border-l-4 ${style.border} p-4 ${!line.decision && !reprise ? "ring-2 ring-amber-300" : ""}`}>
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="min-w-0">
           {line.productId ? (
@@ -229,8 +233,8 @@ function LineCard({
       )}
 
       <div className="grid grid-cols-3 gap-2">
-        {field("qtyOrdered", t.wizard.ordered, { inputMode: "decimal" })}
-        {field("qtyReceived", t.wizard.received, { inputMode: "decimal" })}
+        {field("qtyOrdered", reprise ? t.returnSlip.qtyOnSlip : t.wizard.ordered, { inputMode: "decimal" })}
+        {field("qtyReceived", reprise ? t.returnSlip.qtyTaken : t.wizard.received, { inputMode: "decimal", ...(reprise ? { placeholder: line.qtyOrdered } : {}) })}
         <div>
           <label className="mb-0.5 block text-xs font-medium text-stone-600">{t.common.unit}</label>
           <UnitSelect className="input py-2" value={line.unit} units={catalog?.units ?? DEFAULT_UNITS} onChange={(unit) => onChange({ unit })} />
@@ -238,7 +242,7 @@ function LineCard({
       </div>
 
       <div className="mt-2 grid grid-cols-2 gap-2">
-        {cat?.tempRequired && (
+        {cat?.tempRequired && !reprise && (
           <div>
             <label className="mb-0.5 flex items-center gap-1 text-xs font-medium text-stone-600">
               <Icon name="thermo" className="h-3.5 w-3.5" /> {t.wizard.temperature}
@@ -247,7 +251,7 @@ function LineCard({
             <input className={`input py-2 ${!optional && ev.issues.includes("temp_missing") ? "border-amber-400" : ""}`} inputMode="decimal" value={line.temperature} onChange={(e) => onChange({ temperature: e.target.value })} />
           </div>
         )}
-        {!noDlc && (
+        {!noDlc && !reprise && (
           <div>
             <label className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.dlc}{dlcRequired(line, catalog) && <span className="ml-0.5 text-red-600">*</span>}</label>
             <DateField className={`py-2 ${!optional && needsDlc(line, catalog) ? "border-amber-400 bg-amber-50" : ""}`} value={line.dlc} onChange={(x) => onChange({ dlc: x })} />
@@ -256,11 +260,11 @@ function LineCard({
         {!noDlc && field("lot", t.wizard.lot)}
         <div>
           <label className="mb-0.5 block text-xs font-medium text-stone-600">
-            {t.wizard.unitPrice}<span className="ml-0.5 text-red-600">*</span>
+            {t.wizard.unitPrice}{!reprise && <span className="ml-0.5 text-red-600">*</span>}
             <span className="ml-1 font-normal text-stone-400">{rangeLabel}</span>
             {line.priceLocked && <span className="ml-1 badge bg-sky-100 text-sky-800">🔒 {t.wizard.lockedBadge}</span>}
           </label>
-          <MoneyInput className={`input py-2 ${!optional && !line.unitPrice.trim() && !line.priceNotShown ? "border-amber-400 bg-amber-50" : ""}`} value={line.unitPrice} disabled={!!line.priceNotShown} onChange={(e) => onChange({ unitPrice: e.target.value })} />
+          <MoneyInput className={`input py-2 ${!optional && !reprise && !line.unitPrice.trim() && !line.priceNotShown ? "border-amber-400 bg-amber-50" : ""}`} value={line.unitPrice} disabled={!!line.priceNotShown} onChange={(e) => onChange({ unitPrice: e.target.value })} />
           {/* Soit un prix, soit « Non indiqué sur le bon » (l'un ou l'autre pour valider le bon) */}
           <label className="mt-1 flex items-center gap-1.5 text-xs text-stone-600">
             <input type="checkbox" className="h-4 w-4 accent-brand-600" checked={!!line.priceNotShown} onChange={(e) => {
@@ -286,7 +290,15 @@ function LineCard({
         <input className="input py-2" value={line.note ?? ""} placeholder={t.wizard.notePh} onChange={(e) => onChange({ note: e.target.value })} />
       </div>
 
-      {ev.issues.length > 0 && (
+      {/* Bon de reprise : motif du retour et photo, à la place des contrôles de livraison */}
+      {reprise && (
+        <div className="mt-3 space-y-2 rounded-lg border border-amber-500 bg-amber-50 p-2.5">
+          <p className="text-xs font-semibold text-stone-700">↩ {t.returnSlip.reasonTitle}</p>
+          {reasonSelect}
+          {photoBlock}
+        </div>
+      )}
+      {!reprise && ev.issues.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-1.5">
           {ev.issues.map((i) => (
             <li key={i} className="badge bg-stone-100 text-stone-700">
@@ -298,7 +310,7 @@ function LineCard({
       )}
 
       {/* Refus / Retour : juste au-dessus de la conformité, indépendants (cumulables) ; chacun ouvre Quantité + Unité */}
-      {(() => {
+      {!reprise && (() => {
         const units = catalog?.units ?? DEFAULT_UNITS;
         const toggle = (kind: "refuse" | "return") => onChange(kind === "refuse"
           ? { refuseOn: !line.refuseOn, ...(!line.refuseOn ? { refuseQty: line.refuseQty || line.qtyOrdered || line.qtyReceived, refuseUnit: line.refuseUnit || line.unit } : {}) }
@@ -346,6 +358,7 @@ function LineCard({
         );
       })()}
 
+      {!reprise && <>
       <p className="mt-3 mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">{t.wizard.productConformity} <span className="text-red-600">*</span></p>
       <div className="grid grid-cols-2 gap-1.5">
         {(["conform", "refuse"] as Decision[]).map((d) => (
@@ -363,6 +376,7 @@ function LineCard({
 
       {/* Refus du produit entier sans Refus / Retour au-dessus : motif et photo sous la conformité */}
       {line.decision === "refuse" && !line.refuseOn && !line.returnOn && reasonBlock}
+      </>}
     </article>
   );
 }

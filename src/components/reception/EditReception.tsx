@@ -37,7 +37,7 @@ export function EditReception({ id, initialDraft, number }: { id: number; initia
 
   const setDraft = useCallback((fn: (d: Draft) => Draft) => setDraftState((d) => fn(d)), []);
   const updateLine = useCallback(
-    (key: string, patch: Partial<DraftLine>) => setDraft((d) => ({ ...d, lines: d.lines.map((l) => (l.key === key ? withAutoDecision({ ...l, ...patch }, catalog, d.truckTemp) : l)) })),
+    (key: string, patch: Partial<DraftLine>) => setDraft((d) => ({ ...d, lines: d.lines.map((l) => (l.key === key ? (d.kind === "reprise" ? { ...l, ...patch, decision: "conform" as const } : withAutoDecision({ ...l, ...patch }, catalog, d.truckTemp)) : l)) })),
     [setDraft, catalog],
   );
   // Réserves : texte recalculé tant qu'il n'a pas été modifié à la main
@@ -59,7 +59,7 @@ export function EditReception({ id, initialDraft, number }: { id: number; initia
       return setError(E.deliveryMissing);
     }
     // Fiche importée (générée depuis les anomalies importées) : aucun champ obligatoire ; sans décision = Conforme
-    if (draft.imported) return send({ ...draft, lines: draft.lines.map((l) => (l.decision ? l : { ...l, decision: "conform" as const })) });
+    if (draft.imported || draft.kind === "reprise") return send({ ...draft, lines: draft.lines.map((l) => (l.decision ? l : { ...l, decision: "conform" as const })) });
     const undecided = draft.lines.find((l) => !l.decision);
     if (undecided) { goLine(undecided.key); return setError(`${draft.lines.filter((l) => !l.decision).length} ${t.wizard.undecided}`); }
     const noPrice = draft.lines.filter((l) => l.productName.trim() && !l.unitPrice.trim() && !l.priceNotShown);
@@ -97,6 +97,7 @@ export function EditReception({ id, initialDraft, number }: { id: number; initia
         <Link href={`/receptions/${id}`} className="btn-ghost -ml-2 px-2 py-1.5 text-sm"><Icon name="chevronLeft" className="h-4 w-4" /> {t.common.cancel}</Link>
         <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">{E.title} · {number}</span>
       </div>
+      {draft.kind === "reprise" && <p className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-800">↩ {t.returnSlip.detail}</p>}
       <h1 className="text-xl font-bold leading-tight">{draft.supplierName}</h1>
       {draft.imported && <p className="rounded-lg bg-violet-50 px-3 py-2 text-sm text-violet-800">{E.importedHint}</p>}
 

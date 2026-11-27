@@ -51,7 +51,7 @@ export function ConvertToReturnSlipButton({ id, label, confirmText }: { id: numb
   return (
     <button className="btn-ghost text-amber-700" disabled={pending} onClick={async () => {
       if (!(await appConfirm(confirmText, { danger: true }))) return;
-      start(async () => { const r = await convertReceptionToReturnSlipAction(id); if (r && "ok" in r) { router.push(`/receptions/reprise/${r.id}`); router.refresh(); } });
+      start(async () => { const r = await convertReceptionToReturnSlipAction(id); if (r && "ok" in r) { router.push(`/receptions/${r.id}`); router.refresh(); } });
     }}>
       ↩ {label}
     </button>

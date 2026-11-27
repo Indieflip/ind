@@ -2,7 +2,7 @@ import { fmtNo } from "@/lib/numbering";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { WEIGH_TYPE } from "@/lib/anomaly";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, or } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
@@ -11,7 +11,7 @@ import { fmtDate, fmtDateTime, fmtMoney, fmtNum, fmtPct, num, sentence } from "@
 import { checkPrice } from "@/lib/pricing";
 import { StatusBadge, decisionStyles } from "@/components/DecisionBadge";
 import { Icon } from "@/components/Icon";
-import { receptionNumbers } from "@/lib/server/queries";
+import { receptionNos } from "@/lib/server/queries";
 import { anomalyNumbers } from "@/lib/server/savings";
 import { outcomeOf, outcomeStyles } from "@/lib/anomaly";
 import { AnomalyActionField, PrintButton, DeleteReceptionButton, AddNote, ConsolidateImportedButton, UnconsolidateImportedButton, ConvertToReturnSlipButton } from "./Actions";
@@ -42,8 +42,14 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
   const multiDoc = new Set(lines.map((l) => l.document).filter(Boolean)).size > 1;
   const consolidator = rec.consolidatedBy ? await db.query.users.findFirst({ where: eq(schema.users.id, rec.consolidatedBy), columns: { name: true } }) : undefined;
   const locked = !!rec.consolidatedAt;
-  // Bons de reprise / retour rattachés à cette livraison
-  const slips = await db.select().from(schema.returnSlips).where(eq(schema.returnSlips.receptionId, rec.id)).orderBy(asc(schema.returnSlips.date));
+  // Bons de reprise / retour rattachés à cette livraison (fiches de sorte « reprise ») ; pour un bon : sa livraison d'origine
+  const reprise = rec.kind === "reprise";
+  const r = schema.receptions;
+  const [slipRecs, origin] = await Promise.all([
+    reprise ? Promise.resolve([]) : db.select({ id: r.id, at: r.deliveredAt }).from(r).where(and(eq(r.originReceptionId, rec.id), eq(r.kind, "reprise"))).orderBy(asc(r.deliveredAt)),
+    rec.originReceptionId ? db.query.receptions.findFirst({ where: eq(r.id, rec.originReceptionId), columns: { id: true, deliveredAt: true, blNumber: true } }) : undefined,
+  ]);
+  const slipLines = slipRecs.length ? await db.select({ receptionId: schema.receptionLines.receptionId, name: schema.receptionLines.productName, qty: schema.receptionLines.returnQty, unit: schema.receptionLines.returnUnit }).from(schema.receptionLines).where(inArray(schema.receptionLines.receptionId, slipRecs.map((x) => x.id))).orderBy(asc(schema.receptionLines.position)) : [];
   const editor = rec.updatedBy ? await db.query.users.findFirst({ where: eq(schema.users.id, rec.updatedBy), columns: { name: true } }) : undefined;
   // Montant HT accepté : quantité reçue × prix, hors produits refusés
   const total = lines.reduce((sum, l) => (l.decision === "refuse" ? sum : sum + (num(l.qtyReceived) ?? 0) * (num(l.unitPrice) ?? 0)), 0);
@@ -54,9 +60,11 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
   const blPhotos = photos.filter((p) => p.kind === "bl");
   const labelPhotos = photos.filter((p) => p.kind === "label");
   const docs = ((rec.documents as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[] | null) ?? (rec.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : [])) as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[];
-  const [seq, anoNums] = await Promise.all([receptionNumbers().then((m) => m.get(rec.id)), anomalyNumbers()]);
+  const [recNos, anoNums] = await Promise.all([receptionNos(), anomalyNumbers()]);
+  const no = recNos.get(rec.id) ?? "—";
   const [recAnomalies, recGaps] = await Promise.all([
-    db.select().from(schema.anomalies).where(eq(schema.anomalies.receptionId, rec.id)).orderBy(asc(schema.anomalies.id)),
+    // Bon de reprise : ses fiches d'anomalie + celles de la livraison d'origine mises à jour par le bon
+    db.select().from(schema.anomalies).where(reprise && origin ? or(eq(schema.anomalies.receptionId, rec.id), and(eq(schema.anomalies.receptionId, origin.id), ilike(schema.anomalies.followUp, `%${no}%`))) : eq(schema.anomalies.receptionId, rec.id)).orderBy(asc(schema.anomalies.id)),
     db.select().from(schema.weighGaps).where(eq(schema.weighGaps.receptionId, rec.id)).orderBy(asc(schema.weighGaps.id)),
   ]);
   const showPrices = can.viewPrices(user.role) || can.receive(user.role);
@@ -74,9 +82,9 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
           )}
           {!locked && rec.importedFrom && can.consolidate(user.role) && <ConsolidateImportedButton id={rec.id} label={t.receptions.consolidateImported} confirmText={t.receptions.consolidateImportedConfirm} />}
           {locked && rec.importedFrom && can.consolidate(user.role) && <UnconsolidateImportedButton id={rec.id} label={t.receptions.unconsolidateImported} confirmText={t.receptions.unconsolidateImportedConfirm} />}
-          {can.receive(user.role) && <Link href={`/receptions/reprise/new?reception=${rec.id}`} className="btn-secondary">↩ {t.returnSlip.button}</Link>}
+          {!reprise && can.receive(user.role) && <Link href={`/receptions/new?new=1&kind=reprise&origin=${rec.id}`} className="btn-secondary">↩ {t.returnSlip.button}</Link>}
           <PrintButton label={t.common.print} />
-          {!locked && can.editReception(user.role) && <ConvertToReturnSlipButton id={rec.id} label={t.returnSlip.convert} confirmText={t.returnSlip.convertConfirm} />}
+          {!reprise && !locked && can.editReception(user.role) && <ConvertToReturnSlipButton id={rec.id} label={t.returnSlip.convert} confirmText={t.returnSlip.convertConfirm} />}
           {!locked && can.deleteDraftReception(user.role) && <DeleteReceptionButton id={rec.id} label={t.common.delete} confirmText={t.receptions.deleteConfirm} />}
         </div>
       </div>
@@ -95,13 +103,14 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
       <section className="card overflow-hidden">
         <div className="flex flex-wrap items-start justify-between gap-4 bg-gradient-to-r from-brand-700 to-brand-600 px-5 py-4 text-white">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/70">{t.receptions.detail} · {fmtNo("reception", seq)}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/70">{reprise ? `↩ ${t.returnSlip.detail}` : t.receptions.detail} · {no}</p>
             <h1 className="mt-0.5 text-2xl font-bold leading-tight">{sentence(rec.supplierName)}</h1>
             <p className="mt-1 flex items-center gap-1.5 text-sm text-white/85"><Icon name="truck" className="h-4 w-4" /> {fmtDateTime(rec.deliveredAt, locale)}</p>
+            {origin && <p className="mt-1 text-sm text-white/85">{t.returnSlip.origin} : <Link href={`/receptions/${origin.id}`} className="font-semibold text-white underline decoration-white/50">{recNos.get(origin.id)}{origin.blNumber ? ` · ${origin.blNumber}` : ""} · {fmtDate(origin.deliveredAt, locale)}</Link></p>}
           </div>
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-1.5">
-              <span className="rounded-full bg-white px-1 py-0.5"><StatusBadge status={rec.status} label={t.receptionStatus[rec.status]} /></span>
+              <span className="rounded-full bg-white px-1 py-0.5">{reprise ? <span className="badge bg-amber-100 font-semibold text-amber-900">↩ {t.returnSlip.badge}</span> : <StatusBadge status={rec.status} label={t.receptionStatus[rec.status]} />}</span>
               {/* Modifier : tant que la fiche de réception n'est pas consolidée */}
               {!locked && can.editReception(user.role) && (
                 <Link href={`/receptions/${rec.id}/edit`} className="no-print rounded-full bg-white p-1.5 text-brand-700 hover:bg-brand-50" title={t.receptions.edit} aria-label={t.receptions.edit}><Icon name="edit" className="h-4 w-4" /></Link>
@@ -143,7 +152,8 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
             </dl>
           </div>
 
-          <div className="bg-white p-4">
+          {/* (bon de reprise : ni véhicule, ni conformité) */}
+          {!reprise && <div className="bg-white p-4">
             <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-stone-500"><Icon name="thermo" className="h-4 w-4" /> {t.receptions.vehicle}</h2>
             <div className="flex flex-wrap gap-2">
               <div className={`flex-1 rounded-lg px-3 py-2 ${rec.truckTemp == null ? "bg-stone-50 text-stone-500" : rec.truckTemp > 4 ? "bg-red-50 text-red-800" : "bg-emerald-50 text-emerald-800"}`}>
@@ -155,18 +165,18 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
                 <p className="text-lg font-bold">{rec.vehicleClean == null ? "—" : rec.vehicleClean ? t.common.yes : t.common.no}</p>
               </div>
             </div>
-          </div>
+          </div>}
 
           <div className="bg-white p-4">
             <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-stone-500"><Icon name="check" className="h-4 w-4" /> {t.receptions.summary}</h2>
-            <div className="mb-2 grid grid-cols-3 gap-1.5 text-center">
+            {!reprise && <div className="mb-2 grid grid-cols-3 gap-1.5 text-center">
               {(["conform", "reserve", "refuse"] as const).map((d) => (
                 <div key={d} className={`rounded-lg py-1.5 ${decisionStyles[d].badge}`}>
                   <p className="text-lg font-bold leading-none">{lines.filter((l) => l.decision === d).length}</p>
                   <p className="text-[10px] font-semibold">{t.decision[d]}</p>
                 </div>
               ))}
-            </div>
+            </div>}
             <dl className="space-y-1 text-xs">
               <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.createdBy}</dt><dd className="text-right font-medium">{author?.name ?? "—"}</dd></div>
               {rec.updatedAt && <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.editedOn}</dt><dd className="text-right font-medium">{fmtDateTime(rec.updatedAt, locale)}{editor ? ` · ${editor.name}` : ""}</dd></div>}
@@ -187,8 +197,8 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
                 <span className={`badge ${decisionStyles[l.decision].badge}`}>{t.decision[l.decision]}</span>
               </div>
               <dl className="mt-2 grid grid-cols-3 gap-x-3 gap-y-1 text-xs">
-                <div><dt className="text-stone-500">{t.wizard.ordered}</dt><dd>{fmtNum(l.qtyOrdered, locale)} {l.unit}</dd></div>
-                <div><dt className="text-stone-500">{t.wizard.received}</dt><dd>{fmtNum(l.qtyReceived, locale)} {l.unit}</dd></div>
+                <div><dt className="text-stone-500">{reprise ? t.returnSlip.qtyOnSlip : t.wizard.ordered}</dt><dd>{fmtNum(l.qtyOrdered, locale)} {l.unit}</dd></div>
+                <div><dt className="text-stone-500">{reprise ? t.returnSlip.qtyTaken : t.wizard.received}</dt><dd>{fmtNum(l.qtyReceived, locale)} {l.unit}</dd></div>
                 <div><dt className="text-stone-500">{t.wizard.temperature}</dt><dd>{l.temperature != null ? `${fmtNum(l.temperature, locale, 1)} °C` : "—"}</dd></div>
                 <div><dt className="text-stone-500">{t.wizard.dlc}</dt><dd>{fmtDate(l.dlc, locale)}</dd></div>
                 <div><dt className="text-stone-500">{t.wizard.lot}</dt><dd>{l.lot ?? "—"}</dd></div>
@@ -216,8 +226,8 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
               {multiDoc && <th>{t.receptions.blInvoice}</th>}
               <th>{t.common.product}</th>
               <th>{t.common.category}</th>
-              <th className="text-right">{t.wizard.ordered}</th>
-              <th className="text-right">{t.wizard.received}</th>
+              <th className="text-right">{reprise ? t.returnSlip.qtyOnSlip : t.wizard.ordered}</th>
+              <th className="text-right">{reprise ? t.returnSlip.qtyTaken : t.wizard.received}</th>
               <th className="text-right">{t.wizard.temperature}</th>
               <th>{t.wizard.dlc}</th>
               <th>{t.wizard.lot}</th>
@@ -262,13 +272,13 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
         </table>
       </section>
 
-      {slips.length > 0 && (
+      {slipRecs.length > 0 && (
         <section className="card overflow-hidden border-l-4 border-l-amber-400">
           <h2 className="px-4 pt-3 font-semibold">↩ {t.returnSlip.slipsTitle}</h2>
           <ul className="divide-y divide-stone-100 px-4 pb-3 text-sm">
-            {slips.map((b) => (
+            {slipRecs.map((b) => (
               <li key={b.id} className="py-2">
-                <Link href={`/receptions/reprise/${b.id}`} className="font-semibold text-brand-700 hover:underline">{fmtNo("returnSlip", b.seq)}</Link> · {fmtDate(b.date, locale)} · {b.items.map((i) => `${i.name} ${String(i.qty).replace(".", ",")} ${i.unit}`).join(" · ")}
+                <Link href={`/receptions/${b.id}`} className="font-semibold text-brand-700 hover:underline">{recNos.get(b.id)}</Link> · {fmtDate(b.at, locale)} · {slipLines.filter((i) => i.receptionId === b.id).map((i) => `${i.name}${i.qty != null ? ` ${fmtNum(num(i.qty))} ${i.unit ?? ""}` : ""}`).join(" · ")}
               </li>
             ))}
           </ul>

@@ -20,6 +20,9 @@ export function fmtNo(kind: NumKind, n: number | null | undefined) {
   return `${f.prefix}${String(Math.trunc(n)).padStart(f.digits, "0")}`;
 }
 
+/** N° d'une fiche de réception selon sa sorte : livraison (RCP…) ou bon de reprise / retour (BR…) */
+export const recNo = (kind: string | null | undefined, n: number | null | undefined) => fmtNo(kind === "reprise" ? "returnSlip" : "reception", n);
+
 /** Numéro tapé par l'utilisateur (« ANO401 », « ano 401 », « 401 ») → 401 */
 export function parseNo(input: string | null | undefined) {
   const m = /(\d+)/.exec(String(input ?? ""));

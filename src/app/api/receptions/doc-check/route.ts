@@ -1,7 +1,7 @@
 import { assertUser } from "@/lib/auth";
 import { can } from "@/lib/permissions";
 import { findDocDuplicate } from "@/lib/server/receptions";
-import { receptionNumbers } from "@/lib/server/queries";
+import { receptionNos } from "@/lib/server/queries";
 
 /** Ce numéro de BL / facture est-il déjà utilisé sur une autre réception du même fournisseur ? */
 export async function GET(req: Request) {
@@ -16,6 +16,6 @@ export async function GET(req: Request) {
   const excludeId = Number(u.searchParams.get("exclude")) || null;
   const dup = await findDocDuplicate({ supplierId, supplierName: u.searchParams.get("supplierName") ?? "", numbers: [number], excludeId });
   if (!dup) return Response.json({ duplicate: null });
-  const numbers = await receptionNumbers();
+  const numbers = await receptionNos();
   return Response.json({ duplicate: { ...dup, seq: numbers.get(dup.receptionId) ?? null } });
 }

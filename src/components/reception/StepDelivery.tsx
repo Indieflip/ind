@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/client";
 import type { Catalog, DocRef, Draft } from "@/lib/reception-types";
-import { docsOf } from "./helpers";
+import { docsOf, lineFromProduct } from "./helpers";
 import { fmtDate } from "@/lib/format";
 import { appConfirm } from "../Confirm";
 import { Icon } from "../Icon";
@@ -101,6 +101,8 @@ export function StepDelivery({ draft, setDraft, catalog, editId }: { draft: Draf
           />
         </div>
         <Documents draft={draft} setDraft={setDraft} editId={editId} />
+        {draft.kind === "reprise" && <OriginPicker draft={draft} setDraft={setDraft} catalog={catalog} />}
+        {draft.kind !== "reprise" && (<>
         <div>
           <label className="label">{t.wizard.truckTemp}</label>
           <input
@@ -127,8 +129,58 @@ export function StepDelivery({ draft, setDraft, catalog, editId }: { draft: Draf
             ))}
           </div>
         </div>
+        </>)}
       </section>
     </>
+  );
+}
+
+type Origin = { id: number; no: string; date: string; bl: string | null; lines: { productId: number | null; name: string; unit: string; categoryId: number | null; lot: string; reason: string; qty: number | null; price: number | null }[] };
+
+/** Bon de reprise : livraison d'origine (facultatif) ; ses produits peuvent être repris d'un clic */
+function OriginPicker({ draft, setDraft, catalog }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; catalog?: Catalog }) {
+  const { t, locale } = useI18n();
+  const R = t.returnSlip;
+  const [list, setList] = useState<Origin[] | null>(null);
+  useEffect(() => {
+    if (!draft.supplierId && !draft.supplierName.trim() && !draft.originReceptionId) return;
+    const ctl = new AbortController();
+    const qs = new URLSearchParams({ supplierId: String(draft.supplierId ?? ""), supplierName: draft.supplierName, include: String(draft.originReceptionId ?? "") });
+    fetch(`/api/receptions/origins?${qs}`, { signal: ctl.signal })
+      .then((r) => (r.ok ? r.json() : { deliveries: [] }))
+      .then((j) => setList(j.deliveries ?? []))
+      .catch(() => {});
+    return () => ctl.abort();
+  }, [draft.supplierId, draft.supplierName, draft.originReceptionId]);
+  const sel = list?.find((o) => o.id === draft.originReceptionId);
+  const fmt = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
+  const take = (o: Origin) => setDraft((d) => {
+    const have = new Set(d.lines.map((l) => l.productName.trim().toLowerCase()));
+    const added = o.lines.filter((x) => !have.has(x.name.trim().toLowerCase())).map((x) => {
+      const p = x.productId ? catalog?.products.find((c) => c.id === x.productId) ?? null : null;
+      return lineFromProduct(p, { productId: x.productId, productName: x.name, unit: x.unit || p?.unit || "Pièce", categoryId: x.categoryId ?? p?.categoryId ?? null,
+        qtyOrdered: fmt(x.qty), qtyReceived: fmt(x.qty), unitPrice: fmt(x.price), lot: x.lot, reason: x.reason, decision: "conform" });
+    });
+    return { ...d, lines: [...d.lines, ...added] };
+  });
+  return (
+    <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
+      <label className="block">
+        <span className="label">{R.originPick}</span>
+        <select className="input" value={draft.originReceptionId ?? ""} onChange={(e) => setDraft((d) => ({ ...d, originReceptionId: Number(e.target.value) || null }))}>
+          <option value="">{list ? R.originNone : R.originLoading}</option>
+          {(list ?? []).map((o) => (
+            <option key={o.id} value={o.id}>{o.no} · {fmtDate(o.date, locale)}{o.bl ? ` · ${o.bl}` : ""} · {o.lines.length} {R.products}</option>
+          ))}
+        </select>
+      </label>
+      {sel && (
+        <button type="button" className="btn-secondary w-full" onClick={() => take(sel)}>
+          <Icon name="plus" className="h-4 w-4" /> {R.originAdd} ({sel.lines.length})
+        </button>
+      )}
+      <p className="text-xs text-stone-600">{sel ? R.originHint : R.autoAnomaly}</p>
+    </div>
   );
 }
 
@@ -177,11 +229,11 @@ function Documents({ draft, setDraft, editId }: { draft: Draft; setDraft: (fn: (
       <button type="button" className="btn-ghost px-2 py-1 text-sm text-brand-700" onClick={() => update([...docs, { type: "facture", number: "" }])}>
         <Icon name="plus" className="h-4 w-4" /> {w.addDocument}
       </button>
-      {/* BL / facture non remis : crée la fiche d'anomalie « Bon de livraison manquant » */}
-      <label className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${draft.missingBl ? "border-red-300 bg-red-50 text-red-800" : "border-stone-200 bg-white"}`}>
+      {/* BL / facture non remis : crée la fiche d'anomalie « Bon de livraison manquant » (pas pour un bon de reprise) */}
+      {draft.kind !== "reprise" && <label className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${draft.missingBl ? "border-red-300 bg-red-50 text-red-800" : "border-stone-200 bg-white"}`}>
         <input type="checkbox" className="h-5 w-5 accent-brand-600" checked={!!draft.missingBl} onChange={(e) => setDraft((d) => ({ ...d, missingBl: e.target.checked }))} />
         <span><span className="font-medium">{w.missingBlBox}</span> <span className="text-xs text-stone-500">{w.missingBlBoxHint}</span></span>
-      </label>
+      </label>}
     </div>
   );
 }
@@ -191,7 +243,7 @@ function DocDuplicate({ draft, editId, number, others }: { draft: Draft; editId?
   const { t, locale } = useI18n();
   const w = t.wizard;
   const n = number.trim();
-  const [dup, setDup] = useState<null | { receptionId: number; seq: number | null; deliveredAt: string }>(null);
+  const [dup, setDup] = useState<null | { receptionId: number; seq: string | null; deliveredAt: string }>(null);
   useEffect(() => {
     setDup(null);
     if (!n || (!draft.supplierId && !draft.supplierName.trim())) return;
@@ -211,7 +263,7 @@ function DocDuplicate({ draft, editId, number, others }: { draft: Draft; editId?
     <p className="col-span-2 rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-800">
       {twice ? w.docTwice : (
         <>
-          {w.docUsed} {dup!.seq ? `n° ${dup!.seq}` : ""} {w.docUsedOf} {fmtDate(dup!.deliveredAt, locale)}.{" "}
+          {w.docUsed} {dup!.seq ?? ""} {w.docUsedOf} {fmtDate(dup!.deliveredAt, locale)}.{" "}
           <Link href={`/receptions/${dup!.receptionId}`} target="_blank" className="font-semibold underline">{w.docOpen}</Link>
         </>
       )}

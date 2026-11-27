@@ -53,8 +53,19 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
           return;
         }
       }
-      const existing = params.get("new") ? undefined : await loadDraft();
-      if (alive) setDraftState(existing ?? newDraft());
+      // Bon de reprise / retour (?kind=reprise) : même formulaire, la fiche en cours n'est reprise que si elle est de la même sorte
+      const kind = params.get("kind") === "reprise" ? "reprise" : "livraison";
+      const origin = Number(params.get("origin")) || null;
+      const saved = params.get("new") ? undefined : await loadDraft();
+      const existing = saved && (saved.kind ?? "livraison") === kind && (!origin || saved.originReceptionId === origin) ? saved : undefined;
+      let fresh = existing ?? newDraft(kind, origin);
+      // Bon de reprise ouvert depuis une livraison : fournisseur de la livraison d'origine repris
+      if (!existing && origin) {
+        const res = await fetch(`/api/receptions/origins?include=${origin}`).catch(() => null);
+        const o = res?.ok ? ((await res.json()).deliveries as { id: number; supplierId: number | null; supplierName: string }[]).find((x) => x.id === origin) : undefined;
+        if (o) fresh = { ...fresh, supplierId: o.supplierId, supplierName: o.supplierName, otherSupplier: !o.supplierId };
+      }
+      if (alive) setDraftState(fresh);
     })();
     return () => {
       alive = false;
@@ -74,7 +85,7 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
     (key: string, patch: Partial<DraftLine>) =>
       setDraft((d) => ({
         ...d,
-        lines: d.lines.map((l) => (l.key === key ? withAutoDecision({ ...l, ...patch }, catalog, d.truckTemp) : l)),
+        lines: d.lines.map((l) => (l.key === key ? (d.kind === "reprise" ? { ...l, ...patch, decision: "conform" as const } : withAutoDecision({ ...l, ...patch }, catalog, d.truckTemp)) : l)),
       })),
     [setDraft, catalog],
   );
@@ -91,10 +102,11 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
     if (!catalog) return;
     setDraftState((d) => {
       if (!d) return d;
-      const lines = d.lines.map((l) => withAutoDecision(l, catalog, d.truckTemp));
+      // Bon de reprise : pas de conformité à décider, chaque produit est repris
+      const lines = d.lines.map((l) => (d.kind === "reprise" ? (l.decision === "conform" ? l : { ...l, decision: "conform" as const }) : withAutoDecision(l, catalog, d.truckTemp)));
       return lines.some((l, i) => l !== d.lines[i]) ? { ...d, lines } : d;
     });
-  }, [truckTemp, catalog]);
+  }, [truckTemp, catalog, draft?.lines.length]);
 
   // Texte des réserves régénéré tant qu'il n'a pas été modifié à la main
   const autoReserves = useMemo(() => (draft ? buildReservesText(draft, t, catalog) : ""), [draft, t, catalog]);
@@ -227,6 +239,8 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
    */
   const receiverRequired = !!receiver?.mustType; // signature du réceptionnaire : profil invité seulement
   function findProblem(d: Draft): null | { msg: string; step: number; anchor: string; auto: boolean } {
+    // Bon de reprise : ni conformité, ni prix, ni DLC obligatoires
+    if (d.kind === "reprise") return null;
     const undecided = d.lines.filter((l) => !l.decision);
     if (undecided.length) return { msg: `${undecided.length} ${t.wizard.undecided}`, step: 2, anchor: `line-${undecided[0].key}`, auto: true };
     const noPrice = d.lines.filter((l) => l.productName.trim() && !l.unitPrice.trim() && !l.priceNotShown);
@@ -282,14 +296,19 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
         <div className={`rounded-full p-4 ${done.offline ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>
           <Icon name={done.offline ? "cloudOff" : "check"} className="h-10 w-10" />
         </div>
-        <h1 className="text-xl font-bold">{done.offline ? t.common.offline : t.wizard.savedOk}</h1>
+        <h1 className="text-xl font-bold">{done.offline ? t.common.offline : draft?.kind === "reprise" ? t.returnSlip.saved : t.wizard.savedOk}</h1>
         {done.offline && <p className="text-stone-600">{t.wizard.savedOffline}</p>}
         <div className="flex w-full flex-col gap-2">
           <Link href="/receptions" className="btn-secondary btn-lg">
             <Icon name="truck" /> {t.nav.receptions}
           </Link>
-          <button className="btn-primary btn-lg" onClick={() => { setDone(null); setDraftState(newDraft()); router.replace("/receptions/new?new=1"); }}>
-            {t.receptions.new}
+          {done.id && !done.offline && (
+            <Link href={`/receptions/${done.id}`} className="btn-secondary btn-lg">
+              <Icon name="file" /> {t.wizard.openSheet}
+            </Link>
+          )}
+          <button className="btn-primary btn-lg" onClick={() => { const k = draft?.kind === "reprise" ? "reprise" : "livraison"; setDone(null); setDraftState(newDraft(k)); router.replace(k === "reprise" ? "/receptions/new?new=1&kind=reprise" : "/receptions/new?new=1"); }}>
+            {draft?.kind === "reprise" ? t.returnSlip.newTitle : t.receptions.new}
           </button>
         </div>
       </div>
@@ -310,6 +329,7 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
           </span>
         </div>
         {editId && <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-amber-700">{t.receptions.editing}</p>}
+        {draft.kind === "reprise" && <p className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-800">↩ {t.returnSlip.detail}</p>}
         <h1 className="mt-1 text-lg font-bold">
           {steps[draft.step]}
           {draft.step > 0 && draft.supplierName && <span className="font-normal text-stone-500"> · {draft.supplierName}</span>}

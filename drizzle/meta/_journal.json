@@ -288,6 +288,13 @@
       "when": 1795788713861,
       "tag": "0040_return_slips",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1795795106203,
+      "tag": "0041_reception_kind",
+      "breakpoints": true
     }
   ]
 }

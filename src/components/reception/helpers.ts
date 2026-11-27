@@ -15,8 +15,9 @@ export function nowLocalInput() {
   return local.toISOString().slice(0, 16);
 }
 
-export function newDraft(): Draft {
+export function newDraft(kind: "livraison" | "reprise" = "livraison", originReceptionId: number | null = null): Draft {
   return {
+    ...(kind === "reprise" ? { kind, originReceptionId } : {}),
     clientUuid: uuid(),
     step: 0,
     supplierId: null,
@@ -184,6 +185,15 @@ export function needsTemp(line: DraftLine, catalog: Catalog | undefined) {
 /** Texte des réserves à recopier sur le BL */
 export function buildReservesText(d: Draft, t: Dict, catalog: Catalog | undefined): string {
   const parts: string[] = [];
+  // Bon de reprise : la liste des produits repris (quantité, motif)
+  if (d.kind === "reprise") {
+    for (const l of d.lines) {
+      if (!l.productName.trim()) continue;
+      const q = num(l.qtyReceived) ?? num(l.qtyOrdered);
+      parts.push(`${t.wizard.returnBtn.toUpperCase()} – ${l.productName}${q != null ? ` : ${q} ${l.unit}` : ""}${l.reason ? ` (${(t.reasons as Record<string, string>)[l.reason] ?? l.reason})` : ""}`);
+    }
+    return parts.join("\n");
+  }
   for (const l of d.lines) {
     // Refus / Retour (boutons au-dessus de la conformité) : quantité et unité de chacun
     const fq = l.refuseOn ? num(l.refuseQty ?? "") ?? num(l.qtyOrdered) ?? num(l.qtyReceived) : null;
@@ -233,7 +243,9 @@ export function toPayload(d: Draft): ReceptionPayload {
     receiverName: d.receiverName?.trim() || null,
     receiverSignature: d.receiverSignature || null,
     blPhotos: d.blPhotos,
-    missingBl: !!d.missingBl,
+    missingBl: d.kind === "reprise" ? false : !!d.missingBl,
+    kind: d.kind === "reprise" ? "reprise" : "livraison",
+    originReceptionId: d.kind === "reprise" ? d.originReceptionId ?? null : null,
     labelPhotos: d.labelPhotos ?? [],
     bakery: d.bakery
       ? { baguette: num(d.bakery.baguette), hamburger: num(d.bakery.hamburger), rolls: num(d.bakery.rolls), painDeMie: num(d.bakery.painDeMie) }
@@ -261,8 +273,9 @@ export function toPayload(d: Draft): ReceptionPayload {
         // Refus / Retour : quantité (Q Facturée par défaut) et unité (celle de la ligne par défaut)
         refuseQty: l.refuseOn ? num(l.refuseQty ?? "") ?? num(l.qtyOrdered) ?? num(l.qtyReceived) : null,
         refuseUnit: l.refuseOn ? l.refuseUnit || l.unit || null : null,
-        returnQty: l.returnOn ? num(l.returnQty ?? "") ?? num(l.qtyOrdered) ?? num(l.qtyReceived) : null,
-        returnUnit: l.returnOn ? l.returnUnit || l.unit || null : null,
+        // (bon de reprise : quantité reprise = Q reprise, sinon Q sur le bon)
+        returnQty: d.kind === "reprise" ? num(l.qtyReceived) ?? num(l.qtyOrdered) : l.returnOn ? num(l.returnQty ?? "") ?? num(l.qtyOrdered) ?? num(l.qtyReceived) : null,
+        returnUnit: d.kind === "reprise" ? l.unit || null : l.returnOn ? l.returnUnit || l.unit || null : null,
       })),
   };
 }

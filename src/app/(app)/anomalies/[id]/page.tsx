@@ -17,7 +17,7 @@ import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
 import { fmtDate, fmtDateTime, fmtMoney, num, sentence } from "@/lib/format";
 import { lineDocLabel } from "@/lib/documents";
-import { receptionNumbers } from "@/lib/server/queries";
+import { receptionNos } from "@/lib/server/queries";
 import { Icon } from "@/components/Icon";
 import { claimStyles, isInformative } from "@/lib/anomaly";
 import { AnomalySheetForm } from "./SheetClient";
@@ -42,7 +42,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
     a.supplierId ? db.query.suppliers.findFirst({ where: eq(schema.suppliers.id, a.supplierId), columns: { id: true, name: true, email: true, phone: true, contacts: true } }) : undefined,
     db.select().from(schema.claims).where(eq(schema.claims.anomalyId, id)).orderBy(asc(schema.claims.date)),
     a.lineId ? db.select().from(schema.receptionPhotos).where(eq(schema.receptionPhotos.lineId, a.lineId)) : Promise.resolve([]),
-    receptionNumbers(),
+    receptionNos(),
     anomalyNumbers(),
     a.createdBy ? db.query.users.findFirst({ where: eq(schema.users.id, a.createdBy), columns: { name: true } }) : undefined,
   ]);
@@ -205,7 +205,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
             <h1 className="text-xl font-bold leading-tight sm:text-2xl"><Paren text={sentence(supplier?.name ?? a.supplierName)} /> — <Paren text={problemType} /></h1>
             {itemsLabel && problemType !== t.anomalies.types.missing_bl && problemType !== WEIGH_TYPE && <p className="text-sm text-white/90"><Paren text={itemsLabel} /></p>}
             <div className="flex flex-col items-start gap-0.5 pt-1 text-sm">
-              {rec && <Link href={`/receptions/${rec.id}`} className="font-medium text-white underline decoration-white/50 hover:decoration-white">{t.receptions.sheetLink} {fmtNo("reception", numbers.get(rec.id))}</Link>}
+              {rec && <Link href={`/receptions/${rec.id}`} className="font-medium text-white underline decoration-white/50 hover:decoration-white">{t.receptions.sheetLink} {numbers.get(rec.id) ?? "—"}</Link>}
               {a.claimNo && <Link href={`/anomalies/reclamations?n=${a.claimNo}${claimYear ? `&y=${claimYear}` : ""}`} className="font-medium text-white underline decoration-white/50 hover:decoration-white">{t.claims.title} {fmtNo("claim", a.claimNo)}</Link>}
             </div>
           </div>

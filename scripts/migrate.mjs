@@ -1538,6 +1538,57 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v5
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v57', '1') on conflict (key) do nothing`);
 }
 
+// Bon de reprise = fiche de réception de sorte « reprise » (même formulaire, récap, anomalies), une fois :
+// 1. N° des fiches figés (les nouvelles fiches reçoivent leur N° à l'enregistrement : il ne bouge plus si une fiche est supprimée)
+// 2. bons de reprise déjà saisis (ancien formulaire) → fiches BR, même N°, produits repris en lignes ; leurs fiches d'anomalie restent
+//    rattachées à la livraison d'origine (celles d'une fiche convertie sont rattachées au bon). L'ancienne table n'est pas vidée.
+if (!(await db.execute(sql`select 1 from app_settings where key = 'reprise_kind_v1'`)).rows.length) {
+  await db.execute(sql`update receptions r set seq = x.n from (
+      select q.id, coalesce((select max(r2.seq) from receptions r2 where r2.seq is not null and extract(year from r2.delivered_at at time zone 'Europe/Paris') = q.y), 0)
+             + row_number() over (partition by q.y order by q.id) as n
+      from (select id, extract(year from delivered_at at time zone 'Europe/Paris') as y from receptions where seq is null) q
+    ) x where r.id = x.id`);
+  const slips = (await db.execute(sql`select * from return_slips order by id`)).rows;
+  let moved = 0;
+  for (const b of slips) {
+    const uuid = `br-slip-${b.id}`;
+    if ((await db.execute(sql`select 1 from receptions where client_uuid = ${uuid}`)).rows.length) continue;
+    const day = typeof b.date === "string" ? b.date.slice(0, 10) : new Date(b.date).toISOString().slice(0, 10);
+    const [rec] = (await db.execute(sql`insert into receptions (client_uuid, supplier_id, supplier_name, delivered_at, status, kind, seq, origin_reception_id, notes, created_by, created_at)
+      values (${uuid}, ${b.supplier_id}, ${b.supplier_name}, ((${day}::date + time '12:00') at time zone 'Europe/Paris'), 'conform', 'reprise', ${b.seq}, ${b.reception_id}, ${b.note}, ${b.created_by}, ${b.created_at})
+      returning id`)).rows;
+    const items = Array.isArray(b.items) ? b.items : JSON.parse(b.items ?? "[]");
+    let k = 0;
+    for (const it of items) {
+      const ol = it.lineId ? (await db.execute(sql`select unit_price, category_id, product_id from reception_lines where id = ${it.lineId}`)).rows[0] : undefined;
+      const [line] = (await db.execute(sql`insert into reception_lines (reception_id, product_id, product_name, unit, category_id, qty_ordered, qty_received, unit_price, decision, reason, return_qty, return_unit, position)
+        values (${rec.id}, ${it.productId ?? ol?.product_id ?? null}, ${it.name}, ${it.unit}, ${ol?.category_id ?? null}, ${String(it.qty)}, ${String(it.qty)}, ${ol?.unit_price ?? null}, 'conform', ${it.reason ?? null}, ${String(it.qty)}, ${it.unit}, ${k++})
+        returning id`)).rows;
+      if (it.anomalyId) await db.execute(sql`update anomalies set reception_id = ${rec.id}, line_id = ${line.id} where id = ${it.anomalyId} and reception_id is null`);
+    }
+    moved++;
+  }
+  console.log(`[migrate] N° des fiches figés ; bons de reprise → fiches BR : ${moved}`);
+  await db.execute(sql`insert into app_settings (key, value) values ('reprise_kind_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev : bon de reprise = fiche (même formulaire, récap, anomalies), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v58'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = ${"Bouton « Convertir en bon de reprise » (fiche non consolidée, avec confirmation) : la fiche devient un bon de reprise BR (N° de la suite BR de l'année) et garde produits, informations et fiches d'anomalie (note datée) ; quantité reprise = Retour / Refus saisis, sinon Q Contrôlée / Q Facturée ; pesées, suivi viande / poisson et boulangerie retirés."} where form = 'reception' and section = 'Bon de reprise / retour' and field = 'Convertir une fiche de réception'`);
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  const rows = [
+    ["Bon de reprise / retour", "Formulaire", false, "Même formulaire qu'une livraison (bouton « ↩ Bon de reprise / retour », ou depuis une fiche de réception) : 1. photo du bon, signatures ; 2. fournisseur, date, documents, livraison d'origine (facultatif, « Reprendre ses produits ») ; 3. produits : Q sur le bon, Q reprise, unité, prix, lot, note, motif du retour, photo ; 4. récap. Ni T° camion, ni propreté, ni T° / DLC produit, ni conformité, ni prix obligatoires."],
+    ["Bon de reprise / retour", "N° BR", true, "Suite BR par année (BR001…), remise à zéro le 01/01, attribuée à l'enregistrement ; les fiches de réception gardent leur suite RCP."],
+    ["Bon de reprise / retour", "Fiches d'anomalie", false, "Chaque produit repris → fiche « Retour marchandise » (En attente de : Avoir), quantité reprise × prix. Produit déjà en anomalie sur la livraison d'origine : cette fiche est mise à jour (en attente d'avoir, note datée « Bon de reprise BR… ») sans en créer d'autre. Modification du bon : les fiches suivent produit, quantité, unité, prix et montant."],
+    ["Bon de reprise / retour", "Hors livraisons", false, "Un bon de reprise ne va pas dans la fiche de réception des marchandises (export 23 h), les pesées, le suivi viande / poisson, la boulangerie, les achats ni le reporting ; le Mercurial et le suivi des prix ne sont pas touchés."],
+  ];
+  let i = 0;
+  for (const [section, field, required, rule] of rows) {
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', ${section}, ${field}, ${required}, ${rule}, '', ${pos + i++})`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v58', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

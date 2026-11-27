@@ -9,7 +9,7 @@ import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
 import { fmtDate, fmtDateTime, fmtMoney, num } from "@/lib/format";
-import { one, receptionNumbers, type SP } from "@/lib/server/queries";
+import { one, receptionNos, type SP } from "@/lib/server/queries";
 import { PageHeader } from "@/components/ui";
 import { AnomaliesBoard, AnomalyForm } from "./AnomalyClient";
 import { lineDocLabel } from "@/lib/documents";
@@ -53,7 +53,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
       .from(schema.receptions)
       .orderBy(desc(schema.receptions.deliveredAt))
       .limit(300),
-    receptionNumbers(),
+    receptionNos(),
     // Documents des bons (type, numéro, date) et fournisseurs, pour les colonnes Fournisseur et BL / Facture
     db
       .select({ id: a.id, documents: schema.receptions.documents, blNumber: schema.receptions.blNumber, lineDoc: schema.receptionLines.document, linePrice: schema.receptionLines.unitPrice, supplier: schema.suppliers.name })
@@ -150,7 +150,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
       {can.createAnomaly(user.role) && (
         <AnomalyForm
           preselect={preselect}
-          receptions={recent.map((r) => ({ id: r.id, label: `${numbers.get(r.id) ?? ""}. ${r.blNumber ? r.blNumber : "—"} · ${r.supplierName} · ${fmtDate(r.deliveredAt, locale)}` }))}
+          receptions={recent.map((r) => ({ id: r.id, label: `${numbers.get(r.id) ?? ""} · ${r.blNumber ? r.blNumber : "—"} · ${r.supplierName} · ${fmtDate(r.deliveredAt, locale)}` }))}
         />
       )}
       <DueBox rows={active.map(toRow)} />

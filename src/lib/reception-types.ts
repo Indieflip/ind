@@ -118,6 +118,10 @@ export interface Draft {
   missingBl?: boolean;
   /** Fiche générée depuis les anomalies importées : aucun champ obligatoire */
   imported?: boolean;
+  /** « reprise » : bon de reprise / retour (BR) ; sinon livraison */
+  kind?: "livraison" | "reprise";
+  /** Bon de reprise : livraison d'origine (facultatif) */
+  originReceptionId?: number | null;
   blRead: "idle" | "running" | "done" | "none" | "unavailable" | "error";
   lines: DraftLine[];
   reservesText: string;
@@ -150,6 +154,8 @@ export interface ReceptionPayload {
   labelPhotos?: string[];
   bakery?: { baguette: number | null; hamburger: number | null; rolls: number | null; painDeMie: number | null } | null;
   missingBl?: boolean;
+  kind?: "livraison" | "reprise";
+  originReceptionId?: number | null;
   lines: {
     productId: number | null;
     productName: string;

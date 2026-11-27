@@ -12,6 +12,7 @@ import {
   index,
   real,
   jsonb,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 /** Profils (onglet « Droits utilisateurs » du fichier) */
@@ -183,6 +184,10 @@ export const receptions = pgTable(
     importedFrom: text("imported_from"),
     /** N° de fiche de réception dans l'année (RCP…), attribué par date de livraison ; les nouvelles fiches prennent la suite */
     seq: integer("seq"),
+    /** « livraison » (fiche de réception, RCP) ou « reprise » (bon de reprise / retour, BR) : même formulaire, numérotation à part */
+    kind: text("kind").notNull().default("livraison"),
+    /** Bon de reprise : livraison d'origine des produits repris (facultatif) */
+    originReceptionId: integer("origin_reception_id").references((): AnyPgColumn => receptions.id, { onDelete: "set null" }),
   },
   (t) => [uniqueIndex("receptions_client_uuid_idx").on(t.clientUuid), index("receptions_delivered_idx").on(t.deliveredAt)],
 );

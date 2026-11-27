@@ -119,7 +119,7 @@ export async function runDailyExport(day: string, opts: { includeConsolidated?: 
   const recs = await getDb()
     .select({ id: r.id })
     .from(r)
-    .where(and(sql`${r.deliveredAt} >= ${start}`, sql`${r.deliveredAt} < ${end}`, isNull(r.importedFrom), opts.includeConsolidated ? undefined : isNull(r.consolidatedAt)))
+    .where(and(sql`${r.deliveredAt} >= ${start}`, sql`${r.deliveredAt} < ${end}`, isNull(r.importedFrom), eq(r.kind, "livraison"), opts.includeConsolidated ? undefined : isNull(r.consolidatedAt)))
     .orderBy(asc(r.deliveredAt));
   if (!recs.length) return null;
   const ids = recs.map((x) => x.id);
@@ -140,7 +140,7 @@ export async function runDueExports(now = new Date()) {
   const limit = parisHour(now) >= AUTO_EXPORT_HOUR ? today : null;
   const days = await getDb().execute<{ d: string }>(sql`
     select distinct to_char(${r.deliveredAt} at time zone 'Europe/Paris', 'YYYY-MM-DD') as d from ${r}
-    where ${r.importedFrom} is null and ${first ? sql`true` : sql`${r.consolidatedAt} is null`} order by 1`);
+    where ${r.importedFrom} is null and ${r.kind} = 'livraison' and ${first ? sql`true` : sql`${r.consolidatedAt} is null`} order by 1`);
   const done: string[] = [];
   for (const { d } of days.rows) {
     if (d > today || (d === today && !limit)) continue;

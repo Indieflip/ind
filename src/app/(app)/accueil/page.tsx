@@ -112,7 +112,7 @@ export default async function HomePage() {
       )}
       <div className="mt-6 flex flex-wrap gap-2">
         {can.receive(r) && <Link href="/receptions/new?new=1" className="btn-primary"><Icon name="plus" className="h-4 w-4" /> {t.receptions.new}</Link>}
-        {can.receive(r) && <Link href="/receptions/reprise/new" className="btn-primary !bg-amber-500 hover:!bg-amber-600">↩ {t.returnSlip.button}</Link>}
+        {can.receive(r) && <Link href="/receptions/new?kind=reprise" className="btn-primary !bg-amber-500 hover:!bg-amber-600">↩ {t.returnSlip.button}</Link>}
         <Link href="/anomalies" className="btn-secondary">{t.nav.anomalies}</Link>
         <Link href="/reporting/economies" className="btn-secondary">{t.savings.title}</Link>
       </div>

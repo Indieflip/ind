@@ -3,7 +3,7 @@
  * Mis à jour à chaque évolution (voir CLAUDE.md), comme le schéma de l'application.
  */
 export const MODULES_LIVE: { icon: string; title: string; items: string[] }[] = [
-  { icon: "truck", title: "Réception guidée", items: ["Photo du BL lue automatiquement", "Signatures livreur et réceptionnaire", "T°, DLC, lot ; photo d'étiquette (viandes, poissons, surgelés)", "Décision Acceptée / Refus proposée", "Brouillon automatique, hors ligne", "Bon de reprise / retour (BR) depuis la livraison d'origine"] },
+  { icon: "truck", title: "Réception guidée", items: ["Photo du BL lue automatiquement", "Signatures livreur et réceptionnaire", "T°, DLC, lot ; photo d'étiquette (viandes, poissons, surgelés)", "Décision Acceptée / Refus proposée", "Brouillon automatique, hors ligne", "Bon de reprise / retour (BR) : même formulaire, récap et fiches d'anomalie qu'une livraison, rattaché à la livraison d'origine ; conversion d'une fiche en bon"] },
   { icon: "alert", title: "Anomalies", items: ["Créées automatiquement (refus, manque, T°, DLC, prix)", "Écarts de pesée avec tares", "Une fiche par anomalie, avec son historique"] },
   { icon: "inbox", title: "Réclamations", items: ["Relances au délai de chaque fournisseur", "Avoirs et régularisations vérifiés", "Rappels sur l'Accueil"] },
   { icon: "chart", title: "Économies et Reporting", items: ["Économies justifiées, par fournisseur et par mois", "Achats par fournisseur (semaine, mois, trimestre, année)", "Suivi des prix", "Viandes et poissons"] },

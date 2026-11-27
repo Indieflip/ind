@@ -13,7 +13,7 @@ import { ProductEditor } from "./ProductEditor";
 import { ProductPriceEvolution } from "@/components/prices/PriceEvolution";
 import { ProductHistory, type HistoryRow } from "./ProductHistory";
 import { anomalyNumbers } from "@/lib/server/savings";
-import { receptionNumbers } from "@/lib/server/queries";
+import { receptionNos } from "@/lib/server/queries";
 
 type Event = { at: Date; icon: string; tone: string; title: string; text: string; href?: string };
 
@@ -73,7 +73,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     ...anomalies.map((a) => ({ at: a.createdAt, icon: "alert", tone: "bg-rose-100 text-rose-700", title: `${P.evAnomaly} · ${a.problemType || (t.anomalies.types[a.type as keyof typeof t.anomalies.types] ?? a.type)}`, text: `${a.description} · ${t.stages[a.stage as keyof typeof t.stages] ?? a.stage}`, href: `/anomalies/${a.id}` })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
   // Un seul tableau d'historique : création, prix, anomalies (ci-dessus), mises à jour du Mercurial et réceptions, cliquables
-  const [anoNums, recNums] = await Promise.all([anomalyNumbers(), receptionNumbers()]);
+  const [anoNums, recNums] = await Promise.all([anomalyNumbers(), receptionNos()]);
   const history: HistoryRow[] = [
     ...events.map((e, i) => ({
       id: `e${i}`, date: e.at.toISOString(), dateLabel: fmtDate(e.at, locale), nature: e.title.split(" · ")[0], tone: e.tone,
@@ -83,7 +83,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     ...maj.map((m) => ({ id: `m${m.id}`, date: m.date ? `${m.date}T12:00:00` : m.createdAt.toISOString(), dateLabel: m.date ? fmtDate(m.date, locale) : fmtDate(m.createdAt, locale), nature: P.evMaj, tone: "bg-violet-100 text-violet-800", detail: [m.nature, m.detail, m.reference].filter(Boolean).join(" · "), href: null })),
     ...lines.map((x) => ({
       id: `r${x.id}`, date: x.deliveredAt.toISOString(), dateLabel: fmtDate(x.deliveredAt, locale), nature: P.evReception, tone: x.decision === "refuse" ? "bg-red-100 text-red-800" : "bg-emerald-100 text-emerald-800",
-      detail: `${fmtNo("reception", recNums.get(x.receptionId))} · ${x.document || x.blNumber || "—"} · ${num(x.qtyOrdered) != null ? `${fmtNum(num(x.qtyOrdered)!, locale)} ${x.unit ?? ""}` : "—"}${num(x.unitPrice) != null ? ` × ${money(num(x.unitPrice))}` : ""}${x.decision === "refuse" ? ` · ${t.decision.refuse}` : ""}`,
+      detail: `${recNums.get(x.receptionId) ?? "—"} · ${x.document || x.blNumber || "—"} · ${num(x.qtyOrdered) != null ? `${fmtNum(num(x.qtyOrdered)!, locale)} ${x.unit ?? ""}` : "—"}${num(x.unitPrice) != null ? ` × ${money(num(x.unitPrice))}` : ""}${x.decision === "refuse" ? ` · ${t.decision.refuse}` : ""}`,
       href: `/receptions/${x.receptionId}`,
     })),
   ];

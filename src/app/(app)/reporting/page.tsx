@@ -32,7 +32,7 @@ export default async function ReportingPage({ searchParams }: { searchParams: Pr
   const [kpi, anomalyKpi, priceKpi] = await Promise.all([
     db.execute<{ receptions: number; conform: number }>(sql`
       select count(*)::int as receptions, count(*) filter (where status = 'conform')::int as conform
-      from receptions where delivered_at >= ${start} and delivered_at < ${end}`),
+      from receptions where kind = 'livraison' and delivered_at >= ${start} and delivered_at < ${end}`),
     db.execute<{ open: number; claimed: number; credits: string | null }>(sql`
       select count(*) filter (where status = 'open')::int as open,
              count(*) filter (where status = 'claimed')::int as claimed,

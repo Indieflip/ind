@@ -48,7 +48,7 @@ export function DraftBanner() {
       )}
       <div className="grid gap-2 sm:flex">
         {draft && (
-          <Link href="/receptions/new" className="btn-primary btn-lg">
+          <Link href={draft.kind === "reprise" ? "/receptions/new?kind=reprise" : "/receptions/new"} className="btn-primary btn-lg">
             <Icon name="truck" /> {t.receptions.resume}
             {draft.supplierName && <span className="font-normal opacity-80">· {draft.supplierName}</span>}
           </Link>
@@ -66,7 +66,7 @@ export function DraftBanner() {
           <Icon name="plus" /> {t.receptions.new}
         </button>
         {/* Bon de reprise / retour : même bouton, en orange */}
-        <Link href="/receptions/reprise/new" className="btn-primary btn-lg !bg-amber-500 hover:!bg-amber-600">↩ {t.returnSlip.button}</Link>
+        <Link href="/receptions/new?kind=reprise" className="btn-primary btn-lg !bg-amber-500 hover:!bg-amber-600">↩ {t.returnSlip.button}</Link>
       </div>
     </div>
   );

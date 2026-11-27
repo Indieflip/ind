@@ -24,10 +24,12 @@ export function StepValidate({
     const g = priceGap(l);
     return g != null && g !== 0;
   }).length;
-  const missingTemps = draft.lines.filter((l) => needsTemp(l, catalog));
-  const missingDlc = draft.lines.filter((l) => needsDlc(l, catalog));
-  const missingLabel = !editing && !(draft.labelPhotos ?? []).length && labelPhotoRequired(draft.lines, catalog);
-  const undecided = draft.lines.filter((l) => !l.decision);
+  // Bon de reprise : ni T°, ni DLC, ni étiquette, ni conformité à contrôler
+  const reprise = draft.kind === "reprise";
+  const missingTemps = reprise ? [] : draft.lines.filter((l) => needsTemp(l, catalog));
+  const missingDlc = reprise ? [] : draft.lines.filter((l) => needsDlc(l, catalog));
+  const missingLabel = !reprise && !editing && !(draft.labelPhotos ?? []).length && labelPhotoRequired(draft.lines, catalog);
+  const undecided = reprise ? [] : draft.lines.filter((l) => !l.decision);
 
   const w = t.wizard;
   const multiDoc = docNumbers(draft).length > 1;
@@ -41,8 +43,8 @@ export function StepValidate({
           <div><dt className="text-stone-500">{t.common.supplier}</dt><dd className="font-semibold">{dash(draft.supplierName)}</dd></div>
           <div><dt className="text-stone-500">{w.dateTime}</dt><dd className="font-medium">{fmtDateTime(draft.deliveredAt)}</dd></div>
           <div className="col-span-2"><dt className="text-stone-500">{w.docType}</dt><dd className="font-medium">{docsOf(draft).filter((x) => x.number.trim()).map((x) => `${w.docTypes[x.type]} ${x.number}${x.date ? ` du ${fmtDate(x.date)}` : ""}`).join(" · ") || "—"}</dd></div>
-          <div><dt className="text-stone-500">{t.receptions.truckTemp}</dt><dd className="font-medium">{draft.truckTemp ? `${draft.truckTemp} °C` : "—"}</dd></div>
-          <div><dt className="text-stone-500">{t.receptions.vehicleClean}</dt><dd className="font-medium">{draft.vehicleClean == null ? "—" : draft.vehicleClean ? t.common.yes : t.common.no}</dd></div>
+          {!reprise && <div><dt className="text-stone-500">{t.receptions.truckTemp}</dt><dd className="font-medium">{draft.truckTemp ? `${draft.truckTemp} °C` : "—"}</dd></div>}
+          {!reprise && <div><dt className="text-stone-500">{t.receptions.vehicleClean}</dt><dd className="font-medium">{draft.vehicleClean == null ? "—" : draft.vehicleClean ? t.common.yes : t.common.no}</dd></div>}
           <div className="col-span-2"><dt className="text-stone-500">{t.receptions.blPhotos}</dt><dd className="font-medium">{draft.blPhotos.length || (draft.noBl ? t.receptions.noBl : "—")}</dd></div>
         </dl>
         {draft.bakery && (
@@ -56,7 +58,7 @@ export function StepValidate({
           ) : (
             <table className="w-full text-left text-xs">
               <thead className="text-stone-500">
-                <tr>{multiDoc && <th className="py-1 pr-2">{t.receptions.blInvoice}</th>}<th className="py-1 pr-2">{t.common.product}</th><th className="px-1 text-right">{w.received}</th><th className="px-1 text-right">°C</th><th className="px-1">DLC</th><th className="px-1 text-right">{t.common.price}</th><th className="pl-1">{t.common.status}</th></tr>
+                <tr>{multiDoc && <th className="py-1 pr-2">{t.receptions.blInvoice}</th>}<th className="py-1 pr-2">{t.common.product}</th><th className="px-1 text-right">{reprise ? t.returnSlip.qtyTaken : w.received}</th>{!reprise && <><th className="px-1 text-right">°C</th><th className="px-1">DLC</th></>}<th className="px-1 text-right">{t.common.price}</th><th className="pl-1">{reprise ? t.returnSlip.reasonTitle : t.common.status}</th></tr>
               </thead>
               <tbody>
                 {(multiDoc ? docNumbers(draft).flatMap((n) => draft.lines.filter((l) => lineDoc(draft, l) === n)) : draft.lines).map((l) => (
@@ -64,10 +66,10 @@ export function StepValidate({
                     {multiDoc && <td className="py-1.5 pr-2 whitespace-nowrap text-stone-600">{lineDoc(draft, l)}</td>}
                     <td className="py-1.5 pr-2 font-medium">{l.productName}</td>
                     <td className="px-1 text-right tabular-nums">{dash(l.qtyReceived)}{l.qtyOrdered && l.qtyOrdered !== l.qtyReceived ? ` / ${l.qtyOrdered}` : ""} {l.unit}</td>
-                    <td className="px-1 text-right tabular-nums">{dash(l.temperature)}</td>
-                    <td className="px-1 whitespace-nowrap">{l.dlc ? fmtDate(l.dlc) : "—"}</td>
+                    {!reprise && <><td className="px-1 text-right tabular-nums">{dash(l.temperature)}</td>
+                    <td className="px-1 whitespace-nowrap">{l.dlc ? fmtDate(l.dlc) : "—"}</td></>}
                     <td className="px-1 text-right tabular-nums">{dash(l.unitPrice)}{l.priceNotShown && <span className="block text-[10px] text-stone-500">{t.wizard.priceNotShown}</span>}</td>
-                    <td className="pl-1">{l.decision ? <span className={`badge ${decisionStyles[l.decision].badge}`}>{t.decision[l.decision]}</span> : <span className="badge bg-amber-100 text-amber-900">{w.toDecide}</span>}</td>
+                    <td className="pl-1">{reprise ? (l.reason ? (t.reasons as Record<string, string>)[l.reason] ?? l.reason : "—") : l.decision ? <span className={`badge ${decisionStyles[l.decision].badge}`}>{t.decision[l.decision]}</span> : <span className="badge bg-amber-100 text-amber-900">{w.toDecide}</span>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -76,6 +78,11 @@ export function StepValidate({
         </div>
       </section>
 
+      {reprise ? (
+        <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <strong>{draft.lines.filter((l) => l.productName.trim()).length}</strong> {t.returnSlip.products} · {t.returnSlip.autoAnomaly}
+        </section>
+      ) : (
       <section className="card p-4">
         <h2 className="mb-3 font-semibold">{t.wizard.summary}</h2>
         <div className="grid grid-cols-2 gap-2 text-center">
@@ -88,6 +95,7 @@ export function StepValidate({
         </div>
         {gaps > 0 && <p className="mt-3 text-sm text-stone-700"><strong>{gaps}</strong> {t.wizard.priceGaps}</p>}
       </section>
+      )}
 
       {undecided.length > 0 && (
         <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
