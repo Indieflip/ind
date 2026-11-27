@@ -928,7 +928,7 @@ export const en: Dict = {
   },
   waiting: { label: "Waiting for", reponse: "Supplier reply", avoir: "Credit / adjustment", livraison: "Delivery", retour: "Goods return", facturation: "Invoice check", retour_nyny: "Return NY NY" },
   stages: { a_traiter: "To process", en_attente: "Waiting", cloturee: "Closed", annulee: "Cancelled" },
-  resolutions: { avoir: "Credit / adjustment received", livraison: "Delivered later", retour: "Goods returned", sans_suite: "No follow-up" },
+  resolutions: { avoir: "Credit / adjustment received", bl_facture: "Delivery note / Invoice", livraison: "Delivered later", retour: "Goods returned", sans_suite: "No follow-up" },
   modes: { reclamation: "Claim with reminders", verification_reclamation: "With reminder", verification: "Without reminder" },
   kanban: {
     sortHint: "Sort by supplier: A → Z, Z → A, then by age",
@@ -1292,7 +1292,7 @@ export const en: Dict = {
     stagesTitle: "Follow-up steps",
     stageText: { a_traiter: "issue created, nothing done yet.", en_attente: "réclamation envoyée ou avoir / régularisation annoncé(e) : on attend le fournisseur (retour fournisseur, avoir, livraison, retour marchandise).", cloturee: "settled; the resolution must be given.", annulee: "issue not relevant (entry error, duplicate…)." },
     resolutionsTitle: "Resolutions (at closing)",
-    resolutionText: { avoir: "the supplier issued a credit note: enter its amount, number and date (counts in savings).", livraison: "the goods were delivered later: the amount claimed counts as recovered.", retour: "la marchandise a été retournée au fournisseur : non payée, le montant réclamé compte comme récupéré (économies).", sans_suite: "nothing to recover (e.g. invoice finally correct)." },
+    resolutionText: { avoir: "the supplier issued a credit note: enter its amount, number and date (counts in savings).", bl_facture: "settled by the delivery note or invoice (document received or corrected): nothing to recover in savings, unless a credit is entered.", livraison: "the goods were delivered later: the amount claimed counts as recovered.", retour: "la marchandise a été retournée au fournisseur : non payée, le montant réclamé compte comme récupéré (économies).", sans_suite: "nothing to recover (e.g. invoice finally correct)." },
     savingKind: "Saving type",
     typesTitle: "Issue types",
     type: "Type",

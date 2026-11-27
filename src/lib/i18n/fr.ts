@@ -930,7 +930,7 @@ export const fr = {
   },
   waiting: { label: "En attente de", reponse: "Retour fournisseur", avoir: "Avoir / Régul", livraison: "Livraison", retour: "Retour marchandise", facturation: "Vérification facturation", retour_nyny: "Retour NY NY" },
   stages: { a_traiter: "À traiter", en_attente: "En attente", cloturee: "Clôturée", annulee: "Annulée" },
-  resolutions: { avoir: "Avoir / régularisation reçu(e)", livraison: "Livraison différée", retour: "Retour marchandise", sans_suite: "Sans suite" },
+  resolutions: { avoir: "Avoir / régularisation reçu(e)", bl_facture: "BL / Facture", livraison: "Livraison différée", retour: "Retour marchandise", sans_suite: "Sans suite" },
   modes: { reclamation: "Réclamation avec relances", verification_reclamation: "Avec relance", verification: "Sans relance" },
   kanban: {
     sortHint: "Trier par fournisseur : A → Z, Z → A, puis par ancienneté",
@@ -1294,7 +1294,7 @@ export const fr = {
     stagesTitle: "Étapes du suivi",
     stageText: { a_traiter: "anomalie créée, rien n'a encore été fait.", en_attente: "réclamation envoyée ou avoir / régularisation annoncé(e) : on attend le fournisseur (retour fournisseur, avoir, livraison, retour marchandise).", cloturee: "réglée ; la résolution doit être indiquée.", annulee: "anomalie sans objet (erreur de saisie, doublon…)." },
     resolutionsTitle: "Résolutions (à la clôture)",
-    resolutionText: { avoir: "le fournisseur a fait un avoir : on saisit son montant, son n° et sa date (compte dans les économies).", livraison: "la marchandise a été livrée plus tard : le montant réclamé compte comme récupéré.", retour: "la marchandise a été retournée au fournisseur : non payée, le montant réclamé compte comme récupéré (économies).", sans_suite: "rien à récupérer (ex. facturation finalement correcte)." },
+    resolutionText: { avoir: "le fournisseur a fait un avoir : on saisit son montant, son n° et sa date (compte dans les économies).", bl_facture: "réglé par le BL ou la facture (document reçu ou corrigé) : rien à récupérer en économies, sauf avoir saisi.", livraison: "la marchandise a été livrée plus tard : le montant réclamé compte comme récupéré.", retour: "la marchandise a été retournée au fournisseur : non payée, le montant réclamé compte comme récupéré (économies).", sans_suite: "rien à récupérer (ex. facturation finalement correcte)." },
     savingKind: "Type d'économie",
     typesTitle: "Types d'anomalie",
     type: "Type",

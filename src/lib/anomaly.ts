@@ -54,7 +54,7 @@ export const toggleWaiting = (v: string | null | undefined, w: Waiting) => { con
 
 /** Résolution d'une anomalie clôturée : par un avoir, ou par la marchandise livrée plus tard */
 /** Résolutions : avoir / régularisation, livraison différée, retour de la marchandise au fournisseur, sans suite */
-export const RESOLUTIONS = ["avoir", "livraison", "retour", "sans_suite"] as const;
+export const RESOLUTIONS = ["avoir", "bl_facture", "livraison", "retour", "sans_suite"] as const;
 export type Resolution = (typeof RESOLUTIONS)[number];
 /**
  * Types de suivi :

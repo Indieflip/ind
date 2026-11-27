@@ -1515,6 +1515,12 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v5
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v55', '1') on conflict (key) do nothing`);
 }
 
+// Dev : résolution « BL / Facture », une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v56'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = rule || ' Résolution « BL / Facture » (réglé par le BL ou la facture) proposée dès « À traiter ».' where field ilike 'Résolution%' and rule not ilike '%BL / Facture%'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v56', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

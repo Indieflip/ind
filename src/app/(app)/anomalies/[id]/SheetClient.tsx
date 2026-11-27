@@ -240,7 +240,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
             {stage === "en_attente" && (
               <button type="button" disabled={!editable || dirty} title={dirty ? s.saveFirst : undefined} onClick={() => setReply(reply == null ? "" : null)} className={`rounded-lg border-2 px-2 py-2 text-sm font-semibold ${reply != null ? "border-brand-600 bg-brand-50 text-brand-800" : "border-stone-200 bg-white text-stone-500"}`}>✉ {s.card.mailReply}</button>
             )}
-            {RESOLUTIONS.filter((r) => stage === "cloturee" || (stage === "a_traiter" ? r === "avoir" || r === "sans_suite" : true)).map((r) => (
+            {RESOLUTIONS.filter((r) => stage === "cloturee" || (stage === "a_traiter" ? r === "avoir" || r === "bl_facture" || r === "sans_suite" : true)).sort((x, y) => t.resolutions[x].localeCompare(t.resolutions[y], "fr")).map((r) => (
               <button
                 key={r}
                 type="button"
