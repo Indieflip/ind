@@ -59,6 +59,11 @@ export function EditReception({ id, initialDraft, number }: { id: number; initia
       return setError(E.deliveryMissing);
     }
     // Fiche importée (générée depuis les anomalies importées) : aucun champ obligatoire ; sans décision = Conforme
+    if (draft.kind === "reprise") {
+      // Bon de reprise : motif du retour obligatoire
+      const noReason = draft.lines.filter((l) => l.productName.trim() && !l.reason);
+      if (noReason.length) { goLine(noReason[0].key); return setError(`${noReason.length} ${t.wizard.reasonRequired}`); }
+    }
     if (draft.imported || draft.kind === "reprise") return send({ ...draft, lines: draft.lines.map((l) => (l.decision ? l : { ...l, decision: "conform" as const })) });
     const undecided = draft.lines.find((l) => !l.decision);
     if (undecided) { goLine(undecided.key); return setError(`${draft.lines.filter((l) => !l.decision).length} ${t.wizard.undecided}`); }

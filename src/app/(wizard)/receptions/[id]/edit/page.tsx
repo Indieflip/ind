@@ -68,7 +68,8 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     returnOn: l.returnQty != null || !!l.returnUnit,
     returnQty: str(l.returnQty),
     returnUnit: l.returnUnit ?? "",
-    photos: photos.filter((p) => p.lineId === l.id).map((p) => p.url),
+    photos: photos.filter((p) => p.lineId === l.id && p.kind !== "label").map((p) => p.url),
+    labelPhotos: photos.filter((p) => p.lineId === l.id && p.kind === "label").map((p) => p.url),
   }));
 
   const draft: Draft = {
@@ -84,14 +85,15 @@ export default async function EditReceptionPage({ params }: { params: Promise<{ 
     truckTemp: str(rec.truckTemp),
     vehicleClean: rec.vehicleClean,
     blPhotos: photos.filter((p) => p.kind === "bl").map((p) => p.url),
-    labelPhotos: photos.filter((p) => p.kind === "label").map((p) => p.url),
+    labelPhotos: photos.filter((p) => p.kind === "label" && !p.lineId).map((p) => p.url),
+    v: 2,
     driverLeft: rec.driverLeftUnsigned,
     receiverName: rec.receiverName ?? "",
     receiverSignature: rec.receiverSignatureUrl ?? "",
     blRead: "idle",
     imported: !!rec.importedFrom,
     missingBl: missingBlAnomaly,
-    ...(rec.kind === "reprise" ? { kind: "reprise" as const, originReceptionId: rec.originReceptionId } : {}),
+    ...(rec.kind === "reprise" ? { kind: "reprise" as const, originReceptionId: rec.originReceptionId, originExtraIds: rec.originExtraIds ?? [], noReturnDoc: rec.noReturnDoc } : {}),
     photoOk: photos.some((p) => p.kind === "bl"),
     noBl: !photos.some((p) => p.kind === "bl"),
     lines: draftLines,

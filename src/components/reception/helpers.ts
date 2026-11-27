@@ -18,6 +18,7 @@ export function nowLocalInput() {
 export function newDraft(kind: "livraison" | "reprise" = "livraison", originReceptionId: number | null = null): Draft {
   return {
     ...(kind === "reprise" ? { kind, originReceptionId } : {}),
+    v: 2,
     clientUuid: uuid(),
     step: 0,
     supplierId: null,
@@ -25,7 +26,7 @@ export function newDraft(kind: "livraison" | "reprise" = "livraison", originRece
     otherSupplier: false,
     deliveredAt: nowLocalInput(),
     blNumber: "",
-    documents: [{ type: "bl", number: "" }],
+    documents: [{ type: kind === "reprise" ? "reprise" : "bl", number: "" }],
     driverName: "",
     truckTemp: "",
     vehicleClean: null,
@@ -177,6 +178,16 @@ export function labelPhotoRequired(lines: DraftLine[], catalog: Catalog | undefi
   return lines.some((l) => l.productName.trim() && l.decision !== "refuse" && dlcRequired(l, catalog));
 }
 
+/** Produits dont la nature demande la photo d'étiquette (lot / DLC) et qui n'en ont pas encore */
+export function linesMissingLabel(lines: DraftLine[], catalog: Catalog | undefined) {
+  return lines.filter((l) => l.productName.trim() && l.decision !== "refuse" && dlcRequired(l, catalog) && !(l.labelPhotos ?? []).length);
+}
+
+/** Anciens brouillons (4 étapes : photos / livraison / contrôle / validation) → 3 étapes (livraison / contrôle / validation) */
+export function upgradeDraft(d: Draft): Draft {
+  return d.v === 2 ? d : { ...d, v: 2, step: Math.max(0, (d.step ?? 0) - 1) };
+}
+
 export function needsTemp(line: DraftLine, catalog: Catalog | undefined) {
   const cat = catalog?.categories.find((c) => c.id === line.categoryId);
   return !!cat?.tempRequired && num(line.temperature) == null && line.decision !== "refuse";
@@ -245,7 +256,9 @@ export function toPayload(d: Draft): ReceptionPayload {
     blPhotos: d.blPhotos,
     missingBl: d.kind === "reprise" ? false : !!d.missingBl,
     kind: d.kind === "reprise" ? "reprise" : "livraison",
-    originReceptionId: d.kind === "reprise" ? d.originReceptionId ?? null : null,
+    originReceptionId: d.kind === "reprise" ? (d.noReturnDoc ? null : d.originReceptionId ?? null) : null,
+    originExtraIds: d.kind === "reprise" && !d.noReturnDoc ? (d.originExtraIds ?? []).filter((x) => x && x !== d.originReceptionId) : [],
+    noReturnDoc: d.kind === "reprise" ? !!d.noReturnDoc : false,
     labelPhotos: d.labelPhotos ?? [],
     bakery: d.bakery
       ? { baguette: num(d.bakery.baguette), hamburger: num(d.bakery.hamburger), rolls: num(d.bakery.rolls), painDeMie: num(d.bakery.painDeMie) }
@@ -267,6 +280,7 @@ export function toPayload(d: Draft): ReceptionPayload {
         decision: l.decision ?? "conform",
         reason: l.reason || null,
         photos: l.photos,
+        labelPhotos: l.labelPhotos ?? [],
         document: lineDoc(d, l) || null,
         note: l.note?.trim() || null,
         ref: /^line-\d+$/.test(l.key) ? Number(l.key.slice(5)) : null,

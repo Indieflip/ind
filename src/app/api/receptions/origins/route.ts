@@ -15,8 +15,9 @@ export async function GET(req: Request) {
   const u = new URL(req.url);
   const supplierId = Number(u.searchParams.get("supplierId")) || null;
   const supplierName = (u.searchParams.get("supplierName") ?? "").trim();
-  const include = Number(u.searchParams.get("include")) || null;
-  if (!supplierId && !supplierName && !include) return Response.json({ deliveries: [] });
+  // Livraisons déjà choisies (une ou plusieurs, « 12,34 ») : toujours dans la liste
+  const include = (u.searchParams.get("include") ?? "").split(",").map(Number).filter((x) => Number.isInteger(x) && x > 0);
+  if (!supplierId && !supplierName && !include.length) return Response.json({ deliveries: [] });
   const db = getDb();
   const r = schema.receptions;
   const since = new Date(Date.now() - 183 * 86_400_000);
@@ -24,7 +25,7 @@ export async function GET(req: Request) {
   const recs = await db
     .select({ id: r.id, at: r.deliveredAt, bl: r.blNumber, supplierId: r.supplierId, supplierName: r.supplierName })
     .from(r)
-    .where(and(eq(r.kind, "livraison"), sql`(${and(who, gte(r.deliveredAt, since))} or ${r.id} = ${include ?? 0})`))
+    .where(and(eq(r.kind, "livraison"), include.length ? sql`(${and(who, gte(r.deliveredAt, since))} or ${inArray(r.id, include)})` : and(who, gte(r.deliveredAt, since))))
     .orderBy(desc(r.deliveredAt))
     .limit(60);
   const ids = recs.map((x) => x.id);
@@ -41,8 +42,8 @@ export async function GET(req: Request) {
       id: x.id, no: nos.get(x.id) ?? "—", date: x.at.toISOString(), bl: x.bl, supplierId: x.supplierId, supplierName: x.supplierName,
       lines: lines.filter((y) => y.receptionId === x.id).map((y) => ({
         productId: y.productId, name: y.name, unit: y.unit ?? "", categoryId: y.categoryId, lot: y.lot ?? "", reason: y.reason ?? "",
-        // Quantité proposée : Retour / Refus saisis, sinon Q Facturée
-        qty: num(y.ret) ?? num(y.refuse) ?? num(y.ordered) ?? num(y.received), price: num(y.price),
+        // Quantité proposée : quantité reçue (Q contrôlée), sinon Q facturée
+        qty: num(y.received) ?? num(y.ordered), price: num(y.price),
       })),
     })),
   });

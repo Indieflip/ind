@@ -1589,6 +1589,60 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v5
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v58', '1') on conflict (key) do nothing`);
 }
 
+// Fiches « Retour marchandise » : rattachées au motif choisi sur la ligne (motif = type d'anomalie), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'return_problem_motif_v1'`)).rows.length) {
+  const r = await db.execute(sql`update anomalies a set problem_type = l.reason from reception_lines l
+    where a.line_id = l.id and a.problem_type = 'Retour marchandise' and l.reason is not null and l.reason !~ '^[a-z_]+$'`);
+  console.log(`[migrate] « Retour marchandise » → motif de la ligne : ${r.rowCount ?? 0}`);
+  await db.execute(sql`insert into app_settings (key, value) values ('return_problem_motif_v1', '1') on conflict (key) do nothing`);
+}
+
+// Rien de facturé mais une quantité contrôlée (ex. ANO020 : 9 fûts non décomptés en déconsigne) : la quantité de la fiche d'anomalie
+// = la quantité contrôlée, montant = quantité × prix, une fois (fiches sans quantité seulement)
+if (!(await db.execute(sql`select 1 from app_settings where key = 'qty_checked_only_v1'`)).rows.length) {
+  const nk = (s) => (s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+  const rows = (await db.execute(sql`select a.id, a.reception_id, a.line_id, a.product_name, a.items, a.claimed_amount from anomalies a
+    where a.reception_id is not null and a.type not in ('missing_bl', 'hygiene', 'price', 'locked_price') and a.source <> 'weigh'`)).rows;
+  let n = 0;
+  for (const a of rows) {
+    const items = Array.isArray(a.items) ? a.items : a.items ? JSON.parse(a.items) : [];
+    if (items.length > 1 || (items[0] && Number(items[0].qty) > 0)) continue;
+    const lines = (await db.execute(sql`select id, product_name, unit, qty_ordered, qty_received, unit_price, product_id from reception_lines where reception_id = ${a.reception_id}`)).rows;
+    const name = items[0]?.name || a.product_name;
+    const line = lines.find((l) => l.id === a.line_id) ?? (lines.filter((l) => nk(l.product_name) === nk(name)).length === 1 ? lines.find((l) => nk(l.product_name) === nk(name)) : undefined);
+    if (!line || line.qty_ordered != null || !(Number(line.qty_received) > 0)) continue;
+    const qty = Number(line.qty_received);
+    const price = items[0]?.price ?? (line.unit_price != null ? Number(line.unit_price) : null);
+    const next = [{ productId: items[0]?.productId ?? line.product_id ?? null, name: name || line.product_name, qty, unit: items[0]?.unit || line.unit || "", price }];
+    await db.execute(sql`update anomalies set items = ${JSON.stringify(next)}::jsonb, line_id = coalesce(line_id, ${line.id}),
+      claimed_amount = ${price != null ? String(Math.round(qty * price * 100) / 100) : null}::numeric
+      where id = ${a.id}`);
+    n++;
+  }
+  console.log(`[migrate] quantité contrôlée sans facturé → quantité de la fiche d'anomalie : ${n}`);
+  await db.execute(sql`insert into app_settings (key, value) values ('qty_checked_only_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev : formulaire en 3 étapes, bon de reprise (plusieurs livraisons, pas de BL, motif obligatoire), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v59'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = ${"Même formulaire qu'une livraison, en 3 étapes : 1. Livraison (photo du bon, fournisseur, date et heure du retour, documents — type « Bon reprise / retour » d'office —, livraison d'origine + autres livraisons, ou « Pas de BL / facture correspondant au retour ») ; 2. Contrôle (Q sur le bon, Q reprise — reprises de la Q reçue de la livraison —, unité, prix, lot, note, motif du retour obligatoire, photo) ; 3. Validation. Ni signatures, ni T° camion, ni propreté, ni T° / DLC produit, ni conformité."} where form = 'reception' and section = 'Bon de reprise / retour' and field = 'Formulaire'`);
+  await db.execute(sql`update dev_fields set rule = ${"Chaque produit repris → fiche d'anomalie du type du motif choisi (plus de « Retour marchandise » à part), En attente de : Avoir, quantité reprise × prix. Produit déjà en anomalie sur une des livraisons d'origine : cette fiche est mise à jour (en attente d'avoir, note datée « Bon de reprise BR… ») sans en créer d'autre. Modification du bon : les fiches suivent produit, quantité, unité, prix, montant et motif (type)."} where form = 'reception' and section = 'Bon de reprise / retour' and field = 'Fiches d''anomalie'`);
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  const rows = [
+    ["Étapes", "Formulaire en 3 étapes", false, "1. Livraison : photo du BL / de la facture (lue automatiquement) ou « Pas de BL », fournisseur, date, documents (« Numéro document »), T° camion, propreté ; 2. Contrôle : produits, avec la photo de l'étiquette (lot / DLC) par produit dont la nature la demande (protocole Conformité) ; 3. Validation. Plus de signature du livreur ni de l'utilisateur."],
+    ["Produits", "Motif (Refus / Retour)", false, "Motif = type d'anomalie : la fiche d'anomalie prend le type du motif (plus de « Retour marchandise » à part) ; motif modifié sur la fiche → type de la fiche d'anomalie mis à jour."],
+    ["Produits", "Q contrôlée sans Q facturée", false, "Rien de facturé mais une quantité contrôlée (fûts non décomptés en déconsigne, remise ou régul oubliée…) : la fiche d'anomalie prend toute la quantité contrôlée (montant = quantité × prix)."],
+    ["Règles", "Rappels", false, "Rappels (relances en retard, vérifications de l'avoir) désactivés pour le moment (REMINDERS_ON dans src/lib/anomaly.ts)."],
+    ["Règles", "Boutons", false, "Boutons d'enregistrement uniformisés : « Enregistrer ». Consolidation / annulation de consolidation d'une ancienne fiche : sans confirmation."],
+  ];
+  let i = 0;
+  for (const [section, field, required, rule] of rows) {
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('reception', ${section}, ${field}, ${required}, ${rule}, '', ${pos + i++})`);
+  }
+  await db.execute(sql`update dev_fields set required = true where form = 'reception' and section = 'Bon de reprise / retour' and field = 'Formulaire'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v59', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

@@ -79,6 +79,9 @@ export function legacyOf(stage: Stage, resolution: string | null) {
 /** Délai de relance par défaut (jours) */
 export const DEFAULT_FOLLOW_UP_DAYS = 3;
 
+/** Rappels (relances en retard, vérifications de l'avoir) : désactivés pour le moment — repasser à true pour les réactiver */
+export const REMINDERS_ON = false;
+
 /** Jours écoulés depuis la dernière action (ou la création) */
 /** Vérification de l'avoir - sans réclamation : rappel si « À traiter » depuis 7 j, ou « À vérifier sur facture » depuis 15 j */
 export const VERIFY_TODO_DAYS = 7;

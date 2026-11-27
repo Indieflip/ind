@@ -285,6 +285,15 @@ function LineCard({
         </div>
       </div>
 
+      {/* Photo de l'étiquette (lot / DLC) : pour les produits dont la nature le demande (protocole Conformité) */}
+      {!reprise && dlcRequired(line, catalog) && line.decision !== "refuse" && (
+        <div className={`mt-2 space-y-2 rounded-lg border p-2.5 ${(line.labelPhotos ?? []).length ? "border-stone-200 bg-white" : "border-amber-300 bg-amber-50"}`}>
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-stone-700"><Icon name="camera" className="h-3.5 w-3.5" /> {t.wizard.photoLabelTitle2}</p>
+          <Thumbs photos={line.labelPhotos ?? []} onRemove={async (i) => await appConfirm(t.wizard.removePhotoConfirm) && onChange({ labelPhotos: (line.labelPhotos ?? []).filter((_, j) => j !== i) })} />
+          <PhotoButton label={t.wizard.takeLabelPhoto} className="btn-secondary w-full" onPhotos={(urls) => onChange({ labelPhotos: [...(line.labelPhotos ?? []), ...urls] })} />
+        </div>
+      )}
+
       <div className="mt-2">
         <label className="mb-0.5 block text-xs font-medium text-stone-600">{t.wizard.note}</label>
         <input className="input py-2" value={line.note ?? ""} placeholder={t.wizard.notePh} onChange={(e) => onChange({ note: e.target.value })} />
@@ -293,7 +302,7 @@ function LineCard({
       {/* Bon de reprise : motif du retour et photo, à la place des contrôles de livraison */}
       {reprise && (
         <div className="mt-3 space-y-2 rounded-lg border border-amber-500 bg-amber-50 p-2.5">
-          <p className="text-xs font-semibold text-stone-700">↩ {t.returnSlip.reasonTitle}</p>
+          <p className="text-xs font-semibold text-stone-700">↩ {t.returnSlip.reasonTitle} <span className="text-red-600">*</span></p>
           {reasonSelect}
           {photoBlock}
         </div>

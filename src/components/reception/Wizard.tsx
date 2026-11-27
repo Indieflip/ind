@@ -8,14 +8,14 @@ import type { Catalog, Draft, DraftLine } from "@/lib/reception-types";
 import { clearDraft, enqueue, fetchCatalog, loadCatalogCache, loadDraft, saveDraft, saveServerDraft, sendReception } from "@/lib/client/offline";
 import { Notice } from "@/components/Notice";
 import { Icon } from "../Icon";
-import { buildReservesText, docsOf, needsDlc, lineFromProduct, newDraft, toPayload, withAutoDecision } from "./helpers";
+import { buildReservesText, docsOf, needsDlc, lineFromProduct, newDraft, toPayload, upgradeDraft, withAutoDecision } from "./helpers";
 import { StepDelivery } from "./StepDelivery";
 import { StepPhoto } from "./StepPhoto";
 import { ReadingBanner } from "./ReadingBanner";
 import { StepCheck } from "./StepCheck";
 import { StepValidate } from "./StepValidate";
 
-export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { blReadingEnabled: boolean; editId?: number; initialDraft?: Draft; receiver?: { name: string; mustType: boolean } }) {
+export function Wizard({ blReadingEnabled, editId, initialDraft }: { blReadingEnabled: boolean; editId?: number; initialDraft?: Draft; receiver?: { name: string; mustType: boolean } }) {
   const { t } = useI18n();
   const router = useRouter();
   const params = useSearchParams();
@@ -42,21 +42,22 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
     })();
     (async () => {
       if (initialDraft) {
-        if (alive) setDraftState(initialDraft);
+        if (alive) setDraftState(upgradeDraft(initialDraft));
         return;
       }
       const serverDraft = params.get("draft");
       if (serverDraft) {
         const res = await fetch(`/api/drafts/${serverDraft}`).catch(() => null);
         if (res?.ok && alive) {
-          setDraftState({ ...newDraft(), ...((await res.json()).data as Draft) });
+          setDraftState(upgradeDraft({ ...newDraft(), ...((await res.json()).data as Draft) }));
           return;
         }
       }
       // Bon de reprise / retour (?kind=reprise) : même formulaire, la fiche en cours n'est reprise que si elle est de la même sorte
       const kind = params.get("kind") === "reprise" ? "reprise" : "livraison";
       const origin = Number(params.get("origin")) || null;
-      const saved = params.get("new") ? undefined : await loadDraft();
+      const loaded = params.get("new") ? undefined : await loadDraft();
+      const saved = loaded ? upgradeDraft(loaded) : undefined;
       const existing = saved && (saved.kind ?? "livraison") === kind && (!origin || saved.originReceptionId === origin) ? saved : undefined;
       let fresh = existing ?? newDraft(kind, origin);
       // Bon de reprise ouvert depuis une livraison : fournisseur de la livraison d'origine repris
@@ -90,11 +91,6 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
     [setDraft, catalog],
   );
 
-  // Signature du réceptionnaire : nom et prénom de l'utilisateur connecté (à saisir pour un invité ou un compte sans nom)
-  const receiverDefault = receiver?.name ?? "";
-  useEffect(() => {
-    setDraftState((d) => (d && !d.receiverName && receiverDefault ? { ...d, receiverName: receiverDefault } : d));
-  }, [receiverDefault, draft?.clientUuid]);
 
   // Conformité produit recalculée quand la T° du camion ou les seuils changent (choix manuels conservés)
   const truckTemp = draft?.truckTemp;
@@ -217,7 +213,7 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
   }
 
   const go = (step: number) => {
-    // Passage à l'étape 2 : brouillon enregistré automatiquement (sur le serveur, visible dans Réceptions)
+    // Passage à l'étape Contrôle : brouillon enregistré automatiquement (sur le serveur, visible dans Réceptions)
     if (draft && !editId && draft.step === 0 && step === 1) {
       void saveServerDraft({ ...draft, step: 1 })
         .then(() => { setInfo(t.wizard.draftAuto); setTimeout(() => setInfo(""), 3000); })
@@ -229,24 +225,27 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
   };
 
   const supplierOk = (draft.otherSupplier ? draft.supplierName.trim().length > 0 : !!draft.supplierId) && !!draft.deliveredAt;
-  // Étape 1 (photo du BL, signatures, photo d'étiquette) : plus rien d'obligatoire
-  const canContinue = draft.step === 1 ? supplierOk : true;
+  // Étape Livraison : fournisseur et date obligatoires
+  const canContinue = draft.step === 0 ? supplierOk : true;
 
   /**
    * Premier point bloquant avant d'enregistrer (étape et endroit où le corriger).
    * « auto » : une fois corrigé (photo, signature, choix), la fiche s'enregistre toute seule ;
    * pour un champ tapé (prix, DLC), le bouton « Enregistrer la fiche » reste à portée sur l'étape en cours.
    */
-  const receiverRequired = !!receiver?.mustType; // signature du réceptionnaire : profil invité seulement
   function findProblem(d: Draft): null | { msg: string; step: number; anchor: string; auto: boolean } {
     // Bon de reprise : ni conformité, ni prix, ni DLC obligatoires
-    if (d.kind === "reprise") return null;
+    if (d.kind === "reprise") {
+      // Bon de reprise : motif du retour obligatoire pour chaque produit
+      const noReason = d.lines.filter((l) => l.productName.trim() && !l.reason);
+      return noReason.length ? { msg: `${noReason.length} ${t.wizard.reasonRequired}`, step: 1, anchor: `line-${noReason[0].key}`, auto: false } : null;
+    }
     const undecided = d.lines.filter((l) => !l.decision);
-    if (undecided.length) return { msg: `${undecided.length} ${t.wizard.undecided}`, step: 2, anchor: `line-${undecided[0].key}`, auto: true };
+    if (undecided.length) return { msg: `${undecided.length} ${t.wizard.undecided}`, step: 1, anchor: `line-${undecided[0].key}`, auto: true };
     const noPrice = d.lines.filter((l) => l.productName.trim() && !l.unitPrice.trim() && !l.priceNotShown);
-    if (noPrice.length) return { msg: `${noPrice.length} ${t.wizard.missingPrice}`, step: 2, anchor: `line-${noPrice[0].key}`, auto: false };
+    if (noPrice.length) return { msg: `${noPrice.length} ${t.wizard.missingPrice}`, step: 1, anchor: `line-${noPrice[0].key}`, auto: false };
     const noDlc = d.lines.filter((l) => needsDlc(l, catalog));
-    if (noDlc.length) return { msg: `${noDlc.length} ${t.wizard.missingDlc}`, step: 2, anchor: `line-${noDlc[0].key}`, auto: false };
+    if (noDlc.length) return { msg: `${noDlc.length} ${t.wizard.missingDlc}`, step: 1, anchor: `line-${noDlc[0].key}`, auto: false };
     return null;
   }
 
@@ -277,7 +276,7 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
     } catch (e) {
       if ((e as Error).message === "duplicate_doc") {
         setError(t.wizard.docDuplicateSave);
-        go(1);
+        go(0);
       } else if (editId || (e as { fatal?: boolean }).fatal) {
         setError(`${t.common.error} : ${(e as Error).message}`);
       } else {
@@ -325,7 +324,7 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
             <Icon name="chevronLeft" className="h-4 w-4" /> {editId ? t.common.cancel : t.nav.receptions}
           </Link>
           <span className="text-xs font-medium text-stone-500">
-            {t.wizard.step} {draft.step + 1} {t.wizard.of} 4
+            {t.wizard.step} {draft.step + 1} {t.wizard.of} {t.wizard.steps.length}
           </span>
         </div>
         {editId && <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-amber-700">{t.receptions.editing}</p>}
@@ -334,21 +333,21 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
           {steps[draft.step]}
           {draft.step > 0 && draft.supplierName && <span className="font-normal text-stone-500"> · {draft.supplierName}</span>}
         </h1>
-        <div className="mt-2 grid grid-cols-4 gap-1.5">
+        <div className="mt-2 grid grid-cols-3 gap-1.5">
           {steps.map((s, i) => (
             <button
               key={s}
               type="button"
               disabled={i > draft.step && !canContinue}
               onClick={() => i <= draft.step && go(i)}
-              className={`h-1.5 rounded-full ${i <= draft.step ? "bg-brand-500" : "bg-stone-200"}`}
+              className={`h-1.5 rounded-full ${i <= draft.step ? (draft.kind === "reprise" ? "bg-amber-500" : "bg-brand-500") : "bg-stone-200"}`}
               aria-label={s}
             />
           ))}
         </div>
       </header>
       {draft.step === 0 && !editId && (
-        <Notice id="wizard-tips" version="1" closeLabel={t.common.close} className="border-sky-200 bg-sky-50 text-sky-900">
+        <Notice id="wizard-tips" version="2" closeLabel={t.common.close} className="border-sky-200 bg-sky-50 text-sky-900">
           <span><strong>{t.wizard.tipPauseTitle}</strong> {t.wizard.tipPause}</span>
           <span><strong>{t.wizard.tipOfflineTitle}</strong> {t.wizard.tipOffline}</span>
         </Notice>
@@ -360,24 +359,18 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
             draft={draft}
             setDraft={setDraft}
             readingEnabled={blReadingEnabled}
-            receiverMustType={!!receiver?.mustType}
-            receiverRequired={receiverRequired}
             onConfirm={() => {
               const d = { ...draft, photoOk: true, noBl: false };
               setDraft(() => d);
               void readBl(d);
-              go(1);
             }}
-            onNoBl={() => {
-              setDraft((d) => ({ ...d, noBl: true, photoOk: false, blRead: "idle" }));
-              go(1);
-            }}
+            onNoBl={() => setDraft((d) => ({ ...d, noBl: true, photoOk: false, blRead: "idle" }))}
           />
         )}
-        {draft.step > 0 && draft.step < 3 && <ReadingBanner draft={draft} count={readCount || draft.lines.filter((l) => l.fromBl).length} onRetry={() => readBl(draft)} />}
-        {draft.step === 1 && <StepDelivery draft={draft} setDraft={setDraft} catalog={catalog} editId={editId} />}
-        {draft.step === 2 && <StepCheck draft={draft} setDraft={setDraft} updateLine={updateLine} catalog={catalog} />}
-        {draft.step === 3 && <StepValidate draft={draft} setDraft={setDraft} catalog={catalog} autoReserves={autoReserves} editing={!!editId} />}
+        {draft.step < 2 && <ReadingBanner draft={draft} count={readCount || draft.lines.filter((l) => l.fromBl).length} onRetry={() => readBl(draft)} />}
+        {draft.step === 0 && <StepDelivery draft={draft} setDraft={setDraft} catalog={catalog} editId={editId} />}
+        {draft.step === 1 && <StepCheck draft={draft} setDraft={setDraft} updateLine={updateLine} catalog={catalog} />}
+        {draft.step === 2 && <StepValidate draft={draft} setDraft={setDraft} catalog={catalog} autoReserves={autoReserves} editing={!!editId} />}
         {(info || error) && (
           <div className="pointer-events-none fixed inset-x-0 bottom-24 z-30 mx-auto max-w-2xl px-3">
             {info && <p className="pointer-events-auto rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 shadow-lg">{info}</p>}
@@ -420,21 +413,21 @@ export function Wizard({ blReadingEnabled, editId, initialDraft, receiver }: { b
               <Icon name="chevronLeft" /> <span className="truncate">{t.common.back}</span>
             </button>
           )}
-          {editId && draft.step < 3 && (
+          {editId && draft.step < 2 && (
             <button type="button" className="btn-secondary btn-lg flex-1" disabled={saving || !canContinue} onClick={finish}>
               <Icon name="check" /> {saving ? t.wizard.saving : t.common.save}
             </button>
           )}
-          {!editId && draft.step >= 1 && (
+          {!editId && (
             <button type="button" className="btn-secondary btn-lg flex-1" disabled={draftSaving || saving} onClick={saveAsDraft} title={t.wizard.saveDraftHint}>
               <Icon name="file" className="hidden h-5 w-5 shrink-0 sm:block" /> <span className="text-xs leading-tight sm:text-sm">{draftSaving ? t.wizard.saving : t.wizard.saveDraft}</span>
             </button>
           )}
-          {retry && draft.step < 3 && !editId ? (
+          {retry && draft.step < 2 && !editId ? (
             <button type="button" className="btn-primary btn-lg flex-[1.4]" disabled={saving} onClick={finish}>
               <Icon name="check" /> <span className="truncate text-sm sm:text-base">{saving ? t.wizard.saving : t.wizard.saveNow}</span>
             </button>
-          ) : draft.step < 3 ? (
+          ) : draft.step < 2 ? (
             <button type="button" className="btn-primary btn-lg flex-[1.4]" disabled={!canContinue} onClick={() => go(draft.step + 1)}>
               <span className="truncate">{t.common.continue}</span> <Icon name="chevronRight" />
             </button>

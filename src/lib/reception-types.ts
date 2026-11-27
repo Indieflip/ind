@@ -71,6 +71,8 @@ export interface DraftLine {
   /** Motif de la liste de base, ou motif ajouté (texte) */
   reason: Reason | "" | (string & {});
   photos: string[]; // data URL ou URL déjà envoyée
+  /** Photo de l'étiquette (lot / DLC), pour les produits dont la nature le demande */
+  labelPhotos?: string[];
   fromBl?: boolean;
   /** Numéro du document (BL / facture) auquel le produit est rattaché */
   doc?: string;
@@ -87,7 +89,7 @@ export interface DraftLine {
   returnUnit?: string;
 }
 
-export type DocType = "bl" | "facture" | "autre";
+export type DocType = "bl" | "facture" | "reprise" | "autre";
 export interface DocRef { type: DocType; number: string; /** Date figurant sur le document (AAAA-MM-JJ) */ date?: string }
 
 export interface Draft {
@@ -120,8 +122,12 @@ export interface Draft {
   imported?: boolean;
   /** « reprise » : bon de reprise / retour (BR) ; sinon livraison */
   kind?: "livraison" | "reprise";
-  /** Bon de reprise : livraison d'origine (facultatif) */
+  /** Bon de reprise : livraison d'origine, autres livraisons concernées, ou « pas de BL / facture correspondant » */
   originReceptionId?: number | null;
+  originExtraIds?: number[];
+  noReturnDoc?: boolean;
+  /** Version du formulaire (2 = 3 étapes) */
+  v?: number;
   blRead: "idle" | "running" | "done" | "none" | "unavailable" | "error";
   lines: DraftLine[];
   reservesText: string;
@@ -156,6 +162,8 @@ export interface ReceptionPayload {
   missingBl?: boolean;
   kind?: "livraison" | "reprise";
   originReceptionId?: number | null;
+  originExtraIds?: number[];
+  noReturnDoc?: boolean;
   lines: {
     productId: number | null;
     productName: string;
@@ -171,6 +179,7 @@ export interface ReceptionPayload {
     decision: Decision;
     reason: string | null;
     photos: string[];
+    labelPhotos?: string[];
     document?: string | null;
     note?: string | null;
     /** Modification : id de la ligne d'origine (pour reporter les changements sur les fiches d'anomalie) */

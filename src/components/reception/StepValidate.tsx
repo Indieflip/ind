@@ -3,7 +3,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 import type { Catalog, Draft } from "@/lib/reception-types";
 import { decisionStyles } from "../DecisionBadge";
-import { docNumbers, docsOf, labelPhotoRequired, lineDoc, needsDlc, needsTemp, priceGap } from "./helpers";
+import { docNumbers, docsOf, linesMissingLabel, lineDoc, needsDlc, needsTemp, priceGap } from "./helpers";
 
 export function StepValidate({
   draft,
@@ -28,7 +28,8 @@ export function StepValidate({
   const reprise = draft.kind === "reprise";
   const missingTemps = reprise ? [] : draft.lines.filter((l) => needsTemp(l, catalog));
   const missingDlc = reprise ? [] : draft.lines.filter((l) => needsDlc(l, catalog));
-  const missingLabel = !reprise && !editing && !(draft.labelPhotos ?? []).length && labelPhotoRequired(draft.lines, catalog);
+  // Photo d'étiquette : par produit dont la nature la demande (anciens brouillons : photo commune de l'étape 1)
+  const missingLabel = reprise || editing || (draft.labelPhotos ?? []).length ? [] : linesMissingLabel(draft.lines, catalog);
   const undecided = reprise ? [] : draft.lines.filter((l) => !l.decision);
 
   const w = t.wizard;
@@ -41,7 +42,7 @@ export function StepValidate({
         <p className="mb-3 text-xs text-stone-500">{w.recapHint}</p>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <div><dt className="text-stone-500">{t.common.supplier}</dt><dd className="font-semibold">{dash(draft.supplierName)}</dd></div>
-          <div><dt className="text-stone-500">{w.dateTime}</dt><dd className="font-medium">{fmtDateTime(draft.deliveredAt)}</dd></div>
+          <div><dt className="text-stone-500">{reprise ? w.dateTimeReturn : w.dateTime}</dt><dd className="font-medium">{fmtDateTime(draft.deliveredAt)}</dd></div>
           <div className="col-span-2"><dt className="text-stone-500">{w.docType}</dt><dd className="font-medium">{docsOf(draft).filter((x) => x.number.trim()).map((x) => `${w.docTypes[x.type]} ${x.number}${x.date ? ` du ${fmtDate(x.date)}` : ""}`).join(" · ") || "—"}</dd></div>
           {!reprise && <div><dt className="text-stone-500">{t.receptions.truckTemp}</dt><dd className="font-medium">{draft.truckTemp ? `${draft.truckTemp} °C` : "—"}</dd></div>}
           {!reprise && <div><dt className="text-stone-500">{t.receptions.vehicleClean}</dt><dd className="font-medium">{draft.vehicleClean == null ? "—" : draft.vehicleClean ? t.common.yes : t.common.no}</dd></div>}
@@ -101,14 +102,15 @@ export function StepValidate({
         <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
           <strong>{undecided.length}</strong> {w.undecided} :
           <ul className="mt-1 list-inside list-disc">{undecided.map((l) => <li key={l.key}>{l.productName}</li>)}</ul>
-          <button type="button" className="btn-secondary mt-2" onClick={() => setDraft((d) => ({ ...d, step: 2 }))}>{t.common.back}</button>
+          <button type="button" className="btn-secondary mt-2" onClick={() => setDraft((d) => ({ ...d, step: 1 }))}>{t.common.back}</button>
         </section>
       )}
 
-      {missingLabel && (
-        <section className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900">
-          {w.missingLabelPhoto}
-          <button type="button" className="btn-secondary mt-2 block" onClick={() => setDraft((d) => ({ ...d, step: 0 }))}>{w.goLabelPhoto}</button>
+      {missingLabel.length > 0 && (
+        <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          <strong>{missingLabel.length}</strong> {w.labelMissingLines} :
+          <ul className="mt-1 list-inside list-disc">{missingLabel.map((l) => <li key={l.key}>{l.productName}</li>)}</ul>
+          <button type="button" className="btn-secondary mt-2 block" onClick={() => setDraft((d) => ({ ...d, step: 1 }))}>{w.goLabelPhoto}</button>
         </section>
       )}
 
@@ -116,7 +118,7 @@ export function StepValidate({
         <section className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-900">
           <strong>{missingDlc.length}</strong> {w.missingDlc} :
           <ul className="mt-1 list-inside list-disc">{missingDlc.map((l) => <li key={l.key}>{l.productName}</li>)}</ul>
-          <button type="button" className="btn-secondary mt-2" onClick={() => setDraft((d) => ({ ...d, step: 2 }))}>{t.common.back}</button>
+          <button type="button" className="btn-secondary mt-2" onClick={() => setDraft((d) => ({ ...d, step: 1 }))}>{t.common.back}</button>
         </section>
       )}
 
@@ -126,7 +128,7 @@ export function StepValidate({
           <ul className="mt-1 list-inside list-disc">
             {missingTemps.map((l) => <li key={l.key}>{l.productName}</li>)}
           </ul>
-          <button type="button" className="btn-secondary mt-2" onClick={() => setDraft((d) => ({ ...d, step: 2 }))}>
+          <button type="button" className="btn-secondary mt-2" onClick={() => setDraft((d) => ({ ...d, step: 1 }))}>
             {t.common.back}
           </button>
         </section>
@@ -148,10 +150,6 @@ export function StepValidate({
         )}
       </section>
 
-      <section className="card flex items-center justify-between gap-2 p-4 text-sm">
-        <span>{draft.signature ? <>✓ {w.signedBy} {draft.signerName || draft.driverName || "—"}</> : draft.driverLeft ? <>⚠ {w.driverLeft}</> : <span className="text-stone-500">{w.noDriverSignature}</span>}</span>
-        <button type="button" className="btn-ghost py-1 text-xs" onClick={() => setDraft((d) => ({ ...d, step: 0 }))}>{t.common.edit}</button>
-      </section>
     </>
   );
 }

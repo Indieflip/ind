@@ -33,6 +33,7 @@ const lineSchema = z.object({
   decision: z.enum(["conform", "reserve", "refuse"]),
   reason: z.string().max(60).nullable(),
   photos: z.array(z.string().max(2000)).max(10),
+  labelPhotos: z.array(z.string().max(2000)).max(10).optional(),
   document: z.string().trim().max(100).nullish(),
   note: z.string().trim().max(500).nullish(),
   ref: z.number().int().nullish(),
@@ -48,7 +49,7 @@ export const payloadSchema = z.object({
   supplierName: z.string().trim().min(1).max(200),
   deliveredAt: z.string().datetime({ offset: true }),
   blNumber: z.string().max(100).nullable(),
-  documents: z.array(z.object({ type: z.enum(["bl", "facture", "autre"]), number: z.string().max(100), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish() })).max(10).optional(),
+  documents: z.array(z.object({ type: z.enum(["bl", "facture", "reprise", "autre"]), number: z.string().max(100), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish() })).max(10).optional(),
   driverName: z.string().max(100).nullable(),
   truckTemp: z.number().nullable(),
   vehicleClean: z.boolean().nullable(),
@@ -70,6 +71,8 @@ export const payloadSchema = z.object({
   kind: z.enum(["livraison", "reprise"]).optional(),
   /** Bon de reprise : livraison d'origine des produits repris (facultatif) */
   originReceptionId: z.number().int().nullish(),
+  originExtraIds: z.array(z.number().int()).max(20).optional(),
+  noReturnDoc: z.boolean().optional(),
   lines: z.array(lineSchema).max(300),
 });
 export type Payload = z.infer<typeof payloadSchema>;
@@ -133,7 +136,9 @@ function headerValues(p: Payload) {
     driverLeftUnsigned: !p.signature && !!p.driverLeftUnsigned,
     receiverName: p.receiverName || null,
     receiverSignatureUrl: p.receiverSignature || null,
-    originReceptionId: p.kind === "reprise" ? p.originReceptionId ?? null : null,
+    originReceptionId: p.kind === "reprise" && !p.noReturnDoc ? p.originReceptionId ?? null : null,
+    originExtraIds: p.kind === "reprise" && !p.noReturnDoc && p.originExtraIds?.length ? [...new Set(p.originExtraIds)].filter((x) => x !== p.originReceptionId) : null,
+    noReturnDoc: p.kind === "reprise" && !!p.noReturnDoc,
   };
 }
 
@@ -174,7 +179,7 @@ async function writeContent(
   /** Fiche importée modifiée : pas de « BL manquant » automatique (seulement par la case « BL / Facture manquant ») */
   silent = false,
   /** Bon de reprise (N° BR…) : ni pesée, ni prix, ni contrôles de livraison ; chaque produit repris → fiche « Retour marchandise » en attente d'avoir */
-  reprise: { no: string; originId: number | null } | null = null,
+  reprise: { no: string; originIds: number[] } | null = null,
 ) {
   const { supplierId, supplierName } = supplier;
   const date = new Date(p.deliveredAt);
@@ -275,11 +280,11 @@ async function writeContent(
   const fvIds = [...new Set([...productById.values()].map((x) => x.fvItemId).filter((x): x is number => !!x))];
   const fvById = new Map((fvIds.length ? await tx.select().from(schema.fvItems).where(inArray(schema.fvItems.id, fvIds)) : []).map((f) => [f.id, f]));
   // Bon de reprise rattaché à une livraison : fiches d'anomalie de la livraison d'origine (mises à jour plutôt que recréées)
-  const originId = reprise?.originId ?? null;
-  const [originAnomalies, originLines] = originId
+  const originIds = reprise?.originIds ?? [];
+  const [originAnomalies, originLines] = originIds.length
     ? await Promise.all([
-        tx.select().from(schema.anomalies).where(eq(schema.anomalies.receptionId, originId)),
-        tx.select({ id: schema.receptionLines.id, productName: schema.receptionLines.productName }).from(schema.receptionLines).where(eq(schema.receptionLines.receptionId, originId)),
+        tx.select().from(schema.anomalies).where(inArray(schema.anomalies.receptionId, originIds)),
+        tx.select({ id: schema.receptionLines.id, productName: schema.receptionLines.productName }).from(schema.receptionLines).where(inArray(schema.receptionLines.receptionId, originIds)),
       ])
     : [[], []];
 
@@ -402,6 +407,9 @@ async function writeContent(
     for (const url of l.photos) {
       await tx.insert(schema.receptionPhotos).values({ receptionId: recId, lineId: line.id, kind: "issue", url });
     }
+    for (const url of l.labelPhotos ?? []) {
+      await tx.insert(schema.receptionPhotos).values({ receptionId: recId, lineId: line.id, kind: "label", url });
+    }
 
     // Onglet Anomalies : une anomalie par produit en réserve ou refusé, ou dès qu'un contrôle détecte un problème
     // (température, DLC, quantité), même si le produit a été accepté
@@ -449,7 +457,7 @@ async function writeContent(
       const ddmmyy = `${deliveryDay.slice(8, 10)}/${deliveryDay.slice(5, 7)}/${deliveryDay.slice(2, 4)}`;
       const reasonLabel = l.reason ? motifLabel(l.reason, t) : "";
       const note = `${ddmmyy} : ${t.returnSlip.noteOn} ${reprise.no}${rq != null ? ` : ${qtyText(rq, ru)}` : ""}${reasonLabel ? ` (${reasonLabel})` : ""}`;
-      const origin = reprise.originId ? originAnomalies.find((a) => a.lineId && originLines.find((o) => o.id === a.lineId && normalize(o.productName) === normalize(l.productName)) || normalize(a.productName ?? "") === normalize(l.productName) || (a.items ?? []).some((x) => normalize(x.name) === normalize(l.productName))) : undefined;
+      const origin = originIds.length ? originAnomalies.find((a) => a.lineId && originLines.find((o) => o.id === a.lineId && normalize(o.productName) === normalize(l.productName)) || normalize(a.productName ?? "") === normalize(l.productName) || (a.items ?? []).some((x) => normalize(x.name) === normalize(l.productName))) : undefined;
       if (origin) {
         if (!(origin.followUp ?? "").includes(reprise.no)) {
           const followUp = [origin.followUp, note].filter(Boolean).join("\n");
@@ -463,8 +471,9 @@ async function writeContent(
       await tx.insert(schema.anomalies).values({
         receptionId: recId, lineId: line.id, supplierId, supplierName, productName: l.productName, productId,
         nature: natureOf(l.categoryId), reference: lineRef(l),
+        // Motif du retour = type d'anomalie (plus de « Retour marchandise » à part)
         type: (l.reason && (reasonToAnomaly[l.reason] ?? typeOfLabel(l.reason, t))) || "other",
-        problemType: t.wizard.returnProblem,
+        problemType: reasonLabel || t.wizard.returnProblem,
         description: `${t.returnSlip.noteOn} ${reprise.no}${rq != null ? ` : ${qtyText(rq, ru)}` : ""}${reasonLabel ? ` ; ${reasonLabel.toLowerCase()}` : ""}`,
         items: [{ productId, name: l.productName, qty: rq, unit: ru, price }],
         claimedAmount: money(rq != null && price != null ? rq * price : null),
@@ -498,15 +507,15 @@ async function writeContent(
           ...(fq != null ? { items: [{ productId, name: l.productName, qty: fq, unit: fu, price: l.unitPrice }] } : {}),
         });
       }
-      // Retour : une fiche « Retour marchandise », avec la quantité retournée
+      // Retour : une fiche d'anomalie du motif choisi (type d'anomalie), avec la quantité retournée
       if (returned) {
         const rqty = l.returnQty;
         const ru = l.returnUnit || l.unit;
         const why = [rqty != null ? qtyText(rqty, ru) : "", l.decision !== "conform" || refused ? "" : reasonLabel.toLowerCase()].filter(Boolean);
         await tx.insert(schema.anomalies).values({
           ...base,
-          ...(l.decision !== "conform" || refused ? { type: "other" as const } : {}),
-          problemType: t.wizard.returnProblem,
+          ...(!l.reason && (l.decision !== "conform" || refused) ? { type: "other" as const } : {}),
+          problemType: l.reason ? motifLabel(l.reason, t) : t.wizard.returnProblem,
           description: `${t.wizard.returnBtn} : ${why.join(" ; ")}`,
           claimedAmount: money(rqty != null ? valueOf(rqty, ru) : null),
           items: [{ productId, name: l.productName, qty: rqty ?? null, unit: ru, price: l.unitPrice }],
@@ -584,7 +593,7 @@ export async function saveReception(p: Payload, user: SessionUser): Promise<numb
       .insert(schema.receptions)
       .values({ clientUuid: p.clientUuid, ...supplier, ...headerValues(p), kind, seq, createdBy: user.id })
       .returning();
-    await writeContent(tx, rec.id, supplier, p, user, t, undefined, undefined, undefined, false, kind === "reprise" ? { no: recNo(kind, seq), originId: rec.originReceptionId } : null);
+    await writeContent(tx, rec.id, supplier, p, user, t, undefined, undefined, undefined, false, kind === "reprise" ? { no: recNo(kind, seq), originIds: [rec.originReceptionId, ...(rec.originExtraIds ?? [])].filter((x): x is number => !!x) } : null);
     await tx.delete(schema.receptionDrafts).where(eq(schema.receptionDrafts.clientUuid, p.clientUuid));
     return rec.id;
   });
@@ -709,7 +718,7 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
       .where(eq(schema.receptions.id, id));
     const seqNow = rec.seq ?? (await receptionNumbers()).get(id) ?? null;
     await writeContent(tx, id, supplier, p, user, t, keep, claims, unchanged, !!rec.importedFrom,
-      rec.kind === "reprise" ? { no: recNo("reprise", seqNow), originId: p.originReceptionId ?? null } : null);
+      rec.kind === "reprise" ? { no: recNo("reprise", seqNow), originIds: p.noReturnDoc ? [] : [p.originReceptionId, ...(p.originExtraIds ?? [])].filter((x): x is number => !!x) } : null);
 
     if (linked.length) {
       const newLines = await tx.select().from(schema.receptionLines).where(eq(schema.receptionLines.receptionId, id)).orderBy(asc(schema.receptionLines.position));
@@ -737,7 +746,10 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
           const m = byRef.get(old);
           if (!m) return; // ligne supprimée de la fiche de réception : produit retiré de l'anomalie
           const { pl, nl } = m;
-          const gap = pl.qtyOrdered != null && pl.qtyReceived != null ? Math.round(Math.abs(pl.qtyOrdered - pl.qtyReceived) * 1000) / 1000 : null;
+          // Écart Q facturée / Q contrôlée ; rien de facturé mais une quantité contrôlée (ex. fûts non décomptés en déconsigne,
+          // remise ou régul oubliée) : la quantité à prendre est toute la quantité contrôlée
+          const gap = pl.qtyOrdered != null && pl.qtyReceived != null ? Math.round(Math.abs(pl.qtyOrdered - pl.qtyReceived) * 1000) / 1000
+            : pl.qtyOrdered == null && pl.qtyReceived != null ? pl.qtyReceived : null;
           // Refus / Retour saisis sur la ligne : leur quantité et leur unité priment sur l'écart facturé / contrôlé
           const rq = pl.refuseQty ?? pl.returnQty;
           const ru = pl.refuseQty != null ? pl.refuseUnit : pl.returnUnit;
@@ -745,9 +757,9 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
           lineId ??= nl.id;
           firstPl ??= pl;
         });
-        // Motif changé sur la fiche de réception → type d'anomalie de la fiche (sauf « Retour marchandise »)
+        // Motif changé sur la fiche de réception (ou le bon de reprise) → type d'anomalie de la fiche
         const motif = (firstPl as Payload["lines"][number] | null)?.reason;
-        const motifSet = motif && a.problemType !== t.wizard.returnProblem
+        const motifSet = motif
           ? { problemType: motifLabel(motif, t), type: reasonToAnomaly[motif] ?? typeOfLabel(motif, t) ?? a.type }
           : {};
         // Montant réclamé = somme des produits (quantité × prix) quand tout est connu ; sinon le montant saisi est gardé

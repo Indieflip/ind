@@ -2,7 +2,7 @@ import { fmtNo } from "@/lib/numbering";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { WEIGH_TYPE } from "@/lib/anomaly";
-import { and, asc, eq, ilike, inArray, or } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
@@ -45,8 +45,9 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
   // Bons de reprise / retour rattachés à cette livraison (fiches de sorte « reprise ») ; pour un bon : sa livraison d'origine
   const reprise = rec.kind === "reprise";
   const r = schema.receptions;
+  const extraOrigins = reprise && rec.originExtraIds?.length ? await db.select({ id: r.id, deliveredAt: r.deliveredAt, blNumber: r.blNumber }).from(r).where(inArray(r.id, rec.originExtraIds)) : [];
   const [slipRecs, origin] = await Promise.all([
-    reprise ? Promise.resolve([]) : db.select({ id: r.id, at: r.deliveredAt }).from(r).where(and(eq(r.originReceptionId, rec.id), eq(r.kind, "reprise"))).orderBy(asc(r.deliveredAt)),
+    reprise ? Promise.resolve([]) : db.select({ id: r.id, at: r.deliveredAt }).from(r).where(and(or(eq(r.originReceptionId, rec.id), sql`${r.originExtraIds} @> ${JSON.stringify([rec.id])}::jsonb`), eq(r.kind, "reprise"))).orderBy(asc(r.deliveredAt)),
     rec.originReceptionId ? db.query.receptions.findFirst({ where: eq(r.id, rec.originReceptionId), columns: { id: true, deliveredAt: true, blNumber: true } }) : undefined,
   ]);
   const slipLines = slipRecs.length ? await db.select({ receptionId: schema.receptionLines.receptionId, name: schema.receptionLines.productName, qty: schema.receptionLines.returnQty, unit: schema.receptionLines.returnUnit }).from(schema.receptionLines).where(inArray(schema.receptionLines.receptionId, slipRecs.map((x) => x.id))).orderBy(asc(schema.receptionLines.position)) : [];
@@ -59,12 +60,12 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
   };
   const blPhotos = photos.filter((p) => p.kind === "bl");
   const labelPhotos = photos.filter((p) => p.kind === "label");
-  const docs = ((rec.documents as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[] | null) ?? (rec.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : [])) as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[];
+  const docs = ((rec.documents as { type: "bl" | "facture" | "reprise" | "autre"; number: string; date?: string | null }[] | null) ?? (rec.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : [])) as { type: "bl" | "facture" | "reprise" | "autre"; number: string; date?: string | null }[];
   const [recNos, anoNums] = await Promise.all([receptionNos(), anomalyNumbers()]);
   const no = recNos.get(rec.id) ?? "—";
   const [recAnomalies, recGaps] = await Promise.all([
     // Bon de reprise : ses fiches d'anomalie + celles de la livraison d'origine mises à jour par le bon
-    db.select().from(schema.anomalies).where(reprise && origin ? or(eq(schema.anomalies.receptionId, rec.id), and(eq(schema.anomalies.receptionId, origin.id), ilike(schema.anomalies.followUp, `%${no}%`))) : eq(schema.anomalies.receptionId, rec.id)).orderBy(asc(schema.anomalies.id)),
+    db.select().from(schema.anomalies).where(reprise && (origin || extraOrigins.length) ? or(eq(schema.anomalies.receptionId, rec.id), and(inArray(schema.anomalies.receptionId, [origin?.id ?? 0, ...extraOrigins.map((o) => o.id)]), ilike(schema.anomalies.followUp, `%${no}%`))) : eq(schema.anomalies.receptionId, rec.id)).orderBy(asc(schema.anomalies.id)),
     db.select().from(schema.weighGaps).where(eq(schema.weighGaps.receptionId, rec.id)).orderBy(asc(schema.weighGaps.id)),
   ]);
   const showPrices = can.viewPrices(user.role) || can.receive(user.role);
@@ -101,12 +102,14 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
 
       {/* Partie administrative : en-tête, documents, livraison, véhicule, traçabilité */}
       <section className="card overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-4 bg-gradient-to-r from-brand-700 to-brand-600 px-5 py-4 text-white">
+        <div className={`flex flex-wrap items-start justify-between gap-4 bg-gradient-to-r ${reprise ? "from-amber-600 to-amber-500" : "from-brand-700 to-brand-600"} px-5 py-4 text-white`}>
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wider text-white/70">{reprise ? `↩ ${t.returnSlip.detail}` : t.receptions.detail} · {no}</p>
             <h1 className="mt-0.5 text-2xl font-bold leading-tight">{sentence(rec.supplierName)}</h1>
             <p className="mt-1 flex items-center gap-1.5 text-sm text-white/85"><Icon name="truck" className="h-4 w-4" /> {fmtDateTime(rec.deliveredAt, locale)}</p>
             {origin && <p className="mt-1 text-sm text-white/85">{t.returnSlip.origin} : <Link href={`/receptions/${origin.id}`} className="font-semibold text-white underline decoration-white/50">{recNos.get(origin.id)}{origin.blNumber ? ` · ${origin.blNumber}` : ""} · {fmtDate(origin.deliveredAt, locale)}</Link></p>}
+            {extraOrigins.map((o) => <p key={o.id} className="text-sm text-white/85">+ <Link href={`/receptions/${o.id}`} className="font-semibold text-white underline decoration-white/50">{recNos.get(o.id)}{o.blNumber ? ` · ${o.blNumber}` : ""} · {fmtDate(o.deliveredAt, locale)}</Link></p>)}
+            {rec.noReturnDoc && <p className="mt-1 inline-block rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold">{t.wizard.noReturnDoc}</p>}
           </div>
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-1.5">
@@ -118,7 +121,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
             </div>
             {showPrices && total > 0 && (
               <div className="text-right">
-                <p className="text-[11px] uppercase tracking-wide text-white/70">{t.receptions.total}</p>
+                <p className="text-[11px] uppercase tracking-wide text-white/70">{reprise ? t.returnSlip.totalTaken : t.receptions.total}</p>
                 <p className="text-xl font-bold tabular-nums">{fmtMoney(total, locale)}</p>
               </div>
             )}
@@ -132,7 +135,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
               <ul className="space-y-1.5">
                 {docs.map((d) => (
                   <li key={d.number} className="flex flex-wrap items-center gap-1.5 text-sm">
-                    <span className={`badge ${d.type === "facture" ? "bg-sky-100 text-sky-800" : d.type === "autre" ? "bg-stone-100 text-stone-700" : "bg-brand-50 text-brand-800"}`}>{t.wizard.docTypes[d.type]}</span>
+                    <span className={`badge ${d.type === "facture" ? "bg-sky-100 text-sky-800" : d.type === "reprise" ? "bg-amber-100 text-amber-900" : d.type === "autre" ? "bg-stone-100 text-stone-700" : "bg-brand-50 text-brand-800"}`}>{t.wizard.docTypes[d.type]}</span>
                     <span className="font-semibold">{d.number}</span>
                     {d.date && <span className="text-xs text-stone-500">{t.receptions.docOf} {fmtDate(d.date, locale)}</span>}
                   </li>
@@ -145,10 +148,10 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
           <div className="bg-white p-4">
             <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-stone-500"><Icon name="truck" className="h-4 w-4" /> {t.receptions.delivery}</h2>
             <dl className="space-y-1.5 text-sm">
-              <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.wizard.dateTime}</dt><dd className="text-right font-medium">{fmtDateTime(rec.deliveredAt, locale)}</dd></div>
+              <div className="flex justify-between gap-2"><dt className="text-stone-500">{reprise ? t.wizard.dateTimeReturn : t.wizard.dateTime}</dt><dd className="text-right font-medium">{fmtDateTime(rec.deliveredAt, locale)}</dd></div>
               <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.driver}</dt><dd className="text-right font-medium">{rec.driverName ?? "—"}</dd></div>
-              <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.wizard.receiverTitle}</dt><dd className="text-right font-medium">{rec.receiverSignatureUrl ? `✓ ${rec.receiverName ?? ""}` : rec.receiverName || "—"}</dd></div>
-              <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.signature}</dt><dd className="text-right font-medium">{rec.signatureUrl ? `✓ ${rec.signerName ?? ""}` : rec.driverLeftUnsigned ? `⚠ ${t.wizard.driverLeft}` : "—"}</dd></div>
+              {(rec.receiverSignatureUrl || rec.receiverName) && <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.wizard.receiverTitle}</dt><dd className="text-right font-medium">{rec.receiverSignatureUrl ? `✓ ${rec.receiverName ?? ""}` : rec.receiverName || "—"}</dd></div>}
+              {(rec.signatureUrl || rec.driverLeftUnsigned) && <div className="flex justify-between gap-2"><dt className="text-stone-500">{t.receptions.signature}</dt><dd className="text-right font-medium">{rec.signatureUrl ? `✓ ${rec.signerName ?? ""}` : rec.driverLeftUnsigned ? `⚠ ${t.wizard.driverLeft}` : "—"}</dd></div>}
             </dl>
           </div>
 
@@ -199,8 +202,8 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
               <dl className="mt-2 grid grid-cols-3 gap-x-3 gap-y-1 text-xs">
                 <div><dt className="text-stone-500">{reprise ? t.returnSlip.qtyOnSlip : t.wizard.ordered}</dt><dd>{fmtNum(l.qtyOrdered, locale)} {l.unit}</dd></div>
                 <div><dt className="text-stone-500">{reprise ? t.returnSlip.qtyTaken : t.wizard.received}</dt><dd>{fmtNum(l.qtyReceived, locale)} {l.unit}</dd></div>
-                <div><dt className="text-stone-500">{t.wizard.temperature}</dt><dd>{l.temperature != null ? `${fmtNum(l.temperature, locale, 1)} °C` : "—"}</dd></div>
-                <div><dt className="text-stone-500">{t.wizard.dlc}</dt><dd>{fmtDate(l.dlc, locale)}</dd></div>
+                {!reprise && <div><dt className="text-stone-500">{t.wizard.temperature}</dt><dd>{l.temperature != null ? `${fmtNum(l.temperature, locale, 1)} °C` : "—"}</dd></div>}
+                {!reprise && <div><dt className="text-stone-500">{t.wizard.dlc}</dt><dd>{fmtDate(l.dlc, locale)}</dd></div>}
                 <div><dt className="text-stone-500">{t.wizard.lot}</dt><dd>{l.lot ?? "—"}</dd></div>
                 {showPrices && (
                   <div><dt className="text-stone-500">{t.common.price}</dt><dd>{fmtMoney(l.unitPrice, locale)}{gap ? <span className={gap > 0 ? " text-red-600" : " text-emerald-600"}> {fmtPct(gap)}</span> : null}</dd></div>
@@ -228,8 +231,8 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
               <th>{t.common.category}</th>
               <th className="text-right">{reprise ? t.returnSlip.qtyOnSlip : t.wizard.ordered}</th>
               <th className="text-right">{reprise ? t.returnSlip.qtyTaken : t.wizard.received}</th>
-              <th className="text-right">{t.wizard.temperature}</th>
-              <th>{t.wizard.dlc}</th>
+              {!reprise && <th className="text-right">{t.wizard.temperature}</th>}
+              {!reprise && <th>{t.wizard.dlc}</th>}
               <th>{t.wizard.lot}</th>
               {showPrices && <th className="text-right">{t.wizard.unitPrice}</th>}
               <th>{t.common.status}</th>
@@ -247,8 +250,8 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
                   <td className="text-stone-500">{catName(l.categoryId)}</td>
                   <td className="text-right tabular-nums">{fmtNum(l.qtyOrdered, locale)} {l.qtyOrdered ? l.unit : ""}</td>
                   <td className="text-right tabular-nums">{fmtNum(l.qtyReceived, locale)} {l.qtyReceived ? l.unit : ""}</td>
-                  <td className="text-right tabular-nums">{l.temperature != null ? `${fmtNum(l.temperature, locale, 1)} °C` : "—"}</td>
-                  <td>{fmtDate(l.dlc, locale)}</td>
+                  {!reprise && <td className="text-right tabular-nums">{l.temperature != null ? `${fmtNum(l.temperature, locale, 1)} °C` : "—"}</td>}
+                  {!reprise && <td>{fmtDate(l.dlc, locale)}</td>}
                   <td>{l.lot ?? "—"}</td>
                   {showPrices && (
                     <td className="text-right tabular-nums">
@@ -345,11 +348,11 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
           <h2 className="mb-2 font-semibold">{t.receptions.reservesText}</h2>
           <pre className="whitespace-pre-wrap font-sans text-sm text-stone-700">{rec.reservesText || t.wizard.noReserves}</pre>
         </section>
-        <section className="card p-5">
+        {rec.signatureUrl && <section className="card p-5">
           <h2 className="mb-2 font-semibold">{t.receptions.signature}</h2>
           {rec.signatureUrl ? <img src={rec.signatureUrl} alt="" className="h-32 rounded border border-stone-200 bg-white" /> : <p className="text-sm text-stone-500">—</p>}
           {rec.signerName && <p className="mt-1 text-sm">{rec.signerName}</p>}
-        </section>
+        </section>}
       </div>
 
       {bakery && (

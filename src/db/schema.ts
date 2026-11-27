@@ -188,6 +188,10 @@ export const receptions = pgTable(
     kind: text("kind").notNull().default("livraison"),
     /** Bon de reprise : livraison d'origine des produits repris (facultatif) */
     originReceptionId: integer("origin_reception_id").references((): AnyPgColumn => receptions.id, { onDelete: "set null" }),
+    /** Bon de reprise : autres livraisons concernées (ids) */
+    originExtraIds: jsonb("origin_extra_ids").$type<number[]>(),
+    /** Bon de reprise : pas de BL / facture correspondant au retour */
+    noReturnDoc: boolean("no_return_doc").notNull().default(false),
   },
   (t) => [uniqueIndex("receptions_client_uuid_idx").on(t.clientUuid), index("receptions_delivered_idx").on(t.deliveredAt)],
 );

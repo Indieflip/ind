@@ -92,7 +92,7 @@ export function StepDelivery({ draft, setDraft, catalog, editId }: { draft: Draf
 
       <section className="card space-y-4 p-4">
         <div>
-          <label className="label">{t.wizard.dateTime}</label>
+          <label className="label">{draft.kind === "reprise" ? t.wizard.dateTimeReturn : t.wizard.dateTime}</label>
           <input
             type="datetime-local"
             className="input"
@@ -137,49 +137,74 @@ export function StepDelivery({ draft, setDraft, catalog, editId }: { draft: Draf
 
 type Origin = { id: number; no: string; date: string; bl: string | null; lines: { productId: number | null; name: string; unit: string; categoryId: number | null; lot: string; reason: string; qty: number | null; price: number | null }[] };
 
-/** Bon de reprise : livraison d'origine (facultatif) ; ses produits peuvent être repris d'un clic */
+/** Bon de reprise : livraison d'origine et autres livraisons concernées (ou « pas de BL / facture correspondant ») ; leurs produits peuvent être repris d'un clic */
 function OriginPicker({ draft, setDraft, catalog }: { draft: Draft; setDraft: (fn: (d: Draft) => Draft) => void; catalog?: Catalog }) {
   const { t, locale } = useI18n();
   const R = t.returnSlip;
   const [list, setList] = useState<Origin[] | null>(null);
+  const chosen = [draft.originReceptionId, ...(draft.originExtraIds ?? [])].filter((x): x is number => !!x);
+  const include = chosen.join(",");
   useEffect(() => {
-    if (!draft.supplierId && !draft.supplierName.trim() && !draft.originReceptionId) return;
+    if (!draft.supplierId && !draft.supplierName.trim() && !include) return;
     const ctl = new AbortController();
-    const qs = new URLSearchParams({ supplierId: String(draft.supplierId ?? ""), supplierName: draft.supplierName, include: String(draft.originReceptionId ?? "") });
+    const qs = new URLSearchParams({ supplierId: String(draft.supplierId ?? ""), supplierName: draft.supplierName, include });
     fetch(`/api/receptions/origins?${qs}`, { signal: ctl.signal })
       .then((r) => (r.ok ? r.json() : { deliveries: [] }))
       .then((j) => setList(j.deliveries ?? []))
       .catch(() => {});
     return () => ctl.abort();
-  }, [draft.supplierId, draft.supplierName, draft.originReceptionId]);
-  const sel = list?.find((o) => o.id === draft.originReceptionId);
+  }, [draft.supplierId, draft.supplierName, include]);
   const fmt = (n: number | null) => (n == null ? "" : String(n).replace(".", ","));
   const take = (o: Origin) => setDraft((d) => {
     const have = new Set(d.lines.map((l) => l.productName.trim().toLowerCase()));
     const added = o.lines.filter((x) => !have.has(x.name.trim().toLowerCase())).map((x) => {
       const p = x.productId ? catalog?.products.find((c) => c.id === x.productId) ?? null : null;
+      // Quantité reçue (Q contrôlée) de la livraison d'origine
       return lineFromProduct(p, { productId: x.productId, productName: x.name, unit: x.unit || p?.unit || "Pièce", categoryId: x.categoryId ?? p?.categoryId ?? null,
         qtyOrdered: fmt(x.qty), qtyReceived: fmt(x.qty), unitPrice: fmt(x.price), lot: x.lot, reason: x.reason, decision: "conform" });
     });
     return { ...d, lines: [...d.lines, ...added] };
   });
+  const label = (o: Origin) => `${o.no} · ${fmtDate(o.date, locale)}${o.bl ? ` · ${o.bl}` : ""} · ${o.lines.length} ${R.products}`;
+  const select = (value: number | null, onPick: (id: number | null) => void, exclude: number[]) => (
+    <select className="input" value={value ?? ""} onChange={(e) => onPick(Number(e.target.value) || null)}>
+      <option value="">{list ? R.originNone : R.originLoading}</option>
+      {(list ?? []).filter((o) => o.id === value || !exclude.includes(o.id)).map((o) => <option key={o.id} value={o.id}>{label(o)}</option>)}
+    </select>
+  );
+  const extras = draft.originExtraIds ?? [];
+  const setExtras = (next: number[]) => setDraft((d) => ({ ...d, originExtraIds: next }));
   return (
     <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/50 p-3">
-      <label className="block">
-        <span className="label">{R.originPick}</span>
-        <select className="input" value={draft.originReceptionId ?? ""} onChange={(e) => setDraft((d) => ({ ...d, originReceptionId: Number(e.target.value) || null }))}>
-          <option value="">{list ? R.originNone : R.originLoading}</option>
-          {(list ?? []).map((o) => (
-            <option key={o.id} value={o.id}>{o.no} · {fmtDate(o.date, locale)}{o.bl ? ` · ${o.bl}` : ""} · {o.lines.length} {R.products}</option>
-          ))}
-        </select>
+      <label className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${draft.noReturnDoc ? "border-amber-400 bg-amber-100 text-amber-900" : "border-stone-200 bg-white"}`}>
+        <input type="checkbox" className="h-5 w-5 accent-amber-600" checked={!!draft.noReturnDoc} onChange={(e) => setDraft((d) => ({ ...d, noReturnDoc: e.target.checked }))} />
+        <span className="font-medium">{t.wizard.noReturnDoc}</span>
       </label>
-      {sel && (
-        <button type="button" className="btn-secondary w-full" onClick={() => take(sel)}>
-          <Icon name="plus" className="h-4 w-4" /> {R.originAdd} ({sel.lines.length})
-        </button>
+      {!draft.noReturnDoc && (
+        <>
+          <div>
+            <span className="label">{R.originPick}</span>
+            {select(draft.originReceptionId ?? null, (id) => setDraft((d) => ({ ...d, originReceptionId: id })), extras)}
+          </div>
+          {extras.map((id, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <div className="flex-1">{select(id, (v) => setExtras(v ? extras.map((x, j) => (j === i ? v : x)) : extras.filter((_, j) => j !== i)), [...chosen.filter((x) => x !== id)])}</div>
+              <button type="button" className="btn-ghost p-2 text-stone-400 hover:text-red-600" aria-label={t.common.delete} onClick={() => setExtras(extras.filter((_, j) => j !== i))}><Icon name="trash" className="h-4 w-4" /></button>
+            </div>
+          ))}
+          {chosen.length > 0 && (list ?? []).some((o) => !chosen.includes(o.id)) && (
+            <button type="button" className="btn-ghost px-2 py-1 text-sm text-amber-800" onClick={() => setExtras([...extras.filter(Boolean), 0])}>
+              <Icon name="plus" className="h-4 w-4" /> {R.originMore}
+            </button>
+          )}
+          {(list ?? []).filter((o) => chosen.includes(o.id)).map((o) => (
+            <button key={o.id} type="button" className="btn-secondary w-full" onClick={() => take(o)}>
+              <Icon name="plus" className="h-4 w-4" /> {R.originAdd} · {o.no} ({o.lines.length})
+            </button>
+          ))}
+          <p className="text-xs text-stone-600">{chosen.length ? R.originHint : R.autoAnomaly}</p>
+        </>
       )}
-      <p className="text-xs text-stone-600">{sel ? R.originHint : R.autoAnomaly}</p>
     </div>
   );
 }
@@ -200,6 +225,7 @@ function Documents({ draft, setDraft, editId }: { draft: Draft; setDraft: (fn: (
             <select className="input" value={doc.type} onChange={(e) => update(docs.map((x, j) => (j === i ? { ...x, type: e.target.value as DocRef["type"] } : x)))}>
               <option value="bl">{w.docTypes.bl}</option>
               <option value="facture">{w.docTypes.facture}</option>
+              <option value="reprise">{w.docTypes.reprise}</option>
               <option value="autre">{w.docTypes.autre}</option>
             </select>
           </label>

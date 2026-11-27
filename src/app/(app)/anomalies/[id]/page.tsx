@@ -116,7 +116,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
   const claimMails = mailsOf(supplier?.contacts?.reclamation);
   const claimEmail = (claimMails.length ? claimMails : mailsOf(supplier?.contacts?.societe)).join(",") || supplier?.email || "";
   const claimPhone = supplier?.contacts?.reclamation?.phone || supplier?.contacts?.societe?.phone || supplier?.phone || "";
-  const docs = (rec?.documents as { type: "bl" | "facture" | "autre"; number: string; date?: string | null }[] | null) ?? (rec?.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : []);
+  const docs = (rec?.documents as { type: "bl" | "facture" | "reprise" | "autre"; number: string; date?: string | null }[] | null) ?? (rec?.blNumber ? [{ type: "bl" as const, number: rec.blNumber }] : []);
   const reference = rec ? lineDocLabel(docs, line?.document, rec.blNumber) : a.reference;
   // Date BL / Facture : enregistrée sur la fiche, sinon celle du document du bon, la livraison, la référence ou la fiche
   const lineDocDate = (line?.document && docs.find((d) => d.number === line.document)?.date) || docs.find((d) => d.date)?.date;

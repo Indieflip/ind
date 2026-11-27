@@ -38,7 +38,7 @@ export function UnconsolidateImportedButton({ id, label, confirmText }: { id: nu
   const [pending, start] = useTransition();
   const router = useRouter();
   return (
-    <button className="btn-secondary" disabled={pending} onClick={async () => await appConfirm(confirmText) && start(async () => { await unconsolidateImportedAction(id); router.refresh(); })}>
+    <button className="btn-secondary" disabled={pending} onClick={() => start(async () => { await unconsolidateImportedAction(id); router.refresh(); })}>
       <Icon name="edit" className="h-4 w-4" /> {label}
     </button>
   );

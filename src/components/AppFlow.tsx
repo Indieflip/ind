@@ -7,28 +7,23 @@ import { Icon } from "./Icon";
  */
 const PHONE_STEPS: { title: string; items: string[]; gate?: string; auto?: string }[] = [
   {
-    title: "Photos et signatures",
-    items: ["Photo du BL / facture (ou « Pas de BL »)", "Photo de l'étiquette (lot / DLC), conseillée pour viandes, poissons, surgelés", "Signature du livreur ou « parti sans signer »", "Signature du réceptionnaire"],
-    gate: "Rien d'obligatoire à cette étape",
-  },
-  {
-    title: "Détail de la livraison",
-    items: ["Fournisseur, date et heure", "N° de BL / facture (doublon refusé)", "T° du camion, propreté du véhicule"],
+    title: "1. Livraison",
+    items: ["Photo du BL / facture lue automatiquement (ou « Pas de BL »)", "Fournisseur, date et heure", "Numéro document : BL, facture, bon reprise / retour (doublon refusé)", "T° du camion, propreté du véhicule"],
     auto: "Brouillon enregistré automatiquement",
   },
   {
-    title: "Contrôle des produits",
-    items: ["Q facturée, Q contrôlée, unité", "T° produit, DLC / DDM, lot, note", "Prix unitaire (obligatoire)", "Acceptée / Refus proposé automatiquement", "Refus et / ou Retour : quantité + unité"],
+    title: "2. Contrôle des produits",
+    items: ["Q facturée, Q contrôlée, unité", "T° produit, DLC / DDM, lot, note", "Photo de l'étiquette (lot / DLC) par produit dont la nature la demande", "Prix unitaire (obligatoire)", "Acceptée / Refus proposé automatiquement", "Refus et / ou Retour : motif (= type d'anomalie), quantité + unité"],
   },
   {
-    title: "Validation",
+    title: "3. Validation",
     items: ["Récapitulatif", "Texte des réserves à recopier sur le BL", "Enregistrement (hors ligne possible)"],
     gate: "Pas d'enregistrement sans prix, décision ou DLC obligatoire ; une fois l'info complétée, la fiche s'enregistre sans refaire les étapes",
   },
 ];
 
 const AUTO: { title: string; items: string[] }[] = [
-  { title: "Anomalies créées", items: ["Refus, retour marchandise, manque, quantité en trop", "Bon de reprise BR (même formulaire qu'une livraison) : chaque produit repris → « Retour marchandise » en attente d'avoir", "T° au-delà du seuil + marge, DLC dépassée", "Prix ≥ +10 % au-dessus du mercurial, prix bloqué", "Véhicule sale, BL manquant"] },
+  { title: "Anomalies créées", items: ["Refus, retour marchandise, manque, quantité en trop", "Bon de reprise BR (même formulaire, 3 étapes) : chaque produit repris → fiche d'anomalie du type du motif, en attente d'avoir, ou mise à jour de celle de la livraison d'origine", "T° au-delà du seuil + marge, DLC dépassée", "Prix ≥ +10 % au-dessus du mercurial, prix bloqué", "Véhicule sale, BL manquant"] },
   { title: "Prix et mercurial", items: ["Mercurial mis à jour avec le prix du bon", "Variation de prix enregistrée", "Historique du Mercurial repris dans le Suivi des prix"] },
   { title: "Pesée et suivis", items: ["Écarts de pesée (au kg, tares et perte acceptable du produit déduites), une anomalie « Écart de pesée » par bon", "Suivi viande / poisson, boulangerie", "N° d'anomalie et de réclamation"] },
 ];

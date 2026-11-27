@@ -8,7 +8,7 @@ import { getRestaurantName } from "@/lib/settings";
 import { backupSettings, lastBackup } from "@/lib/server/backup";
 import { count, eq, inArray } from "drizzle-orm";
 import { supplierProcesses } from "@/lib/server/followup";
-import { daysSince, DEFAULT_FOLLOW_UP_DAYS, verificationDue } from "@/lib/anomaly";
+import { daysSince, DEFAULT_FOLLOW_UP_DAYS, REMINDERS_ON, verificationDue } from "@/lib/anomaly";
 import { getDb, schema } from "@/db";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Rappel quotidien : réclamations sans nouvelle action depuis le délai du fournisseur (3 jours par défaut)
   let dueAnomalies = 0;
   let dueVerifications = 0;
-  if (open.length && processes) {
+  if (REMINDERS_ON && open.length && processes) {
     {
       {
         const now = new Date();
