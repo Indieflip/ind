@@ -36,7 +36,7 @@ interface Row {
   created?: string;
 }
 
-export function AddRow({ suppliers, units, natures, fixedSupplier, existing = [] }: { suppliers: Opt[]; units: string[]; natures: string[]; fixedSupplier?: Opt; existing?: { supplierId: number; name: string }[] }) {
+export function AddRow({ suppliers, units, natures, fixedSupplier, existing = [], categories = [] }: { suppliers: Opt[]; units: string[]; natures: string[]; fixedSupplier?: Opt; existing?: { supplierId: number; name: string }[]; categories?: Opt[] }) {
   const { t } = useI18n();
   const m = t.mercurial;
   const router = useRouter();
@@ -89,7 +89,7 @@ export function AddRow({ suppliers, units, natures, fixedSupplier, existing = []
           )}
         </div>
         <label className="relative">
-          <span className="label">{m.products} *</span>
+          <span className="label">{t.common.product} *</span>
           <input name="name" className="input" required value={name} onChange={(e) => setName(e.target.value)} />
           {similar.length > 0 && (
             <div className="absolute left-0 right-0 z-20 mt-1 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs shadow">
@@ -102,7 +102,15 @@ export function AddRow({ suppliers, units, natures, fixedSupplier, existing = []
         <label><span className="label">{m.priceMin}</span><MoneyInput name="priceMin" /></label>
         <label><span className="label">{m.priceMax}</span><MoneyInput name="price" /></label>
       </div>
-      <div className="grid gap-2 sm:grid-cols-[2fr_1fr_auto] sm:items-end">
+      <div className="grid gap-2 sm:grid-cols-[1.4fr_2fr_1fr_auto] sm:items-end">
+        {/* Catégorie (seuils de température, DLC) : sinon déduite de la nature */}
+        <label>
+          <span className="label">{t.common.category}</span>
+          <select name="categoryId" className="input" defaultValue="" key={`cat-${natureKey}`}>
+            <option value="">—</option>
+            {[...categories].sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" })).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
         <div>
           <span className="label">{m.nature}</span>
           <NatureSelect key={natureKey} name="nature" value="" options={natures} />

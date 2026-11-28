@@ -8,6 +8,7 @@ import { num } from "@/lib/format";
 import { syncFvProducts } from "@/lib/server/fv";
 import { unitName } from "@/lib/units";
 import { parisMonth } from "@/lib/pricing";
+import { natureOfCategory } from "@/lib/nature";
 
 /** Unité rattachée à la liste des unités (créée si nouvelle) */
 async function unitOf(u: string) {
@@ -43,8 +44,14 @@ export async function addFvAction(_p: { ok?: boolean; error?: string } | undefin
   const m = parisMonth(new Date());
   prices[m * 2] = pMin ?? pMax;
   prices[m * 2 + 1] = pMax ?? pMin;
-  await getDb().insert(schema.fvItems).values({ supplier, product, unit: await unitOf(String(form.get("unit") ?? "")), year, prices, position: 100000, locked: form.get("locked") === "on" });
+  const [item] = await getDb().insert(schema.fvItems).values({ supplier, product, unit: await unitOf(String(form.get("unit") ?? "")), year, prices, position: 100000, locked: form.get("locked") === "on" }).returning({ id: schema.fvItems.id });
   await syncFvProducts();
+  // Catégorie choisie à l'ajout : reportée sur le compte produit (avec la nature correspondante, gardée par la synchronisation)
+  const categoryId = Number(form.get("categoryId")) || null;
+  if (categoryId) {
+    const cat = await getDb().query.categories.findFirst({ where: eq(schema.categories.id, categoryId) });
+    if (cat) await getDb().update(schema.products).set({ categoryId, nature: natureOfCategory(cat.code) }).where(eq(schema.products.fvItemId, item.id));
+  }
   revalidatePath("/mercurial/fruits-legumes");
   return { ok: true };
 }

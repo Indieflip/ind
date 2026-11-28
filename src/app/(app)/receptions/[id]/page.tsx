@@ -69,6 +69,12 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
     db.select().from(schema.weighGaps).where(eq(schema.weighGaps.receptionId, rec.id)).orderBy(asc(schema.weighGaps.id)),
   ]);
   const showPrices = can.viewPrices(user.role) || can.receive(user.role);
+  // BL manquant reçu après coup : référence et date saisies sur la fiche d'anomalie
+  const lateDocs = recAnomalies.filter((x) => x.type === "missing_bl" && x.reference && !docs.some((d) => x.reference!.includes(d.number))).map((x) => {
+    const ref = x.reference!.trim();
+    const type = (/^fact/i.test(ref) ? "facture" : /^(bl|bon)/i.test(ref) ? "bl" : "autre") as "bl" | "facture" | "autre";
+    return { id: x.id, no: x.number, type, number: ref.replace(/^(facture|bl|bon de livraison|bon)\s*(n°|no)?\s*/i, "").replace(/\s+du\s+\d{2}\/\d{2}\/\d{2,4}$/i, "") || ref, date: x.docDate, at: x.lastActionAt };
+  });
 
   return (
     <div className="space-y-4">
@@ -131,7 +137,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
         <div className="grid gap-px bg-stone-200 sm:grid-cols-2 lg:grid-cols-4">
           <div className="bg-white p-4">
             <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-stone-500"><Icon name="file" className="h-4 w-4" /> {t.receptions.documents}</h2>
-            {docs.length === 0 ? <p className="text-sm text-stone-500">{t.receptions.noBl}</p> : (
+            {docs.length === 0 && lateDocs.length === 0 ? <p className="text-sm text-stone-500">{t.receptions.noBl}</p> : (
               <ul className="space-y-1.5">
                 {docs.map((d) => (
                   <li key={d.number} className="flex flex-wrap items-center gap-1.5 text-sm">
@@ -140,16 +146,18 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
                     {d.date && <span className="text-xs text-stone-500">{t.receptions.docOf} {fmtDate(d.date, locale)}</span>}
                   </li>
                 ))}
+                {/* BL / facture reçu après coup (saisi sur la fiche d'anomalie BL manquant) : affiché comme les autres documents, avec la mention de la mise à jour, sans modifier la fiche */}
+                {lateDocs.map((d) => (
+                  <li key={`late-${d.id}`} className="flex flex-wrap items-center gap-1.5 text-sm">
+                    <span className={`badge ${d.type === "facture" ? "bg-sky-100 text-sky-800" : d.type === "autre" ? "bg-stone-100 text-stone-700" : "bg-brand-50 text-brand-800"}`}>{t.wizard.docTypes[d.type]}</span>
+                    <span className="font-semibold">{d.number}</span>
+                    {d.date && <span className="text-xs text-stone-500">{t.receptions.docOf} {fmtDate(d.date, locale)}</span>}
+                    <span className="w-full text-xs font-medium text-violet-700">↻ {t.receptions.lateDocMention} <Link href={`/anomalies/${d.id}`} className="underline">{fmtNo("anomaly", anoNums.get(d.id)?.n ?? d.no)}</Link>{d.at ? ` · ${t.receptions.updatedOn} ${fmtDate(d.at, locale)}` : ""}</span>
+                  </li>
+                ))}
               </ul>
             )}
             {blPhotos.length > 0 && <p className="mt-2 text-xs text-stone-500">📎 {blPhotos.length} {t.receptions.attached}</p>}
-            {/* BL manquant reçu après coup : infos saisies sur la fiche d'anomalie, affichées ici sans modifier la fiche (ni nouvelle fiche des réceptions de marchandises) */}
-            {recAnomalies.filter((x) => x.type === "missing_bl" && (x.reference || x.docDate) && !docs.some((d) => x.reference?.includes(d.number))).map((x) => (
-              <div key={x.id} className="mt-2 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-sm text-violet-900">
-                <p className="font-semibold">{x.reference ?? "—"}{x.docDate ? ` · ${t.receptions.docOf} ${fmtDate(x.docDate, locale)}` : ""}</p>
-                <p className="text-xs">{t.receptions.fromMissingBl} <Link href={`/anomalies/${x.id}`} className="underline">{fmtNo("anomaly", anoNums.get(x.id)?.n ?? x.number)}</Link></p>
-              </div>
-            ))}
           </div>
 
           <div className="bg-white p-4">

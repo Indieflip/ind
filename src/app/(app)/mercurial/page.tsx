@@ -4,6 +4,7 @@ import { linkToProducts } from "@/lib/server/productLinks";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
+import { categoryOptions } from "@/lib/server/queries";
 import { can } from "@/lib/permissions";
 import { num } from "@/lib/format";
 import { fvRange, parisMonth } from "@/lib/pricing";
@@ -19,7 +20,8 @@ export default async function MercurialPage() {
   await ensureMajNormalized();
   await ensureMajCleanup();
   await throttled("product-links", 10 * 60_000, linkToProducts);
-  const { t } = await getDict();
+  const { t, locale } = await getDict();
+  const cats = await categoryOptions(locale);
   const db = getDb();
   const p = schema.products;
   const s = schema.suppliers;
@@ -53,7 +55,7 @@ export default async function MercurialPage() {
       <p className="-mt-3 mb-4 text-sm text-stone-600">{t.mercurial.intro}</p>
       {editable && (
         <div className="mb-4 grid items-start gap-4 xl:grid-cols-[3fr_1fr]">
-          <AddRow suppliers={supplierRows} units={units.map((u) => u.name)} natures={natures} existing={rows.filter((r) => r.active).map((r) => ({ supplierId: r.supplierId, name: r.name }))} />
+          <AddRow categories={cats} suppliers={supplierRows} units={units.map((u) => u.name)} natures={natures} existing={rows.filter((r) => r.active).map((r) => ({ supplierId: r.supplierId, name: r.name }))} />
           <UnitsPanel units={units.map((u) => ({ id: u.id, name: u.name }))} />
         </div>
       )}

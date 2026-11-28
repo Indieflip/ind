@@ -162,17 +162,24 @@ function FvRow({ r, currentMonth, editable, shownMonths, units }: { r: Row; curr
   );
 }
 
-export function AddFv({ year, suppliers, units }: { year: number; suppliers: string[]; units: string[] }) {
+export function AddFv({ year, suppliers, units, categories = [] }: { year: number; suppliers: string[]; units: string[]; categories?: { id: number; name: string }[] }) {
   const { t } = useI18n();
   const [state, action, pending] = useActionState(addFvAction, undefined);
   const [newUnit, setNewUnit] = useState("Kg");
   const ref = useRef<HTMLFormElement>(null);
   useEffect(() => { if (state?.ok) ref.current?.reset(); }, [state]);
   return (
-    <form ref={ref} action={action} className="card mb-4 grid gap-2 p-4 sm:grid-cols-[1fr_2fr_0.7fr_0.6fr_0.6fr_auto_auto] sm:items-end">
+    <form ref={ref} action={action} className="card mb-4 grid gap-2 p-4 sm:grid-cols-[1fr_2fr_1fr_0.7fr_0.6fr_0.6fr_auto_auto] sm:items-end">
       <input type="hidden" name="year" value={year} />
       <label><span className="label">{t.fv.supplier} *</span><input name="supplier" list="fv-suppliers" className="input" required /></label>
       <label><span className="label">{t.common.product} *</span><input name="product" className="input" required /></label>
+      <label>
+        <span className="label">{t.common.category}</span>
+        <select name="categoryId" className="input" defaultValue={categories.find((c) => /fruit|légume/i.test(c.name))?.id ?? ""}>
+          <option value="">—</option>
+          {[...categories].sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" })).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </label>
       <label><span className="label">{t.common.unit}</span><UnitSelect name="unit" value={newUnit} units={units} onChange={setNewUnit} /></label>
       {/* Prix du mois en cours : minimum « − » et maximum « + » (un seul renseigné : les deux) */}
       <label><span className="label">{t.fv.priceMinMonth}</span><MoneyInput name="priceMin" className="input text-right" /></label>

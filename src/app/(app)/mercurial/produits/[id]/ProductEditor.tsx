@@ -11,9 +11,9 @@ import { UnitSelect } from "@/components/UnitSelect";
 import { NatureSelect } from "@/components/NatureSelect";
 
 /** Compte produit : modifier (nom, unité, nature, prix, prix bloqué, actif) ou supprimer le produit */
-export function ProductEditor({ product, units, natures, fv }: {
-  product: { id: number; name: string; unit: string; nature: string | null; priceMin: number | null; price: number | null; priceLocked: boolean; active: boolean; lossPct: number | null };
-  units: string[]; natures: string[]; fv: boolean;
+export function ProductEditor({ product, units, natures, fv, categories = [] }: {
+  product: { id: number; name: string; unit: string; nature: string | null; categoryId: number | null; priceMin: number | null; price: number | null; priceLocked: boolean; active: boolean; lossPct: number | null };
+  units: string[]; natures: string[]; fv: boolean; categories?: { id: number; name: string }[];
 }) {
   const { t } = useI18n();
   const m = t.mercurial;
@@ -22,10 +22,10 @@ export function ProductEditor({ product, units, natures, fv }: {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const str = (n: number | null) => (n != null ? String(n).replace(".", ",") : "");
-  const [v, setV] = useState({ name: product.name, unit: product.unit, nature: product.nature ?? "", priceMin: str(product.priceMin), price: str(product.price), priceLocked: product.priceLocked, lossPct: str(product.lossPct) });
+  const [v, setV] = useState({ categoryId: product.categoryId ? String(product.categoryId) : "", name: product.name, unit: product.unit, nature: product.nature ?? "", priceMin: str(product.priceMin), price: str(product.price), priceLocked: product.priceLocked, lossPct: str(product.lossPct) });
   const save = () => start(async () => {
     const res = await updateMercurialRowAction(product.id, {
-      name: v.name, unit: v.unit, nature: v.nature, priceLocked: v.priceLocked, acceptableLossPct: v.lossPct,
+      name: v.name, unit: v.unit, nature: v.nature, categoryId: v.categoryId ? Number(v.categoryId) : null, priceLocked: v.priceLocked, acceptableLossPct: v.lossPct,
       ...(fv ? {} : { priceMin: v.priceMin, price: v.price }),
     }, { trace: false });
     if (res && "error" in res && res.error === "exists") return void (await appAlert(m.duplicateEdit));
@@ -47,7 +47,8 @@ export function ProductEditor({ product, units, natures, fv }: {
   return (
     <section className="card w-full space-y-3 p-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <label className="sm:col-span-2"><span className="label">{m.products} *</span><input className="input" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></label>
+        <label className="sm:col-span-2"><span className="label">{t.common.product} *</span><input className="input" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></label>
+        <label><span className="label">{t.common.category}</span><select className="input" value={v.categoryId} onChange={(e) => setV({ ...v, categoryId: e.target.value })}><option value="">—</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
         <label><span className="label">{t.common.unit}</span><UnitSelect className="input" value={v.unit} units={units} onChange={(unit) => setV({ ...v, unit })} /></label>
         <div><span className="label">{m.nature}</span><NatureSelect value={v.nature} options={natures} onChange={(nature) => setV({ ...v, nature })} /></div>
         {fv ? (

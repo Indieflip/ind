@@ -252,7 +252,8 @@ async function writeContent(
       gapQty: String(gapQty),
       gapAmount: gapAmount != null ? String(gapAmount) : null,
       acceptableLoss: loss ? String(loss) : prev?.acceptableLoss ?? null,
-      detail: prev?.detail ?? null,
+      // Produit avec % de perte : note « 55 % de perte acceptable à la pesée » (ancienne note « 55% de perte » mise à jour)
+      detail: prev?.detail ? lossNote(prev.detail) : pct ? `${String(pct).replace(".", ",")} % de perte acceptable à la pesée` : null,
       claimDate: prev?.claimDate ?? null,
       receptionId: recId,
     });
@@ -893,6 +894,11 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
     }
     return id;
   });
+}
+
+/** Note de perte : « 55% de perte » → « 55% de perte acceptable à la pesée » */
+export function lossNote(detail: string) {
+  return /de perte\s*$/i.test(detail.trim()) ? `${detail.trim()} acceptable à la pesée` : detail;
 }
 
 /** Produit au kg reçu en trop au-delà de la marge des pesées (10 g ou 0,10 €) */

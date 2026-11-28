@@ -3,7 +3,7 @@ import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getDict } from "@/lib/i18n/server";
 import { can } from "@/lib/permissions";
-import { one, type SP } from "@/lib/server/queries";
+import { categoryOptions, one, type SP } from "@/lib/server/queries";
 import { PageHeader } from "@/components/ui";
 import { AddFv, FvTable } from "./FvClient";
 import { supplierMatcher } from "@/lib/server/maj";
@@ -11,6 +11,7 @@ import { supplierMatcher } from "@/lib/server/maj";
 export default async function FruitsLegumesPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser(can.viewFv);
   const { t, locale } = await getDict();
+  const cats = await categoryOptions(locale);
   const sp = await searchParams;
   const db = getDb();
   const years = (await db.selectDistinct({ year: schema.fvItems.year }).from(schema.fvItems).orderBy(desc(schema.fvItems.year))).map((y) => y.year);
@@ -31,7 +32,7 @@ export default async function FruitsLegumesPage({ searchParams }: { searchParams
     <>
       <PageHeader title={t.fv.title} />
       <p className="-mt-3 mb-4 max-w-3xl text-sm text-stone-600">{t.fv.intro}</p>
-      {can.editFv(user.role) && <AddFv year={year} suppliers={suppliers} units={units} />}
+      {can.editFv(user.role) && <AddFv categories={cats} year={year} suppliers={suppliers} units={units} />}
       <form method="get" className="no-print mb-3 flex items-end gap-2">
         <label>
           <span className="mb-1 block text-xs font-medium text-stone-600">{t.fv.year}</span>

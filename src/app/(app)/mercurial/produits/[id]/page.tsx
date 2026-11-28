@@ -13,12 +13,13 @@ import { ProductEditor } from "./ProductEditor";
 import { ProductPriceEvolution } from "@/components/prices/PriceEvolution";
 import { ProductHistory, type HistoryRow } from "./ProductHistory";
 import { anomalyNumbers } from "@/lib/server/savings";
-import { receptionNos } from "@/lib/server/queries";
+import { categoryOptions, receptionNos } from "@/lib/server/queries";
 
 type Event = { at: Date; icon: string; tone: string; title: string; text: string; href?: string };
 
 /** Fiche produit du Mercurial : identité, chiffres, historique (création, prix, mises à jour, anomalies) et dernières réceptions */
-export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
+  const tab = (await searchParams).tab === "stats" ? "stats" : "infos";
   const user = await requireUser(can.viewMercurial);
   const { t, locale } = await getDict();
   const P = t.productPage;
@@ -53,6 +54,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     db.select({ name: schema.units.name }).from(schema.units).orderBy(asc(schema.units.position), asc(schema.units.name)),
     db.selectDistinct({ nature: schema.products.nature }).from(schema.products),
   ]);
+  const catOpts = await categoryOptions(locale);
   const natureList = [...new Set(natureRows.flatMap((x) => (x.nature ?? "").split(/,\s*/).filter(Boolean)))].sort((a, b) => a.localeCompare(b, "fr"));
   const money = (n: number | null) => (n != null ? fmtMoney(n, locale) : "—");
   const range = fv ? fvRange(fv.prices, parisMonth(new Date())) : { min: num(product.priceMin), max: num(product.price) };
@@ -121,11 +123,47 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             fv={!!fv}
             units={unitRows.map((u) => u.name)}
             natures={natureList}
-            product={{ id: product.id, name: product.name, unit: product.unit, nature: product.nature, priceMin: num(product.priceMin), price: num(product.price), priceLocked: product.priceLocked, active: product.active, lossPct: num(product.acceptableLossPct) }}
+            categories={catOpts}
+            product={{ id: product.id, name: product.name, unit: product.unit, nature: product.nature, categoryId: product.categoryId, priceMin: num(product.priceMin), price: num(product.price), priceLocked: product.priceLocked, active: product.active, lossPct: num(product.acceptableLossPct) }}
           />
         )}
       </header>
 
+      {/* Onglets : informations du produit (générales et spécifiques) / statistiques */}
+      <nav className="flex gap-1 border-b border-stone-200">
+        {([["infos", P.tabInfo, `/mercurial/produits/${id}`], ["stats", P.tabStats, `/mercurial/produits/${id}?tab=stats`]] as const).map(([k, label, href]) => (
+          <Link key={k} href={href} className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold ${tab === k ? "border-brand-600 text-brand-700" : "border-transparent text-stone-500 hover:text-stone-800"}`}>{label}</Link>
+        ))}
+      </nav>
+
+      {tab === "infos" ? (
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <section className="card p-4">
+            <h2 className="mb-1 text-xs font-bold uppercase tracking-wide text-stone-500">{P.general}</h2>
+            <dl>
+              {info(P.name, product.name)}
+              {info(P.number, fmtNo("product", product.id))}
+              {info(P.supplier, supplier ? <Link href={`/mercurial/fournisseurs/${supplier.id}`} className="text-brand-700 hover:underline">{sentence(supplier.name)}</Link> : "—")}
+              {info(P.category, category ? (locale === "en" ? category.nameEn : category.nameFr) : "—")}
+              {info(P.nature, product.nature || "—")}
+              {info(P.service, product.service || "—")}
+              {info(P.unit, product.unit)}
+              {info(P.created, fmtDate(product.createdAt, locale))}
+              {info(P.status, product.active ? P.active : P.inactive)}
+            </dl>
+          </section>
+          <section className="card p-4">
+            <h2 className="mb-1 text-xs font-bold uppercase tracking-wide text-stone-500">{P.specific}</h2>
+            <dl>
+              {info(P.range, fv ? `${range.min != null && range.max != null && range.min !== range.max ? `${money(range.min)} – ${money(range.max)}` : money(range.max ?? range.min)} · ${P.fv}` : range.min != null && range.max != null && range.min !== range.max ? `${money(range.min)} – ${money(range.max)}` : money(range.max ?? range.min))}
+              {info(P.locked, locked ? `🔒 ${t.common.yes}` : t.common.no)}
+              {info(P.lossPct, num(product.acceptableLossPct) != null ? `${String(num(product.acceptableLossPct)).replace(".", ",")} %` : "—")}
+              {info(P.duplicate, product.duplicateFlag || "—")}
+              {info(P.lastPrice, lastPrice ? `${money(num(lastPrice.unitPrice))} · ${fmtDate(lastPrice.deliveredAt, locale)}` : "—")}
+            </dl>
+          </section>
+        </div>
+      ) : (<>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         {tile(P.range, range.min != null && range.max != null && range.min !== range.max ? `${money(range.min)} – ${money(range.max)}` : money(range.max ?? range.min), product.unit)}
         {tile(P.lastPrice, lastPrice ? money(num(lastPrice.unitPrice)) : "—", lastPrice ? fmtDate(lastPrice.deliveredAt, locale) : undefined)}
@@ -135,21 +173,6 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
 
       {/* Évolution du prix payé (fiches de réception) */}
       <ProductPriceEvolution points={lines.filter((x) => num(x.unitPrice) != null).map((x) => ({ date: x.deliveredAt.toISOString(), price: num(x.unitPrice)!, href: `/receptions/${x.receptionId}` }))} />
-
-      <div className="grid items-start gap-5">
-        <section className="card p-4">
-          <dl>
-            {info(P.supplier, supplier ? sentence(supplier.name) : "—")}
-            {info(P.category, category ? (locale === "en" ? category.nameEn : category.nameFr) : "—")}
-            {info(P.nature, product.nature || "—")}
-            {info(P.service, product.service || "—")}
-            {info(P.unit, product.unit)}
-            {info(P.lossPct, num(product.acceptableLossPct) != null ? `${String(num(product.acceptableLossPct)).replace(".", ",")} %` : "—")}
-            {info(P.created, fmtDate(product.createdAt, locale))}
-          </dl>
-        </section>
-
-      </div>
 
       <section>
         <h2 className="font-semibold">{t.maj.productHistory}</h2>
@@ -181,6 +204,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           <p className="p-4 text-sm text-stone-500">{P.none}</p>
         )}
       </section>
+      </>)}
     </div>
   );
 }

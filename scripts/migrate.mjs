@@ -1730,6 +1730,31 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v6
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v61', '1') on conflict (key) do nothing`);
 }
 
+// Notes de perte des pesées : « 55% de perte » → « 55% de perte acceptable à la pesée », une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'loss_note_v1'`)).rows.length) {
+  const r = await db.execute(sql`update weigh_gaps set detail = trim(detail) || ' acceptable à la pesée' where detail ~* 'de perte\\s*$'`);
+  const a = await db.execute(sql`update anomalies set follow_up = regexp_replace(follow_up, '(\\d[\\d,.]*\\s*%\\s*de perte)', '\\1 acceptable à la pesée', 'gi') where follow_up ~* '%\\s*de perte' and follow_up !~* 'de perte acceptable'`);
+  console.log(`[migrate] notes de perte mises à jour : ${r.rowCount ?? 0} pesée(s), ${a.rowCount ?? 0} fiche(s) d'anomalie`);
+  await db.execute(sql`insert into app_settings (key, value) values ('loss_note_v1', '1') on conflict (key) do nothing`);
+}
+
+// Dev : compte produit en onglets, catégorie à l'ajout, BL reçu après coup, aperçu en modification, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v62'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  const rows = [
+    ["product", "Compte produit", "Onglets", false, "Onglet « Informations » (générales : produit, N°, fournisseur, catégorie, nature, service, unité, création, statut ; spécifiques : tranche de prix, prix bloqué, % de perte acceptable à la pesée, doublon, dernier prix) et onglet « Statistiques » (chiffres, évolution du prix, historique, dernières réceptions). Catégorie modifiable."],
+    ["product", "Ajout d'un produit", "Catégorie", false, "Mercurial et Fruits et légumes : catégorie à indiquer à l'ajout (sinon déduite de la nature ; Fruits et légumes par défaut)."],
+    ["product", "Pesée", "Note de perte", false, "Produit avec % de perte : note « 55 % de perte acceptable à la pesée » sur l'écart de pesée (anciennes notes « 55% de perte » mises à jour)."],
+    ["reception", "Documents", "BL reçu après coup", false, "BL / facture saisi sur la fiche d'anomalie BL manquant : affiché dans les Documents de la fiche de réception comme les autres, avec la mention « Reçu après coup, mis à jour depuis la fiche d'anomalie ANO… le … », sans modifier la fiche."],
+    ["reception", "Modification", "Aperçu de la fiche", false, "Modifier une fiche : aperçu de la fiche de réception finale (mis à jour en direct) ; un clic sur un produit ou sur « Livraison / Produits / Réserves » ouvre sa modification."],
+  ];
+  let i = 0;
+  for (const [form, section, field, required, rule] of rows) {
+    await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values (${form}, ${section}, ${field}, ${required}, ${rule}, '', ${pos + i++})`);
+  }
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v62', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

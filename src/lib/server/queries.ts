@@ -97,3 +97,9 @@ function listRaw(f: ReceptionFilters, limit: number) {
 export async function supplierOptions() {
   return getDb().select({ id: schema.suppliers.id, name: schema.suppliers.name }).from(schema.suppliers).orderBy(schema.suppliers.name);
 }
+
+/** Catégories (formulaires d'ajout de produit), rangées de A à Z */
+export async function categoryOptions(locale = "fr") {
+  const rows = await getDb().select({ id: schema.categories.id, nameFr: schema.categories.nameFr, nameEn: schema.categories.nameEn }).from(schema.categories);
+  return rows.map((c) => ({ id: c.id, name: locale === "en" ? c.nameEn : c.nameFr })).sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
+}

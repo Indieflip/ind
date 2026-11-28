@@ -41,7 +41,8 @@ export async function addMercurialRowAction(_p: R, form: FormData): Promise<R> {
   const service = String(form.get("service") ?? "").trim() || null;
   const nature = String(form.get("nature") ?? "").trim() || null;
   const priceLocked = form.get("priceLocked") === "on";
-  const categoryId = await categoryIdFor(nature);
+  // Catégorie choisie à l'ajout, sinon déduite de la nature
+  const categoryId = Number(form.get("categoryId")) || (await categoryIdFor(nature));
   if (!supplierId && newSupplier) {
     const found = await db.query.suppliers.findFirst({ where: eq(sql`lower(${schema.suppliers.name})`, newSupplier.toLowerCase()) });
     supplierId = found?.id ?? (await db.insert(schema.suppliers).values({ name: newSupplier }).returning())[0].id;
@@ -62,7 +63,7 @@ export async function addMercurialRowAction(_p: R, form: FormData): Promise<R> {
 /** Modification d'une cellule du mercurial. Un changement de prix est tracé dans le suivi des prix. */
 export async function updateMercurialRowAction(
   id: number,
-  data: { supplierId?: number; name?: string; unit?: string; price?: string; priceMin?: string; service?: string; nature?: string; priceLocked?: boolean; duplicateFlag?: string; acceptableLossPct?: string },
+  data: { supplierId?: number; name?: string; unit?: string; price?: string; priceMin?: string; service?: string; nature?: string; priceLocked?: boolean; duplicateFlag?: string; acceptableLossPct?: string; categoryId?: number | null },
   /** Correction depuis le compte produit : pas de ligne automatique dans l'historique des prix */
   opts: { trace?: boolean } = {},
 ) {
@@ -72,6 +73,7 @@ export async function updateMercurialRowAction(
   if (!product) return { error: "not_found" };
   const set: Partial<typeof schema.products.$inferInsert> = {};
   if (data.supplierId) set.supplierId = data.supplierId;
+  if (data.categoryId !== undefined) set.categoryId = data.categoryId;
   if (data.name?.trim()) set.name = data.name.trim();
   // Modification qui créerait un doublon chez le fournisseur : refusée
   if (set.name || set.supplierId) {

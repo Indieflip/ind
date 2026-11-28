@@ -9,7 +9,7 @@ import { can } from "@/lib/permissions";
 import { fmtDate, fmtDateTime, num, sentence } from "@/lib/format";
 import { isSupplierCreation } from "@/lib/majKinds";
 import { fvRange, parisMonth } from "@/lib/pricing";
-import { one, type SP } from "@/lib/server/queries";
+import { categoryOptions, one, type SP } from "@/lib/server/queries";
 import { Icon } from "@/components/Icon";
 import { StatusBadge } from "@/components/DecisionBadge";
 import { anomalyNumbers } from "@/lib/server/savings";
@@ -24,6 +24,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
   await ensureSupplierProcesses();
   const user = await requireUser(can.viewSuppliers);
   const { t, locale } = await getDict();
+  const catOpts = await categoryOptions(locale);
   const id = Number((await params).id);
   const tabParam = one((await searchParams).tab);
   const tab = tabParam === "anomalies" ? "anomalies" : tabParam === "receptions" ? "receptions" : "products";
@@ -181,7 +182,7 @@ export default async function SupplierPage({ params, searchParams }: { params: P
               })) as Record<"societe" | "reclamation" | "commande", { email: string; phone: string; notes: string; extra: { label: string; value: string }[] }>}
             /></div>
           )}
-          {editable && <AddRow suppliers={allSuppliers} units={units} natures={natures} fixedSupplier={{ id: supplier.id, name: supplier.name }} existing={rows.filter((r) => r.active).map((r) => ({ supplierId: r.supplierId, name: r.name }))} />}
+          {editable && <AddRow categories={catOpts} suppliers={allSuppliers} units={units} natures={natures} fixedSupplier={{ id: supplier.id, name: supplier.name }} existing={rows.filter((r) => r.active).map((r) => ({ supplierId: r.supplierId, name: r.name }))} />}
           <h2 className="pt-2 text-lg font-semibold">{t.suppliers.productList}</h2>
           <MercurialTable rows={rows} suppliers={allSuppliers} units={units} natures={natures} editable={editable} />
         </>
