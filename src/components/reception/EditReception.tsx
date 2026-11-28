@@ -10,7 +10,6 @@ import { Icon } from "../Icon";
 import { buildReservesText, needsDlc, toPayload, withAutoDecision } from "./helpers";
 import { StepDelivery } from "./StepDelivery";
 import { StepCheck } from "./StepCheck";
-import { RecapCard } from "./StepValidate";
 
 /**
  * Modifier une fiche de réception (non consolidée) : tout sur une seule page, sans étapes
@@ -24,7 +23,7 @@ export function EditReception({ id, initialDraft, number }: { id: number; initia
   const [draft, setDraftState] = useState<Draft>(initialDraft);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [open, setOpen] = useState<Record<string, boolean>>({ delivery: false, products: false, reserves: false });
+  const [open, setOpen] = useState<Record<string, boolean>>({ delivery: false, products: true, reserves: false });
 
   useEffect(() => {
     let alive = true;
@@ -109,15 +108,6 @@ export function EditReception({ id, initialDraft, number }: { id: number; initia
       {draft.kind === "reprise" && <p className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-800">↩ {t.returnSlip.detail}</p>}
       <h1 className="text-xl font-bold leading-tight">{draft.supplierName}</h1>
       {draft.imported && <p className="rounded-lg bg-violet-50 px-3 py-2 text-sm text-violet-800">{E.importedHint}</p>}
-
-      {/* Aperçu de la fiche de réception finale (mis à jour en direct) : un clic sur un produit ou une partie ouvre sa modification */}
-      <RecapCard draft={draft} catalog={catalog} title={draft.kind === "reprise" ? `↩ ${E.previewBr}` : E.preview} onLine={goLine} />
-      <div className="flex flex-wrap gap-2">
-        {([["delivery", E.delivery], ["products", E.products], ["reserves", E.reserves]] as const).map(([k, label]) => (
-          <button key={k} type="button" onClick={() => { setOpen((o) => ({ ...o, [k]: true })); setTimeout(() => document.getElementById(`edit-${k}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80); }}
-            className={`btn-secondary py-1.5 text-sm ${open[k] ? "ring-2 ring-brand-300" : ""}`}><Icon name="edit" className="h-4 w-4" /> {label}</button>
-        ))}
-      </div>
 
       {section("delivery", E.delivery, E.deliveryHint, <StepDelivery draft={draft} setDraft={setDraft} catalog={catalog} editId={id} />)}
       {section("products", `${E.products} (${draft.lines.length})`, E.productsHint, <StepCheck draft={draft} setDraft={setDraft} updateLine={updateLine} catalog={catalog} />)}

@@ -109,3 +109,24 @@ export function isInformative(a: { type: string; source?: string | null; descrip
 
 /** Type d'anomalie des fiches venues de l'onglet « Écarts pesées » */
 export const WEIGH_TYPE = "Écart de pesée";
+
+/** Origine d'une fiche d'anomalie (pour distinguer deux fiches du même produit / type) : pesée, retour, refus, contrôle… */
+export type Origin = "pesee" | "retour" | "refus" | "reserve" | "controle" | "bl" | "vehicule" | "prix" | "reprise" | "fichier" | "saisie";
+export function anomalyOrigin(a: { source?: string | null; type: string; description?: string | null }): Origin {
+  const d = (a.description ?? "").trim();
+  if (a.source === "weigh") return "pesee";
+  if (a.type === "missing_bl") return "bl";
+  if (a.type === "hygiene") return "vehicule";
+  if (a.type === "price" || a.type === "locked_price") return "prix";
+  if (/^bon de reprise/i.test(d)) return "reprise";
+  if (/^retour/i.test(d)) return "retour";
+  if (/^refus/i.test(d)) return "refus";
+  if (/^(réserve|reserve)/i.test(d)) return "reserve";
+  if (/^anomalie détectée/i.test(d)) return "controle";
+  return a.source === "file" ? "fichier" : "saisie";
+}
+export const ORIGIN_STYLES: Record<Origin, string> = {
+  pesee: "bg-cyan-100 text-cyan-800", retour: "bg-amber-100 text-amber-900", refus: "bg-red-100 text-red-800", reserve: "bg-orange-100 text-orange-800",
+  controle: "bg-violet-100 text-violet-800", bl: "bg-stone-200 text-stone-800", vehicule: "bg-stone-200 text-stone-800", prix: "bg-sky-100 text-sky-800",
+  reprise: "bg-amber-100 text-amber-900", fichier: "bg-stone-100 text-stone-700", saisie: "bg-stone-100 text-stone-700",
+};

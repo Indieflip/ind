@@ -7,7 +7,7 @@ import { claimMailHref } from "@/lib/claimMail";
 
 /** Réclamation par mail : ouverte dans Outlook (web), dans un nouvel onglet, déjà rédigée */
 const OUTLOOK_COMPOSE = "https://outlook.live.com/mail/0/deeplink/compose";
-import { WEIGH_TYPE, stageOf, waitingOf, waitingText } from "@/lib/anomaly";
+import { anomalyOrigin, WEIGH_TYPE, stageOf, waitingOf, waitingText } from "@/lib/anomaly";
 import { notFound } from "next/navigation";
 import { and, asc, eq, isNull, lt, max, sql, ne } from "drizzle-orm";
 import { getDb, schema } from "@/db";
@@ -200,7 +200,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
         {/* En-tête propre à la fiche d'anomalie (bandeau rouge) : ne se confond pas avec les autres fiches */}
         <div className="flex flex-wrap items-start justify-between gap-4 bg-gradient-to-r from-rose-700 to-rose-600 px-6 py-5 text-white">
           <div className="min-w-0 space-y-1">
-            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/80"><Icon name="alert" className="h-4 w-4" /> {s.title} · {fmtNo("anomaly", number)} - {fmtDate(a.createdAt ?? rec?.deliveredAt, locale)}</p>
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/80"><Icon name="alert" className="h-4 w-4" /> {s.title} · {fmtNo("anomaly", number)} - {fmtDate(a.createdAt ?? rec?.deliveredAt, locale)} <span className="ml-1 rounded-full bg-white/20 px-2 py-0.5 normal-case tracking-normal">{t.anomalies.origins[anomalyOrigin(a)]}</span></p>
             {/* Nom du fournisseur sans majuscules, police un peu plus petite ; indications entre parenthèses en plus petit */}
             <h1 className="text-xl font-bold leading-tight sm:text-2xl"><Paren text={sentence(supplier?.name ?? a.supplierName)} /> — <Paren text={problemType} /></h1>
             {itemsLabel && problemType !== t.anomalies.types.missing_bl && problemType !== WEIGH_TYPE && <p className="text-sm text-white/90"><Paren text={itemsLabel} /></p>}

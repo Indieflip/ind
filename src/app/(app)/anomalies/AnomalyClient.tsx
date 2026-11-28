@@ -92,6 +92,7 @@ export interface AnomalyRow {
   stage: string; resolution: string | null; mode: string; claimed: number | null; days: number; delay: number; closedAt: string | null;
   review?: string;
   problemType?: string;
+  origin?: string;
   missing?: string[];
   waitingFor?: string | null;
 }
@@ -170,7 +171,8 @@ export function AnomaliesBoard({ rows, consolidated, canManage, canConsolidate, 
     options: Object.values(a.missingFields), sort: (r) => r.missing?.length ?? 0,
     render: (r) => (r.missing?.length ? <span className="text-xs text-amber-800">{r.missing.join(", ")}</span> : <span className="text-xs text-emerald-700">✓</span>),
   });
-  shownCols.splice(1, 0, { key: "problemType", width: "8rem", label: t.sheet.problemType, text: (r) => r.problemType ?? "", options: [...new Set(rows.map((r) => r.problemType ?? "").filter(Boolean))].sort((x, y) => x.localeCompare(y, "fr")), keepCase: true });
+  shownCols.splice(1, 0, { key: "problemType", width: "8rem", label: t.sheet.problemType, text: (r) => r.problemType ?? "", options: [...new Set(rows.map((r) => r.problemType ?? "").filter(Boolean))].sort((x, y) => x.localeCompare(y, "fr")), keepCase: true,
+    render: (r) => <span>{r.problemType}{r.origin && <span className="mt-0.5 block text-[11px] font-medium text-stone-500">{r.origin}</span>}</span> });
   shownCols.splice(1, 0, {
     key: "review", width: "6.5rem", label: t.sheet.reviewLabel, text: (r) => reviewLabel(r.review), options: Object.values(t.sheet.reviews),
     render: (r) => <ReviewSelect id={r.id} value={r.review ?? ""} disabled={!canManage} />,

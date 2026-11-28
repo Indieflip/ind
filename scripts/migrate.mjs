@@ -1755,6 +1755,15 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v6
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v62', '1') on conflict (key) do nothing`);
 }
 
+// Dev : deux façons de modifier une fiche, origine des fiches d'anomalie, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v63'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = ${"Sur la fiche de réception : « Modifier » rend la fiche elle-même modifiable (même page : date, documents, livraison, produits, type d'anomalie / motif, réserves) ; « Modification complète » ouvre la page de modification habituelle (Livraison, Produits, Réserves). Les deux mettent à jour les fiches d'anomalie de la même façon."} where form = 'reception' and section = 'Modification' and field = 'Aperçu de la fiche'`);
+  await db.execute(sql`update dev_fields set field = 'Modifier / Modification complète' where form = 'reception' and section = 'Modification' and field = 'Aperçu de la fiche'`);
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('anomaly', 'Liste et fiche', 'Origine', false, ${"Badge d'origine sur chaque fiche d'anomalie (Pesée, Retour, Refus, Réserve, Contrôle, BL manquant, Véhicule, Prix, Bon de reprise, Fichier de suivi, Saisie) et type d'anomalie affiché : deux fiches du même produit (ex. écart de pesée et retour) se distinguent sur la fiche de réception, la liste et la fiche d'anomalie."}, '', ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v63', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

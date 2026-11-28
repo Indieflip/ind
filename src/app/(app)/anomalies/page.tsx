@@ -17,7 +17,7 @@ import { ensureAnomaliesLinked } from "@/lib/server/maj";
 import { syncWeighAnomalies } from "@/lib/server/weighAnomalies";
 import { ensureClaimNumbers } from "@/lib/server/claimNumbers";
 import { supplierProcesses } from "@/lib/server/followup";
-import { daysSince, stageOf, isClaimMode, REMINDERS_ON, verificationDue } from "@/lib/anomaly";
+import { anomalyOrigin, daysSince, stageOf, isClaimMode, REMINDERS_ON, verificationDue } from "@/lib/anomaly";
 import { DueBox, Kanban } from "./Kanban";
 import { TypeRecap } from "./TypeRecap";
 import { problemTypes } from "@/lib/server/problemTypes";
@@ -97,6 +97,8 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     nature: x.nature ?? "",
     review: x.review ?? "",
     problemType: x.problemType || t.anomalies.types[x.type],
+    // Origine (Pesée, Retour, Refus…) : distingue deux fiches du même produit / type
+    origin: t.anomalies.origins[anomalyOrigin(x)],
     supplier: extra.get(x.id)?.supplier ?? x.supplierName,
     supplierId: x.supplierId,
     reference: (x.receptionId ? lineDocLabel(extra.get(x.id)?.documents, extra.get(x.id)?.lineDoc, extra.get(x.id)?.blNumber) : null) ?? x.reference ?? "",

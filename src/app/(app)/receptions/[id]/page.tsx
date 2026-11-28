@@ -12,13 +12,15 @@ import { checkPrice } from "@/lib/pricing";
 import { StatusBadge, decisionStyles } from "@/components/DecisionBadge";
 import { Icon } from "@/components/Icon";
 import { receptionNos } from "@/lib/server/queries";
+import { buildEditDraft } from "@/lib/server/editDraft";
+import { InlineEditor } from "@/components/reception/InlineEditor";
 import { anomalyNumbers } from "@/lib/server/savings";
-import { outcomeOf, outcomeStyles } from "@/lib/anomaly";
+import { anomalyOrigin, ORIGIN_STYLES, outcomeOf, outcomeStyles } from "@/lib/anomaly";
 import { AnomalyActionField, PrintButton, DeleteReceptionButton, AddNote, ConsolidateImportedButton, UnconsolidateImportedButton, ConvertToReturnSlipButton } from "./Actions";
 
 const isPdf = (url: string) => /\.pdf($|\?)/i.test(url) || url.startsWith("data:application/pdf");
 
-export default async function ReceptionDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function ReceptionDetail({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string }> }) {
   const user = await requireUser();
   const { t, locale } = await getDict();
   const id = Number((await params).id);
@@ -26,6 +28,16 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
   const db = getDb();
   const rec = await db.query.receptions.findFirst({ where: eq(schema.receptions.id, id) });
   if (!rec) notFound();
+  // « Modifier » : la fiche elle-même devient modifiable (même page) ; « Modification complète » : la page de modification habituelle
+  if ((await searchParams).edit === "1" && !rec.consolidatedAt && can.editReception(user.role)) {
+    const [draft, nos] = await Promise.all([buildEditDraft(rec, locale), receptionNos()]);
+    return (
+      <div className="space-y-4">
+        <Link href={`/receptions/${rec.id}`} className="no-print btn-ghost -ml-2 px-2"><Icon name="chevronLeft" className="h-4 w-4" /> {t.common.cancel}</Link>
+        <InlineEditor id={rec.id} initialDraft={draft} number={nos.get(rec.id) ?? "—"} />
+      </div>
+    );
+  }
   const [lines, photos, categories, author, notes, bakery] = await Promise.all([
     db.select().from(schema.receptionLines).where(eq(schema.receptionLines.receptionId, id)).orderBy(asc(schema.receptionLines.position)),
     db.select().from(schema.receptionPhotos).where(eq(schema.receptionPhotos.receptionId, id)),
@@ -82,7 +94,10 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
         <Link href="/receptions" className="btn-ghost -ml-2 px-2"><Icon name="chevronLeft" className="h-4 w-4" /> {t.nav.receptions}</Link>
         <div className="flex flex-wrap justify-end gap-2">
           {!locked && can.editReception(user.role) && (
-            <Link href={`/receptions/${rec.id}/edit`} className="btn-primary"><Icon name="edit" className="h-4 w-4" /> {t.receptions.edit}</Link>
+            <>
+              <Link href={`/receptions/${rec.id}?edit=1`} className="btn-primary"><Icon name="edit" className="h-4 w-4" /> {t.receptions.editHere}</Link>
+              <Link href={`/receptions/${rec.id}/edit`} className="btn-secondary"><Icon name="layers" className="h-4 w-4" /> {t.receptions.editFull}</Link>
+            </>
           )}
           {can.createAnomaly(user.role) && (
             <Link href={`/anomalies?reception=${rec.id}#new`} className="btn-secondary"><Icon name="alert" className="h-4 w-4" /> {t.receptions.reportAnomaly}</Link>
@@ -122,7 +137,7 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
               <span className="rounded-full bg-white px-1 py-0.5">{reprise ? <span className="badge bg-amber-100 font-semibold text-amber-900">↩ {t.returnSlip.badge}</span> : <StatusBadge status={rec.status} label={t.receptionStatus[rec.status]} />}</span>
               {/* Modifier : tant que la fiche de réception n'est pas consolidée */}
               {!locked && can.editReception(user.role) && (
-                <Link href={`/receptions/${rec.id}/edit`} className="no-print rounded-full bg-white p-1.5 text-brand-700 hover:bg-brand-50" title={t.receptions.edit} aria-label={t.receptions.edit}><Icon name="edit" className="h-4 w-4" /></Link>
+                <Link href={`/receptions/${rec.id}?edit=1`} className="no-print rounded-full bg-white p-1.5 text-brand-700 hover:bg-brand-50" title={t.receptions.edit} aria-label={t.receptions.edit}><Icon name="edit" className="h-4 w-4" /></Link>
               )}
             </div>
             {showPrices && total > 0 && (
@@ -328,7 +343,9 @@ export default async function ReceptionDetail({ params }: { params: Promise<{ id
                   <div className="min-w-0 flex-1">
                     <Link href={`/anomalies/${a.id}`} className="font-medium text-brand-700 hover:underline">
                       <span className="mr-1.5 font-semibold">{fmtNo("anomaly", anoNums.get(a.id)?.n ?? a.number)}</span>
-                      {t.anomalies.types[a.type]}{a.productName ? ` · ${a.productName}` : ""} →
+                      {/* Origine (Pesée, Retour, Refus…) + type d'anomalie de la fiche : deux fiches du même produit se distinguent */}
+                      <span className={`badge mr-1.5 ${ORIGIN_STYLES[anomalyOrigin(a)]}`}>{t.anomalies.origins[anomalyOrigin(a)]}</span>
+                      {a.problemType || t.anomalies.types[a.type]}{a.productName ? ` · ${a.productName}` : ""} →
                     </Link>
                     <p className="text-stone-600">{a.description}</p>
                     <AnomalyActionField id={a.id} initial={a.followUp ?? ""} editable={can.manageAnomalies(user.role) && !a.consolidatedAt} label={t.receptions.actions} saveLabel={t.common.save} savedLabel={t.receptions.actionSaved} />
