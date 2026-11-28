@@ -843,6 +843,8 @@ export const fr = {
     assistant: { imported: "Fiche reprise du fichier de suivi", createdFrom: "Fiche créée automatiquement à l'enregistrement de la réception N°", createdBy: "Fiche créée par", claimNumber: "N° de réclamation attribué :", informative: "Montant à titre informatif : non compté dans les économies", lastAction: "Dernière action enregistrée", followPlanned: "Relance prévue (délai du fournisseur)", followLate: "Relance en retard : rappel affiché sur l'Accueil", verifyPlanned: "Vérification de l'avoir prévue", verifyLate: "Vérification en retard : rappel affiché sur l'Accueil", toProcess: "À traiter : la fiche apparaît dans les tâches de l'Accueil", saving: "Économie comptée dans Reporting › Économies :", consolidated: "Fiche consolidée : plus modifiable" },
     problemDetail: "Détail du problème",
     problemType: "Type d'anomalie",
+    newType: "Nouveau type…",
+    newTypePh: "Nom du nouveau type d'anomalie",
     manageTypes: "Gérer les types",
     addType: "Ajouter un type",
     productLinked: "Produit",

@@ -841,6 +841,8 @@ export const en: Dict = {
     assistant: { imported: "Sheet imported from the follow-up file", createdFrom: "Sheet created automatically when saving reception No.", createdBy: "Sheet created by", claimNumber: "Claim number assigned:", informative: "Amount for information only: not counted in savings", lastAction: "Last action recorded", followPlanned: "Follow-up planned (supplier delay)", followLate: "Follow-up overdue: reminder shown on Home", verifyPlanned: "Credit check planned", verifyLate: "Credit check overdue: reminder shown on Home", toProcess: "To process: listed in the Home tasks", saving: "Saving counted in Reporting › Savings:", consolidated: "Sheet consolidated: read-only" },
     problemDetail: "Problem details",
     problemType: "Anomaly type",
+    newType: "New type…",
+    newTypePh: "Name of the new anomaly type",
     manageTypes: "Manage types",
     addType: "Add a type",
     productLinked: "Product",

@@ -1764,6 +1764,13 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v6
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v63', '1') on conflict (key) do nothing`);
 }
 
+// Dev : ajout direct d'un type d'anomalie sur la fiche d'anomalie, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v64'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('anomaly', 'Fiche d''anomalie', 'Nouveau type d''anomalie', false, ${"Liste « Type d'anomalie » : choix « + Nouveau type… » pour saisir un type ; il est ajouté à la liste des types (rangée de A à Z, aussi proposée comme motif sur les fiches de réception) et choisi sur la fiche. « Gérer les types » pour renommer ou supprimer."}, '', ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v64', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

@@ -44,6 +44,23 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
   const closedWithout = stage === "cloturee" && !v.resolution;
   const [typeList, setTypeList] = useState(types);
   const [managing, setManaging] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [newType, setNewType] = useState("");
+  const [addingBusy, setAddingBusy] = useState(false);
+  const addType = async () => {
+    const name = newType.trim();
+    if (!name) return;
+    setAddingBusy(true);
+    const exists = typeList.find((x) => x.toLowerCase() === name.toLowerCase());
+    const res = exists ? { ok: true as const, list: typeList } : await saveProblemTypesAction([...typeList, name]);
+    setAddingBusy(false);
+    if (res.ok) {
+      setTypeList(res.list);
+      setV((x) => ({ ...x, problemType: exists ?? name }));
+      setSaved(false);
+      setAdding(false);
+    }
+  };
   const typeOptions = v.problemType && !typeList.includes(v.problemType) ? [v.problemType, ...typeList] : typeList;
   // Produits de la fiche : quantité et prix par produit
   const setItem = (i: number, patch: Partial<Item>) => { setV({ ...v, items: v.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) }); setSaved(false); };
@@ -117,9 +134,19 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <span className="label flex items-center justify-between">{s.problemType}{editable && <button type="button" className="text-xs font-normal text-brand-700 underline" onClick={() => setManaging((m) => !m)}>{managing ? t.common.close : `⚙ ${s.manageTypes}`}</button>}</span>
-          <select className="input" value={v.problemType} onChange={set("problemType")} disabled={!editable}>
+          {/* « + Nouveau type… » : ajout direct d'un type d'anomalie (ajouté à la liste des types et choisi sur la fiche) */}
+          <select className="input" value={adding ? "__new" : v.problemType} onChange={(e) => { if (e.target.value === "__new") { setAdding(true); setNewType(""); } else { setAdding(false); set("problemType")(e); } }} disabled={!editable}>
             {[...typeOptions].sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" })).map((x) => <option key={x} value={x}>{x}</option>)}
+            {editable && <option value="__new">+ {s.newType}</option>}
           </select>
+          {adding && (
+            <div className="mt-1.5 flex gap-1.5">
+              <input className="input py-1.5 text-sm" autoFocus placeholder={s.newTypePh} value={newType} onChange={(e) => setNewType(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void addType(); } }} />
+              <button type="button" className="btn-primary py-1.5 text-sm" disabled={!newType.trim() || addingBusy} onClick={() => void addType()}>{t.common.add}</button>
+              <button type="button" className="btn-ghost py-1.5 text-sm" onClick={() => setAdding(false)}>{t.common.cancel}</button>
+            </div>
+          )}
           {managing && <TypesManager list={typeList} onSaved={(l) => { setTypeList(l); if (!l.includes(v.problemType) && l.length) setV({ ...v, problemType: l[0] }); }} />}
         </div>
       </div>
