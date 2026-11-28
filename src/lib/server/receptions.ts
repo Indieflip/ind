@@ -812,7 +812,8 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
           ? { problemType: motifLabel(motif, t), type: reasonToAnomaly[motif] ?? typeOfLabel(motif, t) ?? a.type }
           : {};
         // Montant réclamé = somme des produits (quantité × prix) quand tout est connu ; sinon le montant saisi est gardé
-        const amount = next.length && next.every((x) => x.qty != null && x.price != null) ? Math.round(next.reduce((s, x) => s + x.qty! * x.price!, 0) * 100) / 100 : null;
+        // (+ les blocs « autre anomalie » ajoutés à la main sur la fiche d'anomalie)
+        const amount = next.length && next.every((x) => x.qty != null && x.price != null) ? Math.round((next.reduce((s, x) => s + x.qty! * x.price!, 0) + blocksSum(a.blocks)) * 100) / 100 : null;
         await tx.update(schema.anomalies).set({
           ...common(a),
           ...(a.items?.length || lineId != null ? { items: next } : {}),
@@ -885,7 +886,7 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
         }
         if (items.length || main.source !== "weigh") {
           await tx.update(schema.anomalies).set({
-            items, claimedAmount: sumOf(items) ?? main.claimedAmount,
+            items, claimedAmount: sumOf(items) != null ? String(Math.round((Number(sumOf(items)) + blocksSum(main.blocks)) * 100) / 100) : main.claimedAmount,
             productName: items[0]?.name ?? main.productName, productId: items[0]?.productId ?? main.productId,
             lineId: mine[0]?.id ?? null, ...(main.source === "weigh" ? { groupKey: `rec:${id}` } : {}),
           }).where(eq(schema.anomalies.id, main.id));
@@ -894,6 +895,11 @@ export async function updateReception(id: number, p: Payload, user: SessionUser)
     }
     return id;
   });
+}
+
+/** Montant des blocs « autre anomalie » d'une fiche d'anomalie (quantité × prix des produits connus) */
+export function blocksSum(blocks: { items: { qty: number | null; price: number | null }[] }[] | null | undefined) {
+  return (blocks ?? []).reduce((s, b) => s + b.items.reduce((t, x) => t + (x.qty ?? 0) * (x.price ?? 0), 0), 0);
 }
 
 /** Note de perte : « 55% de perte » → « 55% de perte acceptable à la pesée » */

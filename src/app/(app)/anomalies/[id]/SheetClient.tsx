@@ -14,8 +14,11 @@ import { ProductCombo } from "@/components/ProductCombo";
 import { Paren } from "@/components/Paren";
 
 export interface Item { productId: number | null; name: string; qty: string; unit: string; price: string }
+/** Bloc « autre anomalie » de la fiche (en plus du bloc constaté) */
+export interface Block { problemType: string; description: string; items: Item[] }
 interface Values {
   items: Item[];
+  blocks: Block[];
   problemType: string; productId: number | null; productName: string; note: string; description: string; followUp: string; lastActionAt: string; nextActionAt: string;
   creditAmount: string; claimedAmount: string; stage: string; resolution: string; mode: string; creditNumber: string; creditDate: string; creditKind: string; docDate: string; waitingFor: string;
 }
@@ -86,7 +89,11 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
   // Unité tapée à la main (« kg », « Pièce ») rattachée à l'unité existante de même nom
   const key = (u: string) => u.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const canonUnit = (u: string) => units.find((x) => key(x) === key(u)) ?? u;
-  const itemsTotal = v.items.reduce((sum, x) => sum + (n(x.qty) ?? 0) * (n(x.price) ?? 0), 0);
+  const mainTotal = v.items.reduce((sum, x) => sum + (n(x.qty) ?? 0) * (n(x.price) ?? 0), 0);
+  const blockTotal = (b: Block) => b.items.reduce((sum, x) => sum + (n(x.qty) ?? 0) * (n(x.price) ?? 0), 0);
+  // Montant réclamé = bloc constaté + autres blocs
+  const itemsTotal = mainTotal + v.blocks.reduce((sum, b) => sum + blockTotal(b), 0);
+  const setBlock = (i: number, patch: Partial<Block>) => { setV({ ...v, blocks: v.blocks.map((b, j) => (j === i ? { ...b, ...patch } : b)) }); setSaved(false); };
   // Bon de livraison manquant : le montant est le total des produits (calculé, non saisi)
   const isMissingBl = !!missingBlType && v.problemType === missingBlType;
   // Montant réclamé = somme des produits (quantité × prix) dès qu'un produit a un prix ; sinon saisi à la main (BL manquant : toujours calculé)
@@ -99,6 +106,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
     start(async () => {
       try {
         const { productName: _n, productId: _p, items, ...rest } = v;
+        void rest.blocks;
         void _n; void _p;
         // Sans suite choisi ici : le détail est ajouté à l'historique, daté du jour
         const d = new Date().toLocaleDateString("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "2-digit", year: "2-digit" });
@@ -108,6 +116,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
           ...(noFollowLine ? { followUp: [rest.followUp, noFollowLine].filter(Boolean).join("\n") } : {}),
           ...(amountFromItems ? { claimedAmount: itemsTotal ? itemsTotal.toFixed(2) : "" } : {}),
           items: items.map((x) => ({ productId: x.productId, name: x.name, qty: n(x.qty), unit: x.unit, price: n(x.price) })),
+          blocks: rest.blocks.map((b) => ({ problemType: b.problemType, description: b.description, items: b.items.map((x) => ({ productId: x.productId, name: x.name, qty: n(x.qty), unit: x.unit, price: n(x.price) })) })),
         });
         if (res?.ok) { setSaved(true); router.refresh(); }
         else setError(s.saveFailed);
@@ -131,6 +140,7 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
           </div>
         </dl>
       )}
+      {v.blocks.length > 0 && <p className="flex items-center justify-between text-sm font-bold text-stone-700"><span>{s.blockMain} · {v.problemType}</span><span className="rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-800">{s.blockFound}</span></p>}
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <span className="label flex items-center justify-between">{s.problemType}{editable && <button type="button" className="text-xs font-normal text-brand-700 underline" onClick={() => setManaging((m) => !m)}>{managing ? t.common.close : `⚙ ${s.manageTypes}`}</button>}</span>
@@ -185,6 +195,55 @@ export function AnomalySheetForm({ id, initial, editable, informative, types, pr
         <span className="label">{a.problem}</span>
         <textarea className="input" rows={2} value={v.description} onChange={set("description")} disabled={!editable} />
       </label>
+      {/* Autres anomalies de la même fiche : un bloc par anomalie (type, produits, description) */}
+      {v.blocks.map((b, bi) => (
+        <div key={bi} className="space-y-3 rounded-xl border border-orange-300 bg-orange-50/50 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-bold text-stone-700">{s.block} {bi + 2} · {b.problemType || "—"}</p>
+            <span className="flex items-center gap-1">
+              <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-800">{s.blockAdded}</span>
+              {editable && <button type="button" className="btn-ghost p-1 text-stone-400 hover:text-red-600" aria-label={t.common.delete} onClick={() => { setV({ ...v, blocks: v.blocks.filter((_, j) => j !== bi) }); setSaved(false); }}><Icon name="trash" className="h-4 w-4" /></button>}
+            </span>
+          </div>
+          <label className="block"><span className="label">{s.problemType}</span>
+            <select className="input" value={b.problemType} disabled={!editable} onChange={(e) => setBlock(bi, { problemType: e.target.value })}>
+              <option value="">—</option>
+              {[...new Set([...typeList, ...(b.problemType ? [b.problemType] : [])])].sort((x, y) => x.localeCompare(y, "fr", { sensitivity: "base" })).map((x) => <option key={x} value={x}>{x}</option>)}
+            </select>
+          </label>
+          <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+            <table className="table text-sm">
+              <thead><tr><th>{s.productLinked}</th><th className="w-24 text-right">{s.qty}</th><th className="w-20">{s.unit}</th><th className="w-28 text-right">{s.unitPrice}</th><th className="w-24 text-right">{s.lineTotal}</th><th className="w-10" /></tr></thead>
+              <tbody>
+                {b.items.map((x, i) => {
+                  const setIt = (patch: Partial<Item>) => setBlock(bi, { items: b.items.map((y, j) => (j === i ? { ...y, ...patch } : y)) });
+                  return (
+                    <tr key={i}>
+                      <td><ProductCombo value={x.name} products={products} disabled={!editable} placeholder={s.productPlaceholder} onChange={(name, p) => setIt({ name, productId: p?.id ?? null, unit: x.unit || canonUnit(p?.unit ?? ""), ...(p && !x.price ? { price: priceStr(products.find((y) => y.id === p.id)) } : {}) })} /></td>
+                      <td><input className="input py-1.5 text-right text-sm" inputMode="decimal" value={x.qty} disabled={!editable} onChange={(e) => setIt({ qty: e.target.value })} /></td>
+                      <td>{editable ? <UnitSelect className="input py-1.5 text-sm" value={canonUnit(x.unit)} units={units} onChange={(u) => setIt({ unit: u })} /> : <span>{x.unit}</span>}</td>
+                      <td><MoneyInput className="input py-1.5 text-right text-sm" value={x.price} disabled={!editable} onChange={(e) => setIt({ price: e.target.value })} /></td>
+                      <td className="text-right tabular-nums">{n(x.qty) != null && n(x.price) != null ? `${((n(x.qty) ?? 0) * (n(x.price) ?? 0)).toFixed(2).replace(".", ",")} €` : "—"}</td>
+                      <td>{editable && <button type="button" className="btn-ghost p-1 text-stone-400 hover:text-red-600" aria-label={t.common.delete} onClick={() => setBlock(bi, { items: b.items.filter((_, j) => j !== i) })}><Icon name="trash" className="h-4 w-4" /></button>}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            {editable && <button type="button" className="btn-secondary py-1.5 text-sm" onClick={() => setBlock(bi, { items: [...b.items, { productId: null, name: "", qty: "", unit: "", price: "" }] })}><Icon name="plus" className="h-4 w-4" /> {s.addItem}</button>}
+            {blockTotal(b) > 0 && <span className="font-semibold">{s.itemsTotal} : {blockTotal(b).toFixed(2).replace(".", ",")} €</span>}
+          </div>
+          <label className="block"><span className="label">{a.problem}</span><textarea className="input" rows={2} value={b.description} disabled={!editable} onChange={(e) => setBlock(bi, { description: e.target.value })} /></label>
+        </div>
+      ))}
+      {editable && (
+        <button type="button" className="w-full rounded-lg border border-dashed border-orange-400 py-2 text-sm font-semibold text-orange-700 hover:bg-orange-50"
+          onClick={() => { setV({ ...v, blocks: [...v.blocks, { problemType: "", description: "", items: [{ productId: null, name: "", qty: "", unit: "", price: "" }] }] }); setSaved(false); }}>
+          + {s.addBlock}
+        </button>
+      )}
       <div className="grid gap-3 sm:grid-cols-[14rem_1fr]">
         <label>
           <span className="label">{missingBlType && v.problemType === missingBlType ? s.amountOnly : s.claimed}</span>

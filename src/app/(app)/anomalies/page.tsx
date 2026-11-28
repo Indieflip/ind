@@ -98,7 +98,7 @@ export default async function AnomaliesPage({ searchParams }: { searchParams: Pr
     review: x.review ?? "",
     problemType: x.problemType || t.anomalies.types[x.type],
     // Origine (Pesée, Retour, Refus…) : distingue deux fiches du même produit / type
-    origin: t.anomalies.origins[anomalyOrigin(x)],
+    origin: `${t.anomalies.origins[anomalyOrigin(x)]}${x.blocks?.length ? ` · + ${x.blocks.map((b) => b.problemType).filter(Boolean).join(" + ")}` : ""}`,
     supplier: extra.get(x.id)?.supplier ?? x.supplierName,
     supplierId: x.supplierId,
     reference: (x.receptionId ? lineDocLabel(extra.get(x.id)?.documents, extra.get(x.id)?.lineDoc, extra.get(x.id)?.blNumber) : null) ?? x.reference ?? "",

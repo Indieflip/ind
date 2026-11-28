@@ -345,7 +345,7 @@ export default async function ReceptionDetail({ params, searchParams }: { params
                       <span className="mr-1.5 font-semibold">{fmtNo("anomaly", anoNums.get(a.id)?.n ?? a.number)}</span>
                       {/* Origine (Pesée, Retour, Refus…) + type d'anomalie de la fiche : deux fiches du même produit se distinguent */}
                       <span className={`badge mr-1.5 ${ORIGIN_STYLES[anomalyOrigin(a)]}`}>{t.anomalies.origins[anomalyOrigin(a)]}</span>
-                      {a.problemType || t.anomalies.types[a.type]}{a.productName ? ` · ${a.productName}` : ""} →
+                      {a.problemType || t.anomalies.types[a.type]}{a.blocks?.length ? ` + ${a.blocks.map((b) => b.problemType).filter(Boolean).join(" + ")}` : ""}{a.productName ? ` · ${a.productName}` : ""} →
                     </Link>
                     <p className="text-stone-600">{a.description}</p>
                     <AnomalyActionField id={a.id} initial={a.followUp ?? ""} editable={can.manageAnomalies(user.role) && !a.consolidatedAt} label={t.receptions.actions} saveLabel={t.common.save} savedLabel={t.receptions.actionSaved} />

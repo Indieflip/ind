@@ -202,7 +202,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
           <div className="min-w-0 space-y-1">
             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/80"><Icon name="alert" className="h-4 w-4" /> {s.title} · {fmtNo("anomaly", number)} - {fmtDate(a.createdAt ?? rec?.deliveredAt, locale)} <span className="ml-1 rounded-full bg-white/20 px-2 py-0.5 normal-case tracking-normal">{t.anomalies.origins[anomalyOrigin(a)]}</span></p>
             {/* Nom du fournisseur sans majuscules, police un peu plus petite ; indications entre parenthèses en plus petit */}
-            <h1 className="text-xl font-bold leading-tight sm:text-2xl"><Paren text={sentence(supplier?.name ?? a.supplierName)} /> — <Paren text={problemType} /></h1>
+            <h1 className="text-xl font-bold leading-tight sm:text-2xl"><Paren text={sentence(supplier?.name ?? a.supplierName)} /> — <Paren text={[problemType, ...(a.blocks ?? []).map((b) => b.problemType).filter(Boolean)].join(" + ")} /></h1>
             {itemsLabel && problemType !== t.anomalies.types.missing_bl && problemType !== WEIGH_TYPE && <p className="text-sm text-white/90"><Paren text={itemsLabel} /></p>}
             <div className="flex flex-col items-start gap-0.5 pt-1 text-sm">
               {rec && <Link href={`/receptions/${rec.id}`} className="font-medium text-white underline decoration-white/50 hover:decoration-white">{t.receptions.sheetLink} {numbers.get(rec.id) ?? "—"}</Link>}
@@ -258,6 +258,7 @@ export default async function AnomalySheet({ params }: { params: Promise<{ id: s
             // Unité différente du Mercurial : simplement signalée sur la fiche, le prix enregistré est gardé
             return { productId: x.productId, name: x.name, qty: x.qty != null ? String(x.qty).replace(".", ",") : "", unit: canonUnit(x.unit ?? ""), price: x.price != null ? String(x.price).replace(".", ",") : "" };
           }),
+          blocks: (a.blocks ?? []).map((b) => ({ problemType: b.problemType, description: b.description, items: b.items.map((x) => ({ productId: x.productId, name: x.name, qty: x.qty != null ? String(x.qty).replace(".", ",") : "", unit: canonUnit(x.unit ?? ""), price: x.price != null ? String(x.price).replace(".", ",") : "" })) })),
           problemType,
           productId,
           productName: a.productName ?? line?.productName ?? "",

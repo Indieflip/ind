@@ -64,12 +64,17 @@ export async function syncWeighAnomalies(opts: { receptionId?: number } = {}) {
       // Fiche consolidée : figée, sauf sur une ancienne fiche (importée) modifiée
       if (cur.consolidatedAt && !(first.receptionId && imported.has(first.receptionId))) continue;
       // Sans prix sur les lignes, le montant saisi à la main est gardé
+      const computed = values.claimedAmount != null;
       if (values.claimedAmount == null) values.claimedAmount = cur.claimedAmount;
       // Produits saisis à la main sur la fiche : gardés ; sinon le détail des écarts est repris
       // (liste vidée à la main : fiche gardée sans produit)
       const keepItems = cur.items != null;
       // (montant = somme des produits gardés quand tout est connu, ex. produits rajoutés sur une ancienne fiche)
-      if (keepItems && cur.items!.length && cur.items!.every((x) => x.qty != null && x.price != null)) values.claimedAmount = String(Math.round(cur.items!.reduce((s, x) => s + x.qty! * x.price!, 0) * 100) / 100);
+      const fromItems = keepItems && cur.items!.length > 0 && cur.items!.every((x) => x.qty != null && x.price != null);
+      if (fromItems) values.claimedAmount = String(Math.round(cur.items!.reduce((s, x) => s + x.qty! * x.price!, 0) * 100) / 100);
+      // Blocs « autre anomalie » ajoutés à la main : leur montant s'ajoute
+      const extra = (cur.blocks ?? []).reduce((s, b) => s + b.items.reduce((t, x) => t + (x.qty ?? 0) * (x.price ?? 0), 0), 0);
+      if (extra && (fromItems || (computed && !keepItems)) && values.claimedAmount != null) values.claimedAmount = String(Math.round((Number(values.claimedAmount) + extra) * 100) / 100);
       if (cur.description !== values.description || cur.claimedAmount !== values.claimedAmount || cur.supplierId !== values.supplierId || cur.reference !== values.reference || !keepItems) {
         await db.update(schema.anomalies).set(keepItems ? { ...values, items: cur.items } : values).where(eq(schema.anomalies.id, cur.id));
       }

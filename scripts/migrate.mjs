@@ -1777,6 +1777,13 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v6
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v65', '1') on conflict (key) do nothing`);
 }
 
+// Dev : blocs « autre anomalie » sur une fiche d'anomalie, une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v66'`)).rows.length) {
+  const pos = Number((await db.execute(sql`select coalesce(max(position), 0) + 1 as p from dev_fields`)).rows[0].p);
+  await db.execute(sql`insert into dev_fields (form, section, field, required, rule, message, position) values ('anomaly', 'Fiche d''anomalie', 'Blocs (autre anomalie)', false, ${"« + Ajouter un bloc (autre anomalie) » : une anomalie différente de celle constatée, dans la même fiche (même N° ANO) : type, produits (quantité, unité, prix), description. Bloc 1 = anomalie constatée ; montant réclamé = total de tous les blocs ; un seul suivi / réclamation / avoir. Titre de la fiche et listes : « Écart de pesée + Produit abîmé ». Les blocs sont gardés quand la fiche de réception est modifiée."}, '', ${pos})`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v66', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");

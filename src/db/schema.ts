@@ -299,6 +299,8 @@ export const anomalies = pgTable(
     note: text("note"),
     /** Produits de la fiche : quantité et prix par produit (ajout possible, ex. BL manquant) */
     items: jsonb("items").$type<{ productId: number | null; name: string; qty: number | null; unit: string; price: number | null }[]>(),
+    /** Autres anomalies de la même fiche (blocs ajoutés à la main) : type, produits, description ; le montant réclamé les additionne */
+    blocks: jsonb("blocks").$type<{ problemType: string; description: string; items: { productId: number | null; name: string; qty: number | null; unit: string; price: number | null }[] }[]>(),
     /** Contrôle de la fiche par l'utilisateur : a_verifier | verifiee | a_voir */
     review: text("review").default("a_verifier"),
     description: text("description").notNull(),

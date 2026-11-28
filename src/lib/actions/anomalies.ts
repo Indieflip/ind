@@ -52,6 +52,7 @@ export async function updateAnomalyAction(
     stage?: string; resolution?: string; mode?: string; claimedAmount?: string; creditNumber?: string; creditDate?: string; creditKind?: string; docDate?: string; waitingFor?: string;
     problemType?: string; productId?: number | null; note?: string;
     items?: { productId: number | null; name: string; qty: number | null; unit: string; price: number | null }[];
+    blocks?: { problemType: string; description: string; items: { productId: number | null; name: string; qty: number | null; unit: string; price: number | null }[] }[];
   },
 ) {
   await assertUser(can.manageAnomalies);
@@ -80,6 +81,17 @@ export async function updateAnomalyAction(
     // Le premier produit reste le produit principal de la fiche ; sans produit, la fiche n'en a plus
     if (items[0]) { set.productName = items[0].name; set.productId = items[0].productId; }
     else { set.productName = null; set.productId = null; }
+  }
+  // Blocs « autre anomalie » de la fiche : type, produits, description (blocs vides retirés)
+  if (data.blocks !== undefined) {
+    const cleanItems = (l: NonNullable<typeof data.items>) => l
+      .map((x) => ({ productId: x.productId ?? null, name: String(x.name ?? "").trim().slice(0, 300), qty: x.qty != null && Number.isFinite(x.qty) ? x.qty : null, unit: String(x.unit ?? "").trim().slice(0, 30), price: x.price != null && Number.isFinite(x.price) ? x.price : null }))
+      .filter((x) => x.name).slice(0, 100);
+    const blocks = data.blocks
+      .map((b) => ({ problemType: String(b.problemType ?? "").trim().slice(0, 100), description: String(b.description ?? "").trim().slice(0, 2000), items: cleanItems(b.items ?? []) }))
+      .filter((b) => b.problemType || b.description || b.items.length)
+      .slice(0, 20);
+    set.blocks = blocks.length ? blocks : null;
   }
   if (data.productId !== undefined) {
     const p = data.productId ? await getDb().query.products.findFirst({ where: eq(schema.products.id, data.productId), columns: { id: true, name: true } }) : undefined;
