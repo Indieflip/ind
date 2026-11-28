@@ -54,6 +54,13 @@ export function InlineEditor({ id, initialDraft, number }: { id: number; initial
   const units = catalog?.units ?? DEFAULT_UNITS;
   const reasons = [...(catalog?.reasons ?? [])].sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" }));
   const supplierProducts = (catalog?.products ?? []).filter((p) => p.supplierId === d.supplierId);
+  // Produit tapé = un produit du Mercurial du fournisseur : la ligne prend ce produit (compte, unité, catégorie, tranche de prix)
+  const replaceProduct = (key: string, name: string) => {
+    const p = supplierProducts.find((x) => x.name.trim().toLowerCase() === name.trim().toLowerCase());
+    setLine(key, p
+      ? { productName: p.name, productId: p.id, unit: p.unit || "Pièce", categoryId: p.categoryId ?? null, mercurialPrice: p.price ?? null, mercurialMin: p.priceMin ?? null, priceLocked: !!p.locked }
+      : { productName: name, productId: null });
+  };
 
   async function save() {
     setError("");
@@ -144,7 +151,11 @@ export function InlineEditor({ id, initialDraft, number }: { id: number; initial
           return (
             <article key={l.key} id={`il-${l.key}`} className={`card scroll-mt-24 border-l-4 p-4 ${l.decision === "refuse" ? "border-l-red-500" : reprise ? "border-l-amber-400" : "border-l-emerald-500"}`}>
               <div className="mb-2 flex items-start justify-between gap-2">
-                <input className="input flex-1 py-1.5 font-semibold" value={l.productName} onChange={(e) => setLine(l.key, { productName: e.target.value, productId: null })} />
+                {/* Produit : remplacé par un autre du Mercurial du fournisseur (liste) ou renommé (texte libre) */}
+                <div className="min-w-0 flex-1">
+                  <input className="input py-1.5 font-semibold" list="il-products" value={l.productName} onChange={(e) => replaceProduct(l.key, e.target.value)} />
+                  <p className="mt-0.5 text-[11px] text-stone-500">{l.productId ? `✓ ${w.fromMercurial}` : w.notInMercurial} · {w.replaceHint}</p>
+                </div>
                 <button type="button" className="btn-ghost p-1.5 text-stone-400 hover:text-red-600" aria-label={t.common.delete} onClick={async () => { if (await appConfirm(w.removeLineConfirm)) setD((x) => ({ ...x, lines: x.lines.filter((y) => y.key !== l.key) })); }}><Icon name="trash" className="h-4 w-4" /></button>
               </div>
               {l.originRef && <p className="mb-2 text-xs font-medium text-amber-800">↩ {l.originRef}</p>}
@@ -152,7 +163,16 @@ export function InlineEditor({ id, initialDraft, number }: { id: number; initial
                 <label>{label(reprise ? t.returnSlip.qtyOnSlip : w.ordered)}<input className="input py-1.5" inputMode="decimal" value={l.qtyOrdered} onChange={(e) => setLine(l.key, { qtyOrdered: e.target.value })} /></label>
                 <label>{label(reprise ? t.returnSlip.qtyTaken : w.received)}<input className="input py-1.5" inputMode="decimal" value={l.qtyReceived} onChange={(e) => setLine(l.key, { qtyReceived: e.target.value })} /></label>
                 <label>{label(t.common.unit)}<UnitSelect className="input py-1.5" value={l.unit} units={units} onChange={(unit) => setLine(l.key, { unit })} /></label>
-                <label>{label(w.unitPrice)}<MoneyInput className="input py-1.5" value={l.unitPrice} onChange={(e) => setLine(l.key, { unitPrice: e.target.value })} /></label>
+                <div>{label(w.unitPrice)}<MoneyInput className="input py-1.5" value={l.unitPrice} disabled={!!l.priceNotShown} onChange={(e) => setLine(l.key, { unitPrice: e.target.value })} />
+                  {/* Prix non indiqué sur le bon : prix du Mercurial repris */}
+                  <label className="mt-1 flex items-center gap-1.5 text-[11px] text-stone-600">
+                    <input type="checkbox" className="h-3.5 w-3.5 accent-brand-600" checked={!!l.priceNotShown} onChange={(e) => {
+                      const cp = l.productId ? catalog?.products.find((x) => x.id === l.productId) : undefined;
+                      const ref = l.mercurialPrice ?? l.mercurialMin ?? cp?.price ?? cp?.priceMin ?? null;
+                      setLine(l.key, e.target.checked ? { priceNotShown: true, unitPrice: ref != null ? String(ref).replace(".", ",") : "" } : { priceNotShown: false, unitPrice: "" });
+                    }} /> {w.priceNotShown}
+                  </label>
+                </div>
                 {!reprise && <label>{label(w.temperature)}<input className="input py-1.5" inputMode="decimal" value={l.temperature} onChange={(e) => setLine(l.key, { temperature: e.target.value })} /></label>}
                 {!reprise && <label>{label(w.dlc)}<DateField className="py-1.5" value={l.dlc} onChange={(v) => setLine(l.key, { dlc: v })} /></label>}
                 <label>{label(w.lot)}<input className="input py-1.5" value={l.lot} onChange={(e) => setLine(l.key, { lot: e.target.value })} /></label>
@@ -167,12 +187,33 @@ export function InlineEditor({ id, initialDraft, number }: { id: number; initial
                   </div>
                 )}
               </div>
+              {/* Refus / Retour : boutons ; activés, ils font apparaître Quantité + Unité (pré-remplies) et le motif juste dessous */}
               {!reprise && (
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-                  <label className="flex items-center gap-1.5"><input type="checkbox" className="h-4 w-4 accent-red-600" checked={!!l.refuseOn} onChange={(e) => setLine(l.key, { refuseOn: e.target.checked, refuseQty: l.refuseQty || l.qtyOrdered, refuseUnit: l.refuseUnit || l.unit })} /> {t.decision.refuse}</label>
-                  {l.refuseOn && <input className="input w-24 py-1 text-sm" inputMode="decimal" value={l.refuseQty ?? ""} onChange={(e) => setLine(l.key, { refuseQty: e.target.value })} />}
-                  <label className="flex items-center gap-1.5"><input type="checkbox" className="h-4 w-4 accent-amber-600" checked={!!l.returnOn} onChange={(e) => setLine(l.key, { returnOn: e.target.checked, returnQty: l.returnQty || l.qtyOrdered, returnUnit: l.returnUnit || l.unit })} /> {w.returnBtn}</label>
-                  {l.returnOn && <input className="input w-24 py-1 text-sm" inputMode="decimal" value={l.returnQty ?? ""} onChange={(e) => setLine(l.key, { returnQty: e.target.value })} />}
+                <div className="mt-3">
+                  <div className="grid grid-cols-2">
+                    <button type="button" onClick={() => setLine(l.key, l.refuseOn ? { refuseOn: false } : { refuseOn: true, refuseQty: l.refuseQty || l.qtyOrdered || l.qtyReceived, refuseUnit: l.refuseUnit || l.unit })}
+                      className={`rounded-tl-lg border border-b-0 px-2 py-1.5 text-sm font-semibold ${l.refuseOn ? "border-red-600 bg-red-600 text-white" : "border-stone-200 bg-stone-50 text-stone-500"}`}>⛔ {t.decision.refuse}</button>
+                    <button type="button" onClick={() => setLine(l.key, l.returnOn ? { returnOn: false } : { returnOn: true, returnQty: l.returnQty || l.qtyOrdered || l.qtyReceived, returnUnit: l.returnUnit || l.unit })}
+                      className={`rounded-tr-lg border border-b-0 px-2 py-1.5 text-sm font-semibold ${l.returnOn ? "border-amber-500 bg-amber-500 text-white" : "border-stone-200 bg-stone-50 text-stone-500"}`}>↩ {w.returnBtn}</button>
+                  </div>
+                  <div className={`space-y-2 rounded-b-lg border p-2.5 ${l.refuseOn ? "border-red-600 bg-red-50" : l.returnOn ? "border-amber-500 bg-amber-50" : "border-stone-200 bg-white"}`}>
+                    {l.refuseOn || l.returnOn ? (
+                      <>
+                        {l.refuseOn && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <label>{label(`${t.decision.refuse} · ${w.returnQty}`)}<input className="input py-1.5" inputMode="decimal" value={l.refuseQty ?? ""} onChange={(e) => setLine(l.key, { refuseQty: e.target.value })} /></label>
+                            <label>{label(t.common.unit)}<UnitSelect className="input py-1.5" value={l.refuseUnit || l.unit} units={units} onChange={(u) => setLine(l.key, { refuseUnit: u })} /></label>
+                          </div>
+                        )}
+                        {l.returnOn && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <label>{label(`${w.returnBtn} · ${w.returnQty}`)}<input className="input py-1.5" inputMode="decimal" value={l.returnQty ?? ""} onChange={(e) => setLine(l.key, { returnQty: e.target.value })} /></label>
+                            <label>{label(t.common.unit)}<UnitSelect className="input py-1.5" value={l.returnUnit || l.unit} units={units} onChange={(u) => setLine(l.key, { returnUnit: u })} /></label>
+                          </div>
+                        )}
+                      </>
+                    ) : <p className="text-xs text-stone-400">{w.refuseReturnIdle}</p>}
+                  </div>
                 </div>
               )}
               <div className="mt-2 grid gap-2 sm:grid-cols-2">

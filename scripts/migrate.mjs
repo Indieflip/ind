@@ -1771,6 +1771,12 @@ if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v6
   await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v64', '1') on conflict (key) do nothing`);
 }
 
+// Dev : modification sur la fiche (changer de produit, Refus / Retour, prix non indiqué), une fois
+if (!(await db.execute(sql`select 1 from app_settings where key = 'dev_fields_v65'`)).rows.length) {
+  await db.execute(sql`update dev_fields set rule = rule || ${" Sur la fiche : produit remplaçable par un autre du Mercurial du fournisseur (compte, unité, catégorie, tranche de prix repris) ; boutons Refus / Retour qui font apparaître Quantité + Unité pré-remplies et le motif ; case « Non indiqué sur le bon » (prix du Mercurial repris)."} where form = 'reception' and section = 'Modification' and field = 'Modifier / Modification complète'`);
+  await db.execute(sql`insert into app_settings (key, value) values ('dev_fields_v65', '1') on conflict (key) do nothing`);
+}
+
 // Fruits et légumes : rattacher les produits au fournisseur existant de même nom
 // (« Producteurs réunies » → « PRODUCTEURS REUNIS ») et retirer le doublon devenu vide
 const key = (n) => n.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").map((w) => w.replace(/(es|s|e)$/, "")).join(" ");
